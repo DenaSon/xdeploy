@@ -1,0 +1,981 @@
+<?php
+
+namespace Database\Seeders;
+
+use Domains\Topic\Models\TopicKeyword;
+use Domains\Topic\Models\Topic;
+use Illuminate\Database\Seeder;
+
+class TopicKeywordSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        $keywords = [
+
+            'ai-agents' => [
+
+                ['ai agent', 100],
+                ['ai agents', 100],
+
+                ['agentic ai', 100],
+                ['agentic system', 95],
+                ['agentic systems', 95],
+
+                ['autonomous agent', 95],
+                ['autonomous agents', 95],
+
+                ['multi agent', 95],
+                ['multi agents', 95],
+                ['multi-agent', 95],
+                ['multi-agent system', 95],
+
+                ['agent orchestration', 100],
+                ['agent workflow', 95],
+                ['agent workflows', 95],
+
+                ['agent framework', 90],
+                ['agent frameworks', 90],
+
+                ['agent runtime', 90],
+                ['agent architecture', 90],
+
+                ['agent memory', 95],
+                ['agent planning', 95],
+
+                ['tool calling', 100],
+                ['function calling', 100],
+
+                ['tool use', 100],
+                ['tool usage', 95],
+
+                ['computer use', 100],
+
+                ['browser agent', 100],
+                ['web agent', 95],
+
+                ['autonomous workflow', 95],
+                ['task execution', 90],
+
+                ['agent execution', 95],
+                ['task planning', 90],
+
+                ['goal oriented agent', 95],
+
+                ['agent platform', 85],
+                ['agent infrastructure', 85],
+
+                ['agent communication', 90],
+                ['agent collaboration', 90],
+
+                ['agent coordination', 90],
+
+                ['digital worker', 90],
+
+                ['autonomous workflow engine', 95],
+
+                ['reasoning agent', 95],
+
+                ['agent benchmark', 90],
+
+                ['agent evaluation', 90],
+
+                ['agent ecosystem', 80],
+
+                ['operator agent', 90],
+
+                ['computer agent', 90],
+
+                ['agent loop', 90],
+
+                ['agent planning system', 95],
+            ],
+
+            'coding-ai' => [
+
+                ['coding ai', 100],
+                ['ai coding', 100],
+
+                ['ai programming', 100],
+                ['code generation', 100],
+                ['code assistant', 95],
+
+                ['developer agent', 95],
+                ['coding agent', 100],
+                ['software engineering agent', 100],
+
+                ['agentic coding', 100],
+
+                ['code review ai', 95],
+                ['automated code review', 95],
+
+                ['code completion', 95],
+                ['intelligent code completion', 95],
+
+                ['ai ide', 100],
+                ['ai powered ide', 95],
+
+                ['developer workflow', 85],
+
+                ['software engineering ai', 100],
+
+                ['coding workflow', 90],
+
+                ['repository analysis', 90],
+                ['repository understanding', 90],
+
+                ['codebase understanding', 100],
+                ['codebase analysis', 95],
+
+                ['pull request review', 90],
+                ['pr review', 90],
+
+                ['bug fixing agent', 95],
+
+                ['automated debugging', 95],
+                ['debugging assistant', 90],
+
+                ['test generation', 100],
+                ['unit test generation', 95],
+
+                ['integration test generation', 95],
+
+                ['code refactoring', 95],
+                ['automated refactoring', 95],
+
+                ['developer productivity', 85],
+
+                ['coding benchmark', 90],
+                ['software engineering benchmark', 90],
+
+                ['code interpreter', 90],
+
+                ['code execution agent', 95],
+
+                ['coding copilot', 95],
+
+                ['pair programming ai', 95],
+
+                ['cursor', 100],
+
+                ['claude code', 100],
+
+                ['codex', 100],
+
+                ['devin', 100],
+
+                ['aider', 100],
+
+                ['windsurf', 100],
+
+                ['roo code', 95],
+
+                ['bolt.new', 95],
+
+                ['lovable', 95],
+
+                ['vibe coding', 100],
+
+                ['ai software engineer', 100],
+
+                ['autonomous coding', 100],
+
+                ['code generation benchmark', 90],
+
+                ['developer assistant', 85],
+
+                ['engineering productivity', 85],
+
+                ['repository agent', 95],
+
+                ['coding workflow automation', 90],
+
+                ['software development automation', 90],
+            ],
+
+            'context-engineering' => [
+
+                ['context engineering', 100],
+
+                ['model context protocol', 100],
+                ['mcp', 80],
+
+                ['context management', 100],
+
+                ['long context', 95],
+                ['long context window', 95],
+                ['extended context', 95],
+
+                ['context window', 95],
+
+                ['context retrieval', 95],
+
+                ['agent memory', 100],
+                ['persistent memory', 100],
+                ['memory system', 95],
+                ['memory architecture', 95],
+
+                ['episodic memory', 95],
+                ['long term memory', 95],
+
+                ['memory retrieval', 95],
+
+                ['tool use', 100],
+                ['tool usage', 95],
+
+                ['tool calling', 100],
+                ['function calling', 100],
+
+                ['tool execution', 95],
+
+                ['retrieval augmented generation', 100],
+                ['retrieval-augmented generation', 100],
+
+                ['knowledge retrieval', 95],
+
+                ['retrieval system', 95],
+
+                ['retrieval pipeline', 90],
+
+                ['vector retrieval', 95],
+
+                ['semantic retrieval', 95],
+
+                ['context injection', 95],
+
+                ['context optimization', 95],
+
+                ['context compression', 95],
+
+                ['context selection', 95],
+
+                ['context pruning', 95],
+
+                ['prompt caching', 95],
+
+                ['memory augmented', 95],
+
+                ['knowledge grounding', 95],
+
+                ['grounded generation', 95],
+
+                ['retrieval benchmark', 90],
+
+                ['memory benchmark', 90],
+
+                ['context benchmark', 90],
+
+                ['context aware agent', 95],
+
+                ['memory aware agent', 95],
+
+                ['tool enabled agent', 95],
+
+                ['context aware reasoning', 95],
+
+                ['agent context', 95],
+
+                ['context orchestration', 95],
+
+                ['knowledge integration', 90],
+
+                ['knowledge pipeline', 90],
+
+                ['retrieval workflow', 90],
+
+                ['memory workflow', 90],
+
+                ['vector database', 85],
+
+                ['embedding retrieval', 90],
+
+                ['semantic search', 85],
+
+                ['knowledge graph retrieval', 95],
+            ],
+
+            'reasoning-models' => [
+
+                ['reasoning model', 100],
+                ['reasoning models', 100],
+
+                ['reasoning ai', 95],
+                ['ai reasoning', 95],
+
+                ['reasoning llm', 95],
+                ['reasoning capability', 95],
+
+                ['logical reasoning', 95],
+                ['multi step reasoning', 95],
+                ['multi-hop reasoning', 95],
+
+                ['chain of thought', 100],
+                ['chain-of-thought', 100],
+                ['cot reasoning', 95],
+
+                ['test time compute', 100],
+                ['test-time compute', 100],
+
+                ['deliberative reasoning', 95],
+                ['deep reasoning', 95],
+
+                ['thinking model', 100],
+                ['thinking models', 100],
+
+                ['reasoning benchmark', 95],
+                ['reasoning evaluation', 95],
+
+                ['reasoning performance', 90],
+                ['reasoning capability benchmark', 95],
+
+                ['long reasoning', 90],
+                ['extended thinking', 95],
+
+                ['deep research', 95],
+
+                ['inference-time scaling', 100],
+                ['test-time scaling', 100],
+
+                ['reasoning token', 90],
+                ['thinking token', 90],
+
+                ['system 2 reasoning', 95],
+
+                ['slow thinking', 90],
+
+                ['tree of thoughts', 100],
+                ['tree-of-thoughts', 100],
+
+                ['reasoning trace', 90],
+                ['reasoning path', 90],
+
+                ['deliberation', 85],
+
+                ['self reflection', 90],
+                ['self-reflection', 90],
+
+                ['reflection tuning', 90],
+
+                ['reasoning dataset', 85],
+
+                ['mathematical reasoning', 95],
+                ['math reasoning', 95],
+
+                ['scientific reasoning', 90],
+
+                ['reasoning task', 85],
+
+                ['reasoning frontier', 90],
+
+                ['reasoning agent', 80],
+
+                ['reasoning architecture', 90],
+
+                ['reasoning inference', 90],
+
+                ['step by step reasoning', 95],
+
+                ['planning and reasoning', 90],
+
+                ['reasoning engine', 90],
+
+                ['reasoning focused model', 95],
+
+                ['reasoning-centric model', 95],
+
+                ['model reasoning ability', 90],
+
+                ['reasoning scaling law', 95],
+
+                ['reasoning leaderboard', 85],
+
+                ['reasoning challenge', 85],
+
+                ['reasoning score', 85],
+
+                ['frontier reasoning', 90],
+
+                ['reasoning optimization', 85],
+
+                ['thinking capability', 90],
+
+                ['cognitive reasoning', 90],
+
+                ['deep think', 95],
+
+                ['thinking mode', 85],
+
+                ['reasoning workflow', 85],
+            ],
+
+            'ai-infrastructure' => [
+
+                ['ai infrastructure', 100],
+
+                ['ai compute', 100],
+                ['compute infrastructure', 95],
+
+                ['ai hardware', 100],
+
+                ['gpu cluster', 100],
+                ['gpu clusters', 100],
+
+                ['gpu infrastructure', 100],
+
+                ['accelerator', 95],
+                ['ai accelerator', 100],
+
+                ['inference infrastructure', 100],
+                ['inference platform', 95],
+
+                ['inference engine', 95],
+                ['inference serving', 95],
+
+                ['model serving', 95],
+
+                ['distributed inference', 100],
+
+                ['inference optimization', 95],
+
+                ['serving infrastructure', 95],
+
+                ['high performance computing', 95],
+
+                ['hpc cluster', 95],
+
+                ['training infrastructure', 100],
+
+                ['training cluster', 95],
+
+                ['training compute', 95],
+
+                ['data center', 95],
+                ['ai data center', 100],
+
+                ['compute cluster', 95],
+
+                ['cluster orchestration', 90],
+
+                ['vector database', 100],
+
+                ['vector search', 95],
+
+                ['embedding infrastructure', 95],
+
+                ['retrieval infrastructure', 95],
+
+                ['distributed systems', 90],
+
+                ['scalable inference', 100],
+
+                ['inference scaling', 95],
+
+                ['latency optimization', 90],
+
+                ['throughput optimization', 90],
+
+                ['model deployment', 95],
+
+                ['ai deployment', 95],
+
+                ['production ai', 95],
+
+                ['mlops', 100],
+
+                ['llmops', 100],
+
+                ['model operations', 95],
+
+                ['observability', 90],
+
+                ['model monitoring', 95],
+
+                ['ai platform', 95],
+
+                ['inference stack', 95],
+
+                ['serving stack', 95],
+
+                ['cloud inference', 95],
+
+                ['private inference', 95],
+
+                ['on-prem inference', 95],
+
+                ['edge inference', 95],
+
+                ['edge ai', 95],
+
+                ['gpu', 90],
+
+                ['h100', 100],
+                ['h200', 100],
+
+                ['b200', 100],
+
+                ['gb200', 100],
+
+                ['blackwell', 100],
+
+                ['cuda', 95],
+
+                ['tensor processing unit', 100],
+                ['tpu', 100],
+
+                ['trillium', 95],
+
+                ['amd instinct', 95],
+
+                ['mi300', 95],
+
+                ['ai supercomputer', 100],
+
+                ['compute capacity', 95],
+
+                ['inference cost', 95],
+
+                ['compute efficiency', 95],
+
+                ['foundation model infrastructure', 100],
+            ],
+
+            'multimodal-ai' => [
+
+                // Core Concepts
+
+                ['multimodal ai', 100],
+                ['multimodal model', 100],
+                ['multimodal intelligence', 95],
+
+                ['vision language model', 100],
+                ['vision-language model', 100],
+
+                ['vlm', 95],
+
+                ['cross modal', 95],
+                ['cross-modal', 95],
+
+                ['multimodal reasoning', 95],
+
+                ['multimodal understanding', 95],
+
+                ['multimodal generation', 95],
+
+                // Vision
+
+                ['computer vision', 100],
+
+                ['visual reasoning', 95],
+
+                ['visual understanding', 95],
+
+                ['image understanding', 95],
+
+                ['image analysis', 90],
+
+                ['image recognition', 90],
+
+                ['object detection', 95],
+
+                ['image classification', 90],
+
+                ['visual perception', 95],
+
+                ['scene understanding', 95],
+
+                // Image Generation
+
+                ['image generation', 100],
+
+                ['image generator', 95],
+
+                ['text to image', 100],
+
+                ['text-to-image', 100],
+
+                ['image synthesis', 95],
+
+                ['synthetic image', 90],
+
+                ['generative image', 90],
+
+                ['visual generation', 95],
+
+                ['diffusion model', 100],
+
+                ['diffusion models', 100],
+
+                ['latent diffusion', 95],
+
+                // Video
+
+                ['video generation', 100],
+
+                ['video model', 95],
+
+                ['video synthesis', 95],
+
+                ['text to video', 100],
+
+                ['text-to-video', 100],
+
+                ['video understanding', 95],
+
+                ['video analysis', 90],
+
+                ['video reasoning', 95],
+
+                ['video intelligence', 90],
+
+                ['world model', 95],
+
+                // Audio
+
+                ['audio model', 95],
+
+                ['audio generation', 95],
+
+                ['speech model', 95],
+
+                ['speech recognition', 100],
+
+                ['voice recognition', 95],
+
+                ['speech understanding', 95],
+
+                ['speech synthesis', 95],
+
+                ['text to speech', 95],
+
+                ['text-to-speech', 95],
+
+                ['voice generation', 95],
+
+                ['audio understanding', 90],
+
+                ['audio intelligence', 90],
+
+                // Multimodal Interaction
+
+                ['visual question answering', 100],
+
+                ['vqa', 90],
+
+                ['image captioning', 95],
+
+                ['video captioning', 95],
+
+                ['multimodal retrieval', 95],
+
+                ['multimodal embedding', 95],
+
+                ['multimodal benchmark', 90],
+
+                ['multimodal dataset', 90],
+
+                ['grounded generation', 95],
+
+                ['grounded vision', 95],
+
+                // Research Signals
+
+                ['visual transformer', 95],
+
+                ['vision encoder', 95],
+
+                ['image encoder', 95],
+
+                ['multimodal transformer', 100],
+
+                ['vision encoder decoder', 95],
+
+                ['image-text alignment', 95],
+
+                ['cross-modal alignment', 95],
+
+                ['multimodal learning', 95],
+
+                ['visual-language alignment', 95],
+
+            ],
+
+            'voice-ai' => [
+
+                // Core Concepts
+
+                ['voice ai', 100],
+                ['speech ai', 100],
+
+                ['voice intelligence', 95],
+                ['speech intelligence', 95],
+
+                ['spoken language', 95],
+
+                ['conversational voice', 95],
+
+                ['audio intelligence', 95],
+
+                // Speech Recognition
+
+                ['speech recognition', 100],
+
+                ['automatic speech recognition', 100],
+
+                ['asr', 95],
+
+                ['speech to text', 100],
+                ['speech-to-text', 100],
+
+                ['voice transcription', 95],
+
+                ['spoken language understanding', 95],
+
+                ['speech understanding', 95],
+
+                ['voice understanding', 95],
+
+                ['audio transcription', 95],
+
+                // Speech Generation
+
+                ['speech synthesis', 100],
+
+                ['text to speech', 100],
+                ['text-to-speech', 100],
+
+                ['tts', 95],
+
+                ['voice synthesis', 100],
+
+                ['synthetic voice', 95],
+
+                ['voice generation', 95],
+
+                ['voice cloning', 100],
+
+                ['neural voice', 95],
+
+                ['voice model', 95],
+
+                // Voice Assistants
+
+                ['voice assistant', 100],
+                ['voice assistants', 100],
+
+                ['voice agent', 100],
+                ['voice agents', 100],
+
+                ['conversational agent', 95],
+
+                ['audio agent', 95],
+
+                ['spoken dialogue', 95],
+
+                ['dialogue system', 95],
+
+                ['dialog system', 95],
+
+                ['voice interface', 95],
+
+                ['voice interaction', 95],
+
+                // Audio Understanding
+
+                ['audio understanding', 95],
+
+                ['audio perception', 95],
+
+                ['speaker recognition', 95],
+
+                ['speaker identification', 95],
+
+                ['speaker verification', 95],
+
+                ['voice biometrics', 95],
+
+                ['speech quality', 95],
+
+                ['audio quality assessment', 90],
+
+                ['speech enhancement', 95],
+
+                ['noise suppression', 90],
+
+                // Multilingual Speech
+
+                ['multilingual speech', 95],
+
+                ['speech translation', 100],
+
+                ['voice translation', 100],
+
+                ['spoken translation', 95],
+
+                ['cross-lingual speech', 95],
+
+                // Realtime Voice
+
+                ['realtime voice', 100],
+
+                ['real-time voice', 100],
+
+                ['streaming speech', 95],
+
+                ['streaming audio', 95],
+
+                ['low latency speech', 95],
+
+                ['voice conversation', 95],
+
+                ['live speech', 95],
+
+                // Research Signals
+
+                ['speech benchmark', 90],
+
+                ['speech dataset', 90],
+
+                ['speech corpus', 90],
+
+                ['audio language model', 95],
+
+                ['speech language model', 95],
+
+                ['voice foundation model', 95],
+
+                ['audio foundation model', 95],
+
+                ['spoken intelligence', 90],
+
+            ],
+
+            'foundation-models' => [
+
+                ['foundation model', 100],
+                ['foundation models', 100],
+
+                ['pretraining', 100],
+                ['pre-training', 100],
+
+                ['post training', 100],
+                ['post-training', 100],
+
+                ['model training', 95],
+
+                ['scaling law', 100],
+                ['scaling laws', 100],
+
+                ['model scaling', 95],
+
+                ['rlhf', 100],
+
+                ['reinforcement learning from human feedback', 100],
+
+                ['reward model', 95],
+                ['reward modeling', 95],
+
+                ['alignment training', 95],
+
+                ['instruction tuning', 95],
+
+                ['supervised fine tuning', 95],
+                ['sft', 90],
+
+                ['fine tuning', 60],
+                ['fine-tuning', 60],
+
+                ['model architecture', 95],
+
+                ['transformer architecture', 95],
+
+                ['mixture of experts', 95],
+                ['moe model', 95],
+
+                ['dense model', 90],
+
+                ['parameter efficient training', 95],
+
+                ['knowledge distillation', 95],
+                ['model distillation', 95],
+
+                ['synthetic data', 90],
+
+                ['curriculum learning', 90],
+
+                ['continual learning', 95],
+
+                ['lifelong learning', 95],
+
+                ['knowledge editing', 95],
+
+                ['model editing', 95],
+
+                ['model merging', 90],
+
+                ['model compression', 90],
+
+                ['weight merging', 90],
+
+                ['checkpoint merging', 90],
+
+                ['language model training', 95],
+
+                ['large language model training', 95],
+
+                ['generative model', 90],
+                ['generative models', 90],
+
+                ['diffusion language model', 100],
+                ['diffusion language models', 100],
+
+                ['world model', 90],
+                ['world models', 90],
+
+                ['data mixture', 90],
+
+                ['data composition', 60],
+
+                ['training objective', 60],
+
+                ['pretraining corpus', 95],
+
+                ['emergent capability', 95],
+                ['emergent capabilities', 95],
+
+                ['transfer learning', 60],
+
+                ['representation learning', 90],
+
+                ['self supervised learning', 90],
+                ['self-supervised learning', 90],
+
+                ['foundation model development', 100],
+            ],
+
+        ];
+
+        foreach ($keywords as $slug => $items) {
+
+            $topic = Topic::where('slug', $slug)->first();
+
+            if (! $topic) {
+                continue;
+            }
+
+            foreach ($items as [$keyword, $weight]) {
+
+                TopicKeyword::updateOrCreate(
+                    [
+                        'topic_id' => $topic->id,
+                        'keyword' => strtolower($keyword),
+                    ],
+                    [
+                        'weight' => $weight,
+                    ]
+                );
+            }
+        }
+    }
+}
