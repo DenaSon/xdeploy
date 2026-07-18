@@ -16,6 +16,7 @@
         "laravel/framework": "^13.7",
         "laravel/tinker": "^3.0",
         "livewire/livewire": "*",
+        "phpseclib/phpseclib": "^3.0",
         "robsontenorio/mary": "^2.8"
     },
     "require-dev": {

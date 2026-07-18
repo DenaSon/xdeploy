@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Services\SSHConnection;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +18,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            SSHConnectionInterface::class,
+            SSHConnection::class
+        );
     }
 
     /**
