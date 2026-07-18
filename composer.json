@@ -10,13 +10,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "ext-simplexml": "*",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.7",
         "laravel/tinker": "^3.0",
         "livewire/livewire": "*",
-        "robsontenorio/mary": "^2.8",
-        "ext-simplexml": "*"
+        "robsontenorio/mary": "^2.8"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
@@ -33,7 +33,6 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/",
-            "Domains\\": "app/Domains/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }
@@ -95,8 +94,7 @@
         "laravel": {
             "dont-discover": [],
             "installer": {
-                "post-create-project": [
-                ]
+                "post-create-project": []
             }
         }
     },
