@@ -4,17 +4,19 @@ namespace App\Console\Commands;
 
 use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Services\ServerInformation;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Throwable;
 
 #[Signature('server:test')]
-#[Description('Test SSH connection to the first registered server')]
-class TestSSHConnection extends Command
+#[Description('Test SSH connection to the active server')]
+class TestSSHConnectionCommand extends Command
 {
     public function __construct(
         private readonly SSHConnectionInterface $ssh,
+        private readonly ServerInformation $serverInformation,
     ) {
         parent::__construct();
     }
@@ -26,15 +28,16 @@ class TestSSHConnection extends Command
             ->first();
 
         if (! $server) {
-            $this->error('No server found.');
+            $this->error('No active server found.');
 
             return self::FAILURE;
         }
 
-        $this->info("Connecting to {$server->host}:{$server->port} ...");
+        $this->info("Connecting to {$server->host}:{$server->port}...");
 
         try {
-            $connected = $this->ssh->connect(
+
+            $this->ssh->connect(
                 host: $server->host,
                 port: $server->port,
                 username: $server->username,
@@ -43,33 +46,38 @@ class TestSSHConnection extends Command
                 privateKeyPath: $server->private_key_path,
             );
 
-            if (! $connected) {
-                $this->error('SSH connection failed.');
-
-                return self::FAILURE;
-            }
-
             $this->info('Connected successfully.');
 
-            $hostname = trim(
-                $this->ssh->execute('hostname')
-            );
-
             $this->newLine();
-            $this->info('Hostname:');
-            $this->line($hostname);
 
-            $this->ssh->disconnect();
+            $this->info('Server Information');
+
+            $this->table(
+                ['Property', 'Value'],
+                [
+                    ['Hostname', $this->serverInformation->hostname()],
+                    ['User', $this->serverInformation->whoami()],
+                    ['Operating System', $this->serverInformation->os()],
+                    ['Uptime', $this->serverInformation->uptime()],
+                ]
+            );
 
             return self::SUCCESS;
 
         } catch (Throwable $e) {
 
-            $this->ssh->disconnect();
+            $this->newLine();
 
-            $this->error($e->getMessage());
+            $this->error('SSH Connection Error');
+
+            $this->line($e->getMessage());
 
             return self::FAILURE;
+
+        } finally {
+
+            $this->ssh->disconnect();
+
         }
     }
 }
