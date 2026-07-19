@@ -17,6 +17,11 @@ Route::prefix('core')
 
 Route::prefix('panel')
     ->as('panel.')
-    ->group(function () {});
+    ->group(function () {
+
+        Route::livewire('/', 'pages::panel.index')->name('panel');
+
+
+    });
 
 require __DIR__.'/settings.php';

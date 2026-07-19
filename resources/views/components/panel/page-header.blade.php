@@ -1,40 +1,55 @@
-@props([
-    'title' => null,
-    'description' => null,
-])
+{{--@props([--}}
+{{--    'title' => null,--}}
+{{--    'description' => null,--}}
+{{--])--}}
 
-@if($title || $description)
+{{--@if ($title || $description)--}}
 
-    <div class="mb-8">
+{{--    <header--}}
+{{--        class="--}}
+{{--            mb-6--}}
+{{--            border-b--}}
+{{--            border-base-300--}}
+{{--            pb-5--}}
+{{--        "--}}
+{{--    >--}}
 
-        @if($title)
+{{--        <div class="space-y-3">--}}
 
-            <h1
-                class="
-                    text-3xl
-                    font-black
-                    tracking-tight
-                "
-            >
-                {{ $title }}
-            </h1>
+{{--            @if ($title)--}}
 
-        @endif
+{{--                <h1--}}
+{{--                    class="--}}
+{{--                        text-2xl--}}
+{{--                        font-black--}}
+{{--                        tracking-tight--}}
+{{--                        lg:text-3xl--}}
+{{--                    "--}}
+{{--                >--}}
+{{--                    {{ $title }}--}}
+{{--                </h1>--}}
 
-        @if($description)
+{{--            @endif--}}
 
-            <p
-                class="
-                    text-base-content/70
-                    mt-2
-                    leading-7
-                "
-            >
-                {{ $description }}
-            </p>
+{{--            @if ($description)--}}
 
-        @endif
+{{--                <p--}}
+{{--                    class="--}}
+{{--                        max-w-2xl--}}
+{{--                        text-sm--}}
+{{--                        leading-7--}}
+{{--                        text-base-content/70--}}
+{{--                        lg:text-base--}}
+{{--                    "--}}
+{{--                >--}}
+{{--                    {{ $description }}--}}
+{{--                </p>--}}
 
-    </div>
+{{--            @endif--}}
 
-@endif
+{{--        </div>--}}
+
+{{--    </header>--}}
+
+{{--@endif--}}
+<div></div>

@@ -11,6 +11,18 @@ class SSHConnection implements SSHConnectionInterface
 {
     private ?SSH2 $ssh = null;
 
+    private ?string $host = null;
+
+    private ?int $port = null;
+
+    private ?string $username = null;
+
+    private ?string $authenticationType = null;
+
+    private ?string $credential = null;
+
+    private ?string $privateKeyPath = null;
+
     public function connect(
         string $host,
         int $port,
@@ -20,37 +32,40 @@ class SSHConnection implements SSHConnectionInterface
         ?string $privateKeyPath = null
     ): bool {
 
+        $this->disconnect();
+
+        $this->rememberConnection(
+            $host,
+            $port,
+            $username,
+            $authenticationType,
+            $credential,
+            $privateKeyPath
+        );
+
         $this->ssh = new SSH2($host, $port);
 
-        switch ($authenticationType) {
+        $authenticated = match ($authenticationType) {
 
-            case 'password':
+            'password' => $this->ssh->login(
+                $username,
+                $credential
+            ),
 
-                if (! $this->ssh->login($username, $credential)) {
-                    return false;
-                }
+            'private_key' => $this->loginWithPrivateKey(
+                $username,
+                $privateKeyPath
+            ),
 
-                break;
+            default => throw new SSHConnectionException(
+                "Unsupported authentication type: {$authenticationType}"
+            ),
+        };
 
-            case 'private_key':
+        if (! $authenticated) {
+            $this->disconnect();
 
-                if (! $privateKeyPath || ! file_exists($privateKeyPath)) {
-                    throw new SSHConnectionException('Private key not found.');
-                }
-
-                $key = PublicKeyLoader::load(file_get_contents($privateKeyPath));
-
-                if (! $this->ssh->login($username, $key)) {
-                    return false;
-                }
-
-                break;
-
-            default:
-
-                throw new SSHConnectionException(
-                    "Unsupported authentication type: {$authenticationType}"
-                );
+            return false;
         }
 
         return true;
@@ -58,15 +73,82 @@ class SSHConnection implements SSHConnectionInterface
 
     public function execute(string $command): string
     {
-        if (! $this->ssh) {
-            throw new SSHConnectionException('SSH connection is not established.');
+        if (! $this->isConnected() && ! $this->reconnect()) {
+            throw new SSHConnectionException(
+                'Unable to establish SSH connection.'
+            );
         }
 
         return $this->ssh->exec($command);
     }
 
+    public function isConnected(): bool
+    {
+        return $this->ssh !== null;
+    }
+
     public function disconnect(): void
     {
+        if ($this->ssh !== null) {
+            $this->ssh->disconnect();
+        }
+
         $this->ssh = null;
+    }
+
+    private function reconnect(): bool
+    {
+        if (
+            $this->host === null ||
+            $this->port === null ||
+            $this->username === null ||
+            $this->authenticationType === null
+        ) {
+            return false;
+        }
+
+        return $this->connect(
+            $this->host,
+            $this->port,
+            $this->username,
+            $this->authenticationType,
+            $this->credential,
+            $this->privateKeyPath
+        );
+    }
+
+    private function rememberConnection(
+        string $host,
+        int $port,
+        string $username,
+        string $authenticationType,
+        ?string $credential,
+        ?string $privateKeyPath
+    ): void {
+
+        $this->host = $host;
+        $this->port = $port;
+        $this->username = $username;
+        $this->authenticationType = $authenticationType;
+        $this->credential = $credential;
+        $this->privateKeyPath = $privateKeyPath;
+    }
+
+    private function loginWithPrivateKey(
+        string $username,
+        ?string $privateKeyPath
+    ): bool {
+
+        if (! $privateKeyPath || ! file_exists($privateKeyPath)) {
+            throw new SSHConnectionException(
+                'Private key not found.'
+            );
+        }
+
+        $key = PublicKeyLoader::load(
+            file_get_contents($privateKeyPath)
+        );
+
+        return $this->ssh->login($username, $key);
     }
 }

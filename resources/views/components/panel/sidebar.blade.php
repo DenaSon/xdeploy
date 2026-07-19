@@ -1,22 +1,44 @@
+@php
+    $menu = [
+        [
+            'title' => __('panel.dashboard'),
+            'icon' => 'o-home',
+            'route' => route('panel.panel'),
+        ],
+
+        [
+            'title' => __('panel.modules'),
+            'icon' => 'o-squares-2x2',
+             'route' => route('panel.panel'),
+        ],
+
+        [
+            'title' => __('panel.settings'),
+            'icon' => 'o-cog-6-tooth',
+             'route' => route('panel.panel'),
+        ],
+    ];
+@endphp
+
 <aside
     class="
-        bg-base-100
+        flex
         min-h-full
         w-64
+        flex-col
         border-l
         border-base-300
-        flex
-        flex-col
+        bg-base-100
     "
 >
 
     {{-- Brand --}}
     <div
         class="
-            px-5
-            py-5
             border-b
             border-base-300
+            px-5
+            py-5
         "
     >
 
@@ -30,21 +52,21 @@
 
             <div
                 class="
+                    flex
                     size-11
+                    shrink-0
+                    items-center
+                    justify-center
                     rounded-2xl
                     bg-primary
                     text-primary-content
-                    flex
-                    items-center
-                    justify-center
                     shadow-sm
-                    shrink-0
                 "
             >
 
                 <x-icon
-                    name="o-bolt"
-                    class="w-5 h-5"
+                    name="o-rocket-launch"
+                    class="size-5"
                 />
 
             </div>
@@ -58,19 +80,17 @@
                         leading-none
                     "
                 >
-                    TIP
+                    xDeploy
                 </h2>
 
                 <p
                     class="
-                        hidden
-                        lg:block
+                        mt-1
                         text-xs
                         text-base-content/60
-                        mt-1
                     "
                 >
-                    Trend Intelligence Platform
+                    Deploy & Manage VPS
                 </p>
 
             </div>
@@ -80,7 +100,26 @@
     </div>
 
     {{-- Navigation --}}
-    <div class="flex-1 py-3">
+    <div
+        class="
+            flex-1
+            py-4
+        "
+    >
+
+        <div
+            class="
+                px-5
+                pb-2
+                text-xs
+                font-semibold
+                uppercase
+                tracking-wider
+                text-base-content/50
+            "
+        >
+            Main
+        </div>
 
         <ul
             class="
@@ -91,52 +130,64 @@
             "
         >
 
-            <li>
+            @foreach($menu as $item)
 
-                <a
-                    wire:navigate
-                    wire:current="menu-active"
-                    href="{{ route('panel.opportunities.index') }}"
-                >
+                <li>
 
-                    <x-icon
-                        name="o-light-bulb"
-                        class="w-5 h-5"
-                    />
+                    <a
+                        wire:navigate
+                        wire:current="menu-active"
+                        href="{{ $item['route'] }}"
+                    >
 
-                    <span>
-                        فرصت‌ها
-                    </span>
+                        <x-icon
+                            :name="$item['icon']"
+                            class="size-5"
+                        />
 
-                </a>
+                        <span>
+                            {{ $item['title'] }}
+                        </span>
 
-            </li>
+                    </a>
 
-            <li>
+                </li>
 
-                <a
-                    wire:navigate
-                    wire:current="menu-active"
-                    href="{{ route('panel.trends.index') }}"
-                >
-
-                    <x-icon
-                        name="o-fire"
-                        class="w-5 h-5"
-                    />
-
-                    <span>
-                        روندها
-                    </span>
-
-                </a>
-
-            </li>
+            @endforeach
 
         </ul>
 
     </div>
 
+    {{-- Footer --}}
+    <div
+        class="
+            border-t
+            border-base-300
+            px-5
+            py-4
+        "
+    >
 
+        <div
+            class="
+                text-xs
+                text-base-content/50
+            "
+        >
+            xDeploy
+        </div>
+
+        <div
+            class="
+                mt-1
+                font-medium
+                text-sm
+            "
+        >
+            v0.1.0-alpha
+        </div>
+
+    </div>
 
 </aside>

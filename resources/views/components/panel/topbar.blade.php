@@ -1,5 +1,5 @@
 @props([
-    'title' => null,
+    'breadcrumbs' => [],
 ])
 
 <header
@@ -16,125 +16,111 @@
 
     <div
         class="
-            navbar
-            min-h-18
-            px-4
-            lg:px-6
+            mx-auto
+            max-w-6xl
         "
     >
 
-        {{-- Right --}}
-        <div class="navbar-start">
-
-            <label
-                for="panel-drawer"
-                class="
-                    btn
-                    btn-ghost
-                    btn-square
-                    lg:hidden
-                "
-            >
-
-                <x-icon
-                    name="o-bars-3"
-                    class="w-6 h-6"
-                />
-
-            </label>
-
-            @if($title)
-
-                <div
-                    class="
-                        mr-2
-                    "
-                >
-
-                    <h1
-                        class="
-                            text-xl
-                            font-black
-                            leading-none
-                        "
-                    >
-                        {{ $title }}
-                    </h1>
-
-
-                </div>
-
-            @endif
-
-        </div>
-
-        {{-- Left --}}
         <div
             class="
-                navbar-end
-                gap-2
+                navbar
+                min-h-16
+                px-4
+                lg:px-6
             "
         >
 
-            <div
-                class="
-                    hidden
-                    lg:flex
-                    badge
-                    badge-success
-                    badge-outline
-                    gap-1
-                "
-            >
+            {{-- Start --}}
+            <div class="navbar-start">
 
-                <span
+                <label
+                    for="panel-drawer"
                     class="
-                        size-2
-                        rounded-full
-                        bg-success
+                        btn
+                        btn-ghost
+                        btn-square
+                        lg:hidden
                     "
-                ></span>
+                >
 
-                فعال
+                    <x-icon
+                        name="o-bars-3"
+                        class="size-6"
+                    />
+
+                </label>
+
+                @if (count($breadcrumbs))
+
+                    <div
+                        class="
+                            hidden
+                            lg:flex
+                            items-center
+                            mr-2
+                        "
+                    >
+
+                        <x-breadcrumbs
+                            :items="$breadcrumbs"
+                        />
+
+                    </div>
+
+                @endif
 
             </div>
 
-            <label
+            {{-- End --}}
+            <div
                 class="
-                    swap
-                    swap-rotate
-                    btn
-                    btn-ghost
-                    btn-circle
+                    navbar-end
+                    gap-2
                 "
             >
 
-                <input
-                    id="theme-toggle"
-                    type="checkbox"
-                    class="theme-controller"
-                    value="dark"
-                />
+                {{-- Future:
+                    - Server Status
+                    - Notifications
+                    - User Menu
+                --}}
 
-                <x-icon
-                    name="o-sun"
+                <label
                     class="
-                        swap-off
-                        w-5
-                        h-5
+                        swap
+                        swap-rotate
+                        btn
+                        btn-ghost
+                        btn-circle
                     "
-                />
+                >
 
-                <x-icon
-                    name="o-moon"
-                    class="
-                        swap-on
-                        w-5
-                        h-5
-                    "
-                />
+                    <input
+                        id="theme-toggle"
+                        type="checkbox"
+                        class="theme-controller"
+                        value="dark"
+                    />
 
-            </label>
+                    <x-icon
+                        name="o-sun"
+                        class="
+                            swap-off
+                            size-5
+                        "
+                    />
+
+                    <x-icon
+                        name="o-moon"
+                        class="
+                            swap-on
+                            size-5
+                        "
+                    />
+
+                </label>
+
+            </div>
 
         </div>
 

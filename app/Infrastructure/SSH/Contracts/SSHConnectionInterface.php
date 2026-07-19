@@ -15,5 +15,7 @@ interface SSHConnectionInterface
 
     public function execute(string $command): string;
 
+    public function isConnected(): bool;
+
     public function disconnect(): void;
 }

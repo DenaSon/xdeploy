@@ -2,7 +2,7 @@
 <html
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
     dir="rtl"
-    data-theme="light"
+    data-theme="{{ config('app.theme', 'light') }}"
 >
 
 <head>
@@ -15,7 +15,7 @@
     >
 
     <title>
-        {{ $title ?? 'TIP' }}
+        {{ ($title ?? 'Dashboard') . ' | xDeploy' }}
     </title>
 
     @vite([
@@ -37,15 +37,15 @@
     wire:loading
     wire:target="$navigate"
     class="
-            loading
-            loading-bars
-            loading-primary
-            fixed
-            top-4
-            left-1/2
-            -translate-x-1/2
-            z-[9999]
-        "
+        loading
+        loading-bars
+        loading-primary
+        fixed
+        top-4
+        left-1/2
+        z-50
+        -translate-x-1/2
+    "
 ></div>
 
 <div class="drawer lg:drawer-open">
@@ -58,24 +58,24 @@
 
     <div
         class="
-                drawer-content
-                flex
-                flex-col
-                min-h-screen
-            "
+            drawer-content
+            flex
+            min-h-screen
+            flex-col
+        "
     >
 
         <x-panel.topbar
-            :title="$title ?? null"
+            :breadcrumbs="$breadcrumbs ?? []"
         />
 
         <main
             class="
-                    flex-1
-                    p-4
-                    lg:p-6
-                    overflow-x-hidden
-                "
+                flex-1
+                overflow-x-hidden
+                p-4
+                lg:p-6
+            "
         >
 
             {{ $slot }}
@@ -88,8 +88,8 @@
 
         <label
             for="panel-drawer"
-            aria-label="close sidebar"
             class="drawer-overlay"
+            aria-label="Close sidebar"
         ></label>
 
         @persist('panel-sidebar')
