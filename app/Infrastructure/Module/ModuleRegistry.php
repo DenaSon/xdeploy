@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Module\Registry;
+namespace App\Infrastructure\Module;
 
 use App\Domain\Module\Contracts\Module;
 use App\Domain\Module\Contracts\ModuleRegistryInterface;
