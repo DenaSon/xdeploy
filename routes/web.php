@@ -1,6 +1,8 @@
 <?php
 
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use Illuminate\Support\Facades\Route;
+use App\Domain\Module\Modules\Docker\DockerModule;
 
 Route::prefix('panel')
     ->as('panel.')
@@ -22,5 +24,10 @@ Route::prefix('panel')
         Route::livewire('/', 'pages::panel.index')->name('panel');
 
     });
+
+
+
+
+
 
 require __DIR__.'/settings.php';

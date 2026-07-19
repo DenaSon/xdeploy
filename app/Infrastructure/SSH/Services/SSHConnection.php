@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Infrastructure\SSH\Services;
-
+use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -95,6 +95,23 @@ class SSHConnection implements SSHConnectionInterface
 
         $this->ssh = null;
     }
+
+    public function executeWithResult(string $command): SSHResult
+    {
+        if (! $this->isConnected() && ! $this->reconnect()) {
+            throw new SSHConnectionException(
+                'Unable to establish SSH connection.'
+            );
+        }
+
+        $output = $this->ssh->exec($command);
+
+        return new SSHResult(
+            output: trim($output),
+            exitCode: $this->ssh->getExitStatus() ?? -1,
+        );
+    }
+
 
     private function reconnect(): bool
     {

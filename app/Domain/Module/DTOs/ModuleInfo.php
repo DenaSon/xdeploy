@@ -25,4 +25,15 @@ final readonly class ModuleInfo
     {
         return $this->state === ModuleState::NotInstalled;
     }
+
+    public function version(): ?string
+    {
+        return $this->metadata['version'] ?? null;
+    }
+
+    public function hasVersion(): bool
+    {
+        return isset($this->metadata['version']);
+    }
+
 }
