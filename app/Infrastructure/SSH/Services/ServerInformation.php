@@ -37,5 +37,4 @@ readonly class ServerInformation
             $this->ssh->execute('cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d \'"\'')
         );
     }
-
 }

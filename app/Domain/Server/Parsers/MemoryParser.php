@@ -9,7 +9,6 @@ use App\Domain\Server\Parsers\Contracts\Parser;
 
 final readonly class MemoryParser implements Parser
 {
-
     public function parse(string $output): MemoryInfoData
     {
         $lines = preg_split('/\r\n|\r|\n/', trim($output));

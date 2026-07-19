@@ -4,13 +4,12 @@ namespace App\Domain\Server\Services;
 
 use App\Domain\Server\DTOs\ServerOverviewData;
 use App\Domain\Server\DTOs\ServiceStatusData;
+
 readonly class ServerService
 {
     public function __construct(
         private ServerInspector $inspector,
     ) {}
-
-
 
     /**
      * Get a complete server overview.
@@ -60,5 +59,4 @@ readonly class ServerService
 
         return $result;
     }
-
 }

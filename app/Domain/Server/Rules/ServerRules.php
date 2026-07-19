@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Domain\Server\Rules;
 
 class ServerRules

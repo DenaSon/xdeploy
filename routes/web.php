@@ -21,7 +21,6 @@ Route::prefix('panel')
 
         Route::livewire('/', 'pages::panel.index')->name('panel');
 
-
     });
 
 require __DIR__.'/settings.php';

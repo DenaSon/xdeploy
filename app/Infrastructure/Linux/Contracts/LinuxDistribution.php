@@ -34,7 +34,6 @@ interface LinuxDistribution
      */
     public function privateIp(): string;
 
-
     /**
      * Get the CPU information command.
      */
