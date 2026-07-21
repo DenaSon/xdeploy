@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Infrastructure\SSH\Services;
-use App\Infrastructure\SSH\DTOs\SSHResult;
+
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
+use App\Support\SSH\SSHTimeout;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SSH2;
 
@@ -29,9 +33,8 @@ class SSHConnection implements SSHConnectionInterface
         string $username,
         string $authenticationType,
         ?string $credential = null,
-        ?string $privateKeyPath = null
+        ?string $privateKeyPath = null,
     ): bool {
-
         $this->disconnect();
 
         $this->rememberConnection(
@@ -40,21 +43,20 @@ class SSHConnection implements SSHConnectionInterface
             $username,
             $authenticationType,
             $credential,
-            $privateKeyPath
+            $privateKeyPath,
         );
 
         $this->ssh = new SSH2($host, $port);
 
         $authenticated = match ($authenticationType) {
-
             'password' => $this->ssh->login(
                 $username,
-                $credential
+                $credential,
             ),
 
             'private_key' => $this->loginWithPrivateKey(
                 $username,
-                $privateKeyPath
+                $privateKeyPath,
             ),
 
             default => throw new SSHConnectionException(
@@ -71,20 +73,75 @@ class SSHConnection implements SSHConnectionInterface
         return true;
     }
 
-    public function execute(string $command): string
-    {
-        if (! $this->isConnected() && ! $this->reconnect()) {
-            throw new SSHConnectionException(
-                'Unable to establish SSH connection.'
-            );
-        }
-
-        return $this->ssh->exec($command);
+    public function execute(
+        string $command,
+        int $timeout = SSHTimeout::DEFAULT,
+    ): string {
+        return $this->executeWithResult(
+            $command,
+            $timeout,
+        )->output;
     }
 
+    public function executeWithResult(
+        string $command,
+        int $timeout = SSHTimeout::DEFAULT,
+    ): SSHResult {
+        $this->ensureConnection();
+
+        $command = $this->normalizeCommand($command);
+
+        $this->ssh->setTimeout($timeout);
+
+        try {
+            $startedAt = microtime(true);
+
+            $output = $this->ssh->exec($command);
+
+            $timedOut = $this->ssh->isTimeout();
+
+            if ($timedOut) {
+                $this->handleTimeout($command);
+            }
+
+            $result = new SSHResult(
+                output: is_string($output)
+                    ? trim($output)
+                    : '',
+                exitCode: $this->ssh->getExitStatus() ?? -1,
+            );
+
+            logger()->info('SSH Command Executed', [
+                'command' => $command,
+                'duration' => round(microtime(true) - $startedAt, 3),
+                'exit_code' => $result->exitCode,
+                'timeout' => $timedOut,
+                'output_length' => strlen($result->output),
+            ]);
+
+            return $result;
+        } finally {
+            if ($this->ssh !== null) {
+                $this->ssh->setTimeout(
+                    SSHTimeout::DEFAULT
+                );
+            }
+        }
+    }
+
+    private function normalizeCommand(
+        string $command,
+    ): string {
+        return preg_replace(
+            '/\r\n?/',
+            "\n",
+            trim($command),
+        );
+    }
     public function isConnected(): bool
     {
-        return $this->ssh !== null;
+        return $this->ssh !== null
+            && $this->ssh->isAuthenticated();
     }
 
     public function disconnect(): void
@@ -96,22 +153,33 @@ class SSHConnection implements SSHConnectionInterface
         $this->ssh = null;
     }
 
-    public function executeWithResult(string $command): SSHResult
+    private function ensureConnection(): void
     {
         if (! $this->isConnected() && ! $this->reconnect()) {
             throw new SSHConnectionException(
                 'Unable to establish SSH connection.'
             );
         }
-
-        $output = $this->ssh->exec($command);
-
-        return new SSHResult(
-            output: trim($output),
-            exitCode: $this->ssh->getExitStatus() ?? -1,
-        );
     }
 
+    private function handleTimeout(string $command): void
+    {
+        logger()->warning('SSH command timed out.', [
+            'command' => $command,
+        ]);
+
+        try {
+            $this->ssh->reset();
+        } catch (\Throwable) {
+            $this->disconnect();
+
+            if (! $this->reconnect()) {
+                throw new SSHConnectionException(
+                    'Unable to reconnect after SSH timeout.'
+                );
+            }
+        }
+    }
 
     private function reconnect(): bool
     {
@@ -130,7 +198,7 @@ class SSHConnection implements SSHConnectionInterface
             $this->username,
             $this->authenticationType,
             $this->credential,
-            $this->privateKeyPath
+            $this->privateKeyPath,
         );
     }
 
@@ -140,9 +208,8 @@ class SSHConnection implements SSHConnectionInterface
         string $username,
         string $authenticationType,
         ?string $credential,
-        ?string $privateKeyPath
+        ?string $privateKeyPath,
     ): void {
-
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
@@ -153,10 +220,12 @@ class SSHConnection implements SSHConnectionInterface
 
     private function loginWithPrivateKey(
         string $username,
-        ?string $privateKeyPath
+        ?string $privateKeyPath,
     ): bool {
-
-        if (! $privateKeyPath || ! file_exists($privateKeyPath)) {
+        if (
+            $privateKeyPath === null ||
+            ! file_exists($privateKeyPath)
+        ) {
             throw new SSHConnectionException(
                 'Private key not found.'
             );
@@ -166,6 +235,9 @@ class SSHConnection implements SSHConnectionInterface
             file_get_contents($privateKeyPath)
         );
 
-        return $this->ssh->login($username, $key);
+        return $this->ssh->login(
+            $username,
+            $key,
+        );
     }
 }

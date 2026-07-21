@@ -2,28 +2,28 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Module\Modules\Nginx;
+namespace App\Domain\Module\Modules\Composer;
 
 use App\Domain\Module\Abstracts\CommandModule;
 use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\Enums\SoftwareType;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 
-final readonly class NginxModule extends CommandModule
+final readonly class ComposerModule extends CommandModule
 {
     public function type(): ModuleType
     {
-        return ModuleType::Nginx;
+        return ModuleType::Composer;
     }
 
     public function name(): string
     {
-        return 'Nginx';
+        return 'Composer';
     }
 
     protected function inspectCommand(): string
     {
-        return 'nginx -v 2>&1';
+        return 'composer --version';
     }
 
     protected function metadataFromOutput(string $output): array
@@ -35,12 +35,21 @@ final readonly class NginxModule extends CommandModule
         ];
     }
 
+    protected function checkRequirements(): void
+    {
+        // Example:
+        // - Verify Linux distribution
+        // - Verify root privileges
+        // - Verify supported architecture
+    }
+
     public function provides(): array
     {
         return [
-            new ProvidedSoftware(SoftwareType::Nginx),
+            new ProvidedSoftware(SoftwareType::Composer),
         ];
     }
+
     protected function installCommand(): string
     {
         throw new \LogicException('Installation is not implemented yet.');
@@ -65,4 +74,7 @@ final readonly class NginxModule extends CommandModule
     {
         throw new \LogicException('Not implemented.');
     }
+
+
+
 }

@@ -26,7 +26,7 @@ class extends Component {
             port: 22,
             username: 'root',
             authenticationType: 'password',
-            credential: '280921',
+            credential: '000000',
         );
 
         $this->overview = $overview

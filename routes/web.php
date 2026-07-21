@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Dashboard\Services\DashboardService;
 use App\Domain\Module\Contracts\ModuleRegistryInterface;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use Illuminate\Support\Facades\Route;
@@ -32,16 +33,19 @@ use App\Infrastructure\SSH\Services\SSHConnection;
 Route::get('/test', function (
     SSHConnectionInterface $ssh,
     ModuleRegistryInterface $registry,
+    DashboardService $dashboard
 ) {
     $ssh->connect(
         host: '109.122.247.89',
         port: 22,
         username: 'root',
         authenticationType: 'password',
-        credential: '280921',
+        credential: '000000',
     );
 
-    dd($registry->all());
+    dd(
+        $dashboard->overview()
+    );
 });
 
 
