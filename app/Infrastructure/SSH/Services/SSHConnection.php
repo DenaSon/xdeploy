@@ -73,14 +73,15 @@ class SSHConnection implements SSHConnectionInterface
         return true;
     }
 
-    public function execute(
-        string $command,
-        int $timeout = SSHTimeout::DEFAULT,
-    ): string {
-        return $this->executeWithResult(
-            $command,
-            $timeout,
-        )->output;
+    public function execute(string $command): string
+    {
+        if (! $this->isConnected() && ! $this->reconnect()) {
+            throw new SSHConnectionException(
+                'Unable to establish SSH connection.'
+            );
+        }
+
+        return $this->ssh->exec($command);
     }
 
     public function executeWithResult(
@@ -97,6 +98,9 @@ class SSHConnection implements SSHConnectionInterface
             $startedAt = microtime(true);
 
             $output = $this->ssh->exec($command);
+            logger()->info('Docker Install Output', [
+                'output' => $output,
+            ]);
 
             $timedOut = $this->ssh->isTimeout();
 

@@ -32,6 +32,7 @@ readonly class ServerInspector
      */
     private function run(string $command): string
     {
+
         return trim(
             $this->ssh->execute($command)
         );
