@@ -41,6 +41,7 @@ final readonly class NginxModule extends CommandModule
             new ProvidedSoftware(SoftwareType::Nginx),
         ];
     }
+
     protected function installCommand(): string
     {
         throw new \LogicException('Installation is not implemented yet.');

@@ -8,7 +8,7 @@ use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\ValueObjects\ModuleDependency;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 
-interface ModuleInterface extends InstallableInterface, InspectableInterface
+interface ModuleInterface extends InspectableInterface, InstallableInterface
 {
     /**
      * Returns the unique type of the module.

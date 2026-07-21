@@ -138,6 +138,7 @@ class SSHConnection implements SSHConnectionInterface
             trim($command),
         );
     }
+
     public function isConnected(): bool
     {
         return $this->ssh !== null

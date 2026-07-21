@@ -58,6 +58,4 @@ interface LinuxDistribution
      * Get service status command.
      */
     public function serviceStatus(string $service): string;
-
-
 }

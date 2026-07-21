@@ -11,9 +11,9 @@ use App\Domain\Module\ValueObjects\ProvidedSoftware;
 final readonly class ModuleInfo
 {
     /**
-     * @param array<string, mixed> $metadata
-     * @param list<ModuleDependency> $dependencies
-     * @param list<ProvidedSoftware> $provides
+     * @param  array<string, mixed>  $metadata
+     * @param  list<ModuleDependency>  $dependencies
+     * @param  list<ProvidedSoftware>  $provides
      */
     public function __construct(
         public ModuleState $state,

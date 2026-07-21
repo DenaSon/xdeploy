@@ -48,6 +48,7 @@ class ServerServiceProvider extends ServiceProvider
 
     /**
      * @return list<ModuleInterface>
+     *
      * @throws BindingResolutionException
      */
     private function modules(Application $app): array

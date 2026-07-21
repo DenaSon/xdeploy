@@ -74,7 +74,4 @@ final readonly class ComposerModule extends CommandModule
     {
         throw new \LogicException('Not implemented.');
     }
-
-
-
 }

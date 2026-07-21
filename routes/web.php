@@ -4,7 +4,6 @@ use App\Domain\Dashboard\Services\DashboardService;
 use App\Domain\Module\Contracts\ModuleRegistryInterface;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use Illuminate\Support\Facades\Route;
-use App\Domain\Module\Modules\Docker\DockerModule;
 
 Route::prefix('panel')
     ->as('panel.')
@@ -27,9 +26,6 @@ Route::prefix('panel')
 
     });
 
-use App\Infrastructure\SSH\Services\SSHConnection;
-
-
 Route::get('/test', function (
     SSHConnectionInterface $ssh,
     ModuleRegistryInterface $registry,
@@ -47,7 +43,5 @@ Route::get('/test', function (
         $dashboard->overview()
     );
 });
-
-
 
 require __DIR__.'/settings.php';

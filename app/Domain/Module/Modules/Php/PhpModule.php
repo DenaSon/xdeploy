@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Domain\Module\Modules\Php;
@@ -33,6 +34,7 @@ final readonly class PhpModule extends CommandModule
             'version' => $matches[1] ?? '',
         ];
     }
+
     public function provides(): array
     {
         return [
@@ -46,6 +48,7 @@ final readonly class PhpModule extends CommandModule
 DEBIAN_FRONTEND=noninteractive apt-get install -y php
 BASH;
     }
+
     public function start(): void
     {
         throw new \LogicException('Not implemented.');

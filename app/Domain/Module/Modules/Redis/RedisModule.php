@@ -46,6 +46,7 @@ final readonly class RedisModule extends CommandModule
     {
         throw new \LogicException('Installation is not implemented yet.');
     }
+
     public function start(): void
     {
         throw new \LogicException('Not implemented.');

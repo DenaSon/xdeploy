@@ -109,5 +109,4 @@ BASH;
     {
         return SSHTimeout::DOCKER_INSTALL;
     }
-
 }

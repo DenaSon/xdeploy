@@ -12,7 +12,7 @@ use RuntimeException;
 final readonly class ModuleRegistry implements ModuleRegistryInterface
 {
     /**
-     * @param array<int, ModuleInterface> $modules
+     * @param  array<int, ModuleInterface>  $modules
      */
     public function __construct(
         private array $modules,

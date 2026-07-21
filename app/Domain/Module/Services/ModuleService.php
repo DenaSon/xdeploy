@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Module\Services;
 
 use App\Domain\Module\Contracts\ModuleInterface;
+use App\Domain\Module\Contracts\ModuleRegistryInterface;
 use App\Domain\Module\DTOs\ModuleInfo;
 use App\Domain\Module\Enums\ModuleType;
-use App\Domain\Module\Contracts\ModuleRegistryInterface;
 
 final readonly class ModuleService
 {
@@ -22,7 +22,6 @@ final readonly class ModuleService
     {
         return $this->registry->all();
     }
-
 
     public function inspect(ModuleType $type): ModuleInfo
     {
@@ -54,7 +53,4 @@ final readonly class ModuleService
 
         return $modules;
     }
-
-
-
 }

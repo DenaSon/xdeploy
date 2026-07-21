@@ -10,7 +10,7 @@ namespace App\Domain\Module\DTOs;
 final readonly class InstallReport
 {
     /**
-     * @param Messages $messages
+     * @param  Messages  $messages
      */
     public function __construct(
         public array $messages = [],

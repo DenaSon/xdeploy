@@ -11,11 +11,11 @@ final readonly class DashboardService
     public function __construct(
         private ModuleService $moduleService,
     ) {}
+
     public function overview(): array
     {
         return [
             'modules' => $this->moduleService->inspectAll(),
         ];
     }
-
 }

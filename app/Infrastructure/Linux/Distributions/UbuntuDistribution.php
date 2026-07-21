@@ -105,5 +105,4 @@ else
 fi
 BASH;
     }
-
 }
