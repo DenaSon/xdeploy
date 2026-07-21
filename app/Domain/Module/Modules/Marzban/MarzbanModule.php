@@ -39,8 +39,16 @@ final readonly class MarzbanModule extends CommandModule implements StartableInt
         $result = $this->ssh->executeWithResult(
             'docker ps --filter "name=marzban" --format "{{.Names}}"',
         );
+        logger()->info('DEBUG', [
+            'output' => $result->output,
+            'exit' => $result->exitCode,
+        ]);
 
-        return $result->output !== ''
+        if (! $result->successful()) {
+            return ModuleState::Installed;
+        }
+
+        return trim($result->output) !== ''
             ? ModuleState::Running
             : ModuleState::Installed;
     }
@@ -89,6 +97,7 @@ BASH;
             exception: ModuleStartException::class,
             message: 'Failed to start Marzban.',
         );
+
 
         if ($this->resolveState() !== ModuleState::Running) {
             throw new ModuleStartException(
