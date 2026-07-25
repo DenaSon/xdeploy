@@ -9,7 +9,10 @@ use App\Domain\Module\Contracts\StartableInterface;
 use App\Domain\Module\Enums\ModuleState;
 use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\Enums\SoftwareType;
+use App\Domain\Module\Exceptions\ModuleRestartException;
 use App\Domain\Module\Exceptions\ModuleStartException;
+use App\Domain\Module\Exceptions\ModuleStopException;
+use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 use App\Support\SSH\SSHTimeout;
 use LogicException;
@@ -37,9 +40,14 @@ final readonly class DockerModule extends CommandModule implements StartableInte
             'systemctl is-active docker',
         );
 
-        return $result->successful() && trim($result->output) === 'active'
-            ? ModuleState::Running
-            : ModuleState::Installed;
+        if (
+            $result->successful() &&
+            trim($result->output) === 'active'
+        ) {
+            return ModuleState::Running;
+        }
+
+        return ModuleState::Installed;
     }
 
     /**
@@ -92,17 +100,47 @@ BASH;
 
     public function stop(): void
     {
-        throw new LogicException('Not implemented.');
+        $result = $this->ssh->executeWithResult(
+            'systemctl stop docker',
+        );
+
+        if (! $result->successful()) {
+            throw new ModuleStopException(
+                'Failed to stop Docker.',
+            );
+        }
+
+        if ($this->resolveState() !== ModuleState::Installed) {
+            throw new ModuleStopException(
+                'Docker did not stop successfully.',
+            );
+        }
     }
 
     public function restart(): void
     {
-        throw new LogicException('Not implemented.');
+        $result = $this->ssh->executeWithResult(
+            'systemctl restart docker',
+        );
+
+        if (! $result->successful()) {
+            throw new ModuleRestartException(
+                'Failed to restart Docker.',
+            );
+        }
+
+        if ($this->resolveState() !== ModuleState::Running) {
+            throw new ModuleRestartException(
+                'Docker did not restart successfully.',
+            );
+        }
     }
 
-    public function uninstall(): void
+    protected function uninstallCommand(): string
     {
-        throw new LogicException('Not implemented.');
+        throw new ModuleUninstallException(
+            'Docker uninstall is not supported yet.'
+        );
     }
 
     protected function installTimeout(): int

@@ -45,6 +45,7 @@ final readonly class PhpModule extends CommandModule
     protected function installCommand(): string
     {
         return <<<'BASH'
+apt-get update &&
 DEBIAN_FRONTEND=noninteractive apt-get install -y php
 BASH;
     }
@@ -64,8 +65,11 @@ BASH;
         throw new \LogicException('Not implemented.');
     }
 
-    public function uninstall(): void
+    protected function uninstallCommand(): string
     {
-        throw new \LogicException('Not implemented.');
+        return <<<'BASH'
+apt-get purge -y 'php*' &&
+apt-get autoremove -y
+BASH;
     }
 }

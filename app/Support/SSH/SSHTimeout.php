@@ -6,7 +6,7 @@ final class SSHTimeout
 {
     private function __construct() {}
 
-    public const int DEFAULT = 30;
+    public const int DEFAULT = 60;
 
     public const int QUICK = 10;
 

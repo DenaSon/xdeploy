@@ -7,8 +7,8 @@ namespace App\Domain\Module\Modules\DockerCompose;
 use App\Domain\Module\Abstracts\CommandModule;
 use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\Enums\SoftwareType;
+use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
-use LogicException;
 
 final readonly class DockerComposeModule extends CommandModule
 {
@@ -35,7 +35,7 @@ final readonly class DockerComposeModule extends CommandModule
         preg_match('/v?(\d+\.\d+\.\d+)/', $output, $matches);
 
         return [
-            'version' => $matches[1] ?? '',
+            'version' => $matches[1] ?? null,
         ];
     }
 
@@ -45,7 +45,9 @@ final readonly class DockerComposeModule extends CommandModule
     public function provides(): array
     {
         return [
-            new ProvidedSoftware(SoftwareType::DockerCompose),
+            new ProvidedSoftware(
+                SoftwareType::DockerCompose,
+            ),
         ];
     }
 
@@ -57,8 +59,10 @@ apt-get install -y docker-compose-plugin
 BASH;
     }
 
-    public function uninstall(): void
+    protected function uninstallCommand(): string
     {
-        throw new LogicException('Not implemented.');
+        throw new ModuleUninstallException(
+            'Docker Compose uninstall is not supported yet.',
+        );
     }
 }

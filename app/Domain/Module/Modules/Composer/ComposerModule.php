@@ -7,6 +7,8 @@ namespace App\Domain\Module\Modules\Composer;
 use App\Domain\Module\Abstracts\CommandModule;
 use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\Enums\SoftwareType;
+use App\Domain\Module\Exceptions\ModuleUninstallException;
+use App\Domain\Module\ValueObjects\ModuleDependency;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 
 final readonly class ComposerModule extends CommandModule
@@ -19,6 +21,16 @@ final readonly class ComposerModule extends CommandModule
     public function name(): string
     {
         return 'Composer';
+    }
+
+    /**
+     * @return list<ModuleDependency>
+     */
+    public function dependencies(): array
+    {
+        return [
+            new ModuleDependency(ModuleType::Php),
+        ];
     }
 
     protected function inspectCommand(): string
@@ -52,7 +64,11 @@ final readonly class ComposerModule extends CommandModule
 
     protected function installCommand(): string
     {
-        throw new \LogicException('Installation is not implemented yet.');
+        return <<<'BASH'
+apt-get update &&
+apt-get install -y curl &&
+curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+BASH;
     }
 
     public function start(): void
@@ -70,8 +86,10 @@ final readonly class ComposerModule extends CommandModule
         throw new \LogicException('Not implemented.');
     }
 
-    public function uninstall(): void
+    protected function uninstallCommand(): string
     {
-        throw new \LogicException('Not implemented.');
+        return <<<'BASH'
+rm -f /usr/local/bin/composer
+BASH;
     }
 }
