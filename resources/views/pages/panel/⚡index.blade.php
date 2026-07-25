@@ -22,11 +22,11 @@ class extends Component {
         // Temporary (Sprint 02)
         // TODO: Read server credentials from the selected server.
         $connect->handle(
-            host: '109.122.247.89',
-            port: 22,
+            host: '127.0.0.1',
+            port: 2222,
             username: 'root',
             authenticationType: 'password',
-            credential: '000000',
+            credential: 'xdeploy',
         );
 
         $this->overview = $overview

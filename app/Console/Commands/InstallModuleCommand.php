@@ -39,11 +39,11 @@ final class InstallModuleCommand extends Command
 
         // TODO: Replace with the selected server after Server Management is implemented.
         $this->connect->handle(
-            host: '109.122.247.89',
-            port: 22,
+            host: '127.0.0.1',
+            port: 2222,
             username: 'root',
             authenticationType: 'password',
-            credential: '000000',
+            credential: 'xdeploy',
         );
 
         $this->info("Installing {$type->value}...");
