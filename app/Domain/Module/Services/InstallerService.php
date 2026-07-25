@@ -6,7 +6,6 @@ namespace App\Domain\Module\Services;
 
 use App\Domain\Module\Contracts\ModuleInterface;
 use App\Domain\Module\Contracts\ModuleRegistryInterface;
-use App\Domain\Module\Contracts\StartableInterface;
 use App\Domain\Module\DTOs\InstallMessage;
 use App\Domain\Module\DTOs\InstallReport;
 use App\Domain\Module\Enums\ModuleState;
@@ -24,15 +23,10 @@ final readonly class InstallerService
         $module = $this->registry->find($type);
 
         return match ($module->inspect()->state) {
-            ModuleState::Running => $this->report(
+            ModuleState::Running,
+            ModuleState::Installed => $this->report(
                 $type,
-                'Already running.',
-            ),
-
-            ModuleState::Installed => $this->handleInstalledModule(
-                $module,
-                $type,
-                new InstallReport,
+                'Already installed.',
             ),
 
             ModuleState::NotInstalled => $this->installModule(
@@ -61,6 +55,43 @@ final readonly class InstallerService
 
         $module->install();
 
+        $this->verifyInstallation(
+            $module,
+            $type,
+        );
+
+        return $report->merge(
+            $this->report(
+                $type,
+                'Installed successfully.',
+            ),
+        );
+    }
+
+    public function uninstall(ModuleType $type): void
+    {
+        $module = $this->registry->find($type);
+
+        if ($module->inspect()->state === ModuleState::NotInstalled) {
+            return;
+        }
+
+        $module->uninstall();
+
+        if (
+            $module->inspect()->state !== ModuleState::NotInstalled
+        ) {
+            throw new LogicException(sprintf(
+                'Module [%s] uninstall verification failed.',
+                $type->value,
+            ));
+        }
+    }
+
+    private function verifyInstallation(
+        ModuleInterface $module,
+        ModuleType $type,
+    ): void {
         $state = $module->inspect()->state;
 
         if (
@@ -72,71 +103,6 @@ final readonly class InstallerService
                 $type->value,
             ));
         }
-
-        $report = $report->merge(
-            $this->report(
-                $type,
-                'Installed successfully.',
-            ),
-        );
-
-        return $this->handleInstalledModule(
-            $module,
-            $type,
-            $report,
-        );
-    }
-
-    private function handleInstalledModule(
-        ModuleInterface $module,
-        ModuleType $type,
-        InstallReport $report,
-    ): InstallReport {
-        if (! $module instanceof StartableInterface) {
-            return $report->merge(
-                $this->report(
-                    $type,
-                    'Already installed.',
-                ),
-            );
-        }
-
-        return $this->startModule(
-            $module,
-            $type,
-            $report,
-        );
-    }
-
-    private function startModule(
-        StartableInterface&ModuleInterface $module,
-        ModuleType $type,
-        InstallReport $report,
-    ): InstallReport {
-        if ($module->inspect()->state === ModuleState::Running) {
-            return $report->merge(
-                $this->report(
-                    $type,
-                    'Already running.',
-                ),
-            );
-        }
-
-        $module->start();
-
-        if ($module->inspect()->state !== ModuleState::Running) {
-            throw new LogicException(sprintf(
-                'Module [%s] failed to start.',
-                $type->value,
-            ));
-        }
-
-        return $report->merge(
-            $this->report(
-                $type,
-                'Started successfully.',
-            ),
-        );
     }
 
     private function report(

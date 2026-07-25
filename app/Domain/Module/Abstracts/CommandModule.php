@@ -7,6 +7,7 @@ namespace App\Domain\Module\Abstracts;
 use App\Domain\Module\DTOs\ModuleInfo;
 use App\Domain\Module\Enums\ModuleState;
 use App\Domain\Module\Exceptions\ModuleInstallationException;
+use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Support\SSH\SSHTimeout;
 
 abstract readonly class CommandModule extends AbstractModule
@@ -29,13 +30,36 @@ abstract readonly class CommandModule extends AbstractModule
 
     final public function install(): void
     {
+        $this->checkRequirements();
+
+        $this->prepare();
+
         $result = $this->ssh->executeWithResult(
             $this->installCommand(),
             $this->installTimeout(),
         );
 
         if (! $result->successful()) {
-            throw new ModuleInstallationException('Module Installation failed');
+            throw new ModuleInstallationException(
+                'Module Installation failed',
+            );
+        }
+
+        $this->configure();
+
+        $this->healthCheck();
+    }
+    final public function uninstall(): void
+    {
+        $result = $this->ssh->executeWithResult(
+            $this->uninstallCommand(),
+            $this->installTimeout(),
+        );
+
+        if (! $result->successful()) {
+            throw new ModuleUninstallException(
+                'Module uninstall failed.',
+            );
         }
     }
 
@@ -62,6 +86,12 @@ abstract readonly class CommandModule extends AbstractModule
     abstract protected function inspectCommand(): string;
 
     abstract protected function installCommand(): string;
+    protected function uninstallCommand(): string
+    {
+        throw new ModuleUninstallException(
+            'Uninstall is not supported for this module.',
+        );
+    }
 
     /**
      * @return array<string,mixed>

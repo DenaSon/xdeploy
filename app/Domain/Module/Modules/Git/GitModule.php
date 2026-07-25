@@ -44,7 +44,18 @@ final readonly class GitModule extends CommandModule
 
     protected function installCommand(): string
     {
-        throw new \LogicException('Installation is not implemented yet.');
+        return <<<'BASH'
+apt-get update &&
+DEBIAN_FRONTEND=noninteractive apt-get install -y git
+BASH;
+    }
+
+    protected function uninstallCommand(): string
+    {
+        return <<<'BASH'
+apt-get purge -y git &&
+apt-get autoremove -y
+BASH;
     }
 
     public function start(): void
@@ -62,8 +73,5 @@ final readonly class GitModule extends CommandModule
         throw new \LogicException('Not implemented.');
     }
 
-    public function uninstall(): void
-    {
-        throw new \LogicException('Not implemented.');
-    }
+
 }

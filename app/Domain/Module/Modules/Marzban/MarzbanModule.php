@@ -9,9 +9,11 @@ use App\Domain\Module\Contracts\StartableInterface;
 use App\Domain\Module\Enums\ModuleState;
 use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\Enums\SoftwareType;
+use App\Domain\Module\Exceptions\ModuleInstallationException;
 use App\Domain\Module\Exceptions\ModuleRestartException;
 use App\Domain\Module\Exceptions\ModuleStartException;
 use App\Domain\Module\Exceptions\ModuleStopException;
+use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Domain\Module\ValueObjects\ModuleDependency;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 use App\Support\SSH\SSHTimeout;
@@ -36,17 +38,26 @@ final readonly class MarzbanModule extends CommandModule implements StartableInt
 
     protected function resolveState(): ModuleState
     {
-        $result = $this->ssh->executeWithResult(
+        $installed = $this->ssh->executeWithResult(
+            'test -d /opt/marzban',
+        );
+
+        if (! $installed->successful()) {
+            return ModuleState::NotInstalled;
+        }
+
+        $container = $this->ssh->executeWithResult(
             'docker ps --filter "name=marzban" --format "{{.Names}}"',
         );
 
-        return $result->output !== ''
+        return $container->successful()
+        && trim($container->output) !== ''
             ? ModuleState::Running
             : ModuleState::Installed;
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string,mixed>
      */
     protected function metadataFromOutput(string $output): array
     {
@@ -59,8 +70,13 @@ final readonly class MarzbanModule extends CommandModule implements StartableInt
     public function provides(): array
     {
         return [
-            new ProvidedSoftware(SoftwareType::Marzban),
-            new ProvidedSoftware(SoftwareType::Xray),
+            new ProvidedSoftware(
+                SoftwareType::Marzban,
+            ),
+
+            new ProvidedSoftware(
+                SoftwareType::Xray,
+            ),
         ];
     }
 
@@ -70,9 +86,40 @@ final readonly class MarzbanModule extends CommandModule implements StartableInt
     public function dependencies(): array
     {
         return [
-            new ModuleDependency(ModuleType::Docker),
-            new ModuleDependency(ModuleType::DockerCompose),
+            new ModuleDependency(
+                ModuleType::Docker,
+            ),
+
+            new ModuleDependency(
+                ModuleType::DockerCompose,
+            ),
         ];
+    }
+
+    protected function checkRequirements(): void
+    {
+        $root = $this->ssh->executeWithResult(
+            'id -u',
+        );
+
+        if (
+            ! $root->successful()
+            || trim($root->output) !== '0'
+        ) {
+            throw new ModuleInstallationException(
+                'Marzban installation requires root privileges.',
+            );
+        }
+
+        $curl = $this->ssh->executeWithResult(
+            'command -v curl',
+        );
+
+        if (! $curl->successful()) {
+            throw new ModuleInstallationException(
+                'curl is required for Marzban installation.',
+            );
+        }
     }
 
     protected function installCommand(): string
@@ -92,7 +139,7 @@ BASH;
 
         if ($this->resolveState() !== ModuleState::Running) {
             throw new ModuleStartException(
-                'Marzban did not enter the running state.',
+                'Marzban did not enter running state.',
             );
         }
     }
@@ -127,17 +174,13 @@ BASH;
         }
     }
 
-    public function uninstall(): void
+    public function healthCheck(): void
     {
-        throw new LogicException('Not implemented.');
-    }
-
-    protected function checkRequirements(): void
-    {
-        // Example:
-        // - Verify Linux distribution
-        // - Verify root privileges
-        // - Verify supported architecture
+        if ($this->resolveState() !== ModuleState::Running) {
+            throw new LogicException(
+                'Marzban health check failed.',
+            );
+        }
     }
 
     /**
@@ -157,6 +200,13 @@ BASH;
         if (! $result->successful()) {
             throw new $exception($message);
         }
+    }
+
+    protected function uninstallCommand(): string
+    {
+        return <<<'BASH'
+printf "y\ny\n" | marzban uninstall
+BASH;
     }
 
     protected function installTimeout(): int
