@@ -98,18 +98,11 @@ class SSHConnection implements SSHConnectionInterface
             $startedAt = microtime(true);
 
             $output = $this->ssh->exec($command);
-
-            $exitCode = $this->ssh->getExitStatus();
-            $stdError = $this->ssh->getStdError();
-            $timedOut = $this->ssh->isTimeout();
-
-            logger()->info('SSH RAW', [
-                'command' => $command,
-                'stdout' => $output,
-                'stderr' => $stdError,
-                'exit_code' => $exitCode,
-                'timeout' => $timedOut,
+            logger()->info('Docker Install Output', [
+                'output' => $output,
             ]);
+
+            $timedOut = $this->ssh->isTimeout();
 
             if ($timedOut) {
                 $this->handleTimeout($command);
@@ -119,7 +112,7 @@ class SSHConnection implements SSHConnectionInterface
                 output: is_string($output)
                     ? trim($output)
                     : '',
-                exitCode: $exitCode ?? -1,
+                exitCode: $this->ssh->getExitStatus() ?? -1,
             );
 
             logger()->info('SSH Command Executed', [
@@ -134,7 +127,7 @@ class SSHConnection implements SSHConnectionInterface
         } finally {
             if ($this->ssh !== null) {
                 $this->ssh->setTimeout(
-                    SSHTimeout::DEFAULT,
+                    SSHTimeout::DEFAULT
                 );
             }
         }

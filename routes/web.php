@@ -26,10 +26,10 @@ Route::prefix('panel')
 
     });
 
-
-
 Route::get('/test', function (
     SSHConnectionInterface $ssh,
+    ModuleRegistryInterface $registry,
+    DashboardService $dashboard
 ) {
     $ssh->connect(
         host: '109.122.247.89',
@@ -39,13 +39,9 @@ Route::get('/test', function (
         credential: '000000',
     );
 
-    dd([
-        'php' => $ssh->executeWithResult('php --version'),
-        'docker' => $ssh->executeWithResult('docker --version'),
-        'fake' => $ssh->executeWithResult('command_that_does_not_exist'),
-    ]);
+    dd(
+        $dashboard->overview()
+    );
 });
-
-
 
 require __DIR__.'/settings.php';
