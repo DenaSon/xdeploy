@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\SMS\Exceptions;
+namespace App\Infrastructure\Sms\Exceptions;
 
 use RuntimeException;
 

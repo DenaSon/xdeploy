@@ -3,9 +3,9 @@
 namespace App\Providers;
 
 use App\Domain\Authentication\Contracts\OtpRepositoryInterface;
-use App\Domain\Authentication\Repositories\EloquentOtpRepository;
-use App\Domain\SMS\Contracts\SmsProviderInterface;
-use App\Domain\SMS\Providers\SmsIrProvider;
+use App\Infrastructure\Persistence\Repositories\EloquentOtpRepository;
+use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
+use App\Infrastructure\Sms\Providers\SmsIrProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 

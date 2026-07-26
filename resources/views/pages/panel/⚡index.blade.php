@@ -1,10 +1,10 @@
 <?php
 
-use App\Domain\Server\Actions\ConnectServerAction;
+use App\Application\Server\Actions\ConnectServerAction;
+use App\Application\Server\Actions\GetServerOverviewAction;
 use App\Domain\Server\Enums\AuthenticationType;
-use App\Domain\Server\Models\Server;
+use App\Models\Server;
 use App\Support\Formatters\ByteFormatter;
-use App\Domain\Server\Actions\GetServerOverviewAction;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 

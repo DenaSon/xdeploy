@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Domain\Server\Actions;
+namespace App\Application\Server\Actions;
 
-use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Models\Server;
 
 readonly class ConnectServerAction
 {

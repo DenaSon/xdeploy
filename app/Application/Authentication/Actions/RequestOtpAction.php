@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Authentication\Actions;
+namespace App\Application\Authentication\Actions;
 
 use App\Domain\Authentication\DTOs\RequestOtpData;
 use App\Domain\Authentication\Services\OtpService;
-use App\Domain\SMS\Services\SmsService;
+use App\Infrastructure\Sms\Services\SmsService;
 
 final readonly class RequestOtpAction
 {

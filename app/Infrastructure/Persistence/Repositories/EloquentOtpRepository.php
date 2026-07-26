@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Authentication\Repositories;
+namespace App\Infrastructure\Persistence\Repositories;
 
 use App\Domain\Authentication\Contracts\OtpRepositoryInterface;
 use App\Domain\Authentication\ValueObjects\OtpCode;

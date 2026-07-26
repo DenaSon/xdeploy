@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Authentication\Actions;
+namespace App\Application\Authentication\Actions;
 
+use App\Application\User\Actions\FindOrCreateUserAction;
 use App\Domain\Authentication\DTOs\VerifyOtpData;
 use App\Domain\Authentication\Services\OtpService;
-use App\Domain\User\Actions\FindOrCreateUserAction;
 use Laravel\Sanctum\NewAccessToken;
 
 final readonly class VerifyOtpAction

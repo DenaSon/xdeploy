@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\SSH\Services;
 
-use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
+use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
 use phpseclib3\Net\SSH2;
 

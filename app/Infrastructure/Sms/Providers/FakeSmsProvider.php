@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\SMS\Providers;
+namespace App\Infrastructure\Sms\Providers;
 
 use App\Domain\Authentication\ValueObjects\OtpCode;
-use App\Domain\SMS\Contracts\SmsProviderInterface;
 use App\Domain\User\ValueObjects\PhoneNumber;
+use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
 use Illuminate\Support\Facades\Log;
 
 final readonly class FakeSmsProvider implements SmsProviderInterface

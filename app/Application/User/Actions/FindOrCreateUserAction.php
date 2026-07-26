@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\User\Actions;
+namespace App\Application\User\Actions;
 
 use App\Domain\User\Services\UserService;
 use App\Domain\User\ValueObjects\PhoneNumber;
 use App\Models\User;
 
-final readonly class CreateUserAction
+final readonly class FindOrCreateUserAction
 {
     public function __construct(
         private UserService $users,
@@ -16,11 +16,7 @@ final readonly class CreateUserAction
 
     public function handle(
         PhoneNumber $phone,
-        ?string $name = null,
     ): User {
-        return $this->users->create(
-            phone: $phone,
-            name: $name,
-        );
+        return $this->users->firstOrCreate($phone);
     }
 }

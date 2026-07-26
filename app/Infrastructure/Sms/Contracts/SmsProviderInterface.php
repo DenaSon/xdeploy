@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Sms\Contracts;
+namespace App\Infrastructure\Sms\Contracts;
 
 use App\Domain\Authentication\ValueObjects\OtpCode;
 use App\Domain\User\ValueObjects\PhoneNumber;

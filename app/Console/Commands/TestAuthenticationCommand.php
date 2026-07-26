@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Domain\Authentication\Actions\RequestOtpAction;
-use App\Domain\Authentication\Actions\VerifyOtpAction;
+use App\Application\Authentication\Actions\RequestOtpAction;
+use App\Application\Authentication\Actions\VerifyOtpAction;
 use App\Domain\Authentication\DTOs\RequestOtpData;
 use App\Domain\Authentication\DTOs\VerifyOtpData;
 use App\Domain\Authentication\ValueObjects\OtpCode;

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Sms\Providers;
+namespace App\Infrastructure\Sms\Providers;
 
 use App\Domain\Authentication\ValueObjects\OtpCode;
-use App\Domain\SMS\Contracts\SmsProviderInterface;
 use App\Domain\User\ValueObjects\PhoneNumber;
+use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
 use Ipe\Sdk\Facades\SmsIr;
 use Throwable;
 

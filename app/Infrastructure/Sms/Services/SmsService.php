@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\SMS\Services;
+namespace App\Infrastructure\Sms\Services;
 
 use App\Domain\Authentication\ValueObjects\OtpCode;
-use App\Domain\SMS\Contracts\SmsProviderInterface;
 use App\Domain\User\ValueObjects\PhoneNumber;
+use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
 
 final readonly class SmsService
 {

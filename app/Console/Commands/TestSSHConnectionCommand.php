@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Services\ServerInformation;
+use App\Models\Server;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;

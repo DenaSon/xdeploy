@@ -7,7 +7,6 @@ use App\Providers\UserServiceProvider;
 
 return [
     AppServiceProvider::class,
-    FortifyServiceProvider::class,
     ServerServiceProvider::class,
     UserServiceProvider::class,
 ];

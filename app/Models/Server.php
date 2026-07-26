@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Server\Models;
+namespace App\Models;
 
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

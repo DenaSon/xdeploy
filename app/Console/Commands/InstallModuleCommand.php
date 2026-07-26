@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Application\Module\Actions\InstallModuleAction;
+use App\Application\Server\Actions\ConnectServerAction;
 use App\Domain\Module\DTOs\InstallReport;
 use App\Domain\Module\Enums\ModuleType;
-use App\Domain\Server\Actions\ConnectServerAction;
 use App\Domain\Server\Enums\AuthenticationType;
-use App\Domain\Server\Models\Server;
+use App\Models\Server;
 use Illuminate\Console\Command;
 
 final class InstallModuleCommand extends Command

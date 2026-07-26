@@ -2,8 +2,8 @@
 
 namespace App\Infrastructure\SSH\Contracts;
 
-use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\DTOs\SSHResult;
+use App\Models\Server;
 
 interface SSHConnectionInterface
 {

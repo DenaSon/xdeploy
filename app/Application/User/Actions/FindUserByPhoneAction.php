@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\User\Actions;
+namespace App\Application\User\Actions;
 
 use App\Domain\User\Services\UserService;
 use App\Domain\User\ValueObjects\PhoneNumber;

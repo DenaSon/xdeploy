@@ -2,7 +2,7 @@
 
 namespace App\Infrastructure\SSH\Authentication;
 
-use App\Domain\Server\Models\Server;
+use App\Models\Server;
 use phpseclib3\Net\SSH2;
 
 class PasswordAuthenticator implements AuthenticationStrategy
