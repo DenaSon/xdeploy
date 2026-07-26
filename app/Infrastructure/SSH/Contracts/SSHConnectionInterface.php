@@ -2,18 +2,12 @@
 
 namespace App\Infrastructure\SSH\Contracts;
 
+use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 
 interface SSHConnectionInterface
 {
-    public function connect(
-        string $host,
-        int $port,
-        string $username,
-        string $authenticationType,
-        ?string $credential = null,
-        ?string $privateKeyPath = null
-    ): bool;
+    public function connect(Server $server): bool;
 
     public function execute(string $command): string;
 

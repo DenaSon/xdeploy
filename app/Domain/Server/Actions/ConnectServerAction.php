@@ -2,6 +2,7 @@
 
 namespace App\Domain\Server\Actions;
 
+use App\Domain\Server\Models\Server;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 
 readonly class ConnectServerAction
@@ -10,21 +11,8 @@ readonly class ConnectServerAction
         private SSHConnectionInterface $ssh,
     ) {}
 
-    public function handle(
-        string $host,
-        int $port,
-        string $username,
-        string $authenticationType,
-        ?string $credential = null,
-        ?string $privateKeyPath = null,
-    ): bool {
-        return $this->ssh->connect(
-            host: $host,
-            port: $port,
-            username: $username,
-            authenticationType: $authenticationType,
-            credential: $credential,
-            privateKeyPath: $privateKeyPath,
-        );
+    public function handle(Server $server): bool
+    {
+        return $this->ssh->connect($server);
     }
 }

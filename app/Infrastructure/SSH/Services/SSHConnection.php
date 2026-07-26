@@ -4,65 +4,43 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\SSH\Services;
 
+use App\Domain\Server\Models\Server;
+use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Support\SSH\SSHTimeout;
-use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SSH2;
 
 class SSHConnection implements SSHConnectionInterface
 {
     private ?SSH2 $ssh = null;
 
-    private ?string $host = null;
+    private ?Server $server = null;
 
-    private ?int $port = null;
+    public function __construct(
+        private readonly AuthenticationStrategyFactory $authenticationStrategyFactory,
+    ) {}
 
-    private ?string $username = null;
-
-    private ?string $authenticationType = null;
-
-    private ?string $credential = null;
-
-    private ?string $privateKeyPath = null;
-
-    public function connect(
-        string $host,
-        int $port,
-        string $username,
-        string $authenticationType,
-        ?string $credential = null,
-        ?string $privateKeyPath = null,
-    ): bool {
+    public function connect(Server $server): bool
+    {
         $this->disconnect();
 
-        $this->rememberConnection(
-            $host,
-            $port,
-            $username,
-            $authenticationType,
-            $credential,
-            $privateKeyPath,
+        $this->server = $server;
+
+        $this->ssh = new SSH2(
+            $server->host,
+            $server->port,
         );
 
-        $this->ssh = new SSH2($host, $port);
+        $strategy = $this->authenticationStrategyFactory->make(
+            $server->authentication_type,
+        );
 
-        $authenticated = match ($authenticationType) {
-            'password' => $this->ssh->login(
-                $username,
-                $credential,
-            ),
-
-            'private_key' => $this->loginWithPrivateKey(
-                $username,
-                $privateKeyPath,
-            ),
-
-            default => throw new SSHConnectionException(
-                "Unsupported authentication type: {$authenticationType}"
-            ),
-        };
+        $authenticated = $strategy->authenticate(
+            $this->ssh,
+            $server,
+        );
 
         if (! $authenticated) {
             $this->disconnect();
@@ -75,13 +53,11 @@ class SSHConnection implements SSHConnectionInterface
 
     public function execute(string $command): string
     {
-        if (! $this->isConnected() && ! $this->reconnect()) {
-            throw new SSHConnectionException(
-                'Unable to establish SSH connection.'
-            );
-        }
+        $this->ensureConnection();
 
-        return $this->ssh->exec($command);
+        return $this->ssh->exec(
+            $this->normalizeCommand($command)
+        );
     }
 
     public function executeWithResult(
@@ -98,9 +74,11 @@ class SSHConnection implements SSHConnectionInterface
             $startedAt = microtime(true);
 
             $output = $this->ssh->exec($command);
-            logger()->info('Docker Install Output', [
-                'output' => $output,
+
+            logger()->debug('SSH Command Output', [
+                'length' => strlen((string) $output),
             ]);
+
 
             $timedOut = $this->ssh->isTimeout();
 
@@ -188,61 +166,10 @@ class SSHConnection implements SSHConnectionInterface
 
     private function reconnect(): bool
     {
-        if (
-            $this->host === null ||
-            $this->port === null ||
-            $this->username === null ||
-            $this->authenticationType === null
-        ) {
+        if ($this->server === null) {
             return false;
         }
 
-        return $this->connect(
-            $this->host,
-            $this->port,
-            $this->username,
-            $this->authenticationType,
-            $this->credential,
-            $this->privateKeyPath,
-        );
-    }
-
-    private function rememberConnection(
-        string $host,
-        int $port,
-        string $username,
-        string $authenticationType,
-        ?string $credential,
-        ?string $privateKeyPath,
-    ): void {
-        $this->host = $host;
-        $this->port = $port;
-        $this->username = $username;
-        $this->authenticationType = $authenticationType;
-        $this->credential = $credential;
-        $this->privateKeyPath = $privateKeyPath;
-    }
-
-    private function loginWithPrivateKey(
-        string $username,
-        ?string $privateKeyPath,
-    ): bool {
-        if (
-            $privateKeyPath === null ||
-            ! file_exists($privateKeyPath)
-        ) {
-            throw new SSHConnectionException(
-                'Private key not found.'
-            );
-        }
-
-        $key = PublicKeyLoader::load(
-            file_get_contents($privateKeyPath)
-        );
-
-        return $this->ssh->login(
-            $username,
-            $key,
-        );
+        return $this->connect($this->server);
     }
 }

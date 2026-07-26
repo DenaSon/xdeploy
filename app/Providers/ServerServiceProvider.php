@@ -15,6 +15,7 @@ use App\Domain\Module\Modules\Redis\RedisModule;
 use App\Domain\Module\Registry\ModuleRegistry;
 use App\Infrastructure\Linux\Contracts\LinuxDistribution;
 use App\Infrastructure\Linux\Distributions\UbuntuDistribution;
+use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Services\SSHConnection;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -43,6 +44,10 @@ class ServerServiceProvider extends ServiceProvider
             fn (Application $app) => new ModuleRegistry(
                 $this->modules($app),
             ),
+        );
+
+        $this->app->singleton(
+            AuthenticationStrategyFactory::class
         );
     }
 
