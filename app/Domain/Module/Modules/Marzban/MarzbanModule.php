@@ -13,7 +13,6 @@ use App\Domain\Module\Exceptions\ModuleInstallationException;
 use App\Domain\Module\Exceptions\ModuleRestartException;
 use App\Domain\Module\Exceptions\ModuleStartException;
 use App\Domain\Module\Exceptions\ModuleStopException;
-use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Domain\Module\ValueObjects\ModuleDependency;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 use App\Support\SSH\SSHTimeout;

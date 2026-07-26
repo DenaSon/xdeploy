@@ -49,6 +49,7 @@ abstract readonly class CommandModule extends AbstractModule
 
         $this->healthCheck();
     }
+
     final public function uninstall(): void
     {
         $result = $this->ssh->executeWithResult(
@@ -86,6 +87,7 @@ abstract readonly class CommandModule extends AbstractModule
     abstract protected function inspectCommand(): string;
 
     abstract protected function installCommand(): string;
+
     protected function uninstallCommand(): string
     {
         throw new ModuleUninstallException(

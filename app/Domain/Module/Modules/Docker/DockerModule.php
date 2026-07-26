@@ -15,7 +15,6 @@ use App\Domain\Module\Exceptions\ModuleStopException;
 use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 use App\Support\SSH\SSHTimeout;
-use LogicException;
 
 final readonly class DockerModule extends CommandModule implements StartableInterface
 {

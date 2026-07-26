@@ -36,7 +36,6 @@ final readonly class ModuleLifecycleService
         }
     }
 
-
     public function stop(ModuleType $type): void
     {
         $module = $this->registry->find($type);
@@ -57,7 +56,6 @@ final readonly class ModuleLifecycleService
         }
     }
 
-
     public function restart(ModuleType $type): void
     {
         $module = $this->registry->find($type);
@@ -73,7 +71,6 @@ final readonly class ModuleLifecycleService
             ));
         }
     }
-
 
     private function ensureStartable(
         mixed $module,

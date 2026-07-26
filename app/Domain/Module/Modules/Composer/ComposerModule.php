@@ -7,7 +7,6 @@ namespace App\Domain\Module\Modules\Composer;
 use App\Domain\Module\Abstracts\CommandModule;
 use App\Domain\Module\Enums\ModuleType;
 use App\Domain\Module\Enums\SoftwareType;
-use App\Domain\Module\Exceptions\ModuleUninstallException;
 use App\Domain\Module\ValueObjects\ModuleDependency;
 use App\Domain\Module\ValueObjects\ProvidedSoftware;
 

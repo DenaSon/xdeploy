@@ -72,6 +72,4 @@ BASH;
     {
         throw new \LogicException('Not implemented.');
     }
-
-
 }
