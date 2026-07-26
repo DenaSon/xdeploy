@@ -1,8 +1,10 @@
 <?php
 
-use App\Domain\Server\Actions\ConnectServerAction;
+use App\Application\Server\Actions\ConnectServerAction;
+use App\Application\Server\Actions\GetServerOverviewAction;
+use App\Domain\Server\Enums\AuthenticationType;
+use App\Models\Server;
 use App\Support\Formatters\ByteFormatter;
-use App\Domain\Server\Actions\GetServerOverviewAction;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -19,15 +21,17 @@ class extends Component {
         GetServerOverviewAction $overview,
     ): void
     {
-        // Temporary (Sprint 02)
-        // TODO: Read server credentials from the selected server.
-        $connect->handle(
-            host: '127.0.0.1',
-            port: 2222,
-            username: 'root',
-            authenticationType: 'password',
-            credential: 'xdeploy',
-        );
+        // TODO: Read the selected server from the authenticated user.
+
+        $server = new Server([
+            'host' => '127.0.0.1',
+            'port' => 2222,
+            'username' => 'root',
+            'authentication_type' => AuthenticationType::Password,
+            'credential' => 'xdeploy',
+        ]);
+
+        $connect->handle($server);
 
         $this->overview = $overview
             ->handle()
