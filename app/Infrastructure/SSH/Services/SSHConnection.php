@@ -79,7 +79,6 @@ class SSHConnection implements SSHConnectionInterface
                 'length' => strlen((string) $output),
             ]);
 
-
             $timedOut = $this->ssh->isTimeout();
 
             if ($timedOut) {

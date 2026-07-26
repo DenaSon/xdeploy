@@ -20,7 +20,6 @@ enum OperatingSystem: string
 
     case Unknown = 'unknown';
 
-
     public function label(): string
     {
         return match ($this) {
@@ -33,8 +32,4 @@ enum OperatingSystem: string
             self::Unknown => 'Unknown',
         };
     }
-
-
 }
-
-

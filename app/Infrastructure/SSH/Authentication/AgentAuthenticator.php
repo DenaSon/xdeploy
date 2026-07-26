@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\SSH\Authentication;
 
-use phpseclib3\Net\SSH2;
 use App\Domain\Server\Models\Server;
+use phpseclib3\Net\SSH2;
 
 final class AgentAuthenticator implements AuthenticationStrategy
 {
