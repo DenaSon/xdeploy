@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a19f4adb8842c2b71d23cfaaba8bdbd5",
+    "content-hash": "bbb9f298618ca290abc128c79b1adbf0",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -945,16 +945,16 @@
         },
         {
             "name": "guzzlehttp/guzzle",
-            "version": "7.15.0",
+            "version": "7.15.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/guzzle.git",
-                "reference": "90bd104afeb0fcc2190c9eb6fd8a441447e4b30d"
+                "reference": "61443dfb33c62f308ee8add20f45b4d6e4bf8d2f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/90bd104afeb0fcc2190c9eb6fd8a441447e4b30d",
-                "reference": "90bd104afeb0fcc2190c9eb6fd8a441447e4b30d",
+                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/61443dfb33c62f308ee8add20f45b4d6e4bf8d2f",
+                "reference": "61443dfb33c62f308ee8add20f45b4d6e4bf8d2f",
                 "shasum": ""
             },
             "require": {
@@ -1053,7 +1053,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/guzzle/issues",
-                "source": "https://github.com/guzzle/guzzle/tree/7.15.0"
+                "source": "https://github.com/guzzle/guzzle/tree/7.15.1"
             },
             "funding": [
                 {
@@ -1069,7 +1069,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-07-17T12:26:48+00:00"
+            "time": "2026-07-18T11:23:11+00:00"
         },
         {
             "name": "guzzlehttp/promises",
@@ -1359,6 +1359,51 @@
                 }
             ],
             "time": "2026-07-17T13:53:03+00:00"
+        },
+        {
+            "name": "ipe/smsir-php",
+            "version": "v1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/IPeCompany/smsir-php.git",
+                "reference": "a9c1bf0259541cc0f29317f36b868186ec5a03ba"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/IPeCompany/smsir-php/zipball/a9c1bf0259541cc0f29317f36b868186ec5a03ba",
+                "reference": "a9c1bf0259541cc0f29317f36b868186ec5a03ba",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.0",
+                "php": "^7.3|^8.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "SmsIr": "Ipe\\Sdk\\Facades\\SmsIr"
+                    },
+                    "providers": [
+                        "Ipe\\Sdk\\SmsIrServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ipe\\Sdk\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A package for sending SMS.",
+            "support": {
+                "issues": "https://github.com/IPeCompany/smsir-php/issues",
+                "source": "https://github.com/IPeCompany/smsir-php/tree/v1.0.1"
+            },
+            "time": "2024-10-19T05:20:03+00:00"
         },
         {
             "name": "jfcherng/php-color-output",
