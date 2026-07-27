@@ -29,10 +29,10 @@ return [
     |
     */
 
-    'component_namespaces' => [
-        'layouts' => resource_path('views/layouts'),
-        'pages' => resource_path('views/pages'),
-    ],
+//    'component_namespaces' => [
+//        'layouts' => resource_path('views/layouts'),
+//        'pages' => resource_path('views/pages'),
+//    ],
 
     /*
     |---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ return [
 
     'make_command' => [
         'type' => 'class',
-        'emoji' => false,
+        'emoji' => true,
         'with' => [
             'js' => false,
             'css' => false,

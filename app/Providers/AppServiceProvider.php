@@ -8,6 +8,7 @@ use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
 use App\Infrastructure\Sms\Providers\SmsIrProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,5 +31,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Schema::defaultStringLength(191);
+
+
     }
 }

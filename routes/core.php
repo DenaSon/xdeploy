@@ -25,7 +25,7 @@ Route::middleware([
         |--------------------------------------------------------------------------
         */
 
-        Route::livewire('/dashboard', 'pages::core.dashboard.index')
+        Route::livewire('/dashboard', 'core.dashboard')
             ->name('dashboard');
 
     });

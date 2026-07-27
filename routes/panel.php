@@ -24,8 +24,7 @@ Route::middleware([
         | Dashboard
         |--------------------------------------------------------------------------
         */
-
-        Route::livewire('/', 'pages::panel.dashboard.index')
+        Route::livewire('/', 'panel.dashboard')
             ->name('dashboard');
 
         /*
