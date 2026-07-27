@@ -4,9 +4,7 @@
     dir="rtl"
     data-theme="{{ config('app.theme', 'light') }}"
 >
-
 <head>
-
     <meta charset="utf-8">
 
     <meta
@@ -15,14 +13,13 @@
     >
 
     <title>
-        {{ ($title ?? 'Dashboard') . ' | xDeploy' }}
+        {{ $title ?? __('Dashboard') }} | xDeploy
     </title>
 
     @vite([
         'resources/css/app.css',
         'resources/js/app.js',
     ])
-
 </head>
 
 <body
@@ -33,77 +30,28 @@
     "
 >
 
-<div
-    wire:loading
-    wire:target="$navigate"
-    class="
-        loading
-        loading-bars
-        loading-primary
-        fixed
-        top-4
-        left-1/2
-        z-50
-        -translate-x-1/2
-    "
-></div>
+{{-- Global Navigation Loading --}}
+<x-panel.loading-indicator />
 
-<div class="drawer lg:drawer-open">
+{{-- Main Drawer Layout --}}
+<x-panel.drawer>
 
-    <input
-        id="panel-drawer"
-        type="checkbox"
-        class="drawer-toggle"
-    >
+    {{-- Header --}}
+    <x-panel.header
+        :breadcrumbs="$breadcrumbs ?? []"
+    />
 
-    <div
-        class="
-            drawer-content
-            flex
-            min-h-screen
-            flex-col
-        "
-    >
+    {{-- Page Content --}}
+    <x-panel.page-container>
 
-        <x-panel.topbar
-            :breadcrumbs="$breadcrumbs ?? []"
-        />
+        {{ $slot }}
 
-        <main
-            class="
-                flex-1
-                overflow-x-hidden
-                p-4
-                lg:p-6
-            "
-        >
+    </x-panel.page-container>
 
-            {{ $slot }}
+</x-panel.drawer>
 
-        </main>
-
-    </div>
-
-    <div class="drawer-side">
-
-        <label
-            for="panel-drawer"
-            class="drawer-overlay"
-            aria-label="Close sidebar"
-        ></label>
-
-        @persist('panel-sidebar')
-
-        <x-panel.sidebar />
-
-        @endpersist
-
-    </div>
-
-</div>
-
+{{-- Global Toast --}}
 <x-toast position="toast-top toast-center" />
 
 </body>
-
 </html>

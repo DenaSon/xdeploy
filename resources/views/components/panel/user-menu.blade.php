@@ -1,0 +1,56 @@
+@php
+    $user = auth()->user();
+@endphp
+
+<x-dropdown>
+    <x-slot:trigger>
+
+        <x-button
+            icon="lucide.user"
+            class="btn-ghost"
+            responsive
+        >
+
+            <div class="hidden text-right lg:block">
+
+                <div class="font-medium">
+                    {{ $user?->name }}
+                </div>
+
+                <div class="text-xs opacity-70">
+                    {{ $user?->mobile ?? $user?->email }}
+                </div>
+
+            </div>
+
+        </x-button>
+
+    </x-slot:trigger>
+
+    <x-menu>
+
+        <x-menu-item
+            title="پروفایل"
+            icon="lucide.user"
+            link=""
+        />
+
+        <x-menu-separator />
+
+        <form
+            method="POST"
+            action=""
+        >
+            @csrf
+
+            <x-menu-item
+                title="خروج"
+                icon="lucide.log-out"
+                onclick="event.preventDefault(); this.closest('form').submit();"
+            />
+
+        </form>
+
+    </x-menu>
+
+</x-dropdown>

@@ -43,10 +43,6 @@ class extends Component {
 
 <div class="space-y-6">
 
-    <x-panel.page-header
-        :title="$title"
-        :description="$description"
-    />
 
     <section class="rounded-xl border bg-white p-6">
 
