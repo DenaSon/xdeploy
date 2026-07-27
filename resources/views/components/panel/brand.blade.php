@@ -8,7 +8,7 @@
 >
 
     <a
-        href="{{ route('panel.panel') }}"
+        href="{{ route('panel.dashboard') }}"
         wire:navigate
         class="flex items-center gap-3"
     >

@@ -10,19 +10,19 @@ class PanelNavigation
             [
                 'title' => __('panel.dashboard'),
                 'icon' => 'lucide.layout-dashboard',
-                'route' => route('panel.panel'),
+                'route' => route('panel.dashboard'),
             ],
 
             [
                 'title' => __('panel.modules'),
                 'icon' => 'lucide.package',
-                'route' => route('panel.panel'),
+                'route' => route('panel.dashboard'),
             ],
 
             [
                 'title' => __('panel.settings'),
                 'icon' => 'lucide.settings',
-                'route' => route('panel.panel'),
+                'route' => route('panel.dashboard'),
             ],
         ];
     }
