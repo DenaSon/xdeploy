@@ -49,7 +49,7 @@
         @endif
 
         {{-- Activates the menu item when a route matches the `link` property --}}
-        <x-menu activate-by-route>
+        <x-menu activate-by-route active-bg-color="bg-base-700">
             <x-menu-item title="Dashboard" icon="o-home" link="" />
 
 {{--            <x-menu-sub title="Settings" icon="o-cog-6-tooth">--}}

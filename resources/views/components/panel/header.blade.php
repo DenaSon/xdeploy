@@ -1,64 +1,85 @@
+@props([
+    'breadcrumbs' => [],
+    'title' => null,
+])
+
 <header
     class="
         navbar
         sticky
         top-0
-        z-30
+        z-20
+
+        h-14
+        min-h-14
+
         border-b
-        border-base-300
-        bg-base-100/90
-        px-4
-        backdrop-blur
-        lg:px-6
+        border-base-300/70
+
+        bg-base-100/85
+        backdrop-blur-xl
+
+        px-3
+        lg:px-5
     "
 >
 
-    {{-- Left Section --}}
-    <div class="navbar-start gap-2">
+    <div class="navbar-start min-w-0 gap-2">
 
-        {{-- Mobile Drawer Toggle --}}
         <label
             for="panel-drawer"
-            class="btn btn-square btn-ghost lg:hidden"
+            class="btn btn-square btn-ghost btn-sm lg:hidden"
         >
             <x-icon
                 name="lucide.menu"
-                class="h-5 w-5"
+                class="size-5"
             />
         </label>
 
-        {{-- Breadcrumb --}}
-        <x-panel.breadcrumb
-            :items="$breadcrumbs"
-        />
+        @if($breadcrumbs)
+
+            <div class="breadcrumbs text-sm">
+
+                <ul>
+
+                    @foreach($breadcrumbs as $breadcrumb)
+
+                        <li>
+
+                            @if(!empty($breadcrumb['url']))
+
+                                <a
+                                    href="{{ $breadcrumb['url'] }}"
+                                    wire:navigate
+                                    class="text-base-content/60 hover:text-base-content transition-colors"
+                                >
+                                    {{ $breadcrumb['label'] }}
+                                </a>
+
+                            @else
+
+                                <span class="font-medium text-base-content">
+                                    {{ $breadcrumb['label'] }}
+                                </span>
+
+                            @endif
+
+                        </li>
+
+                    @endforeach
+
+                </ul>
+
+            </div>
+
+        @endif
 
     </div>
 
-    {{-- Center Section --}}
-    <div class="navbar-center hidden lg:flex">
+    <div class="navbar-end gap-1">
 
-        @isset($title)
+        <x-theme-toggle />
 
-            <h1 class="text-lg font-semibold">
-
-                {{ $title }}
-
-            </h1>
-
-        @endisset
-
-    </div>
-
-    {{-- Right Section --}}
-    <div class="navbar-end gap-2">
-
-        {{-- Theme Switcher (Sprint Later) --}}
-        {{-- <x-panel.theme-switcher /> --}}
-
-        {{-- Notifications (Sprint Later) --}}
-        {{-- <x-panel.notifications /> --}}
-
-        {{-- User Menu --}}
         <x-panel.user-menu />
 
     </div>

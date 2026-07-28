@@ -4,35 +4,21 @@
 
 <nav class="flex-1 py-4">
 
-    <div class="px-5 pb-2 text-xs font-semibold uppercase tracking-wider text-base-content/50">
-        {{ __('panel.navigation') }}
-    </div>
+    <x-menu class="">
 
-    <ul class="menu w-full gap-1 px-3">
+        @foreach (PanelNavigation::items() as $item)
 
-        @foreach(PanelNavigation::items() as $item)
-
-            <li>
-
-                <a
-                    wire:navigate
-                    wire:current="menu-active"
-                    href="{{ $item['route'] }}"
-                >
-
-                    <x-icon
-                        :name="$item['icon']"
-                        class="size-5"
-                    />
-
-                    {{ $item['title'] }}
-
-                </a>
-
-            </li>
+            <x-menu-item
+                :title="$item['title']"
+                :icon="$item['icon']"
+                :link="$item['route']"
+                :active="request()->routeIs($item['name'])"
+                wire:navigate
+                class="rounded-xl"
+            />
 
         @endforeach
 
-    </ul>
+    </x-menu>
 
 </nav>

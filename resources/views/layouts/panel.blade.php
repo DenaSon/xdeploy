@@ -30,25 +30,41 @@
     "
 >
 
-{{-- Global Navigation Loading --}}
-<x-panel.loading-indicator />
+<x-main full-width>
 
-{{-- Main Drawer Layout --}}
-<x-panel.drawer>
+    <x-slot:sidebar
+        drawer="panel-drawer"
+        collapsible
+        collapse-text=""
+        class="bg-base-300/80"
+    >
 
-    {{-- Header --}}
-    <x-panel.header
-        :breadcrumbs="$breadcrumbs ?? []"
-    />
+        <x-panel.brand />
 
-    {{-- Page Content --}}
-    <x-panel.page-container>
+        <x-panel.navigation />
 
-        {{ $slot }}
+    </x-slot:sidebar>
 
-    </x-panel.page-container>
+    <x-slot:content>
 
-</x-panel.drawer>
+        <x-panel.header
+            :breadcrumbs="$breadcrumbs ?? []"
+            :title="$title ?? null"
+        />
+
+        <x-panel.page-container>
+            {{ $slot }}
+        </x-panel.page-container>
+
+    </x-slot:content>
+
+    <x-slot:footer>
+
+        <x-panel.footer />
+
+    </x-slot:footer>
+
+</x-main>
 
 {{-- Global Toast --}}
 <x-toast position="toast-top toast-center" />

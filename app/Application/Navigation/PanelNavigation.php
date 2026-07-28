@@ -8,21 +8,24 @@ class PanelNavigation
     {
         return [
             [
-                'title' => __('panel.dashboard'),
-                'icon' => 'lucide.layout-dashboard',
+                'title' => 'داشبورد',
+                'icon'  => 'lucide.layout-dashboard',
                 'route' => route('panel.dashboard'),
+                'name'  => 'panel.dashboard',
             ],
 
             [
-                'title' => __('panel.modules'),
-                'icon' => 'lucide.package',
+                'title' => 'ماژول‌ها',
+                'icon'  => 'lucide.package',
                 'route' => route('panel.modules.index'),
+                'name'  => 'panel.modules.*',
             ],
 
             [
-                'title' => __('panel.settings'),
-                'icon' => 'lucide.settings',
+                'title' => 'تنظیمات',
+                'icon'  => 'lucide.settings',
                 'route' => route('panel.dashboard'),
+                'name'  => 'panel.settings.*',
             ],
         ];
     }

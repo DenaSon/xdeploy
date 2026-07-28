@@ -1,17 +1,20 @@
 @font-face {
-    font-family: "Vazirmatn";
+    font-family: "Yekan";
 
-    src: url("../fonts/Vazirmatn-Variable.woff2")
-    format("woff2");
+    src:
+        url("../fonts/yekan/Yekan.woff2") format("woff2"),
+        url("../fonts/yekan/Yekan.woff") format("woff"),
+        url("../fonts/yekan/Yekan.ttf") format("truetype");
 
-    font-weight: 100 900;
-
+    font-weight: 400;
     font-style: normal;
-
     font-display: swap;
 }
+
+
+
 @import 'tailwindcss';
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
 
 
 /* daisyUI */
@@ -24,7 +27,14 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: "Vazirmatn", sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans:
+        "Yekan",
+        sans-serif,
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji";
+
 
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
@@ -43,6 +53,14 @@
     --color-accent-foreground: var(--color-white);
 }
 
+html {
+    text-rendering: optimizeLegibility;
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    font-feature-settings: "kern";
+}
 @layer theme {
     .dark {
         --color-accent: var(--color-white);

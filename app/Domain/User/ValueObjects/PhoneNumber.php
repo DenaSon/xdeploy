@@ -25,6 +25,8 @@ final readonly class PhoneNumber
 
     public static function from(string $phone): self
     {
+        $phone = preg_replace('/\s+/', '', $phone);
+
         return new self($phone);
     }
 

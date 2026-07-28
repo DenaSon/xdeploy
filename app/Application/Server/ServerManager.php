@@ -19,7 +19,7 @@ readonly class ServerManager
     {
         return Cache::remember(
             "server:{$server->id}:overview",
-            now()->addMinutes(5),
+            now()->addMinutes(20),
             function () use ($server) {
 
                 $this->connectServer->handle($server);

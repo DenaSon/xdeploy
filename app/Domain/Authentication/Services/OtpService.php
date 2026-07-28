@@ -7,9 +7,11 @@ namespace App\Domain\Authentication\Services;
 use App\Domain\Authentication\Contracts\OtpRepositoryInterface;
 use App\Domain\Authentication\Exceptions\InvalidOtpException;
 use App\Domain\Authentication\Exceptions\OtpExpiredException;
+use App\Domain\Authentication\Exceptions\TooManyOtpRequestsException;
 use App\Domain\Authentication\ValueObjects\OtpCode;
 use App\Domain\User\ValueObjects\PhoneNumber;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\RateLimiter;
 
 final readonly class OtpService
 {
@@ -20,6 +22,15 @@ final readonly class OtpService
     public function generate(
         PhoneNumber $phone,
     ): OtpCode {
+
+        $key = 'otp:'.$phone;
+
+        if (RateLimiter::tooManyAttempts($key, 2)) {
+            throw new TooManyOtpRequestsException;
+        }
+
+        RateLimiter::hit($key, 60);
+
         $code = OtpCode::generate();
 
         $this->repository->store(

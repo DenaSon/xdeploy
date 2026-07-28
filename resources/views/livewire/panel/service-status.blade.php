@@ -1,49 +1,20 @@
-<x-card
-    title="وضعیت سرویس‌ها" class="shadow-md"
-
+<x-dashboard.card
+    title="وضعیت سرویس‌ها"
+    subtitle="Services"
+    icon="o-bolt"
 >
 
-    <div class="max-h-64 overflow-y-auto scrollbar-thin divide-y divide-base-200 pe-2">
+    <div class="space-y-3 max-h-64 overflow-y-auto scrollbar-thin">
 
         @foreach($this->services as $service)
 
-            @php($active = $service['status'] === 'active')
-
-            <div class="flex items-center justify-between py-3 transition-colors hover:bg-base-200/40">
-
-                <div class="flex items-center gap-3">
-
-                    <div class="inline-grid *:[grid-area:1/1]">
-
-                        @if($active)
-                            <div class="status status-success animate-ping"></div>
-                            <div class="status status-success"></div>
-                        @else
-                            <div class="status status-error"></div>
-                        @endif
-
-                    </div>
-
-                    <span class="font-medium">
-                        {{ $service['name'] }}
-                    </span>
-
-                </div>
-
-                <span @class([
-                    'text-xs font-medium',
-                    'text-success' => $active,
-                    'text-error' => ! $active,
-                ])>
-                    {{ $active ? 'فعال' : 'غیرفعال' }}
-                </span>
-
-            </div>
+            <x-dashboard.service-status
+                :name="$service['name']"
+                :active="$service['status'] === 'active'"
+            />
 
         @endforeach
 
-
-
     </div>
 
-</x-card>
+</x-dashboard.card>
