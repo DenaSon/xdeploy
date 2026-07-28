@@ -37,19 +37,7 @@
 
         <x-menu-separator />
 
-        <form
-            method="POST"
-            action=""
-        >
-            @csrf
-
-            <x-menu-item
-                title="خروج"
-                icon="lucide.log-out"
-                onclick="event.preventDefault(); this.closest('form').submit();"
-            />
-
-        </form>
+      <livewire:auth.logout/>
 
     </x-menu>
 
