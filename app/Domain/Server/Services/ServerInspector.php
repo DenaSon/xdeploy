@@ -157,8 +157,11 @@ readonly class ServerInspector
      */
     public function serviceStatus(string $service): string
     {
-        return $this->run(
-            $this->distribution->serviceStatus($service)
-        );
+        $command = match ($service) {
+            'marzban' => $this->distribution->dockerContainerStatus('marzban'),
+            default => $this->distribution->serviceStatus($service),
+        };
+
+        return $this->run($command);
     }
 }

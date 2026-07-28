@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Server\DTOs;
 
+use App\Support\Formatters\ByteFormatter;
+
 final readonly class DiskInfoData
 {
     public function __construct(
@@ -16,10 +18,11 @@ final readonly class DiskInfoData
     public function toArray(): array
     {
         return [
-            'total' => $this->total,
-            'used' => $this->used,
-            'available' => $this->available,
-            'usage_percent' => $this->usagePercent,
+            'total' => ByteFormatter::format($this->total),
+            'used' => ByteFormatter::format($this->used),
+            'available' => ByteFormatter::format($this->available),
+
+            'usagePercent' => $this->usagePercent,
         ];
     }
 }

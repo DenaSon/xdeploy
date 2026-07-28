@@ -1,7 +1,6 @@
 <?php
 
 use App\Providers\AppServiceProvider;
-use App\Providers\FortifyServiceProvider;
 use App\Providers\ServerServiceProvider;
 use App\Providers\UserServiceProvider;
 

@@ -42,16 +42,16 @@ Route::middleware([
         |--------------------------------------------------------------------------
         */
 
-        // Route::livewire('/modules', 'pages::panel.modules.index')
-        //     ->name('modules.index');
+        Route::livewire('/modules', 'modules.index')
+            ->name('modules.index');
+
+        Route::livewire('/modules/{module}', 'modules.show')
+            ->name('modules.show');
 
         /*
         |--------------------------------------------------------------------------
         | Settings
         |--------------------------------------------------------------------------
         */
-
-        // Route::livewire('/settings', 'pages::panel.settings.index')
-        //     ->name('settings');
 
     });

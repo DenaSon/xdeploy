@@ -80,3 +80,20 @@ select:focus[data-flux-control] {
 @source "../../storage/framework/views/*.php";
 
 
+.scrollbar-minimal::-webkit-scrollbar {
+    width: 4px;
+}
+
+.scrollbar-minimal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-minimal::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+    transition: background .2s;
+}
+
+.scrollbar-minimal:hover::-webkit-scrollbar-thumb {
+    background: rgb(var(--color-base-300));
+}

@@ -58,4 +58,6 @@ interface LinuxDistribution
      * Get service status command.
      */
     public function serviceStatus(string $service): string;
+
+    public function dockerContainerStatus(string $container): string;
 }

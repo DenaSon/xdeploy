@@ -16,7 +16,7 @@ class PanelNavigation
             [
                 'title' => __('panel.modules'),
                 'icon' => 'lucide.package',
-                'route' => route('panel.dashboard'),
+                'route' => route('panel.modules.index'),
             ],
 
             [

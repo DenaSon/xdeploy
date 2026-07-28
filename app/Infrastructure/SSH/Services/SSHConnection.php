@@ -10,6 +10,7 @@ use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
+use phpseclib3\Exception\ConnectionClosedException;
 use phpseclib3\Net\SSH2;
 
 class SSHConnection implements SSHConnectionInterface
@@ -32,6 +33,7 @@ class SSHConnection implements SSHConnectionInterface
             $server->host,
             $server->port,
         );
+        $this->ssh->setTimeout(40);
 
         $strategy = $this->authenticationStrategyFactory->make(
             $server->authentication_type,
@@ -55,9 +57,21 @@ class SSHConnection implements SSHConnectionInterface
     {
         $this->ensureConnection();
 
-        return $this->ssh->exec(
-            $this->normalizeCommand($command)
-        );
+        try {
+            return $this->ssh->exec(
+                $this->normalizeCommand($command)
+            );
+        } catch (ConnectionClosedException) {
+            if (! $this->reconnect()) {
+                throw new SSHConnectionException(
+                    'Unable to re-establish SSH connection.'
+                );
+            }
+
+            return $this->ssh->exec(
+                $this->normalizeCommand($command)
+            );
+        }
     }
 
     public function executeWithResult(

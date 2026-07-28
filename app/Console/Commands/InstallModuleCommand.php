@@ -8,7 +8,6 @@ use App\Application\Module\Actions\InstallModuleAction;
 use App\Application\Server\Actions\ConnectServerAction;
 use App\Domain\Module\DTOs\InstallReport;
 use App\Domain\Module\Enums\ModuleType;
-use App\Domain\Server\Enums\AuthenticationType;
 use App\Models\Server;
 use Illuminate\Console\Command;
 
@@ -40,13 +39,7 @@ final class InstallModuleCommand extends Command
         $this->info('Connecting to server...');
 
         // TODO: Replace with the selected server after Server Management is implemented.
-        $server = new Server([
-            'host' => '127.0.0.1',
-            'port' => 2222,
-            'username' => 'root',
-            'authentication_type' => AuthenticationType::Password,
-            'credential' => 'xdeploy',
-        ]);
+        $server = Server::first();
 
         $this->connect->handle($server);
 

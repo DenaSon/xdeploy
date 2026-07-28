@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Server\DTOs;
 
+use App\Support\Formatters\ByteFormatter;
+
 final readonly class MemoryInfoData
 {
     public function __construct(
@@ -17,11 +19,12 @@ final readonly class MemoryInfoData
     public function toArray(): array
     {
         return [
-            'total' => $this->total,
-            'used' => $this->used,
-            'free' => $this->free,
-            'available' => $this->available,
-            'usage_percent' => $this->usagePercent,
+            'total' => ByteFormatter::format($this->total),
+            'used' => ByteFormatter::format($this->used),
+            'free' => ByteFormatter::format($this->free),
+            'available' => ByteFormatter::format($this->available),
+
+            'usagePercent' => $this->usagePercent,
         ];
     }
 }

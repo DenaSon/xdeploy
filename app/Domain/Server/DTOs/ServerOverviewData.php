@@ -36,10 +36,12 @@ readonly class ServerOverviewData
             'uptime' => $this->uptime,
             'user' => $this->user,
             'privateIp' => $this->privateIp,
+
             'cpu' => $this->cpu->toArray(),
             'memory' => $this->memory->toArray(),
             'disk' => $this->disk->toArray(),
-            'load_average' => $this->loadAverage->toArray(),
+            'loadAverage' => $this->loadAverage->toArray(),
+
             'services' => array_map(
                 fn (ServiceStatusData $service) => $service->toArray(),
                 $this->services,

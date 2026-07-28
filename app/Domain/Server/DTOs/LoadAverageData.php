@@ -15,9 +15,9 @@ final readonly class LoadAverageData
     public function toArray(): array
     {
         return [
-            '1m' => $this->oneMinute,
-            '5m' => $this->fiveMinutes,
-            '15m' => $this->fifteenMinutes,
+            'oneMinute' => $this->oneMinute,
+            'fiveMinutes' => $this->fiveMinutes,
+            'fifteenMinutes' => $this->fifteenMinutes,
         ];
     }
 }

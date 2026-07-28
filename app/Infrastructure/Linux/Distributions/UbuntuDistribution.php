@@ -105,4 +105,21 @@ else
 fi
 BASH;
     }
+
+    /**
+     * Get Docker container status command.
+     */
+    public function dockerContainerStatus(string $container): string
+    {
+        return <<<BASH
+if docker ps \
+    --filter "name={$container}" \
+    --filter "status=running" \
+    --format "{{.Names}}" | grep -q .; then
+    echo "active"
+else
+    echo "inactive"
+fi
+BASH;
+    }
 }

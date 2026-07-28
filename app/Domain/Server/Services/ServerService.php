@@ -46,6 +46,10 @@ readonly class ServerService
             'Nginx' => 'nginx',
             'Marzban' => 'marzban',
             'Xray' => 'xray',
+            'Fail2Ban' => 'fail2ban',
+            'UFW' => 'ufw',
+            'Redis' => 'redis',
+            'MySQL' => 'mysql',
         ];
 
         $result = [];
