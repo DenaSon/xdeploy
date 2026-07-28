@@ -13,4 +13,14 @@ final readonly class VerifyOtpData
         public PhoneNumber $phone,
         public OtpCode $code,
     ) {}
+
+    public static function from(
+        string $phone,
+        string $code,
+    ): self {
+        return new self(
+            phone: PhoneNumber::from($phone),
+            code: OtpCode::from($code),
+        );
+    }
 }

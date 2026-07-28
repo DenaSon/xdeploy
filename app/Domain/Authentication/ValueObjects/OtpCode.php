@@ -8,6 +8,8 @@ use InvalidArgumentException;
 
 final readonly class OtpCode
 {
+    private const int LENGTH = 4;
+
     public function __construct(
         public string $value,
     ) {
@@ -20,17 +22,10 @@ final readonly class OtpCode
         return new self($value);
     }
 
-    public static function generate(
-        int $length = 6,
-    ): self {
-        if ($length < 4 || $length > 8) {
-            throw new InvalidArgumentException(
-                'OTP length must be between 4 and 8 digits.',
-            );
-        }
-
-        $min = 10 ** ($length - 1);
-        $max = (10 ** $length) - 1;
+    public static function generate(): self
+    {
+        $min = 10 ** (self::LENGTH - 1);
+        $max = (10 ** self::LENGTH) - 1;
 
         return new self(
             (string) random_int($min, $max),
@@ -39,7 +34,10 @@ final readonly class OtpCode
 
     private function validate(): void
     {
-        if (! preg_match('/^\d{4,8}$/', $this->value)) {
+        if (! preg_match(
+            '/^\d{'.self::LENGTH.'}$/',
+            $this->value,
+        )) {
             throw new InvalidArgumentException(
                 'Invalid OTP code.',
             );

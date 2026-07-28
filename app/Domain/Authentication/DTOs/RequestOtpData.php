@@ -11,4 +11,11 @@ final readonly class RequestOtpData
     public function __construct(
         public PhoneNumber $phone,
     ) {}
+
+    public static function from(string $phone): self
+    {
+        return new self(
+            phone: PhoneNumber::from($phone),
+        );
+    }
 }

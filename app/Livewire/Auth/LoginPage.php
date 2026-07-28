@@ -40,28 +40,28 @@ final class LoginPage extends Component
                 description: 'کد تأیید برای شماره موبایل شما ارسال شد.',
             );
 
-//            $this->redirectRoute(
-//                'verify',
-//                navigate: true,
-//            );
-        }
-        catch (TooManyOtpRequestsException) {
+            $this->redirectRoute(
+                name: 'verify',
+                parameters: [
+                    'phone' => $this->phone,
+                ],
+                navigate: true,
+            );
+        } catch (TooManyOtpRequestsException) {
 
             $this->warning(
                 title: 'کمی صبر کنید',
                 description: 'شما بیش از حد مجاز درخواست کد تأیید ارسال کرده‌اید. لطفاً چند دقیقه دیگر دوباره تلاش کنید.',
             );
 
-        }
-        catch (\InvalidArgumentException $e) {
-
+        } catch (\InvalidArgumentException $e) {
+            dd($e->getMessage());
             $this->addError(
                 'phone',
                 'شماره موبایل معتبر نیست.',
             );
 
         } catch (\Throwable $e) {
-
 
             report($e);
 

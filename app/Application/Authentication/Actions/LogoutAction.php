@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Application\Authentication\Actions;
 
-use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
-final class LogoutAction
+final readonly class LogoutAction
 {
-    public function handle(
-        User $user,
-    ): void {
-        $user
-            ->currentAccessToken()
-            ?->delete();
+    public function handle(): void
+    {
+        Auth::logout();
+
+        request()->session()->invalidate();
+
+        request()->session()->regenerateToken();
     }
 }
