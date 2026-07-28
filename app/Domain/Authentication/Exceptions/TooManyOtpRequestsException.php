@@ -11,7 +11,7 @@ final class TooManyOtpRequestsException extends RuntimeException
     public function __construct()
     {
         parent::__construct(
-            'Too many OTP requests.',
+            'تعداد درخواست‌های دریافت کد تأیید بیش از حد مجاز است. لطفاً چند دقیقه دیگر دوباره تلاش کنید.',
         );
     }
 }

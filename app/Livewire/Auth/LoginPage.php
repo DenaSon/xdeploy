@@ -55,7 +55,7 @@ final class LoginPage extends Component
             );
 
         } catch (\InvalidArgumentException $e) {
-            dd($e->getMessage());
+
             $this->addError(
                 'phone',
                 'شماره موبایل معتبر نیست.',

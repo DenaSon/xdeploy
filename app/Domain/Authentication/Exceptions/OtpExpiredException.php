@@ -8,5 +8,5 @@ use RuntimeException;
 
 final class OtpExpiredException extends RuntimeException
 {
-    protected $message = 'The verification code has expired.';
+    protected $message = 'کد تأیید منقضی شده است. لطفاً دوباره درخواست کد دهید.';
 }

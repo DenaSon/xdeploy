@@ -76,7 +76,15 @@
 
                             </label>
 
+
+
                         </div>
+
+                        @error('code')
+                        <div class="alert alert-error alert-soft mt-4">
+                            <span>{{ $message }}</span>
+                        </div>
+                        @enderror
 
                         <x-button
                             spinner

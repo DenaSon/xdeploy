@@ -9,6 +9,7 @@
 
                 <div class="card-body space-y-10 p-8 lg:p-10">
 
+
                     {{-- Brand --}}
                     <div class="text-center">
 
@@ -31,7 +32,7 @@
                         </p>
 
                     </div>
-
+                    <x-hr/>
                     {{-- Intro --}}
                     <div class="space-y-2 text-center">
 
@@ -58,6 +59,7 @@
                             placeholder="09xxxxxxxxx"
                             class="text-left"
                         />
+
 
                         <x-button
                             spinner

@@ -8,5 +8,5 @@ use RuntimeException;
 
 final class InvalidOtpException extends RuntimeException
 {
-    protected $message = 'The verification code is invalid.';
+    protected $message = 'کد تأیید وارد شده صحیح نیست.';
 }
