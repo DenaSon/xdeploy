@@ -9,9 +9,10 @@ use App\Livewire\Concerns\HasServerForm;
 use App\Livewire\Concerns\TestsServerConnection;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Mary\Traits\Toast;
-
+#[Layout('layouts.guest')]
 final class Edit extends Component
 {
     use HasServerForm;
