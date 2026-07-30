@@ -24,11 +24,11 @@ enum SoftwareType: string
         return match ($this) {
             self::Docker => 'Docker',
             self::DockerCompose => 'Docker Compose',
+            self::Nginx => 'Nginx',
             self::PHP => 'PHP',
             self::Composer => 'Composer',
             self::Git => 'Git',
             self::Redis => 'Redis',
-            self::Nginx => 'Nginx',
             self::Marzban => 'Marzban',
             self::Xray => 'Xray',
         };

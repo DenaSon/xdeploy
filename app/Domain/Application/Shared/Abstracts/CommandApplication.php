@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Application\Shared\Abstracts;
 
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
+use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
 use App\Domain\Application\Shared\Exceptions\ApplicationUninstallException;
-use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Support\SSH\SSHTimeout;
 
 abstract readonly class CommandApplication extends AbstractApplication
@@ -19,10 +19,12 @@ abstract readonly class CommandApplication extends AbstractApplication
         );
 
         if (! $result->successful()) {
-            return $this->moduleInfo(ApplicationState::NotInstalled);
+            return $this->applicationInfo(
+                ApplicationState::NotInstalled,
+            );
         }
 
-        return $this->moduleInfo(
+        return $this->applicationInfo(
             state: $this->resolveState(),
             metadata: $this->metadataFromOutput($result->output),
         );
@@ -41,7 +43,7 @@ abstract readonly class CommandApplication extends AbstractApplication
 
         if (! $result->successful()) {
             throw new ApplicationInstallationException(
-                'Module Installation failed',
+                'Application installation failed.',
             );
         }
 
@@ -59,7 +61,7 @@ abstract readonly class CommandApplication extends AbstractApplication
 
         if (! $result->successful()) {
             throw new ApplicationUninstallException(
-                'Module uninstall failed.',
+                'Application uninstall failed.',
             );
         }
     }
@@ -70,9 +72,9 @@ abstract readonly class CommandApplication extends AbstractApplication
     }
 
     /**
-     * @param  array<string,mixed>  $metadata
+     * @param array<string,mixed> $metadata
      */
-    protected function moduleInfo(
+    protected function applicationInfo(
         ApplicationState $state,
         array $metadata = [],
     ): ApplicationInfo {
@@ -91,7 +93,7 @@ abstract readonly class CommandApplication extends AbstractApplication
     protected function uninstallCommand(): string
     {
         throw new ApplicationUninstallException(
-            'Uninstall is not supported for this module.',
+            'Uninstall is not supported for this application.',
         );
     }
 

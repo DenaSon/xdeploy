@@ -17,9 +17,6 @@ use Illuminate\Support\ServiceProvider;
 
 class ServerServiceProvider extends ServiceProvider
 {
-    /**
-     * Register server services.
-     */
     public function register(): void
     {
         $this->app->singleton(
@@ -35,7 +32,7 @@ class ServerServiceProvider extends ServiceProvider
         $this->app->singleton(
             ApplicationRegistryInterface::class,
             fn (Application $app) => new ApplicationRegistry(
-                $this->modules($app),
+                $this->applications($app),
             ),
         );
 
@@ -49,12 +46,10 @@ class ServerServiceProvider extends ServiceProvider
      *
      * @throws BindingResolutionException
      */
-    private function modules(Application $app): array
+    private function applications(Application $app): array
     {
         return [
             $app->make(DockerPlatform::class),
-
-
         ];
     }
 }

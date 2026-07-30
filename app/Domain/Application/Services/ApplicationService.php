@@ -9,7 +9,6 @@ use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 
-
 final readonly class ApplicationService
 {
     public function __construct(
@@ -40,18 +39,18 @@ final readonly class ApplicationService
      */
     public function inspectAll(): array
     {
-        $modules = [];
+        $applications = [];
 
-        foreach ($this->registry->all() as $module) {
-            $info = $module->inspect();
+        foreach ($this->registry->all() as $application) {
+            $info = $application->inspect();
 
-            $modules[] = [
-                'type' => $module->type(),
-                'name' => $module->name(),
+            $applications[] = [
+                'type' => $application->type(),
+                'name' => $application->name(),
                 'info' => $info,
             ];
         }
 
-        return $modules;
+        return $applications;
     }
 }

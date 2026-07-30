@@ -20,43 +20,43 @@ final readonly class ApplicationInstallationService
 
     public function install(ApplicationType $type): InstallReport
     {
-        $module = $this->registry->find($type);
+        $application = $this->registry->find($type);
 
-        return match ($module->inspect()->state) {
+        return match ($application->inspect()->state) {
             ApplicationState::Running,
             ApplicationState::Installed => $this->report(
                 $type,
                 'Already installed.',
             ),
 
-            ApplicationState::NotInstalled => $this->installModule(
-                $module,
+            ApplicationState::NotInstalled => $this->installApplication(
+                $application,
                 $type,
                 new InstallReport,
             ),
 
             default => throw new LogicException(sprintf(
-                'Unsupported module state [%s].',
-                $module->inspect()->state->value,
+                'Unsupported application state [%s].',
+                $application->inspect()->state->value,
             )),
         };
     }
 
-    private function installModule(
-        ApplicationInterface $module,
+    private function installApplication(
+        ApplicationInterface $application,
         ApplicationType $type,
         InstallReport $report,
     ): InstallReport {
-        foreach ($module->dependencies() as $dependency) {
+        foreach ($application->dependencies() as $dependency) {
             $report = $report->merge(
                 $this->install($dependency->type),
             );
         }
 
-        $module->install();
+        $application->install();
 
         $this->verifyInstallation(
-            $module,
+            $application,
             $type,
         );
 
@@ -70,36 +70,36 @@ final readonly class ApplicationInstallationService
 
     public function uninstall(ApplicationType $type): void
     {
-        $module = $this->registry->find($type);
+        $application = $this->registry->find($type);
 
-        if ($module->inspect()->state === ApplicationState::NotInstalled) {
+        if ($application->inspect()->state === ApplicationState::NotInstalled) {
             return;
         }
 
-        $module->uninstall();
+        $application->uninstall();
 
         if (
-            $module->inspect()->state !== ApplicationState::NotInstalled
+            $application->inspect()->state !== ApplicationState::NotInstalled
         ) {
             throw new LogicException(sprintf(
-                'Module [%s] uninstall verification failed.',
+                'Application [%s] uninstall verification failed.',
                 $type->value,
             ));
         }
     }
 
     private function verifyInstallation(
-        ApplicationInterface $module,
+        ApplicationInterface $application,
         ApplicationType $type,
     ): void {
-        $state = $module->inspect()->state;
+        $state = $application->inspect()->state;
 
         if (
             $state !== ApplicationState::Installed &&
             $state !== ApplicationState::Running
         ) {
             throw new LogicException(sprintf(
-                'Module [%s] installation verification failed.',
+                'Application [%s] installation verification failed.',
                 $type->value,
             ));
         }
@@ -111,7 +111,7 @@ final readonly class ApplicationInstallationService
     ): InstallReport {
         return new InstallReport([
             new InstallMessage(
-                module: $type->value,
+                application: $type->value,
                 message: $message,
             ),
         ]);

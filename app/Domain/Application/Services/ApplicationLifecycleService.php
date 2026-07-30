@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Application\Services;
 
+use App\Domain\Application\Contracts\ApplicationInterface;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Contracts\StartableInterface;
 use App\Domain\Application\Shared\Enums\ApplicationState;
@@ -18,19 +19,19 @@ final readonly class ApplicationLifecycleService
 
     public function start(ApplicationType $type): void
     {
-        $module = $this->registry->find($type);
+        $application = $this->registry->find($type);
 
-        $this->ensureStartable($module);
+        $this->ensureStartable($application);
 
-        if ($module->inspect()->state === ApplicationState::Running) {
+        if ($application->inspect()->state === ApplicationState::Running) {
             return;
         }
 
-        $module->start();
+        $application->start();
 
-        if ($module->inspect()->state !== ApplicationState::Running) {
+        if ($application->inspect()->state !== ApplicationState::Running) {
             throw new LogicException(sprintf(
-                'Module [%s] failed to start.',
+                'Application [%s] failed to start.',
                 $type->value,
             ));
         }
@@ -38,19 +39,19 @@ final readonly class ApplicationLifecycleService
 
     public function stop(ApplicationType $type): void
     {
-        $module = $this->registry->find($type);
+        $application = $this->registry->find($type);
 
-        $this->ensureStartable($module);
+        $this->ensureStartable($application);
 
-        if ($module->inspect()->state !== ApplicationState::Running) {
+        if ($application->inspect()->state !== ApplicationState::Running) {
             return;
         }
 
-        $module->stop();
+        $application->stop();
 
-        if ($module->inspect()->state !== ApplicationState::Installed) {
+        if ($application->inspect()->state !== ApplicationState::Installed) {
             throw new LogicException(sprintf(
-                'Module [%s] failed to stop.',
+                'Application [%s] failed to stop.',
                 $type->value,
             ));
         }
@@ -58,26 +59,26 @@ final readonly class ApplicationLifecycleService
 
     public function restart(ApplicationType $type): void
     {
-        $module = $this->registry->find($type);
+        $application = $this->registry->find($type);
 
-        $this->ensureStartable($module);
+        $this->ensureStartable($application);
 
-        $module->restart();
+        $application->restart();
 
-        if ($module->inspect()->state !== ApplicationState::Running) {
+        if ($application->inspect()->state !== ApplicationState::Running) {
             throw new LogicException(sprintf(
-                'Module [%s] failed to restart.',
+                'Application [%s] failed to restart.',
                 $type->value,
             ));
         }
     }
 
     private function ensureStartable(
-        mixed $module,
+        ApplicationInterface $application,
     ): void {
-        if (! $module instanceof StartableInterface) {
+        if (! $application instanceof StartableInterface) {
             throw new LogicException(
-                'Module does not support lifecycle operations.',
+                'Application does not support lifecycle operations.',
             );
         }
     }

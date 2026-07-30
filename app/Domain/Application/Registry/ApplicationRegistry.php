@@ -12,10 +12,10 @@ use RuntimeException;
 final readonly class ApplicationRegistry implements ApplicationRegistryInterface
 {
     /**
-     * @param  array<int, ApplicationInterface>  $modules
+     * @param array<int, ApplicationInterface> $applications
      */
     public function __construct(
-        private array $modules,
+        private array $applications,
     ) {}
 
     /**
@@ -23,19 +23,19 @@ final readonly class ApplicationRegistry implements ApplicationRegistryInterface
      */
     public function all(): array
     {
-        return $this->modules;
+        return $this->applications;
     }
 
     public function find(ApplicationType $type): ApplicationInterface
     {
-        foreach ($this->modules as $module) {
-            if ($module->type() === $type) {
-                return $module;
+        foreach ($this->applications as $application) {
+            if ($application->type() === $type) {
+                return $application;
             }
         }
 
         throw new RuntimeException(sprintf(
-            'Module [%s] is not registered.',
+            'Application [%s] is not registered.',
             $type->value,
         ));
     }

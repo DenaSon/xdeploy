@@ -13,8 +13,8 @@ use App\Models\Server;
 final readonly class ApplicationManager
 {
     public function __construct(
-        private ConnectServerAction          $connectServer,
-        private GetApplicationOverviewAction $getModulesOverview,
+        private ConnectServerAction $connectServerAction,
+        private GetApplicationOverviewAction $getApplicationOverviewAction,
     ) {}
 
     /**
@@ -26,8 +26,8 @@ final readonly class ApplicationManager
      */
     public function overview(Server $server): array
     {
-        $this->connectServer->handle($server);
+        $this->connectServerAction->handle($server);
 
-        return $this->getModulesOverview->handle();
+        return $this->getApplicationOverviewAction->execute();
     }
 }

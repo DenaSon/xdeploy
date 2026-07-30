@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Domain\Application\Marzban;
 
-use App\Domain\Application\Abstracts\CommandApplication;
 use App\Domain\Application\Contracts\StartableInterface;
-use App\Domain\Application\Enums\ApplicationState;
-use App\Domain\Application\Enums\ApplicationType;
-use App\Domain\Application\Enums\SoftwareType;
-use App\Domain\Application\Exceptions\ApplicationInstallationException;
-use App\Domain\Application\Exceptions\ApplicationRestartException;
-use App\Domain\Application\Exceptions\ApplicationStartException;
-use App\Domain\Application\Exceptions\ApplicationStopException;
-use App\Domain\Application\ValueObjects\ApplicationDependency;
-use App\Domain\Application\ValueObjects\ProvidedSoftware;
+use App\Domain\Application\Shared\Abstracts\CommandApplication;
+use App\Domain\Application\Shared\Enums\ApplicationState;
+use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\Application\Shared\Enums\SoftwareType;
+use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
+use App\Domain\Application\Shared\Exceptions\ApplicationRestartException;
+use App\Domain\Application\Shared\Exceptions\ApplicationStartException;
+use App\Domain\Application\Shared\Exceptions\ApplicationStopException;
+use App\Domain\Application\Shared\ValueObjects\ApplicationDependency;
+use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
 use App\Support\SSH\SSHTimeout;
 use LogicException;
 
@@ -56,7 +56,7 @@ final readonly class MarzbanApplication extends CommandApplication implements St
     }
 
     /**
-     * @return array<string,mixed>
+     * @return array<string, mixed>
      */
     protected function metadataFromOutput(string $output): array
     {
@@ -183,7 +183,7 @@ BASH;
     }
 
     /**
-     * @param  class-string<\RuntimeException>  $exception
+     * @param class-string<\RuntimeException> $exception
      */
     private function runCommand(
         string $command,
@@ -210,6 +210,6 @@ BASH;
 
     protected function installTimeout(): int
     {
-        return SSHTimeout::MODULE_INSTALL;
+        return SSHTimeout::APPLICATION_INSTALL;
     }
 }

@@ -10,11 +10,11 @@ use App\Domain\Application\Shared\Enums\ApplicationType;
 final readonly class UninstallApplicationAction
 {
     public function __construct(
-        private ApplicationInstallationService $installer,
+        private ApplicationInstallationService $installationService,
     ) {}
 
     public function execute(ApplicationType $type): void
     {
-        $this->installer->uninstall($type);
+        $this->installationService->uninstall($type);
     }
 }

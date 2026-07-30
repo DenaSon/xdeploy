@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Server\Abstracts;
 
-use App\Domain\Application\Enums\ApplicationType;
+use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Server\Contracts\Distribution;
 use App\Domain\Server\Enums\LinuxCommand;
 use App\Domain\Server\Exceptions\UnsupportedCommandException;
@@ -12,11 +12,12 @@ use App\Domain\Server\Exceptions\UnsupportedCommandException;
 abstract class AbstractDistribution implements Distribution
 {
     public function command(
-        ApplicationType $module,
-        LinuxCommand    $command,
+        ApplicationType $application,
+        LinuxCommand $command,
     ): string {
         $commands = $this->commands();
-        $key = self::key($module, $command);
+
+        $key = self::key($application, $command);
 
         if (! isset($commands[$key])) {
             throw new UnsupportedCommandException($key);
@@ -31,9 +32,9 @@ abstract class AbstractDistribution implements Distribution
     abstract protected function commands(): array;
 
     protected static function key(
-        ApplicationType $module,
-        LinuxCommand    $command,
+        ApplicationType $application,
+        LinuxCommand $command,
     ): string {
-        return "{$module->value}.{$command->value}";
+        return "{$application->value}.{$command->value}";
     }
 }

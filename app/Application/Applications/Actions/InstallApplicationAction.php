@@ -14,19 +14,19 @@ use App\Domain\Application\Shared\Enums\ApplicationType;
 final readonly class InstallApplicationAction
 {
     public function __construct(
-        private ApplicationInstallationService $installer,
-        private ApplicationLifecycleService $lifecycle,
+        private ApplicationInstallationService $installationService,
+        private ApplicationLifecycleService $lifecycleService,
         private ApplicationRegistryInterface $registry,
     ) {}
 
     public function execute(ApplicationType $type): InstallReport
     {
-        $report = $this->installer->install($type);
+        $report = $this->installationService->install($type);
 
-        $module = $this->registry->find($type);
+        $application = $this->registry->find($type);
 
-        if ($module instanceof StartableInterface) {
-            $this->lifecycle->start($type);
+        if ($application instanceof StartableInterface) {
+            $this->lifecycleService->start($type);
         }
 
         return $report;

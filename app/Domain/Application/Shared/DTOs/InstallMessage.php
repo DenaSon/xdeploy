@@ -7,7 +7,7 @@ namespace App\Domain\Application\Shared\DTOs;
 final readonly class InstallMessage
 {
     public function __construct(
-        public string $module,
+        public string $application,
         public string $message,
     ) {}
 }

@@ -1,9 +1,9 @@
 @props([
-    'module',
+    'application',
 ])
 
 <a
-    href="{{ route('panel.modules.show', ['module' => $module['type']]) }}"
+    href="{{ route('panel.applications.show', ['application' => $application['type']]) }}"
     class="group black"
 >
     <x-card
@@ -20,12 +20,12 @@
             </div>
 
             <div class="min-w-0 flex-1">
-                <h2 class="truncate text-lg font-semibold">
-                    {{ $module['name'] }}
+                <h2 class="truncate text-lg text-base font-semibold">
+                    {{ $application['name'] }}
                 </h2>
 
                 <p class="text-sm text-base-content/60">
-                    {{ $module['type'] }}
+                    {{ $application['type'] }}
                 </p>
             </div>
 

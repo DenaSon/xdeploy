@@ -1,14 +1,13 @@
 <div>
     <x-header
-        title="ماژول‌ها"
-
+        title="برنامه‌ها"
     />
 
     <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
 
-        @forelse ($modules as $module)
+        @forelse ($applications as $application)
 
-            <x-modules.card :module="$module" />
+            <x-applications.card :application="$application" />
 
         @empty
 
@@ -22,11 +21,11 @@
                     />
 
                     <h3 class="mt-4 text-lg font-semibold">
-                        هیچ ماژولی یافت نشد.
+                        هیچ برنامه‌ای یافت نشد.
                     </h3>
 
                     <p class="mt-2 text-base-content/60">
-                        در حال حاضر هیچ ماژولی برای نمایش وجود ندارد.
+                        در حال حاضر هیچ برنامه‌ای برای نمایش وجود ندارد.
                     </p>
 
                 </x-card>

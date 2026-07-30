@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Domain\Dashboard\Services;
 
-use App\Application\Applications\Actions\InspectAllApplicationAction;
+use App\Application\Applications\Actions\InspectApplicationsAction;
 
 final readonly class DashboardService
 {
     public function __construct(
-        private InspectAllApplicationAction $inspectModules,
+        private InspectApplicationsAction $inspectApplications,
     ) {}
 
     public function overview(): array
     {
         return [
-            'modules' => $this->inspectModules->execute(),
+            'applications' => $this->inspectApplications->execute(),
         ];
     }
 }

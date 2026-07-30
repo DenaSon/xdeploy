@@ -8,14 +8,14 @@ use App\Domain\Application\Services\ApplicationService;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 
-final readonly class InspectAllApplicationAction
+final readonly class InspectApplicationsAction
 {
     public function __construct(
-        private ApplicationService $modules,
+        private ApplicationService $applicationService,
     ) {}
 
     /**
-     * @return array<int, array{
+     * @return list<array{
      *     type: ApplicationType,
      *     name: string,
      *     info: ApplicationInfo,
@@ -23,6 +23,6 @@ final readonly class InspectAllApplicationAction
      */
     public function execute(): array
     {
-        return $this->modules->inspectAll();
+        return $this->applicationService->inspectAll();
     }
 }

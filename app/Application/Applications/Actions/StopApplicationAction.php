@@ -10,11 +10,11 @@ use App\Domain\Application\Shared\Enums\ApplicationType;
 final readonly class StopApplicationAction
 {
     public function __construct(
-        private ApplicationLifecycleService $lifecycle,
+        private ApplicationLifecycleService $lifecycleService,
     ) {}
 
     public function execute(ApplicationType $type): void
     {
-        $this->lifecycle->stop($type);
+        $this->lifecycleService->stop($type);
     }
 }

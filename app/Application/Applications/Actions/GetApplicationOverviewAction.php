@@ -11,7 +11,7 @@ use App\Domain\Application\Shared\Enums\ApplicationType;
 final readonly class GetApplicationOverviewAction
 {
     public function __construct(
-        private ApplicationService $modules,
+        private ApplicationService $applicationService,
     ) {}
 
     /**
@@ -21,8 +21,8 @@ final readonly class GetApplicationOverviewAction
      *     info: ApplicationInfo,
      * }>
      */
-    public function handle(): array
+    public function execute(): array
     {
-        return $this->modules->inspectAll();
+        return $this->applicationService->inspectAll();
     }
 }

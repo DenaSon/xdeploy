@@ -13,9 +13,9 @@ use Illuminate\Console\Command;
 
 final class InstallApplicationCommand extends Command
 {
-    protected $signature = 'module:install {module}';
+    protected $signature = 'application:install {application}';
 
-    protected $description = 'Install a module';
+    protected $description = 'Install an application';
 
     public function __construct(
         private readonly InstallApplicationAction $action,
@@ -26,12 +26,12 @@ final class InstallApplicationCommand extends Command
 
     public function handle(): int
     {
-        $value = (string) $this->argument('module');
+        $value = (string) $this->argument('application');
 
-        $type = ApplicationType::tryFrom($value);
+        $applicationType = ApplicationType::tryFrom($value);
 
-        if ($type === null) {
-            $this->error("Unknown module [{$value}].");
+        if ($applicationType === null) {
+            $this->error("Unknown application [{$value}].");
 
             return self::FAILURE;
         }
@@ -43,9 +43,9 @@ final class InstallApplicationCommand extends Command
 
         $this->connect->handle($server);
 
-        $this->info("Installing {$type->value}...");
+        $this->info("Installing application {$applicationType->value}...");
 
-        $report = $this->action->execute($type);
+        $report = $this->action->execute($applicationType);
 
         $this->renderReport($report);
 
@@ -57,7 +57,7 @@ final class InstallApplicationCommand extends Command
         foreach ($report->messages as $message) {
             $this->info(sprintf(
                 '[%s] %s',
-                $message->module,
+                $message->application,
                 $message->message,
             ));
         }

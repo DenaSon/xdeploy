@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Server\Distributions;
 
-use App\Domain\Application\Enums\ApplicationType;
+use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Server\Abstracts\AbstractDistribution;
 use App\Domain\Server\Enums\DistributionType;
 use App\Domain\Server\Enums\LinuxCommand;

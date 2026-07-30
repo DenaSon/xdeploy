@@ -23,8 +23,8 @@ Route::middleware(['web', 'auth'])
     ->as('panel.')
     ->group(function () {
 
-        Route::livewire('/modules', 'modules.index')
-            ->name('modules.index');
+        Route::livewire('/applications', 'applications.index')
+            ->name('applications.index');
 
         Route::livewire('/servers', Index::class)
             ->name('servers.index');

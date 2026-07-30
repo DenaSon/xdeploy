@@ -14,7 +14,7 @@ final class SSHTimeout
 
     public const int DOCKER_INSTALL = 120;
 
-    public const int MODULE_INSTALL = 90;
+    public const int APPLICATION_INSTALL = 90;
 
     public const int IMAGE_PULL = 180;
 }
