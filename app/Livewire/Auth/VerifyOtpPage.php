@@ -13,7 +13,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
-#[Layout('layouts.auth')]
+#[Layout('layouts.guest')]
 final class VerifyOtpPage extends Component
 {
     public string $phone = '';

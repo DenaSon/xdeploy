@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Panel;
+namespace App\Livewire\Servers;
 
 use App\Application\Server\ServerManager;
 use App\Models\Server;
@@ -10,9 +10,10 @@ class CpuInfo extends Component
 {
     public array $cpu = [];
 
-    public function mount(ServerManager $serverManager): void
+    public Server $server;
+
+    public function mount(ServerManager $serverManager, Server $server): void
     {
-        $server = Server::query()->firstOrFail();
 
         $overview = $serverManager
             ->overview($server)
@@ -23,6 +24,6 @@ class CpuInfo extends Component
 
     public function render()
     {
-        return view('livewire.panel.cpu-info');
+        return view('livewire.servers.cpu-info');
     }
 }

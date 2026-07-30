@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Panel;
+namespace App\Livewire\Servers;
 
 use App\Application\Server\ServerManager;
 use App\Models\Server;
@@ -14,11 +14,9 @@ class ServiceStatus extends Component
      * @var array<int, array{name: string, status: string}>
      */
     public array $services = [];
-
-    public function mount(ServerManager $serverManager): void
+    public Server $server;
+    public function mount(ServerManager $serverManager,Server $server): void
     {
-        $server = Server::query()->firstOrFail();
-
         $overview = $serverManager
             ->overview($server)
             ->toArray();
@@ -28,6 +26,6 @@ class ServiceStatus extends Component
 
     public function render()
     {
-        return view('livewire.panel.service-status');
+        return view('livewire.servers.service-status');
     }
 }

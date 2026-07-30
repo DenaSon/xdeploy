@@ -8,22 +8,22 @@
 
         {{-- Server Overview --}}
         <div class="xl:col-span-8">
-            <livewire:panel.server-overview />
+            <livewire:servers.server-overview  :server="$server" />
         </div>
 
         {{-- Services --}}
         <div class="xl:col-span-4">
-            <livewire:panel.service-status />
+            <livewire:servers.service-status  :server="$server" />
         </div>
 
         {{-- CPU --}}
         <div class="xl:col-span-12">
-            <livewire:panel.cpu-info />
+            <livewire:servers.cpu-info  :server="$server" />
         </div>
 
         {{-- Resources --}}
         <div class="xl:col-span-12">
-            <livewire:panel.resource-usage />
+            <livewire:servers.resource-usage  :server="$server" />
         </div>
 
     </section>

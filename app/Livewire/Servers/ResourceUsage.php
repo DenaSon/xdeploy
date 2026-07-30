@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Panel;
+namespace App\Livewire\Servers;
 
 use App\Application\Server\ServerManager;
 use App\Models\Server;
@@ -12,12 +12,12 @@ class ResourceUsage extends Component
 
     public array $disk = [];
 
+    public Server $server;
+
     public array $loadAverage = [];
 
-    public function mount(ServerManager $serverManager): void
+    public function mount(ServerManager $serverManager, Server $server): void
     {
-
-        $server = Server::query()->firstOrFail();
 
         $overview = $serverManager
             ->overview($server)
@@ -30,6 +30,6 @@ class ResourceUsage extends Component
 
     public function render()
     {
-        return view('livewire.panel.resource-usage');
+        return view('livewire.servers.resource-usage');
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Panel;
+namespace App\Livewire\Servers;
 
 use App\Application\Server\ServerManager;
 use App\Models\Server;
@@ -10,9 +10,10 @@ class ServerOverview extends Component
 {
     public array $overview = [];
 
-    public function mount(ServerManager $serverManager): void
+    public Server $server;
+
+    public function mount(ServerManager $serverManager, Server $server): void
     {
-        $server = Server::query()->firstOrFail();
 
         $this->overview = $serverManager
             ->overview($server)
@@ -33,6 +34,6 @@ class ServerOverview extends Component
 
     public function render()
     {
-        return view('livewire.panel.server-overview');
+        return view('livewire.servers.server-overview');
     }
 }

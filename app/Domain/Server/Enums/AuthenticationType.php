@@ -29,4 +29,15 @@ enum AuthenticationType: string
             self::Agent => 'SSH Agent',
         };
     }
+
+    public static function options(): array
+    {
+        return array_map(
+            static fn (self $type) => [
+                'id' => $type->value,
+                'label' => $type->label(),
+            ],
+            self::cases(),
+        );
+    }
 }

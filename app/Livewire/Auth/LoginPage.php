@@ -13,7 +13,7 @@ use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
-#[Layout('layouts.auth')]
+#[Layout('layouts.guest')]
 final class LoginPage extends Component
 {
     use Toast;

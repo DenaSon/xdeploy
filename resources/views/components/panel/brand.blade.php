@@ -13,16 +13,16 @@
     "
 >
 
-    <a
-        href="{{ route('panel.dashboard') }}"
-        wire:navigate
-        class="
-            group
-            flex
-            items-center
-            gap-3
-        "
-    >
+{{--    <a--}}
+{{--        href="{{ route('panel.servers.dashboard', ['server' => $server]) }}"--}}
+{{--        wire:navigate--}}
+{{--        class="--}}
+{{--            group--}}
+{{--            flex--}}
+{{--            items-center--}}
+{{--            gap-3--}}
+{{--        "--}}
+{{--    >--}}
 
         <div
             class="

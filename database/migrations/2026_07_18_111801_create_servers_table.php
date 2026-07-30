@@ -40,14 +40,13 @@ return new class extends Migration
             $table->text('credential')
                 ->nullable();
 
-            $table->string('private_key_path')
-                ->nullable();
-
             // Status
             $table->enum('status', array_column(
                 ServerStatus::cases(),
                 'value'
             ))->default(ServerStatus::Active->value);
+
+            $table->index('status');
 
             $table->timestamps();
 

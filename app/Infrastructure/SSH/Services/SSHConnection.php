@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
 use phpseclib3\Exception\ConnectionClosedException;
 use phpseclib3\Net\SSH2;
+use Throwable;
 
 class SSHConnection implements SSHConnectionInterface
 {
@@ -27,30 +28,42 @@ class SSHConnection implements SSHConnectionInterface
     {
         $this->disconnect();
 
-        $this->server = $server;
+        try {
 
-        $this->ssh = new SSH2(
-            $server->host,
-            $server->port,
-        );
-        $this->ssh->setTimeout(40);
+            $this->server = $server;
 
-        $strategy = $this->authenticationStrategyFactory->make(
-            $server->authentication_type,
-        );
+            $this->ssh = new SSH2(
+                $server->host,
+                $server->port,
+            );
 
-        $authenticated = $strategy->authenticate(
-            $this->ssh,
-            $server,
-        );
+            $this->ssh->setTimeout(40);
 
-        if (! $authenticated) {
+            $strategy = $this->authenticationStrategyFactory->make(
+                $server->authentication_type,
+            );
+
+            $authenticated = $strategy->authenticate(
+                $this->ssh,
+                $server,
+            );
+
+            if (! $authenticated) {
+                $this->disconnect();
+
+                return false;
+            }
+
+            return true;
+
+        } catch (Throwable $exception) {
+
+            report($exception);
+
             $this->disconnect();
 
             return false;
         }
-
-        return true;
     }
 
     public function execute(string $command): string
