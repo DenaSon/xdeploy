@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Application\Module\Actions\InstallModuleAction;
+
+use App\Application\Application\Actions\InstallModuleAction;
 use App\Application\Server\Actions\ConnectServerAction;
-use App\Domain\Module\DTOs\InstallReport;
-use App\Domain\Module\Enums\ModuleType;
+use App\Domain\Application\DTOs\InstallReport;
+use App\Domain\Application\Enums\ModuleType;
 use App\Models\Server;
 use Illuminate\Console\Command;
 

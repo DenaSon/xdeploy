@@ -42,8 +42,9 @@ final class VerifyOtpPage extends Component
             );
 
             $this->redirectRoute(
-                name: 'panel.dashboard',
+                name: 'panel.servers.dashboard',
                 navigate: true,
+
             );
 
         } catch (InvalidOtpException|OtpExpiredException $e) {

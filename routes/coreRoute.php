@@ -25,7 +25,7 @@ Route::middleware([
         |--------------------------------------------------------------------------
         */
 
-        Route::livewire('/dashboard', 'core.dashboard')
+        Route::livewire('/dashboard', 'auth.login-page')
             ->name('dashboard');
 
     });

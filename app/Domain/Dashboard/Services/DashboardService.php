@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Dashboard\Services;
 
-use App\Application\Module\Actions\InspectAllModulesAction;
+use App\Application\Application\Actions\InspectAllModulesAction;
 
 final readonly class DashboardService
 {
