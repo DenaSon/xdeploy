@@ -67,7 +67,7 @@ abstract readonly class AbstractApplication implements ApplicationInterface
      * Hook executed after installation/configuration.
      * Override if the application supports health checks.
      */
-    public function healthCheck(): void
+    protected function healthCheck(): void
     {
         //
     }

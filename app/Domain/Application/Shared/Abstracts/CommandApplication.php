@@ -56,7 +56,7 @@ abstract readonly class CommandApplication extends AbstractApplication
     {
         $result = $this->ssh->executeWithResult(
             $this->uninstallCommand(),
-            $this->installTimeout(),
+            $this->uninstallTimeout()
         );
 
         if (! $result->successful()) {
@@ -72,7 +72,7 @@ abstract readonly class CommandApplication extends AbstractApplication
     }
 
     /**
-     * @param array<string,mixed> $metadata
+     * @param  array<string,mixed>  $metadata
      */
     protected function applicationInfo(
         ApplicationState $state,
@@ -105,6 +105,11 @@ abstract readonly class CommandApplication extends AbstractApplication
     ): array;
 
     protected function installTimeout(): int
+    {
+        return SSHTimeout::DEFAULT;
+    }
+
+    protected function uninstallTimeout(): int
     {
         return SSHTimeout::DEFAULT;
     }

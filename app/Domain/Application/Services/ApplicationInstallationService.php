@@ -22,7 +22,9 @@ final readonly class ApplicationInstallationService
     {
         $application = $this->registry->find($type);
 
-        return match ($application->inspect()->state) {
+        $state = $application->inspect()->state;
+
+        return match ($state) {
             ApplicationState::Running,
             ApplicationState::Installed => $this->report(
                 $type,
@@ -37,7 +39,7 @@ final readonly class ApplicationInstallationService
 
             default => throw new LogicException(sprintf(
                 'Unsupported application state [%s].',
-                $application->inspect()->state->value,
+                $state->value,
             )),
         };
     }
