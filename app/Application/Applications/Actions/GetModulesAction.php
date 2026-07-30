@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Application\Actions;
+namespace App\Application\Applications\Actions;
 
 use App\Domain\Application\Services\ModuleService;
 

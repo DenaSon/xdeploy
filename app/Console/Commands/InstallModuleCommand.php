@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 
-use App\Application\Application\Actions\InstallModuleAction;
+use App\Application\Applications\Actions\InstallModuleAction;
 use App\Application\Server\Actions\ConnectServerAction;
 use App\Domain\Application\DTOs\InstallReport;
 use App\Domain\Application\Enums\ModuleType;

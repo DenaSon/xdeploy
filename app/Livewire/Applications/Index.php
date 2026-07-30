@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Applications;
 
-use App\Application\Application\Actions\GetModulesAction;
+use App\Application\Applications\Actions\GetModulesAction;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 

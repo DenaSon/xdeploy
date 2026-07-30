@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Application\DTOs;
+namespace App\Application\Applications\DTOs;
 
 use App\Domain\Application\Enums\ModuleType;
 use Livewire\Wireable;

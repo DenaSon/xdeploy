@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Application\Actions;
+namespace App\Application\Applications\Actions;
 
 use App\Domain\Application\Enums\ModuleType;
 use App\Domain\Application\Services\ModuleLifecycleService;
 
-final readonly class RestartModuleAction
+final readonly class StartModuleAction
 {
     public function __construct(
         private ModuleLifecycleService $lifecycle,
@@ -15,6 +15,6 @@ final readonly class RestartModuleAction
 
     public function execute(ModuleType $type): void
     {
-        $this->lifecycle->restart($type);
+        $this->lifecycle->start($type);
     }
 }

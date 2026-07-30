@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Application\Actions;
+namespace App\Application\Applications\Actions;
 
 use App\Domain\Application\DTOs\ModuleInfo;
 use App\Domain\Application\Enums\ModuleType;
 use App\Domain\Application\Services\ModuleService;
 
-final readonly class InspectAllModulesAction
+final readonly class GetModulesOverviewAction
 {
     public function __construct(
         private ModuleService $modules,
@@ -21,7 +21,7 @@ final readonly class InspectAllModulesAction
      *     info: ModuleInfo,
      * }>
      */
-    public function execute(): array
+    public function handle(): array
     {
         return $this->modules->inspectAll();
     }

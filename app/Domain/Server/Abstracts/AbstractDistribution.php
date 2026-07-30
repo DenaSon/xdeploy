@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Server\Abstracts;
 
-use App\Domain\Module\Enums\ModuleType;
+use App\Domain\Application\Enums\ModuleType;
 use App\Domain\Server\Contracts\Distribution;
 use App\Domain\Server\Enums\LinuxCommand;
 use App\Domain\Server\Exceptions\UnsupportedCommandException;
