@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Applications;
 
-use App\Application\Applications\Actions\GetModulesAction;
+use App\Application\Applications\Actions\GetApplicationAction;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -22,13 +22,13 @@ final class Index extends Component
      */
     public array $modules = [];
 
-    public function mount(GetModulesAction $getModules): void
+    public function mount(GetApplicationAction $getModules): void
     {
         $this->modules = $getModules->handle();
     }
 
     public function render()
     {
-        return view('livewire.modules.index');
+        return view('livewire.applications.index');
     }
 }

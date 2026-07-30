@@ -2,17 +2,10 @@
 
 namespace App\Providers;
 
-use App\Domain\Application\Contracts\ModuleInterface;
-use App\Domain\Application\Contracts\ModuleRegistryInterface;
-use App\Domain\Application\Modules\Docker\DockerModule;
-use App\Domain\Application\Modules\DockerCompose\DockerComposeModule;
-use App\Domain\Application\Registry\ModuleRegistry;
-use App\Domain\Module\Modules\Composer\ComposerModule;
-use App\Domain\Module\Modules\Git\GitModule;
-use App\Domain\Module\Modules\Marzban\MarzbanModule;
-use App\Domain\Module\Modules\Nginx\NginxModule;
-use App\Domain\Module\Modules\Php\PhpModule;
-use App\Domain\Module\Modules\Redis\RedisModule;
+use App\Domain\Application\Contracts\ApplicationInterface;
+use App\Domain\Application\Contracts\ApplicationRegistryInterface;
+use App\Domain\Application\Registry\ApplicationRegistry;
+use App\Domain\Platform\Docker\DockerPlatform;
 use App\Infrastructure\Linux\Contracts\LinuxDistribution;
 use App\Infrastructure\Linux\Distributions\UbuntuDistribution;
 use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
@@ -40,8 +33,8 @@ class ServerServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(
-            ModuleRegistryInterface::class,
-            fn (Application $app) => new ModuleRegistry(
+            ApplicationRegistryInterface::class,
+            fn (Application $app) => new ApplicationRegistry(
                 $this->modules($app),
             ),
         );
@@ -52,21 +45,15 @@ class ServerServiceProvider extends ServiceProvider
     }
 
     /**
-     * @return list<ModuleInterface>
+     * @return list<ApplicationInterface>
      *
      * @throws BindingResolutionException
      */
     private function modules(Application $app): array
     {
         return [
-            $app->make(DockerModule::class),
-//            $app->make(DockerComposeModule::class),
-//            $app->make(NginxModule::class),
-//            $app->make(PhpModule::class),
-//            $app->make(ComposerModule::class),
-//            $app->make(GitModule::class),
-//            $app->make(RedisModule::class),
-//            $app->make(MarzbanModule::class),
+            $app->make(DockerPlatform::class),
+
 
         ];
     }
