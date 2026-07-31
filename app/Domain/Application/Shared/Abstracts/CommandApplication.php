@@ -9,25 +9,35 @@ use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
 use App\Domain\Application\Shared\Exceptions\ApplicationUninstallException;
 use App\Support\SSH\SSHTimeout;
+use RuntimeException;
 
 abstract readonly class CommandApplication extends AbstractApplication
 {
     final public function inspect(): ApplicationInfo
     {
-        $result = $this->ssh->executeWithResult(
-            $this->inspectCommand(),
-        );
+        try {
+            $result = $this->ssh->executeWithResult(
+                command: $this->inspectCommand(),
+                timeout: $this->inspectTimeout(),
+            );
 
-        if (! $result->successful()) {
+            if (! $result->successful()) {
+                return $this->applicationInfo(
+                    ApplicationState::NotInstalled,
+                );
+            }
+
             return $this->applicationInfo(
-                ApplicationState::NotInstalled,
+                state: $this->resolveState(),
+                metadata: $this->metadataFromOutput(
+                    $result->output,
+                ),
+            );
+        } catch (RuntimeException) {
+            return $this->applicationInfo(
+                ApplicationState::Unknown,
             );
         }
-
-        return $this->applicationInfo(
-            state: $this->resolveState(),
-            metadata: $this->metadataFromOutput($result->output),
-        );
     }
 
     final public function install(): void
@@ -37,31 +47,35 @@ abstract readonly class CommandApplication extends AbstractApplication
         $this->prepare();
 
         $result = $this->ssh->executeWithResult(
-            $this->installCommand(),
-            $this->installTimeout(),
+            command: $this->installCommand(),
+            timeout: $this->installTimeout(),
         );
 
         if (! $result->successful()) {
             throw new ApplicationInstallationException(
-                'Application installation failed.',
+                sprintf(
+                    'Application [%s] installation command failed.',
+                    $this->type()->value,
+                ),
             );
         }
 
         $this->configure();
-
-        $this->healthCheck();
     }
 
     final public function uninstall(): void
     {
         $result = $this->ssh->executeWithResult(
-            $this->uninstallCommand(),
-            $this->uninstallTimeout()
+            command: $this->uninstallCommand(),
+            timeout: $this->uninstallTimeout(),
         );
 
         if (! $result->successful()) {
             throw new ApplicationUninstallException(
-                'Application uninstall failed.',
+                sprintf(
+                    'Application [%s] uninstall command failed.',
+                    $this->type()->value,
+                ),
             );
         }
     }
@@ -72,7 +86,7 @@ abstract readonly class CommandApplication extends AbstractApplication
     }
 
     /**
-     * @param  array<string,mixed>  $metadata
+     * @param  array<string, mixed>  $metadata
      */
     protected function applicationInfo(
         ApplicationState $state,
@@ -81,7 +95,7 @@ abstract readonly class CommandApplication extends AbstractApplication
         return new ApplicationInfo(
             state: $state,
             metadata: $metadata,
-            dependencies: $this->dependencies(),
+            requirements: $this->requirements(),
             provides: $this->provides(),
         );
     }
@@ -93,16 +107,24 @@ abstract readonly class CommandApplication extends AbstractApplication
     protected function uninstallCommand(): string
     {
         throw new ApplicationUninstallException(
-            'Uninstall is not supported for this application.',
+            sprintf(
+                'Uninstall is not supported for application [%s].',
+                $this->type()->value,
+            ),
         );
     }
 
     /**
-     * @return array<string,mixed>
+     * @return array<string, mixed>
      */
     abstract protected function metadataFromOutput(
         string $output,
     ): array;
+
+    protected function inspectTimeout(): int
+    {
+        return SSHTimeout::QUICK;
+    }
 
     protected function installTimeout(): int
     {

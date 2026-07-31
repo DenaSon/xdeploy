@@ -12,7 +12,7 @@ use RuntimeException;
 final readonly class ApplicationRegistry implements ApplicationRegistryInterface
 {
     /**
-     * @param array<int, ApplicationInterface> $applications
+     * @param  array<int, ApplicationInterface>  $applications
      */
     public function __construct(
         private array $applications,

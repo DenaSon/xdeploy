@@ -6,7 +6,7 @@ namespace App\Domain\Application\Shared\Abstracts;
 
 use App\Domain\Application\Contracts\ApplicationInterface;
 use App\Domain\Application\Shared\Enums\ApplicationType;
-use App\Domain\Application\Shared\ValueObjects\ApplicationDependency;
+use App\Domain\Application\Shared\ValueObjects\ApplicationRequirements;
 use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 
@@ -20,12 +20,9 @@ abstract readonly class AbstractApplication implements ApplicationInterface
 
     abstract public function name(): string;
 
-    /**
-     * @return list<ApplicationDependency>
-     */
-    public function dependencies(): array
+    public function requirements(): ApplicationRequirements
     {
-        return [];
+        return new ApplicationRequirements;
     }
 
     /**
@@ -36,38 +33,17 @@ abstract readonly class AbstractApplication implements ApplicationInterface
         return [];
     }
 
-    /**
-     * Hook executed before installation.
-     * Override if the application has installation prerequisites.
-     */
     protected function checkRequirements(): void
     {
         //
     }
 
-    /**
-     * Hook executed before installation.
-     * Override if the application requires preparation.
-     */
-    public function prepare(): void
+    protected function prepare(): void
     {
         //
     }
 
-    /**
-     * Hook executed after installation.
-     * Override if the application requires additional configuration.
-     */
-    public function configure(): void
-    {
-        //
-    }
-
-    /**
-     * Hook executed after installation/configuration.
-     * Override if the application supports health checks.
-     */
-    protected function healthCheck(): void
+    protected function configure(): void
     {
         //
     }

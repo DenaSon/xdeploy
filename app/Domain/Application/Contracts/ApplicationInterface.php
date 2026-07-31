@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Application\Contracts;
 
 use App\Domain\Application\Shared\Enums\ApplicationType;
-use App\Domain\Application\Shared\ValueObjects\ApplicationDependency;
+use App\Domain\Application\Shared\ValueObjects\ApplicationRequirements;
 use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
 
 interface ApplicationInterface extends InspectableInterface, InstallableInterface
@@ -21,14 +21,12 @@ interface ApplicationInterface extends InspectableInterface, InstallableInterfac
     public function name(): string;
 
     /**
-     * Returns the application dependencies.
-     *
-     * @return list<ApplicationDependency>
+     * Returns the requirements needed by the application.
      */
-    public function dependencies(): array;
+    public function requirements(): ApplicationRequirements;
 
     /**
-     * Returns the software provided by this application.
+     * Returns the software provided by the application.
      *
      * @return list<ProvidedSoftware>
      */

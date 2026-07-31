@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,12 +20,10 @@ class Server extends Model
         'username',
         'authentication_type',
         'credential',
-        'is_active',
     ];
 
     protected $casts = [
         'port' => 'integer',
-        'is_active' => 'boolean',
         'credential' => 'encrypted',
         'status' => ServerStatus::class,
         'authentication_type' => AuthenticationType::class,
@@ -36,5 +35,15 @@ class Server extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === ServerStatus::Active;
+    }
+
+    public function scopeActive(Builder $query): void
+    {
+        $query->where('status', ServerStatus::Active);
     }
 }

@@ -4,17 +4,26 @@ declare(strict_types=1);
 
 namespace App\Domain\Platform\DockerCompose;
 
-use App\Domain\Application\Shared\Abstracts\CommandApplication;
-use App\Domain\Application\Shared\Enums\ApplicationType;
-use App\Domain\Application\Shared\Enums\SoftwareType;
-use App\Domain\Application\Shared\Exceptions\ApplicationUninstallException;
-use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
+use App\Domain\Platform\Contracts\PlatformInterface;
+use App\Domain\Platform\DTOs\PlatformInfo;
+use App\Domain\Platform\Enums\PlatformState;
+use App\Domain\Platform\Enums\PlatformType;
+use App\Domain\Platform\Exceptions\PlatformInstallationException;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Support\SSH\SSHTimeout;
+use RuntimeException;
 
-final readonly class DockerComposePlatform extends CommandApplication
+final readonly class DockerComposePlatform implements PlatformInterface
 {
-    public function type(): ApplicationType
+    private const COMMAND_TIMEOUT_SECONDS = 5;
+
+    public function __construct(
+        private SSHConnectionInterface $ssh,
+    ) {}
+
+    public function type(): PlatformType
     {
-        return ApplicationType::DockerCompose;
+        return PlatformType::DockerCompose;
     }
 
     public function name(): string
@@ -22,47 +31,105 @@ final readonly class DockerComposePlatform extends CommandApplication
         return 'Docker Compose';
     }
 
-    protected function inspectCommand(): string
+    public function inspect(): PlatformInfo
     {
-        return 'docker compose version';
+        try {
+            $dockerResult = $this->ssh->executeWithResult(
+                command: 'command -v docker >/dev/null 2>&1',
+                timeout: SSHTimeout::QUICK,
+            );
+
+            if (! $dockerResult->successful()) {
+                return $this->notInstalled();
+            }
+
+            $versionResult = $this->ssh->executeWithResult(
+                command: sprintf(
+                    'timeout --signal=TERM --kill-after=2 %d docker compose version 2>/dev/null',
+                    self::COMMAND_TIMEOUT_SECONDS,
+                ),
+                timeout: SSHTimeout::QUICK,
+            );
+
+            if ($this->commandTimedOut($versionResult->exitCode)) {
+                return $this->unknown();
+            }
+
+            if (! $versionResult->successful()) {
+                return $this->notInstalled();
+            }
+
+            return new PlatformInfo(
+                state: PlatformState::Installed,
+                metadata: [
+                    'version' => $this->extractVersion(
+                        $versionResult->output,
+                    ),
+                ],
+            );
+        } catch (RuntimeException) {
+            return $this->unknown();
+        }
+    }
+
+    public function install(): void
+    {
+        throw new PlatformInstallationException(
+            'Docker Compose is unavailable after installing the docker-compose-plugin system package.',
+        );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return list<PlatformType>
      */
-    protected function metadataFromOutput(string $output): array
+    public function dependencies(): array
     {
-        preg_match('/v?(\d+\.\d+\.\d+)/', $output, $matches);
-
         return [
-            'version' => $matches[1] ?? null,
+            PlatformType::Docker,
         ];
     }
 
     /**
-     * @return list<ProvidedSoftware>
+     * @return list<string>
      */
-    public function provides(): array
+    public function systemPackages(): array
     {
         return [
-            new ProvidedSoftware(
-                SoftwareType::DockerCompose,
-            ),
+            'docker-compose-plugin',
         ];
     }
 
-    protected function installCommand(): string
+    private function commandTimedOut(int $exitCode): bool
     {
-        return <<<'BASH'
-apt-get update &&
-apt-get install -y docker-compose-plugin
-BASH;
+        return in_array(
+            $exitCode,
+            [124, 137],
+            true,
+        );
     }
 
-    protected function uninstallCommand(): string
+    private function extractVersion(string $output): ?string
     {
-        throw new ApplicationUninstallException(
-            'Docker Compose uninstall is not supported yet.',
+        preg_match(
+            '/v?(\d+\.\d+\.\d+)/',
+            $output,
+            $matches,
+        );
+
+        return $matches[1] ?? null;
+    }
+
+    private function notInstalled(): PlatformInfo
+    {
+        return new PlatformInfo(
+            state: PlatformState::NotInstalled,
+        );
+    }
+
+    private function unknown(): PlatformInfo
+    {
+        return new PlatformInfo(
+            state: PlatformState::Unknown,
         );
     }
 }

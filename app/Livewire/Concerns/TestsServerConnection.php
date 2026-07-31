@@ -10,6 +10,7 @@ use Throwable;
 trait TestsServerConnection
 {
     use Toast;
+
     public function testConnection(TestServerConnectionAction $action): void
     {
         $data = TestServerConnectionData::from(

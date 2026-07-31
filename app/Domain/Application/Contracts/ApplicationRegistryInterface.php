@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Application\Contracts;
 
-
-
 use App\Domain\Application\Shared\Enums\ApplicationType;
 
 interface ApplicationRegistryInterface

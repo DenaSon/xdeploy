@@ -8,7 +8,6 @@ use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Livewire\Concerns\HasServerForm;
 use App\Livewire\Concerns\TestsServerConnection;
-use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -57,7 +56,6 @@ final class Create extends Component
             navigate: true,
         );
     }
-
 
     public function render(): View
     {

@@ -5,62 +5,98 @@
 ])
 
 <x-card
-    class="
-        relative overflow-hidden
+    {{ $attributes->class([
+        '
+            group relative h-full overflow-hidden
+            rounded-3xl
 
-        border border-base-content/5
-        bg-base-100/70
-        backdrop-blur-sm
+            border border-base-content/8
+            bg-base-100/75
+            backdrop-blur-xl
 
-        shadow-[0_8px_30px_rgba(15,23,42,0.06)]
+            shadow-[0_8px_32px_rgba(15,23,42,0.05)]
 
-        transition-all duration-300 ease-out
+            transition-all duration-300 ease-out
 
-        hover:bg-base-100/80
-        hover:border-primary/20
-        hover:shadow-[0_12px_40px_rgba(15,23,42,0.10)]
-    "
+            hover:-translate-y-0.5
+            hover:border-primary/15
+            hover:bg-base-100/85
+            hover:shadow-[0_16px_45px_rgba(15,23,42,0.08)]
+        '
+    ]) }}
 >
 
-    {{-- Top Highlight --}}
+    {{-- Top highlight --}}
     <div
-        class="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/40"
+        class="
+            pointer-events-none absolute inset-x-8 top-0 h-px
+            bg-gradient-to-r
+            from-transparent via-base-content/15 to-transparent
+        "
     ></div>
 
-    <div class="mb-5 flex items-center justify-between">
+    {{-- Ambient glow --}}
+    <div
+        class="
+            pointer-events-none absolute -top-20 -right-20
+            size-48 rounded-full bg-primary/8 blur-3xl
 
-        <div class="flex items-center gap-4">
+            opacity-60 transition-opacity duration-500
+            group-hover:opacity-100
+        "
+    ></div>
+
+    {{-- Header --}}
+    <div class="relative z-10 mb-6 flex items-start justify-between gap-4">
+
+        <div class="flex min-w-0 items-center gap-3.5">
 
             @if($icon)
                 <div
                     class="
-                        flex size-11 items-center justify-center
+                        flex size-11 shrink-0 items-center justify-center
                         rounded-2xl
 
-                        border border-base-content/5
+                        border border-primary/10
                         bg-primary/10
 
-                        shadow-inner
-                        transition-colors duration-300
+                        shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]
 
+                        transition-all duration-300
+                        group-hover:border-primary/15
                         group-hover:bg-primary/15
                     "
                 >
                     <x-icon
                         :name="$icon"
-                        class="size-5 text-primary/90"
+                        class="
+                            size-5 text-primary
+                            transition-transform duration-300
+                            group-hover:scale-105
+                        "
                     />
                 </div>
             @endif
 
-            <div>
+            <div class="min-w-0">
 
-                <h2 class="text-lg font-semibold tracking-tight">
+                <h2
+                    class="
+                        truncate text-base font-semibold
+                        tracking-tight text-base-content
+                        sm:text-lg
+                    "
+                >
                     {{ $title }}
                 </h2>
 
                 @if($subtitle)
-                    <p class="mt-0.5 text-sm text-base-content/60">
+                    <p
+                        class="
+                            mt-1 line-clamp-2 text-xs leading-5
+                            text-base-content/55 sm:text-sm
+                        "
+                    >
                         {{ $subtitle }}
                     </p>
                 @endif
@@ -70,11 +106,16 @@
         </div>
 
         @isset($menu)
-            {{ $menu }}
+            <div class="shrink-0">
+                {{ $menu }}
+            </div>
         @endisset
 
     </div>
 
-    {{ $slot }}
+    {{-- Content --}}
+    <div class="relative z-10">
+        {{ $slot }}
+    </div>
 
 </x-card>

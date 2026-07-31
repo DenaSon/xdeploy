@@ -21,9 +21,8 @@ final class VerifyOtpPage extends Component
     #[Validate('required|digits:4')]
     public string $code = '';
 
-    public function mount(
-        string $phone,
-    ): void {
+    public function mount(string $phone): void
+    {
         $this->phone = (string) PhoneNumber::from($phone);
     }
 
@@ -33,7 +32,6 @@ final class VerifyOtpPage extends Component
         $this->validate();
 
         try {
-
             $verifyOtp->handle(
                 VerifyOtpData::from(
                     phone: $this->phone,
@@ -42,18 +40,14 @@ final class VerifyOtpPage extends Component
             );
 
             $this->redirectRoute(
-                name: 'panel.servers.dashboard',
+                name: 'panel.servers.index',
                 navigate: true,
-
             );
-
-        } catch (InvalidOtpException|OtpExpiredException $e) {
-
+        } catch (InvalidOtpException|OtpExpiredException $exception) {
             $this->addError(
                 'code',
-                $e->getMessage(),
+                $exception->getMessage(),
             );
-
         }
     }
 

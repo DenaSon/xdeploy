@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Application\Applications\Actions\InstallApplicationAction;
 use App\Application\Server\Actions\ConnectServerAction;
-use App\Domain\Application\Shared\DTOs\InstallReport;
 use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\Shared\DTOs\InstallReport;
 use App\Models\Server;
 use Illuminate\Console\Command;
 
@@ -57,7 +57,7 @@ final class InstallApplicationCommand extends Command
         foreach ($report->messages as $message) {
             $this->info(sprintf(
                 '[%s] %s',
-                $message->application,
+                $message->component,
                 $message->message,
             ));
         }

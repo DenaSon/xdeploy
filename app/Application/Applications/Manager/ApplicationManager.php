@@ -5,16 +5,29 @@ declare(strict_types=1);
 namespace App\Application\Applications\Manager;
 
 use App\Application\Applications\Actions\GetApplicationOverviewAction;
+use App\Application\Applications\Actions\InstallApplicationAction;
+use App\Application\Applications\Actions\RestartApplicationAction;
+use App\Application\Applications\Actions\StartApplicationAction;
+use App\Application\Applications\Actions\StopApplicationAction;
+use App\Application\Applications\Actions\UninstallApplicationAction;
 use App\Application\Server\Actions\ConnectServerAction;
+use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\Shared\DTOs\InstallReport;
 use App\Models\Server;
 
 final readonly class ApplicationManager
 {
     public function __construct(
         private ConnectServerAction $connectServerAction,
+        private ApplicationRegistryInterface $applicationRegistry,
         private GetApplicationOverviewAction $getApplicationOverviewAction,
+        private InstallApplicationAction $installApplicationAction,
+        private UninstallApplicationAction $uninstallApplicationAction,
+        private StartApplicationAction $startApplicationAction,
+        private StopApplicationAction $stopApplicationAction,
+        private RestartApplicationAction $restartApplicationAction,
     ) {}
 
     /**
@@ -26,8 +39,69 @@ final readonly class ApplicationManager
      */
     public function overview(Server $server): array
     {
-        $this->connectServerAction->handle($server);
+        $this->connect($server);
 
         return $this->getApplicationOverviewAction->execute();
+    }
+
+    public function inspect(
+        Server $server,
+        ApplicationType $type,
+    ): ApplicationInfo {
+        $this->connect($server);
+
+        return $this->applicationRegistry
+            ->find($type)
+            ->inspect();
+    }
+
+    public function install(
+        Server $server,
+        ApplicationType $type,
+    ): InstallReport {
+        $this->connect($server);
+
+        return $this->installApplicationAction->execute($type);
+    }
+
+    public function uninstall(
+        Server $server,
+        ApplicationType $type,
+    ): void {
+        $this->connect($server);
+
+        $this->uninstallApplicationAction->execute($type);
+    }
+
+    public function start(
+        Server $server,
+        ApplicationType $type,
+    ): void {
+        $this->connect($server);
+
+        $this->startApplicationAction->execute($type);
+    }
+
+    public function stop(
+        Server $server,
+        ApplicationType $type,
+    ): void {
+        $this->connect($server);
+
+        $this->stopApplicationAction->execute($type);
+    }
+
+    public function restart(
+        Server $server,
+        ApplicationType $type,
+    ): void {
+        $this->connect($server);
+
+        $this->restartApplicationAction->execute($type);
+    }
+
+    private function connect(Server $server): void
+    {
+        $this->connectServerAction->handle($server);
     }
 }

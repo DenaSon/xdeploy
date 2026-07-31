@@ -9,14 +9,13 @@ use App\Domain\Application\Shared\Abstracts\CommandApplication;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Application\Shared\Enums\SoftwareType;
-use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
 use App\Domain\Application\Shared\Exceptions\ApplicationRestartException;
 use App\Domain\Application\Shared\Exceptions\ApplicationStartException;
 use App\Domain\Application\Shared\Exceptions\ApplicationStopException;
-use App\Domain\Application\Shared\ValueObjects\ApplicationDependency;
+use App\Domain\Application\Shared\ValueObjects\ApplicationRequirements;
 use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
+use App\Domain\Platform\Enums\PlatformType;
 use App\Support\SSH\SSHTimeout;
-use LogicException;
 
 final readonly class MarzbanApplication extends CommandApplication implements StartableInterface
 {
@@ -30,37 +29,17 @@ final readonly class MarzbanApplication extends CommandApplication implements St
         return 'Marzban';
     }
 
-    protected function inspectCommand(): string
+    public function requirements(): ApplicationRequirements
     {
-        return 'test -d /opt/marzban';
-    }
-
-    protected function resolveState(): ApplicationState
-    {
-        $installed = $this->ssh->executeWithResult(
-            'test -d /opt/marzban',
+        return new ApplicationRequirements(
+            systemPackages: [
+                'curl',
+                'ca-certificates',
+            ],
+            platforms: [
+                PlatformType::DockerCompose,
+            ],
         );
-
-        if (! $installed->successful()) {
-            return ApplicationState::NotInstalled;
-        }
-
-        $container = $this->ssh->executeWithResult(
-            'docker ps --filter "name=marzban" --format "{{.Names}}"',
-        );
-
-        return $container->successful()
-        && trim($container->output) !== ''
-            ? ApplicationState::Running
-            : ApplicationState::Installed;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function metadataFromOutput(string $output): array
-    {
-        return [];
     }
 
     /**
@@ -79,68 +58,77 @@ final readonly class MarzbanApplication extends CommandApplication implements St
         ];
     }
 
-    /**
-     * @return list<ApplicationDependency>
-     */
-    public function dependencies(): array
+    protected function inspectCommand(): string
     {
-        return [
-            new ApplicationDependency(
-                ApplicationType::Docker,
-            ),
-
-            new ApplicationDependency(
-                ApplicationType::DockerCompose,
-            ),
-        ];
+        return 'test -d /opt/marzban';
     }
 
-    protected function checkRequirements(): void
+    protected function resolveState(): ApplicationState
     {
-        $root = $this->ssh->executeWithResult(
-            'id -u',
+        $installedResult = $this->ssh->executeWithResult(
+            command: $this->inspectCommand(),
+            timeout: SSHTimeout::QUICK,
         );
 
-        if (
-            ! $root->successful()
-            || trim($root->output) !== '0'
-        ) {
-            throw new ApplicationInstallationException(
-                'Marzban installation requires root privileges.',
-            );
+        if (! $installedResult->successful()) {
+            return ApplicationState::NotInstalled;
         }
 
-        $curl = $this->ssh->executeWithResult(
-            'command -v curl',
-        );
+        return $this->resolveContainerState();
+    }
 
-        if (! $curl->successful()) {
-            throw new ApplicationInstallationException(
-                'curl is required for Marzban installation.',
-            );
-        }
+    /**
+     * @return array<string, mixed>
+     */
+    protected function metadataFromOutput(string $output): array
+    {
+        return [];
     }
 
     protected function installCommand(): string
     {
         return <<<'BASH'
-bash -c "$(curl -fsSL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
+set -euo pipefail
+
+INSTALLER="$(mktemp /tmp/xdeploy-marzban-installer.XXXXXX)"
+
+cleanup() {
+    rm -f "$INSTALLER"
+}
+
+trap cleanup EXIT
+
+curl -fsSL \
+    https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh \
+    -o "$INSTALLER"
+
+if ! grep -q '^follow_marzban_logs() {' "$INSTALLER"; then
+    echo "Unexpected Marzban installer format." >&2
+    exit 90
+fi
+
+sed -i \
+    '/^follow_marzban_logs() {/a\    return 0' \
+    "$INSTALLER"
+
+timeout --signal=TERM 600 \
+    bash "$INSTALLER" install </dev/null
 BASH;
     }
 
     public function start(): void
     {
         $this->runCommand(
-            command: 'marzban up',
+            command: 'marzban up --no-logs',
             exception: ApplicationStartException::class,
             message: 'Failed to start Marzban.',
         );
 
-        if ($this->resolveState() !== ApplicationState::Running) {
-            throw new ApplicationStartException(
-                'Marzban did not enter running state.',
-            );
-        }
+        $this->waitForState(
+            expectedState: ApplicationState::Running,
+            exception: ApplicationStartException::class,
+            message: 'Marzban did not enter the running state.',
+        );
     }
 
     public function stop(): void
@@ -151,39 +139,48 @@ BASH;
             message: 'Failed to stop Marzban.',
         );
 
-        if ($this->resolveState() !== ApplicationState::Installed) {
-            throw new ApplicationStopException(
-                'Marzban did not stop successfully.',
-            );
-        }
+        $this->waitForState(
+            expectedState: ApplicationState::Installed,
+            exception: ApplicationStopException::class,
+            message: 'Marzban did not stop successfully.',
+        );
     }
 
     public function restart(): void
     {
         $this->runCommand(
-            command: 'marzban restart',
+            command: 'marzban restart --no-logs',
             exception: ApplicationRestartException::class,
             message: 'Failed to restart Marzban.',
         );
 
-        if ($this->resolveState() !== ApplicationState::Running) {
-            throw new ApplicationRestartException(
-                'Marzban did not restart successfully.',
-            );
-        }
+        $this->waitForState(
+            expectedState: ApplicationState::Running,
+            exception: ApplicationRestartException::class,
+            message: 'Marzban did not restart successfully.',
+        );
     }
 
-    public function healthCheck(): void
+    protected function uninstallCommand(): string
     {
-        if ($this->resolveState() !== ApplicationState::Running) {
-            throw new LogicException(
-                'Marzban health check failed.',
-            );
-        }
+        return <<<'BASH'
+timeout --signal=TERM 180 \
+    sh -c 'yes y | marzban uninstall'
+BASH;
+    }
+
+    protected function uninstallTimeout(): int
+    {
+        return SSHTimeout::APPLICATION_UNINSTALL;
+    }
+
+    protected function installTimeout(): int
+    {
+        return SSHTimeout::APPLICATION_INSTALL;
     }
 
     /**
-     * @param class-string<\RuntimeException> $exception
+     * @param  class-string<\RuntimeException>  $exception
      */
     private function runCommand(
         string $command,
@@ -201,15 +198,57 @@ BASH;
         }
     }
 
-    protected function uninstallCommand(): string
-    {
-        return <<<'BASH'
-printf "y\ny\n" | marzban uninstall
-BASH;
+    /**
+     * @param  class-string<\RuntimeException>  $exception
+     */
+    private function waitForState(
+        ApplicationState $expectedState,
+        string $exception,
+        string $message,
+        int $attempts = 20,
+        int $delayMilliseconds = 500,
+    ): void {
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            if ($this->resolveState() === $expectedState) {
+                return;
+            }
+
+            if ($attempt < $attempts) {
+                usleep($delayMilliseconds * 1_000);
+            }
+        }
+
+        throw new $exception($message);
     }
 
-    protected function installTimeout(): int
+    private function resolveContainerState(): ApplicationState
     {
-        return SSHTimeout::APPLICATION_INSTALL;
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $result = $this->ssh->executeWithResult(
+                    command: <<<'BASH'
+timeout --signal=TERM 8 \
+docker ps \
+    --filter "name=marzban" \
+    --format "{{.Names}}"
+BASH,
+                    timeout: SSHTimeout::QUICK,
+                );
+
+                if ($result->successful()) {
+                    return trim($result->output) !== ''
+                        ? ApplicationState::Running
+                        : ApplicationState::Installed;
+                }
+            } catch (\Throwable) {
+                // Retry transient Docker/SSH inspection failures.
+            }
+
+            if ($attempt < 3) {
+                usleep(500_000);
+            }
+        }
+
+        return ApplicationState::Unknown;
     }
 }

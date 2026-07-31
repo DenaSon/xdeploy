@@ -4,23 +4,29 @@ declare(strict_types=1);
 
 namespace App\Domain\Platform\Docker;
 
-use App\Domain\Application\Shared\Abstracts\CommandApplication;
-use App\Domain\Application\Contracts\StartableInterface;
-use App\Domain\Application\Shared\Enums\ApplicationState;
-use App\Domain\Application\Shared\Enums\ApplicationType;
-use App\Domain\Application\Shared\Enums\SoftwareType;
-use App\Domain\Application\Shared\Exceptions\ApplicationRestartException;
-use App\Domain\Application\Shared\Exceptions\ApplicationStartException;
-use App\Domain\Application\Shared\Exceptions\ApplicationStopException;
-use App\Domain\Application\Shared\Exceptions\ApplicationUninstallException;
-use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
+use App\Domain\Platform\Contracts\PlatformInterface;
+use App\Domain\Platform\Contracts\StartablePlatformInterface;
+use App\Domain\Platform\DTOs\PlatformInfo;
+use App\Domain\Platform\Enums\PlatformState;
+use App\Domain\Platform\Enums\PlatformType;
+use App\Domain\Platform\Exceptions\PlatformInstallationException;
+use App\Domain\Platform\Exceptions\PlatformRestartException;
+use App\Domain\Platform\Exceptions\PlatformStartException;
+use App\Domain\Platform\Exceptions\PlatformStopException;
+use App\Domain\Server\Services\PrivilegedExecutionPreflight;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 
-final readonly class DockerPlatform extends CommandApplication implements StartableInterface
+final readonly class DockerPlatform implements PlatformInterface, StartablePlatformInterface
 {
-    public function type(): ApplicationType
+    public function __construct(
+        private SSHConnectionInterface $ssh,
+        private PrivilegedExecutionPreflight $preflight,
+    ) {}
+
+    public function type(): PlatformType
     {
-        return ApplicationType::Docker;
+        return PlatformType::Docker;
     }
 
     public function name(): string
@@ -28,70 +34,117 @@ final readonly class DockerPlatform extends CommandApplication implements Starta
         return 'Docker';
     }
 
-    protected function inspectCommand(): string
+    public function inspect(): PlatformInfo
     {
-        return 'docker --version';
-    }
+        $existsResult = $this->ssh->executeWithResult(
+            'command -v docker >/dev/null 2>&1',
+        );
 
-    protected function resolveState(): ApplicationState
-    {
-        $result = $this->ssh->executeWithResult(
+        if (! $existsResult->successful()) {
+            return new PlatformInfo(
+                state: PlatformState::NotInstalled,
+            );
+        }
+
+        $versionResult = $this->ssh->executeWithResult(
+            'docker --version',
+        );
+
+        if (! $versionResult->successful()) {
+            return new PlatformInfo(
+                state: PlatformState::Unknown,
+            );
+        }
+
+        $serviceResult = $this->ssh->executeWithResult(
             'systemctl is-active docker',
         );
 
-        if (
-            $result->successful() &&
-            trim($result->output) === 'active'
-        ) {
-            return ApplicationState::Running;
+        $serviceState = trim($serviceResult->output);
+
+        $state = match ($serviceState) {
+            'active' => PlatformState::Running,
+
+            'inactive',
+            'failed',
+            'deactivating' => PlatformState::Installed,
+
+            default => PlatformState::Unknown,
+        };
+
+        return new PlatformInfo(
+            state: $state,
+            metadata: [
+                'version' => $this->extractVersion(
+                    $versionResult->output,
+                ),
+                'service_state' => $serviceState,
+            ],
+        );
+    }
+
+    public function install(): void
+    {
+        $this->preflight->ensureRoot();
+
+        $result = $this->ssh->executeWithResult(
+            command: 'curl -fsSL https://get.docker.com | sh',
+            timeout: SSHTimeout::DOCKER_INSTALL,
+        );
+
+        if (! $result->successful()) {
+            throw new PlatformInstallationException(
+                'Docker installation failed.',
+            );
         }
 
-        return ApplicationState::Installed;
+        $info = $this->inspect();
+
+        if (
+            $info->isNotInstalled()
+            || $info->isUnknown()
+        ) {
+            throw new PlatformInstallationException(
+                'Docker installation verification failed.',
+            );
+        }
     }
 
     /**
-     * @return array<string, mixed>
+     * @return list<PlatformType>
      */
-    protected function metadataFromOutput(string $output): array
+    public function dependencies(): array
     {
-        preg_match('/\d+\.\d+\.\d+/', $output, $matches);
-
-        return [
-            'version' => $matches[0] ?? null,
-        ];
+        return [];
     }
 
     /**
-     * @return list<ProvidedSoftware>
+     * @return list<string>
      */
-    public function provides(): array
+    public function systemPackages(): array
     {
         return [
-            new ProvidedSoftware(SoftwareType::Docker),
+            'curl',
+            'ca-certificates',
         ];
-    }
-
-    protected function installCommand(): string
-    {
-        return <<<'BASH'
-curl -fsSL https://get.docker.com | sh
-BASH;
     }
 
     public function start(): void
     {
+        $this->preflight->ensureRoot();
+
         $result = $this->ssh->executeWithResult(
-            'systemctl start docker',
+            'systemctl enable --now docker',
         );
 
         if (! $result->successful()) {
-            throw new ApplicationStartException(
+            throw new PlatformStartException(
                 'Failed to start Docker.',
             );
         }
 
-        if ($this->resolveState() !== ApplicationState::Running) {
-            throw new ApplicationStartException(
+        if (! $this->inspect()->isRunning()) {
+            throw new PlatformStartException(
                 'Docker did not enter the running state.',
             );
         }
@@ -99,18 +152,20 @@ BASH;
 
     public function stop(): void
     {
+        $this->preflight->ensureRoot();
+
         $result = $this->ssh->executeWithResult(
             'systemctl stop docker',
         );
 
         if (! $result->successful()) {
-            throw new ApplicationStopException(
+            throw new PlatformStopException(
                 'Failed to stop Docker.',
             );
         }
 
-        if ($this->resolveState() !== ApplicationState::Installed) {
-            throw new ApplicationStopException(
+        if ($this->inspect()->state !== PlatformState::Installed) {
+            throw new PlatformStopException(
                 'Docker did not stop successfully.',
             );
         }
@@ -118,32 +173,33 @@ BASH;
 
     public function restart(): void
     {
+        $this->preflight->ensureRoot();
+
         $result = $this->ssh->executeWithResult(
             'systemctl restart docker',
         );
 
         if (! $result->successful()) {
-            throw new ApplicationRestartException(
+            throw new PlatformRestartException(
                 'Failed to restart Docker.',
             );
         }
 
-        if ($this->resolveState() !== ApplicationState::Running) {
-            throw new ApplicationRestartException(
+        if (! $this->inspect()->isRunning()) {
+            throw new PlatformRestartException(
                 'Docker did not restart successfully.',
             );
         }
     }
 
-    protected function uninstallCommand(): string
+    private function extractVersion(string $output): ?string
     {
-        throw new ApplicationUninstallException(
-            'Docker uninstall is not supported yet.'
+        preg_match(
+            '/\d+\.\d+\.\d+/',
+            $output,
+            $matches,
         );
-    }
 
-    protected function installTimeout(): int
-    {
-        return SSHTimeout::DOCKER_INSTALL;
+        return $matches[0] ?? null;
     }
 }

@@ -15,9 +15,9 @@ class PanelNavigation
             ],
 
             [
-                'title' => 'ماژول‌ها',
+                'title' => 'برنامه ها',
                 'icon' => 'lucide.package',
-                'route' => route('core.dashboard'),
+                'route' => route('panel.applications.index'),
                 'name' => 'panel.applications.*',
             ],
 
