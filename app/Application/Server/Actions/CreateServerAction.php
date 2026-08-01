@@ -9,6 +9,9 @@ use App\Models\User;
 
 final readonly class CreateServerAction
 {
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
     public function handle(
         User $user,
         array $attributes,

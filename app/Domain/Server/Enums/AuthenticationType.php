@@ -6,19 +6,10 @@ namespace App\Domain\Server\Enums;
 
 enum AuthenticationType: string
 {
-    /**
-     * Authenticate using a username and password.
-     */
     case Password = 'password';
 
-    /**
-     * Authenticate using a private SSH key.
-     */
     case SSHKey = 'ssh_key';
 
-    /**
-     * Authenticate using the local SSH agent.
-     */
     case Agent = 'agent';
 
     public function label(): string
@@ -30,14 +21,35 @@ enum AuthenticationType: string
         };
     }
 
+    public function isSupported(): bool
+    {
+        return $this === self::Password;
+    }
+
+    /**
+     * @return list<self>
+     */
+    public static function supportedCases(): array
+    {
+        return array_values(
+            array_filter(
+                self::cases(),
+                static fn (self $type): bool => $type->isSupported(),
+            ),
+        );
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
     public static function options(): array
     {
         return array_map(
-            static fn (self $type) => [
+            static fn (self $type): array => [
                 'id' => $type->value,
                 'label' => $type->label(),
             ],
-            self::cases(),
+            self::supportedCases(),
         );
     }
 }

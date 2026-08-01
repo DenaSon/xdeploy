@@ -7,6 +7,7 @@ namespace App\Livewire\Servers;
 use App\Application\Server\Actions\DeleteServerAction;
 use App\Application\Server\Actions\GetServersAction;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -27,19 +28,24 @@ final class Index extends Component
     }
 
     public function delete(
-        Server $server,
+        int $serverId,
         DeleteServerAction $action,
     ): void {
+        /** @var User $user */
+        $user = Auth::user();
 
-        $action->handle($server);
+        $action->handle(
+            user: $user,
+            serverId: $serverId,
+        );
 
         $this->servers = $this->servers->reject(
-            fn (Server $item) => $item->is($server)
+            static fn (Server $server): bool => $server->getKey() === $serverId,
         );
 
         $this->success(
             'حذف شد',
-            'سرور با موفقیت حذف شد.'
+            'سرور با موفقیت حذف شد.',
         );
     }
 

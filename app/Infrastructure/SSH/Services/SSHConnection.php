@@ -20,7 +20,7 @@ use Throwable;
 
 final class SSHConnection implements SSHConnectionInterface
 {
-    private const OUTPUT_EXCERPT_LENGTH = 1_000;
+    private const int OUTPUT_EXCERPT_LENGTH = 1_000;
 
     private ?SSH2 $ssh = null;
 
@@ -33,6 +33,9 @@ final class SSHConnection implements SSHConnectionInterface
 
     public function connect(Server $server): bool
     {
+        $strategy = $this->authenticationStrategyFactory->make(
+            $server->authentication_type,
+        );
         $this->disconnect();
 
         $this->server = $server;
@@ -62,10 +65,6 @@ final class SSHConnection implements SSHConnectionInterface
 
             $this->ssh->setTimeout(
                 SSHTimeout::AUTHENTICATION,
-            );
-
-            $strategy = $this->authenticationStrategyFactory->make(
-                $server->authentication_type,
             );
 
             $authenticated = $strategy->authenticate(

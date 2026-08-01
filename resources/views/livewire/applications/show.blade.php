@@ -249,8 +249,8 @@
                             class="mt-2 text-sm leading-7
                                    text-base-content/60"
                         >
-                            مدیریت چرخه عمر Marzban شامل نصب، اجرا، توقف،
-                            راه‌اندازی مجدد و حذف برنامه.
+                            مدیریت چرخه عمر {{ $name }} شامل نصب، اجرا،
+                            توقف، راه‌اندازی مجدد و حذف برنامه.
                         </p>
 
                     </div>
@@ -512,7 +512,7 @@
                         label="حذف"
                         icon="o-trash"
                         wire:click="uninstall"
-                        wire:confirm="آیا از حذف کامل Marzban مطمئن هستید؟ این عملیات قابل بازگشت نیست."
+                        wire:confirm="آیا از حذف کامل {{ $name }} مطمئن هستید؟ این عملیات قابل بازگشت نیست."
                         wire:loading.attr="disabled"
                         wire:target="uninstall"
                         spinner="uninstall"
@@ -535,7 +535,7 @@
                         label="حذف"
                         icon="o-trash"
                         wire:click="uninstall"
-                        wire:confirm="آیا از حذف کامل Marzban مطمئن هستید؟ این عملیات قابل بازگشت نیست."
+                        wire:confirm="آیا از حذف کامل {{ $name }} مطمئن هستید؟ این عملیات قابل بازگشت نیست."
                         wire:loading.attr="disabled"
                         wire:target="uninstall"
                         spinner="uninstall"
@@ -548,44 +548,22 @@
 
         </x-card>
 
-        {{-- Future operations --}}
-        @if ($info['is_running'])
+        {{-- Application-specific management panel --}}
+        @if (
+            $info['is_running']
+            && $serverId !== null
+        )
 
-            <x-card
-                class="mt-6 border border-dashed border-base-300
-                       bg-base-200/20"
-            >
-
-                <div class="flex items-start gap-4">
-
-                    <div
-                        class="flex size-11 shrink-0 items-center
-                               justify-center rounded-2xl bg-base-200"
-                    >
-                        <x-icon
-                            name="o-wrench-screwdriver"
-                            class="size-5 text-base-content/50"
-                        />
-                    </div>
-
-                    <div>
-                        <h3 class="font-semibold text-base-content">
-                            تنظیمات و ابزارهای Marzban
-                        </h3>
-
-                        <p
-                            class="mt-1 text-sm leading-7
-                                   text-base-content/60"
-                        >
-                            ساخت مدیر، پشتیبان‌گیری، SSL، تنظیمات Xray و سایر
-                            ابزارهای مدیریتی در نسخه‌های بعدی به این بخش
-                            اضافه خواهند شد.
-                        </p>
-                    </div>
-
-                </div>
-
-            </x-card>
+            <div class="mt-6">
+                <livewire:is
+                    :component="$managementPanel"
+                    :server-id="$serverId"
+                    :key="'application-management-panel-'
+                        .$application.'-'
+                        .$serverId.'-'
+                        .$managementPanelRevision"
+                />
+            </div>
 
         @endif
 

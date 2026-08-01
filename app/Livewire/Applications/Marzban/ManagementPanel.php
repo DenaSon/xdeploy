@@ -1,0 +1,99 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Applications\Marzban;
+
+use App\Application\Applications\Marzban\MarzbanManager;
+use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
+use App\Models\Server;
+use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
+use Livewire\Component;
+use Throwable;
+
+final class ManagementPanel extends Component
+{
+    #[Locked]
+    public int $serverId;
+
+    /**
+     * @var array<string, mixed>
+     */
+    public array $management = [];
+
+    public bool $managementUnavailable = false;
+
+    public function mount(
+        int $serverId,
+        MarzbanManager $manager,
+    ): void {
+        $this->serverId = $serverId;
+
+        $this->loadManagement($manager);
+    }
+
+    public function refreshManagement(
+        MarzbanManager $manager,
+    ): void {
+        $this->loadManagement($manager);
+    }
+
+    /**
+     * @param  array<string, mixed>  $management
+     */
+    #[On('marzban-management-updated.{serverId}')]
+    public function updateManagement(
+        array $management,
+    ): void {
+        $state = $management['setup']['state'] ?? null;
+
+        if (
+            ! is_string($state)
+            || MarzbanSetupState::tryFrom($state) === null
+        ) {
+            return;
+        }
+
+        $this->management = $management;
+        $this->managementUnavailable = false;
+    }
+
+    #[On('marzban-setup-completed.{serverId}')]
+    public function markSetupCompleted(): void
+    {
+        $this->management['setup']['state']
+            = MarzbanSetupState::Complete->value;
+
+        $this->managementUnavailable = false;
+    }
+
+    public function render(): View
+    {
+        return view(
+            'livewire.applications.marzban.management-panel',
+        );
+    }
+
+    private function loadManagement(
+        MarzbanManager $manager,
+    ): void {
+        try {
+            $server = Server::query()->findOrFail(
+                $this->serverId,
+            );
+
+            $this->management = $manager
+                ->overview($server)
+                ->toArray();
+
+            $this->managementUnavailable = false;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $this->management = [];
+            $this->managementUnavailable = true;
+        }
+    }
+}

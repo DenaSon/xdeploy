@@ -145,7 +145,7 @@
 
                 <x-button
                     icon="o-trash"
-                    wire:click="delete({{ $server->id }})"
+                    wire:click="delete({{ $server->getKey() }})"
                     wire:confirm="آیا از حذف این سرور مطمئن هستید؟"
                     class="btn-ghost btn-sm text-error hover:bg-error/10"
                     tooltip="حذف سرور"

@@ -8,11 +8,13 @@ use App\Application\Applications\Manager\ApplicationManager;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Infrastructure\SSH\Services\SSHConnectionCircuitBreaker;
+use App\Livewire\Applications\Resolvers\ApplicationManagementPanelResolver;
 use App\Livewire\Concerns\HandlesSshAvailability;
 use App\Models\Server;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
@@ -24,6 +26,13 @@ final class Show extends Component
     public string $application = '';
 
     public string $name = '';
+
+    public string $managementPanel = '';
+
+    #[Locked]
+    public ?int $serverId = null;
+
+    public int $managementPanelRevision = 0;
 
     /**
      * @var array{
@@ -56,6 +65,7 @@ final class Show extends Component
         string $application,
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
+        ApplicationManagementPanelResolver $managementPanelResolver,
     ): void {
         $type = ApplicationType::tryFrom($application);
 
@@ -67,6 +77,7 @@ final class Show extends Component
 
         $this->application = $type->value;
         $this->name = ucfirst($type->value);
+        $this->managementPanel = $managementPanelResolver->resolve($type);
 
         $this->loadApplication(
             applicationManager: $applicationManager,
@@ -161,8 +172,14 @@ final class Show extends Component
                     type: $type,
                 );
             },
-            successMessage: 'مرزبان با موفقیت نصب و اجرا شد.',
-            failureMessage: 'نصب مرزبان با خطا مواجه شد.',
+            successMessage: sprintf(
+                '%s با موفقیت نصب و اجرا شد.',
+                $this->name,
+            ),
+            failureMessage: sprintf(
+                'نصب %s با خطا مواجه شد.',
+                $this->name,
+            ),
         );
     }
 
@@ -183,8 +200,14 @@ final class Show extends Component
                     type: $type,
                 );
             },
-            successMessage: 'مرزبان با موفقیت حذف شد.',
-            failureMessage: 'حذف مرزبان با خطا مواجه شد.',
+            successMessage: sprintf(
+                '%s با موفقیت حذف شد.',
+                $this->name,
+            ),
+            failureMessage: sprintf(
+                'حذف %s با خطا مواجه شد.',
+                $this->name,
+            ),
         );
     }
 
@@ -205,8 +228,14 @@ final class Show extends Component
                     type: $type,
                 );
             },
-            successMessage: 'مرزبان با موفقیت اجرا شد.',
-            failureMessage: 'اجرای مرزبان با خطا مواجه شد.',
+            successMessage: sprintf(
+                '%s با موفقیت اجرا شد.',
+                $this->name,
+            ),
+            failureMessage: sprintf(
+                'اجرای %s با خطا مواجه شد.',
+                $this->name,
+            ),
         );
     }
 
@@ -227,8 +256,14 @@ final class Show extends Component
                     type: $type,
                 );
             },
-            successMessage: 'مرزبان با موفقیت متوقف شد.',
-            failureMessage: 'توقف مرزبان با خطا مواجه شد.',
+            successMessage: sprintf(
+                '%s با موفقیت متوقف شد.',
+                $this->name,
+            ),
+            failureMessage: sprintf(
+                'توقف %s با خطا مواجه شد.',
+                $this->name,
+            ),
         );
     }
 
@@ -249,8 +284,14 @@ final class Show extends Component
                     type: $type,
                 );
             },
-            successMessage: 'مرزبان با موفقیت راه‌اندازی مجدد شد.',
-            failureMessage: 'راه‌اندازی مجدد مرزبان با خطا مواجه شد.',
+            successMessage: sprintf(
+                '%s با موفقیت راه‌اندازی مجدد شد.',
+                $this->name,
+            ),
+            failureMessage: sprintf(
+                'راه‌اندازی مجدد %s با خطا مواجه شد.',
+                $this->name,
+            ),
         );
     }
 
@@ -364,6 +405,8 @@ final class Show extends Component
             return false;
         }
 
+        $this->serverId = (int) $server->getKey();
+
         try {
             $this->serverMissing = false;
 
@@ -399,6 +442,7 @@ final class Show extends Component
             }
 
             $this->setApplicationInfo($info);
+            $this->managementPanelRevision++;
 
             $this->errorMessage = null;
 
@@ -440,6 +484,7 @@ final class Show extends Component
 
     private function handleMissingServer(): void
     {
+        $this->serverId = null;
         $this->serverMissing = true;
         $this->info = $this->unknownApplicationInfo();
         $this->successMessage = null;

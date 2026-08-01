@@ -16,6 +16,7 @@ use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Shared\DTOs\InstallReport;
 use App\Models\Server;
+use Closure;
 
 final readonly class ApplicationManager
 {
@@ -39,69 +40,87 @@ final readonly class ApplicationManager
      */
     public function overview(Server $server): array
     {
-        $this->connect($server);
-
-        return $this->getApplicationOverviewAction->execute();
+        return $this->onServer(
+            $server,
+            fn (): array => $this->getApplicationOverviewAction->execute(),
+        );
     }
 
     public function inspect(
         Server $server,
         ApplicationType $type,
     ): ApplicationInfo {
-        $this->connect($server);
-
-        return $this->applicationRegistry
-            ->find($type)
-            ->inspect();
+        return $this->onServer(
+            $server,
+            fn (): ApplicationInfo => $this->applicationRegistry
+                ->find($type)
+                ->inspect(),
+        );
     }
 
     public function install(
         Server $server,
         ApplicationType $type,
     ): InstallReport {
-        $this->connect($server);
-
-        return $this->installApplicationAction->execute($type);
+        return $this->onServer(
+            $server,
+            fn (): InstallReport => $this->installApplicationAction
+                ->execute($type),
+        );
     }
 
     public function uninstall(
         Server $server,
         ApplicationType $type,
     ): void {
-        $this->connect($server);
-
-        $this->uninstallApplicationAction->execute($type);
+        $this->onServer(
+            $server,
+            fn () => $this->uninstallApplicationAction->execute($type),
+        );
     }
 
     public function start(
         Server $server,
         ApplicationType $type,
     ): void {
-        $this->connect($server);
-
-        $this->startApplicationAction->execute($type);
+        $this->onServer(
+            $server,
+            fn () => $this->startApplicationAction->execute($type),
+        );
     }
 
     public function stop(
         Server $server,
         ApplicationType $type,
     ): void {
-        $this->connect($server);
-
-        $this->stopApplicationAction->execute($type);
+        $this->onServer(
+            $server,
+            fn () => $this->stopApplicationAction->execute($type),
+        );
     }
 
     public function restart(
         Server $server,
         ApplicationType $type,
     ): void {
-        $this->connect($server);
-
-        $this->restartApplicationAction->execute($type);
+        $this->onServer(
+            $server,
+            fn () => $this->restartApplicationAction->execute($type),
+        );
     }
 
-    private function connect(Server $server): void
-    {
+    /**
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $operation
+     * @return TResult
+     */
+    private function onServer(
+        Server $server,
+        Closure $operation,
+    ): mixed {
         $this->connectServerAction->handle($server);
+
+        return $operation();
     }
 }
