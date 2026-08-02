@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Application\Server\Actions\ActivateServerAction;
 use App\Application\Server\ServerManager;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Services\SSHConnectionCircuitBreaker;
 use App\Livewire\Concerns\HandlesSshAvailability;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -34,11 +37,19 @@ final class Dashboard extends Component
 
     public function mount(
         Server $server,
+        ActivateServerAction $activateServer,
         SSHConnectionInterface $ssh,
         SSHConnectionCircuitBreaker $circuitBreaker,
         ServerManager $serverManager,
     ): void {
-        $this->server = $server;
+        $user = Auth::user();
+
+        abort_unless($user instanceof User, 401);
+
+        $this->server = $activateServer->handle(
+            $user,
+            $server,
+        );
 
         /*
          * ServerManager may return cached overview data. Therefore, an

@@ -103,12 +103,26 @@
 
                 <div class="min-w-0">
 
-                    <div class="truncate font-semibold text-base-content">
-                        {{ $server->name }}
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="truncate font-semibold text-base-content">
+                            {{ $server->name }}
+                        </span>
+
+                        @if($server->isActive())
+                            <span
+                                class="badge badge-primary badge-soft badge-sm gap-1.5"
+                            >
+                                <span class="size-1.5 rounded-full bg-primary"></span>
+
+                                فعال
+                            </span>
+                        @endif
                     </div>
 
                     <div class="mt-0.5 text-xs text-base-content/40">
-                        VPS Server
+                        {{ $server->isActive()
+                            ? 'سرور انتخاب‌شده برای مدیریت'
+                            : 'VPS Server' }}
                     </div>
 
                 </div>
@@ -124,7 +138,13 @@
                 dir="ltr"
                 class="inline-flex items-center gap-2 rounded-lg bg-base-200 px-3 py-2 font-mono text-xs font-medium text-base-content/70"
             >
-                <span class="size-1.5 rounded-full bg-success"></span>
+                <span
+                    @class([
+                        'size-1.5 rounded-full',
+                        'bg-primary' => $server->isActive(),
+                        'bg-base-content/20' => ! $server->isActive(),
+                    ])
+                ></span>
 
                 <span>{{ $server->host }}:{{ $server->port }}</span>
             </div>
@@ -137,15 +157,31 @@
             <div class="flex items-center justify-end gap-2">
 
                 <x-button
-                    label="مدیریت"
-                    icon="o-cog-6-tooth"
+                    tooltip="فعالسازی و مدیریت "
+                    :label="$server->isActive()
+                        ? 'مدیریت'
+                        : 'انتخاب سرور'"
+                    :icon="$server->isActive()
+                        ? 'o-cog-6-tooth'
+                        : 'o-cursor-arrow-rays'"
                     :link="route('panel.servers.dashboard', $server)"
-                    class="btn-primary btn-sm"
+                    @class([
+                        'btn-sm',
+                        'btn-primary' => $server->isActive(),
+                        'btn-outline' => ! $server->isActive(),
+                    ])
                 />
 
                 <x-button
                     icon="o-trash"
-                    wire:click="delete({{ $server->getKey() }})"
+                    wire:click="delete({{ $server->id }})"
+                    wire:confirm="آیا از حذف این سرور مطمئن هستید؟"
+                    class="btn-ghost btn-sm text-error hover:bg-error/10"
+                    tooltip="حذف سرور"
+                />
+                <x-button
+                    icon="o-edit"
+                    wire:click="edit({{ $server->id }})"
                     wire:confirm="آیا از حذف این سرور مطمئن هستید؟"
                     class="btn-ghost btn-sm text-error hover:bg-error/10"
                     tooltip="حذف سرور"
