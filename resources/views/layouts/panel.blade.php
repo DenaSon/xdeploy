@@ -36,7 +36,7 @@
         drawer="panel-drawer"
         collapsible
         collapse-text=""
-        class="bg-base-300/80"
+        class="bg-base-500"
     >
 
         <x-panel.brand />

@@ -16,9 +16,19 @@ use App\Domain\Application\Shared\ValueObjects\ApplicationRequirements;
 use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
 use App\Domain\Platform\Enums\PlatformType;
 use App\Support\SSH\SSHTimeout;
+use RuntimeException;
+use Throwable;
 
 final readonly class MarzbanApplication extends CommandApplication implements StartableInterface
 {
+    private const int STATE_CHECK_ATTEMPTS = 20;
+
+    private const int STATE_CHECK_DELAY_MICROSECONDS = 500_000;
+
+    private const int CONTAINER_INSPECTION_ATTEMPTS = 3;
+
+    private const int CONTAINER_INSPECTION_DELAY_MICROSECONDS = 500_000;
+
     public function type(): ApplicationType
     {
         return ApplicationType::Marzban;
@@ -56,6 +66,39 @@ final readonly class MarzbanApplication extends CommandApplication implements St
                 SoftwareType::Xray,
             ),
         ];
+    }
+
+    public function start(): void
+    {
+        $this->executeLifecycleOperation(
+            operation: 'up -d --remove-orphans',
+            expectedState: ApplicationState::Running,
+            exception: ApplicationStartException::class,
+            commandFailureMessage: 'Failed to start Marzban.',
+            stateFailureMessage: 'Marzban did not enter the running state.',
+        );
+    }
+
+    public function stop(): void
+    {
+        $this->executeLifecycleOperation(
+            operation: 'down --remove-orphans',
+            expectedState: ApplicationState::Installed,
+            exception: ApplicationStopException::class,
+            commandFailureMessage: 'Failed to stop Marzban.',
+            stateFailureMessage: 'Marzban did not stop successfully.',
+        );
+    }
+
+    public function restart(): void
+    {
+        $this->executeLifecycleOperation(
+            operation: 'up -d --force-recreate --remove-orphans',
+            expectedState: ApplicationState::Running,
+            exception: ApplicationRestartException::class,
+            commandFailureMessage: 'Failed to restart Marzban.',
+            stateFailureMessage: 'Marzban did not restart successfully.',
+        );
     }
 
     protected function inspectCommand(): string
@@ -116,57 +159,18 @@ timeout --signal=TERM 600 \
 BASH;
     }
 
-    public function start(): void
-    {
-        $this->runCommand(
-            command: 'marzban up --no-logs',
-            exception: ApplicationStartException::class,
-            message: 'Failed to start Marzban.',
-        );
-
-        $this->waitForState(
-            expectedState: ApplicationState::Running,
-            exception: ApplicationStartException::class,
-            message: 'Marzban did not enter the running state.',
-        );
-    }
-
-    public function stop(): void
-    {
-        $this->runCommand(
-            command: 'marzban down',
-            exception: ApplicationStopException::class,
-            message: 'Failed to stop Marzban.',
-        );
-
-        $this->waitForState(
-            expectedState: ApplicationState::Installed,
-            exception: ApplicationStopException::class,
-            message: 'Marzban did not stop successfully.',
-        );
-    }
-
-    public function restart(): void
-    {
-        $this->runCommand(
-            command: 'marzban restart --no-logs',
-            exception: ApplicationRestartException::class,
-            message: 'Failed to restart Marzban.',
-        );
-
-        $this->waitForState(
-            expectedState: ApplicationState::Running,
-            exception: ApplicationRestartException::class,
-            message: 'Marzban did not restart successfully.',
-        );
-    }
-
     protected function uninstallCommand(): string
     {
-        return <<<'BASH'
+        return sprintf(
+            "%s\n\n%s",
+            $this->composeCommand(
+                'down --remove-orphans',
+            ),
+            <<<'BASH'
 timeout --signal=TERM 180 \
     sh -c 'yes y | marzban uninstall'
-BASH;
+BASH,
+        );
     }
 
     protected function uninstallTimeout(): int
@@ -180,57 +184,97 @@ BASH;
     }
 
     /**
-     * @param  class-string<\RuntimeException>  $exception
+     * @param  class-string<RuntimeException>  $exception
      */
-    private function runCommand(
-        string $command,
+    private function executeLifecycleOperation(
+        string $operation,
+        ApplicationState $expectedState,
         string $exception,
-        string $message,
-        int $timeout = SSHTimeout::DEFAULT,
+        string $commandFailureMessage,
+        string $stateFailureMessage,
     ): void {
         $result = $this->ssh->executeWithResult(
-            command: $command,
-            timeout: $timeout,
+            command: $this->composeCommand($operation),
+            timeout: SSHTimeout::DEFAULT,
         );
 
         if (! $result->successful()) {
-            throw new $exception($message);
+            throw new $exception($commandFailureMessage);
         }
+
+        $this->waitForState(
+            expectedState: $expectedState,
+            exception: $exception,
+            message: $stateFailureMessage,
+        );
     }
 
     /**
-     * @param  class-string<\RuntimeException>  $exception
+     * @param  class-string<RuntimeException>  $exception
      */
     private function waitForState(
         ApplicationState $expectedState,
         string $exception,
         string $message,
-        int $attempts = 20,
-        int $delayMilliseconds = 500,
     ): void {
-        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+        for (
+            $attempt = 1;
+            $attempt <= self::STATE_CHECK_ATTEMPTS;
+            $attempt++
+        ) {
             if ($this->resolveState() === $expectedState) {
                 return;
             }
 
-            if ($attempt < $attempts) {
-                usleep($delayMilliseconds * 1_000);
+            if ($attempt < self::STATE_CHECK_ATTEMPTS) {
+                usleep(self::STATE_CHECK_DELAY_MICROSECONDS);
             }
         }
 
         throw new $exception($message);
     }
 
+    private function composeCommand(string $operation): string
+    {
+        return sprintf(
+            <<<'BASH'
+set -euo pipefail
+
+compose_files=(
+    -f /opt/marzban/docker-compose.yml
+)
+
+if [ -f /opt/marzban/docker-compose.xdeploy.yml ]; then
+    compose_files+=(
+        -f /opt/marzban/docker-compose.xdeploy.yml
+    )
+fi
+
+docker compose \
+    --env-file /opt/marzban/.env \
+    "${compose_files[@]}" \
+    %s
+BASH,
+            $operation,
+        );
+    }
+
     private function resolveContainerState(): ApplicationState
     {
-        for ($attempt = 1; $attempt <= 3; $attempt++) {
+        for (
+            $attempt = 1;
+            $attempt <= self::CONTAINER_INSPECTION_ATTEMPTS;
+            $attempt++
+        ) {
             try {
                 $result = $this->ssh->executeWithResult(
                     command: <<<'BASH'
 timeout --signal=TERM 8 \
 docker ps \
-    --filter "name=marzban" \
-    --format "{{.Names}}"
+    --filter "label=com.docker.compose.project=marzban" \
+    --filter "label=com.docker.compose.service=marzban" \
+    --filter "status=running" \
+    --format "{{.ID}}"
 BASH,
                     timeout: SSHTimeout::QUICK,
                 );
@@ -240,12 +284,12 @@ BASH,
                         ? ApplicationState::Running
                         : ApplicationState::Installed;
                 }
-            } catch (\Throwable) {
-                // Retry transient Docker/SSH inspection failures.
+            } catch (Throwable) {
+                // Retry transient Docker or SSH inspection failures.
             }
 
-            if ($attempt < 3) {
-                usleep(500_000);
+            if ($attempt < self::CONTAINER_INSPECTION_ATTEMPTS) {
+                usleep(self::CONTAINER_INSPECTION_DELAY_MICROSECONDS);
             }
         }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Applications\Marzban;
 
 use App\Application\Applications\Marzban\MarzbanManager;
+use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
@@ -47,11 +48,21 @@ final class ManagementPanel extends Component
     public function updateManagement(
         array $management,
     ): void {
-        $state = $management['setup']['state'] ?? null;
+        $setupState = data_get(
+            $management,
+            'setup.state',
+        );
+
+        $httpsState = data_get(
+            $management,
+            'https.state',
+        );
 
         if (
-            ! is_string($state)
-            || MarzbanSetupState::tryFrom($state) === null
+            ! is_string($setupState)
+            || MarzbanSetupState::tryFrom($setupState) === null
+            || ! is_string($httpsState)
+            || MarzbanHttpsState::tryFrom($httpsState) === null
         ) {
             return;
         }
