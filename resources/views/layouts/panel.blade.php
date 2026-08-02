@@ -36,7 +36,7 @@
         drawer="panel-drawer"
         collapsible
         collapse-text=""
-        class="bg-base-500"
+        class="bg-base-300"
     >
 
         <x-panel.brand />
@@ -47,10 +47,7 @@
 
     <x-slot:content>
 
-        <x-panel.header
-            :breadcrumbs="$breadcrumbs ?? []"
-            :title="$title ?? null"
-        />
+        <x-panel.header/>
 
         <x-panel.page-container>
             {{ $slot }}

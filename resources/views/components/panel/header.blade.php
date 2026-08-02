@@ -1,21 +1,20 @@
 @props([
-    'breadcrumbs' => [],
     'title' => null,
 ])
 
+@php
+    $activeServer = auth()->user()
+        ?->servers()
+        ->active()
+        ->first();
+@endphp
+
 <header
     class="
-        navbar
-        sticky
-        top-0
-        z-20
+        navbar sticky top-0 z-20
+        h-14 min-h-14
 
-        h-14
-        min-h-14
-
-        border-b
-        border-base-300/70
-
+        border-b border-base-content/5
         bg-base-100/85
         backdrop-blur-xl
 
@@ -23,12 +22,17 @@
         lg:px-5
     "
 >
-
+    {{-- Start --}}
     <div class="navbar-start min-w-0 gap-2">
 
         <label
             for="panel-drawer"
-            class="btn btn-square btn-ghost btn-sm lg:hidden"
+            aria-label="باز کردن منوی پنل"
+            class="
+                btn btn-square btn-ghost btn-sm
+                shrink-0 rounded-xl
+                lg:hidden
+            "
         >
             <x-icon
                 name="lucide.menu"
@@ -36,46 +40,126 @@
             />
         </label>
 
-        @if($breadcrumbs)
+        @auth
+            @if($activeServer)
 
-            <div class="breadcrumbs text-sm">
+                <a
+                    href="{{ route('panel.servers.dashboard', $activeServer) }}"
+                    wire:navigate
+                    aria-label="مدیریت سرور فعال {{ $activeServer->name }}"
+                    class="
+                        group
+                        flex min-w-0 items-center gap-2
+                        rounded-xl
 
-                <ul>
+                        border border-base-content/5
+                        bg-base-200/35
 
-                    @foreach($breadcrumbs as $breadcrumb)
+                        px-2.5 py-1.5
 
-                        <li>
+                        transition-all duration-200
 
-                            @if(!empty($breadcrumb['url']))
+                        hover:border-primary/15
+                        hover:bg-primary/5
+                    "
+                >
+                    {{-- Server icon --}}
+                    <span
+                        class="
+                            flex size-6 shrink-0
+                            items-center justify-center
+                            rounded-lg
 
-                                <a
-                                    href="{{ $breadcrumb['url'] }}"
-                                    wire:navigate
-                                    class="text-base-content/60 hover:text-base-content transition-colors"
-                                >
-                                    {{ $breadcrumb['label'] }}
-                                </a>
+                            bg-primary/10
+                            text-primary
 
-                            @else
+                            transition-colors
+                            group-hover:bg-primary/15
+                        "
+                    >
+                        <x-icon
+                            name="lucide.server"
+                            class="!size-3 stroke-[1.5]"
+                        />
+                    </span>
 
-                                <span class="font-medium text-base-content">
-                                    {{ $breadcrumb['label'] }}
-                                </span>
+                    {{-- Server information --}}
+                    <span class="flex min-w-0 items-center gap-2">
 
-                            @endif
+                        <span class="min-w-0 text-start">
 
-                        </li>
+                            <span
+                                class="
+                                    block max-w-28 truncate
+                                    text-[11px] font-medium
+                                    leading-none
+                                    text-base-content/65
 
-                    @endforeach
+                                    sm:max-w-40
+                                "
+                            >
+                                {{ $activeServer->name }}
+                            </span>
 
-                </ul>
+                            <span
+                                dir="ltr"
+                                class="
+                                    mt-1 block
+                                    max-w-28 truncate
+                                    font-mono text-[9px]
+                                    leading-none
+                                    text-base-content/35
 
-            </div>
+                                    sm:max-w-40
+                                "
+                            >
+                                {{ $activeServer->host }}
+                            </span>
 
-        @endif
+                        </span>
+
+                        {{-- Active indicator --}}
+                        <span
+                            class="
+                                inline-grid shrink-0
+                                *:[grid-area:1/1]
+                            "
+                            aria-label="سرور فعال"
+                        >
+                            <span
+                                class="
+                                    status status-success
+                                    animate-ping
+                                "
+                            ></span>
+
+                            <span
+                                class="
+                                    status status-success
+                                "
+                            ></span>
+                        </span>
+
+                    </span>
+                </a>
+
+            @elseif($title)
+
+                <span
+                    class="
+                        truncate text-sm font-medium
+                        text-base-content/60
+                    "
+                >
+                    {{ $title }}
+                </span>
+
+            @endif
+        @endauth
 
     </div>
 
+    {{-- End --}}
     <div class="navbar-end gap-1">
 
         <x-theme-toggle />
@@ -83,5 +167,4 @@
         <x-panel.user-menu />
 
     </div>
-
 </header>

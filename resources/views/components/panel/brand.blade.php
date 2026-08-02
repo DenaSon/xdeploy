@@ -6,80 +6,71 @@
 
 <div
     class="
-        border-b
-        border-base-content/5
-        px-5
-        py-5
+        overflow-hidden
+        border-b border-base-content/5
+        px-2.5 py-4
     "
 >
-
-{{--    <a--}}
-{{--        href="{{ route('panel.servers.dashboard', ['server' => $server]) }}"--}}
-{{--        wire:navigate--}}
-{{--        class="--}}
-{{--            group--}}
-{{--            flex--}}
-{{--            items-center--}}
-{{--            gap-3--}}
-{{--        "--}}
-{{--    >--}}
-
-        <div
+    <a
+        href="{{ route('panel.servers.index') }}"
+        wire:navigate
+        title="{{ $title }}"
+        class="
+            group
+            flex min-w-0 items-center gap-3
+        "
+    >
+        {{-- Logo --}}
+        <span
             class="
-                flex
-                size-10
-                shrink-0
-                items-center
-                justify-center
+                flex size-10 shrink-0
+                items-center justify-center
 
                 rounded-2xl
-
                 bg-primary
                 text-primary-content
 
-                shadow-sm
+                shadow-sm shadow-primary/20
 
-                transition-all
-                duration-300
+                transition-all duration-200
 
                 group-hover:scale-[1.03]
                 group-hover:shadow-md
+                group-hover:shadow-primary/20
             "
         >
             <x-icon
                 :name="$icon"
-                class="size-3"
+                class="!size-4 stroke-[1.8]"
             />
-        </div>
+        </span>
 
-        <div class="min-w-0">
+        {{-- Brand text: hidden automatically when sidebar collapses --}}
+        <span class="mary-hideable min-w-0 overflow-hidden">
 
-            <h1
+            <span
                 class="
-                    text-base
-                    font-bold
-                    leading-none
-                    tracking-tight
+                    block truncate
+                    text-base font-bold
+                    leading-none tracking-tight
+                    text-base-content
                 "
             >
                 {{ $title }}
-            </h1>
+            </span>
 
             @if($subtitle)
-                <p
+                <span
                     class="
-                        mt-1
-                        truncate
-                        text-xs
-                        text-base-content/55
+                        mt-1.5 block truncate
+                        text-[10px] font-normal
+                        text-base-content/40
                     "
                 >
                     {{ $subtitle }}
-                </p>
+                </span>
             @endif
 
-        </div>
-
+        </span>
     </a>
-
 </div>
