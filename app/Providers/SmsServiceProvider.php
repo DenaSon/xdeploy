@@ -1,39 +1,62 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
 use App\Domain\Authentication\Contracts\OtpRepositoryInterface;
 use App\Infrastructure\Persistence\Repositories\EloquentOtpRepository;
 use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
+use App\Infrastructure\Sms\Providers\FakeSmsProvider;
 use App\Infrastructure\Sms\Providers\SmsIrProvider;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 
-class SmsServiceProvider extends ServiceProvider
+final class SmsServiceProvider extends ServiceProvider
 {
-    /**
-     * Register services.
-     */
     public function register(): void
+    {
+        $this->registerRepositories();
+        $this->registerSmsProvider();
+    }
+
+    private function registerRepositories(): void
     {
         $this->app->bind(
             OtpRepositoryInterface::class,
             EloquentOtpRepository::class,
         );
-
-        $this->app->singleton(
-            SmsProviderInterface::class,
-            fn () => new SmsIrProvider(
-                templateId: config('services.smsir.template_id'),
-                parameterName: config('services.smsir.parameter_name', 'Code'),
-            ),
-        );
     }
 
-    /**
-     * Bootstrap services.
-     */
-    public function boot(): void
+    private function registerSmsProvider(): void
     {
-        //
+        $this->app->singleton(
+            SmsProviderInterface::class,
+            function (Application $app): SmsProviderInterface {
+                $driver = $app->make('config')->string(
+                    'services.sms.driver',
+                    'fake',
+                );
+
+                return match ($driver) {
+                    'fake' => new FakeSmsProvider,
+
+                    'smsir' => new SmsIrProvider(
+                        templateId: $app->make('config')->integer(
+                            'services.smsir.template_id',
+                        ),
+                        parameterName: $app->make('config')->string(
+                            'services.smsir.parameter_name',
+                            'Code',
+                        ),
+                    ),
+
+                    default => throw new InvalidArgumentException(
+                        "Unsupported SMS driver [{$driver}].",
+                    ),
+                };
+            },
+        );
     }
 }
