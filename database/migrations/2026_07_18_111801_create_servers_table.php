@@ -40,6 +40,11 @@ return new class extends Migration
             $table->text('credential')
                 ->nullable();
 
+            $table
+                ->uuid('credential_context')
+                ->nullable()
+                ->unique();
+
             // Status
             $table->enum('status', array_column(
                 ServerStatus::cases(),

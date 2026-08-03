@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
+use App\Infrastructure\Security\Casts\ServerCredentialCast;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,10 +22,14 @@ class Server extends Model
         'authentication_type',
         'credential',
     ];
+    protected $hidden = [
+        'credential',
+        'credential_context',
+    ];
 
     protected $casts = [
         'port' => 'integer',
-        'credential' => 'encrypted',
+        'credential' => ServerCredentialCast::class,
         'status' => ServerStatus::class,
         'authentication_type' => AuthenticationType::class,
     ];

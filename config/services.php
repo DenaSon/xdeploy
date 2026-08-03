@@ -7,20 +7,8 @@ return [
     | Third Party Services
     |--------------------------------------------------------------------------
     */
-
-    'postmark' => [
-        'token' => env('POSTMARK_TOKEN'),
-    ],
-
-    'resend' => [
-        'key' => env('RESEND_API_KEY'),
-    ],
-
-    'slack' => [
-        'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
-        ],
+    'sms' => [
+        'driver' => env('SMS_DRIVER', 'fake'),
     ],
 
     'smsir' => [

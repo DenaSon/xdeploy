@@ -2,6 +2,7 @@
 
 use App\Providers\ApplicationServiceProvider;
 use App\Providers\AppServiceProvider;
+use App\Providers\CredentialSecurityServiceProvider;
 use App\Providers\PlatformServiceProvider;
 use App\Providers\ServerServiceProvider;
 use App\Providers\SmsServiceProvider;
@@ -14,4 +15,5 @@ return [
     PlatformServiceProvider::class,
     SmsServiceProvider::class,
     UserServiceProvider::class,
+    CredentialSecurityServiceProvider::class,
 ];
