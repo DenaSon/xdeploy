@@ -62,7 +62,7 @@
     </x-slot:footer>
 
 </x-main>
-
+<x-components.panel.offline-indicator />
 {{-- Global Toast --}}
 <x-toast position="toast-top toast-center" />
 

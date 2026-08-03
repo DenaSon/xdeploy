@@ -23,27 +23,24 @@
         {{-- Logo --}}
         <span
             class="
-                flex size-10 shrink-0
-                items-center justify-center
+        flex size-10 shrink-0
+        items-center justify-center
+        rounded-2xl
 
-                rounded-2xl
-                bg-primary
-                text-primary-content
+        border border-primary/15
+        bg-primary/10
+        text-primary
 
-                shadow-sm shadow-primary/20
-
-                transition-all duration-200
-
-                group-hover:scale-[1.03]
-                group-hover:shadow-md
-                group-hover:shadow-primary/20
-            "
+        shadow-sm
+        backdrop-blur-xl
+        ring-1 ring-inset ring-white/20
+    "
         >
-            <x-icon
-                :name="$icon"
-                class="!size-4 stroke-[1.8]"
-            />
-        </span>
+    <x-icon
+        name="lucide.cloud-upload"
+        class="!size-5 !fill-none stroke-current stroke-[1.8]"
+    />
+</span>
 
         {{-- Brand text: hidden automatically when sidebar collapses --}}
         <span class="mary-hideable min-w-0 overflow-hidden">

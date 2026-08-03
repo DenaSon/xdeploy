@@ -115,3 +115,14 @@ select:focus[data-flux-control] {
 .scrollbar-minimal:hover::-webkit-scrollbar-thumb {
     background: rgb(var(--color-base-300));
 }
+/* Livewire navigation progress bar */
+#nprogress .bar {
+    height: 4px !important;
+    border-radius: 0 0 9999px 9999px;
+    z-index: 9999 !important;
+}
+
+#nprogress .peg {
+    height: 100%;
+    opacity: 0.6;
+}

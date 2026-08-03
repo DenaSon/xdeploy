@@ -1,10 +1,19 @@
-<main class="flex-1 p-4 lg:p-6">
+<main
+    class="
+        min-w-0 flex-1
+        py-4 pe-4 ps-2
+        lg:py-6 lg:pe-6 lg:ps-3
+    "
+>
 
     <div
         class="
-            relative overflow-hidden
+            relative
+            w-full
+            overflow-hidden
 
-            rounded-3xl lg:rounded-[2rem]
+            rounded-3xl
+            lg:rounded-[2rem]
 
             border border-base-content/5
             bg-base-100/55
@@ -19,10 +28,14 @@
 
         {{-- Top Highlight --}}
         <div
-            class="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/30"
+            class="
+                pointer-events-none
+                absolute inset-x-0 top-0
+                h-px bg-white/30
+            "
         ></div>
 
-        <div class="p-4 lg:p-6">
+        <div class="p-3 lg:p-6">
 
             {{ $slot }}
 
