@@ -16,16 +16,4 @@ return [
         'parameter_name' => env('SMSIR_PARAMETER_NAME', 'Code'),
     ],
 
-
-    'arvan_cloud' => [
-        'api_key' => env('ARVAN_CLOUD_API_KEY'),
-        'region' => env('ARVAN_CLOUD_REGION', 'ir-thr-c2'),
-        'base_url' => env(
-            'ARVAN_CLOUD_BASE_URL',
-            'https://napi.arvancloud.ir/ecc/v1'
-        ),
-    ],
-
-
-
 ];

@@ -18,7 +18,7 @@ final class CredentialKeyRing
     private array $keys = [];
 
     /**
-     * @param array<string, string|null> $encodedKeys
+     * @param  array<string, string|null>  $encodedKeys
      */
     public function __construct(
         private readonly string $currentKeyId,

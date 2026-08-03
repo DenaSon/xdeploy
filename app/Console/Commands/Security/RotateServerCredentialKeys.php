@@ -134,11 +134,9 @@ final class RotateServerCredentialKeys extends Command
 
                             $rewrappedCredential =
                                 $this->cipher->rewrap(
-                                    encryptedValue:
-                                    $encryptedCredential,
+                                    encryptedValue: $encryptedCredential,
 
-                                    context:
-                                    $credentialContext,
+                                    context: $credentialContext,
                                 );
 
                             /*
@@ -149,11 +147,9 @@ final class RotateServerCredentialKeys extends Command
                              * printed or logged.
                              */
                             $this->cipher->decrypt(
-                                encryptedValue:
-                                $rewrappedCredential,
+                                encryptedValue: $rewrappedCredential,
 
-                                context:
-                                $credentialContext,
+                                context: $credentialContext,
                             );
 
                             if (! $dryRun) {
@@ -171,11 +167,9 @@ final class RotateServerCredentialKeys extends Command
                                         $server->getKey(),
                                     )
                                     ->update([
-                                        'credential' =>
-                                            $rewrappedCredential,
+                                        'credential' => $rewrappedCredential,
 
-                                        'updated_at' =>
-                                            now(),
+                                        'updated_at' => now(),
                                     ]);
                             }
 

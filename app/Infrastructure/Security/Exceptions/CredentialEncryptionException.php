@@ -6,6 +6,4 @@ namespace App\Infrastructure\Security\Exceptions;
 
 use RuntimeException;
 
-final class CredentialEncryptionException extends RuntimeException
-{
-}
+final class CredentialEncryptionException extends RuntimeException {}

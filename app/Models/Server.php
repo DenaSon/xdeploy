@@ -22,6 +22,7 @@ class Server extends Model
         'authentication_type',
         'credential',
     ];
+
     protected $hidden = [
         'credential',
         'credential_context',

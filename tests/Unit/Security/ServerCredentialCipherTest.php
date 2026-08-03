@@ -221,10 +221,10 @@ final class ServerCredentialCipherTest extends TestCase
             : 'A';
 
         $tampered = substr(
-                $encrypted,
-                0,
-                -1,
-            ).$replacement;
+            $encrypted,
+            0,
+            -1,
+        ).$replacement;
 
         $this->expectException(
             CredentialEncryptionException::class,
@@ -251,7 +251,7 @@ final class ServerCredentialCipherTest extends TestCase
     private function credentialKey(): string
     {
         return 'base64:'.base64_encode(
-                random_bytes(32),
-            );
+            random_bytes(32),
+        );
     }
 }

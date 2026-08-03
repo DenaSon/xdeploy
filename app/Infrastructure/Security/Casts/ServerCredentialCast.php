@@ -19,7 +19,7 @@ use Stringable;
 final class ServerCredentialCast implements CastsAttributes
 {
     /**
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     public function get(
         Model $model,
@@ -63,8 +63,7 @@ final class ServerCredentialCast implements CastsAttributes
     }
 
     /**
-     * @param array<string, mixed> $attributes
-     *
+     * @param  array<string, mixed>  $attributes
      * @return array<string, string|null>
      */
     public function set(
@@ -111,7 +110,7 @@ final class ServerCredentialCast implements CastsAttributes
     }
 
     /**
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     private function existingContext(
         array $attributes,
@@ -129,7 +128,7 @@ final class ServerCredentialCast implements CastsAttributes
     }
 
     /**
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     private function contextForWriting(
         array $attributes,

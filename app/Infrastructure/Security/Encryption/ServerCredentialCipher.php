@@ -390,8 +390,7 @@ final readonly class ServerCredentialCipher
         }
 
         foreach (
-            ['v', 'kid', 'wn', 'wk', 'pn', 'ct']
-            as $requiredField
+            ['v', 'kid', 'wn', 'wk', 'pn', 'ct'] as $requiredField
         ) {
             if (! array_key_exists($requiredField, $decoded)) {
                 throw new CredentialEncryptionException(
@@ -407,8 +406,7 @@ final readonly class ServerCredentialCipher
         }
 
         foreach (
-            ['kid', 'wn', 'wk', 'pn', 'ct']
-            as $stringField
+            ['kid', 'wn', 'wk', 'pn', 'ct'] as $stringField
         ) {
             if (
                 ! is_string($decoded[$stringField])
