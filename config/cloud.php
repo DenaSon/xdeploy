@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Default Cloud Provider
+    | Default Provider
     |--------------------------------------------------------------------------
     */
 
@@ -16,17 +16,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Discovery
+    | Provisioning Workflow
     |--------------------------------------------------------------------------
-    |
-    | Temporary local-only cloud discovery routes.
-    | This must remain disabled in production.
-    |
     */
 
-    'discovery_enabled' => env(
-        'ARVAN_CLOUD_DISCOVERY_ENABLED',
-        false,
+    'provisioning' => [
+        'max_attempts' => (int) env(
+            'CLOUD_PROVISIONING_MAX_ATTEMPTS',
+            20,
+        ),
+
+        'poll_delay_seconds' => (int) env(
+            'CLOUD_PROVISIONING_POLL_DELAY_SECONDS',
+            3,
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Temporary Discovery
+    |--------------------------------------------------------------------------
+    */
+
+    'discovery_enabled' => filter_var(
+        env(
+            'ARVAN_CLOUD_DISCOVERY_ENABLED',
+            false,
+        ),
+        FILTER_VALIDATE_BOOL,
     ),
 
     /*
@@ -37,20 +54,14 @@ return [
 
     'providers' => [
         'arvan' => [
-            /*
-            |--------------------------------------------------------------------------
-            | Connection
-            |--------------------------------------------------------------------------
-            */
-
             'base_url' => env(
                 'ARVAN_CLOUD_BASE_URL',
                 'https://napi.arvancloud.ir/ecc/v1',
             ),
 
             /*
-             * Store only the raw token in the environment.
-             * The "Apikey" prefix is added by ArvanCloudClient.
+             * Environment contains only the token.
+             * ArvanCloudClient adds the "Apikey" prefix.
              */
             'api_key' => env(
                 'ARVAN_CLOUD_API_KEY',
@@ -80,78 +91,61 @@ return [
             */
 
             'defaults' => [
-                /*
-                 * ArvanCloud flavor ID.
-                 */
                 'size_id' => env(
                     'ARVAN_CLOUD_DEFAULT_SIZE_ID',
-                    'eco-2-2-0',
+                    'eco-1-1-0',
                 ),
 
-                /*
-                 * Ubuntu 24.04 image ID.
-                 */
                 'image_id' => env(
                     'ARVAN_CLOUD_DEFAULT_IMAGE_ID',
                     '00aaa9d1-3e0a-468c-aaf4-334513981e42',
                 ),
 
-                /*
-                 * Default public IPv4 network ID.
-                 */
                 'network_id' => env(
                     'ARVAN_CLOUD_DEFAULT_NETWORK_ID',
                     'c72ea6b9-e1c1-4b72-80eb-adc6fc1941a2',
                 ),
 
                 /*
-                 * The create-server API expects the security-group UUID
-                 * inside security_groups[].name.
+                 * ArvanCloud expects the UUID inside
+                 * security_groups[].name.
                  */
                 'security_group_id' => env(
                     'ARVAN_CLOUD_DEFAULT_SECURITY_GROUP_ID',
                     '8449a4f5-5709-4017-9e63-45496bfe5cc9',
                 ),
 
-                /*
-                 * Kept for catalog display and configuration compatibility.
-                 * Provisioning must use security_group_id.
-                 */
                 'security_group_name' => env(
                     'ARVAN_CLOUD_DEFAULT_SECURITY_GROUP_NAME',
                     'default',
                 ),
 
-                /*
-                 * Volume-backed server creation.
-                 */
                 'create_type' => env(
                     'ARVAN_CLOUD_DEFAULT_CREATE_TYPE',
                     'cinder',
                 ),
 
-                /*
-                 * Root volume size in GiB.
-                 */
-                'disk_size' => (int) env(
-                    'ARVAN_CLOUD_DEFAULT_DISK_SIZE',
-                    30,
+                'username' => env(
+                    'ARVAN_CLOUD_DEFAULT_USERNAME',
+                    'ubuntu',
                 ),
 
-                /*
-                 * Optional provider initialization script.
-                 */
+                'disk_size' => (int) env(
+                    'ARVAN_CLOUD_DEFAULT_DISK_SIZE',
+                    25,
+                ),
+
                 'init_script' => env(
                     'ARVAN_CLOUD_DEFAULT_INIT_SCRIPT',
                     '',
                 ),
 
-                /*
-                 * High availability remains disabled for the MVP.
-                 */
-                'ha_enabled' => env(
-                    'ARVAN_CLOUD_DEFAULT_HA_ENABLED',
-                    false,
+                'ha_enabled' => filter_var(
+                    env(
+                        'ARVAN_CLOUD_DEFAULT_HA_ENABLED',
+                        false,
+                    ),
+                    FILTER_VALIDATE_BOOL,
                 ),
             ],
         ],

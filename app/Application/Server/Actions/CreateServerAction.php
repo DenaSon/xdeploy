@@ -11,31 +11,49 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class CreateServerAction
 {
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
     public function handle(
         User $user,
         array $attributes,
+        ?ServerStatus $explicitStatus = null,
     ): Server {
-        return DB::transaction(function () use (
-            $user,
-            $attributes,
-        ): Server {
-            $lockedUser = User::query()
-                ->lockForUpdate()
-                ->findOrFail($user->getKey());
+        return DB::transaction(
+            function () use (
+                $user,
+                $attributes,
+                $explicitStatus,
+            ): Server {
+                $lockedUser = User::query()
+                    ->lockForUpdate()
+                    ->findOrFail(
+                        $user->getKey(),
+                    );
 
-            $hasRegisteredServer = $lockedUser
-                ->servers()
-                ->exists();
+                $hasRegisteredServer =
+                    $lockedUser
+                        ->servers()
+                        ->exists();
 
-            $server = new Server($attributes);
+                $server = new Server(
+                    $attributes,
+                );
 
-            $server->status = $hasRegisteredServer
-                ? ServerStatus::Inactive
-                : ServerStatus::Active;
+                $server->status =
+                    $explicitStatus
+                    ?? (
+                        $hasRegisteredServer
+                            ? ServerStatus::Inactive
+                            : ServerStatus::Active
+                    );
 
-            $lockedUser->servers()->save($server);
+                $lockedUser
+                    ->servers()
+                    ->save($server);
 
-            return $server->refresh();
-        });
+                return $server->refresh();
+            },
+        );
     }
 }

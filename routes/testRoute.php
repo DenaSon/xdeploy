@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -10,9 +12,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
-use Illuminate\Http\JsonResponse;
-
 
 $guardCloudDiscovery = static function (): void {
     abort_unless(
@@ -674,8 +673,6 @@ Route::post(
     },
 )->name('dev.arvan.provision.store');
 
-
-
 Route::get(
     '/dev/arvan/servers/{serverId}',
     function (string $serverId): JsonResponse {
@@ -744,22 +741,22 @@ Route::get(
                 );
 
                 $isSensitive = in_array(
-                        $normalizedKey,
-                        [
-                            'password',
-                            'root_password',
-                            'admin_password',
-                            'token',
-                            'access_token',
-                            'refresh_token',
-                            'api_key',
-                            'authorization',
-                            'secret',
-                            'private_key',
-                            'credential',
-                        ],
-                        true,
-                    )
+                    $normalizedKey,
+                    [
+                        'password',
+                        'root_password',
+                        'admin_password',
+                        'token',
+                        'access_token',
+                        'refresh_token',
+                        'api_key',
+                        'authorization',
+                        'secret',
+                        'private_key',
+                        'credential',
+                    ],
+                    true,
+                )
                     || str_ends_with(
                         $normalizedKey,
                         '_password',
@@ -931,8 +928,7 @@ Route::get(
 
                 return collect($items)
                     ->filter(
-                        static fn (mixed $item): bool =>
-                        is_array($item),
+                        static fn (mixed $item): bool => is_array($item),
                     )
                     ->map(
                         static function (
@@ -973,15 +969,13 @@ Route::get(
                     ->all();
             },
         )->filter(
-            static fn (array $address): bool =>
-                is_string($address['address'])
+            static fn (array $address): bool => is_string($address['address'])
                 && filter_var(
                     $address['address'],
                     FILTER_VALIDATE_IP,
                 ) !== false,
         )->unique(
-            static fn (array $address): string =>
-            implode(
+            static fn (array $address): string => implode(
                 '|',
                 [
                     $address['address'],
@@ -999,8 +993,7 @@ Route::get(
 
         $publicIpv4s = $addresses
             ->filter(
-                static fn (array $address): bool =>
-                    $address['version'] === 4
+                static fn (array $address): bool => $address['version'] === 4
                     && $address['is_public'] === true
                     && filter_var(
                         $address['address'],
@@ -1015,8 +1008,7 @@ Route::get(
 
         $privateIpv4s = $addresses
             ->filter(
-                static fn (array $address): bool =>
-                    $address['version'] === 4
+                static fn (array $address): bool => $address['version'] === 4
                     && $address['is_public'] === false
                     && filter_var(
                         $address['address'],
@@ -1031,8 +1023,7 @@ Route::get(
 
         $publicIpv6s = $addresses
             ->filter(
-                static fn (array $address): bool =>
-                    $address['version'] === 6
+                static fn (array $address): bool => $address['version'] === 6
                     && $address['is_public'] === true
                     && filter_var(
                         $address['address'],
@@ -1047,8 +1038,7 @@ Route::get(
 
         $privateIpv6s = $addresses
             ->filter(
-                static fn (array $address): bool =>
-                    $address['version'] === 6
+                static fn (array $address): bool => $address['version'] === 6
                     && $address['is_public'] === false
                     && filter_var(
                         $address['address'],
@@ -1074,12 +1064,10 @@ Route::get(
                 [],
             ),
         )->filter(
-            static fn (mixed $networkId): bool =>
-                is_string($networkId)
+            static fn (mixed $networkId): bool => is_string($networkId)
                 && trim($networkId) !== '',
         )->map(
-            static fn (string $networkId): string =>
-            trim($networkId),
+            static fn (string $networkId): string => trim($networkId),
         )->unique()
             ->values()
             ->all();
@@ -1097,11 +1085,9 @@ Route::get(
                 [],
             ),
         )->filter(
-            static fn (mixed $group): bool =>
-            is_array($group),
+            static fn (mixed $group): bool => is_array($group),
         )->unique(
-            static fn (array $group): string =>
-            (string) (
+            static fn (array $group): string => (string) (
                 $group['id']
                 ?? $group['name']
                 ?? ''
@@ -1111,13 +1097,11 @@ Route::get(
         $securityGroupIds = $securityGroups
             ->pluck('id')
             ->filter(
-                static fn (mixed $id): bool =>
-                    is_string($id)
+                static fn (mixed $id): bool => is_string($id)
                     && trim($id) !== '',
             )
             ->map(
-                static fn (string $id): string =>
-                trim($id),
+                static fn (string $id): string => trim($id),
             )
             ->unique()
             ->values()
@@ -1126,13 +1110,11 @@ Route::get(
         $securityGroupNames = $securityGroups
             ->pluck('name')
             ->filter(
-                static fn (mixed $name): bool =>
-                    is_string($name)
+                static fn (mixed $name): bool => is_string($name)
                     && trim($name) !== '',
             )
             ->map(
-                static fn (string $name): string =>
-                trim($name),
+                static fn (string $name): string => trim($name),
             )
             ->unique()
             ->values()
@@ -1300,14 +1282,11 @@ Route::get(
                         ),
                 ],
 
-                'network_attachment_ids' =>
-                    $networkAttachmentIds,
+                'network_attachment_ids' => $networkAttachmentIds,
 
-                'security_group_ids' =>
-                    $securityGroupIds,
+                'security_group_ids' => $securityGroupIds,
 
-                'security_group_names' =>
-                    $securityGroupNames,
+                'security_group_names' => $securityGroupNames,
 
                 'volume_backed' => data_get(
                     $server,
@@ -1338,8 +1317,7 @@ Route::get(
             'provider_fields' => [
                 'addresses' => $addresses->all(),
 
-                'network_attachment_ids' =>
-                    $networkAttachmentIds,
+                'network_attachment_ids' => $networkAttachmentIds,
 
                 'security_groups' => $sanitize(
                     $securityGroups->all(),

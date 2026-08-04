@@ -8,6 +8,7 @@ use App\Domain\Cloud\Exceptions\CloudAuthenticationException;
 use App\Domain\Cloud\Exceptions\CloudAuthorizationException;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Domain\Cloud\Exceptions\CloudConnectionException;
+use App\Domain\Cloud\Exceptions\CloudInsufficientBalanceException;
 use App\Domain\Cloud\Exceptions\CloudRateLimitException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
@@ -42,9 +43,12 @@ final class ArvanCloudClientTest extends TestCase
             ],
         );
 
-        $this->assertSame([
-            'data' => [],
-        ], $result);
+        $this->assertSame(
+            [
+                'data' => [],
+            ],
+            $result,
+        );
 
         Http::assertSent(
             function (Request $request): bool {
@@ -59,6 +63,61 @@ final class ArvanCloudClientTest extends TestCase
                         'Accept',
                         'application/json',
                     );
+            },
+        );
+    }
+
+    public function test_it_sends_an_authenticated_post_request(): void
+    {
+        Http::fake([
+            'https://api.example.test/ecc/v1/*' => Http::response(
+                [
+                    'id' => 'cloud-server-id',
+                    'status' => 'BUILD',
+                ],
+                201,
+            ),
+        ]);
+
+        $payload = [
+            'name' => 'xdeploy-server',
+            'network_id' => 'network-id',
+            'flavor_id' => 'eco-1-1-0',
+            'image_id' => 'ubuntu-image',
+        ];
+
+        $result = $this->client()->post(
+            'regions/eu-west1-a/servers',
+            $payload,
+        );
+
+        $this->assertSame(
+            'cloud-server-id',
+            $result['id'],
+        );
+
+        Http::assertSent(
+            function (
+                Request $request,
+            ) use (
+                $payload,
+            ): bool {
+                return $request->method() === 'POST'
+                    && $request->url() ===
+                    'https://api.example.test/ecc/v1/regions/eu-west1-a/servers'
+                    && $request->hasHeader(
+                        'Authorization',
+                        'Apikey test-api-key',
+                    )
+                    && $request->hasHeader(
+                        'Accept',
+                        'application/json',
+                    )
+                    && $request->hasHeader(
+                        'Content-Type',
+                        'application/json',
+                    )
+                    && $request->data() === $payload;
             },
         );
     }
@@ -93,7 +152,9 @@ final class ArvanCloudClientTest extends TestCase
             ]),
         ]);
 
-        $result = $this->client()->get('regions');
+        $result = $this->client()->get(
+            'regions',
+        );
 
         $this->assertSame(
             'eu-west1-a',
@@ -149,18 +210,26 @@ final class ArvanCloudClientTest extends TestCase
         string $expectedException,
     ): void {
         Http::fake([
-            '*' => Http::response([
-                'message' => 'Provider error',
-            ], $status),
+            '*' => Http::response(
+                [
+                    'message' => 'Provider error',
+                ],
+                $status,
+            ),
         ]);
 
-        $this->expectException($expectedException);
+        $this->expectException(
+            $expectedException,
+        );
 
         $this->client()->get('regions');
     }
 
     /**
-     * @return array<string, array{int, class-string<\Throwable>}>
+     * @return array<string, array{
+     *     int,
+     *     class-string<\Throwable>
+     * }>
      */
     public static function mappedStatusProvider(): array
     {
@@ -172,6 +241,10 @@ final class ArvanCloudClientTest extends TestCase
             'unauthorized' => [
                 401,
                 CloudAuthenticationException::class,
+            ],
+            'insufficient balance' => [
+                402,
+                CloudInsufficientBalanceException::class,
             ],
             'forbidden' => [
                 403,
@@ -208,6 +281,48 @@ final class ArvanCloudClientTest extends TestCase
         ];
     }
 
+    public function test_it_maps_insufficient_balance(): void
+    {
+        Http::fake([
+            '*' => Http::response(
+                [
+                    'message' => 'Account balance is insufficient.',
+                ],
+                402,
+            ),
+        ]);
+
+        try {
+            $this->client()->post(
+                'regions/eu-west1-a/servers',
+                [
+                    'name' => 'xdeploy-server',
+                ],
+            );
+
+            $this->fail(
+                'Expected insufficient balance exception was not thrown.',
+            );
+        } catch (
+            CloudInsufficientBalanceException $exception
+        ) {
+            $this->assertSame(
+                402,
+                $exception->getCode(),
+            );
+
+            $this->assertSame(
+                'Cloud provider account balance is insufficient.',
+                $exception->getMessage(),
+            );
+
+            $this->assertStringNotContainsString(
+                'Account balance is insufficient.',
+                $exception->getMessage(),
+            );
+        }
+    }
+
     public function test_it_maps_rate_limit_and_retry_after(): void
     {
         Http::fake([
@@ -226,9 +341,11 @@ final class ArvanCloudClientTest extends TestCase
             $this->client()->get('regions');
 
             $this->fail(
-                'Expected CloudRateLimitException was not thrown.',
+                'Expected rate limit exception was not thrown.',
             );
-        } catch (CloudRateLimitException $exception) {
+        } catch (
+            CloudRateLimitException $exception
+        ) {
             $this->assertSame(
                 120,
                 $exception->retryAfterSeconds,
@@ -241,7 +358,7 @@ final class ArvanCloudClientTest extends TestCase
         }
     }
 
-    public function test_it_maps_transport_failure(): void
+    public function test_it_maps_get_transport_failure(): void
     {
         Http::fake([
             '*' => Http::failedConnection(
@@ -258,6 +375,26 @@ final class ArvanCloudClientTest extends TestCase
         );
 
         $this->client()->get('regions');
+    }
+
+    public function test_it_maps_post_transport_failure(): void
+    {
+        Http::fake([
+            '*' => Http::failedConnection(
+                'Connection failed.',
+            ),
+        ]);
+
+        $this->expectException(
+            CloudConnectionException::class,
+        );
+
+        $this->client()->post(
+            'regions/eu-west1-a/servers',
+            [
+                'name' => 'xdeploy-server',
+            ],
+        );
     }
 
     public function test_it_rejects_an_empty_path(): void

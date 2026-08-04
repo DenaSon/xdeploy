@@ -21,6 +21,11 @@ class Server extends Model
         'username',
         'authentication_type',
         'credential',
+        'status',
+        'cloud_provider',
+        'cloud_server_id',
+        'cloud_region',
+        'provisioned_at',
     ];
 
     protected $hidden = [
@@ -30,26 +35,52 @@ class Server extends Model
 
     protected $casts = [
         'port' => 'integer',
+
         'credential' => ServerCredentialCast::class,
+
         'status' => ServerStatus::class,
+
         'authentication_type' => AuthenticationType::class,
+
+        'provisioned_at' => 'immutable_datetime',
     ];
 
     /**
      * Server owner.
+     *
+     * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(
+            User::class,
+        );
     }
 
     public function isActive(): bool
     {
-        return $this->status === ServerStatus::Active;
+        return $this->status
+            === ServerStatus::Active;
     }
 
-    public function scopeActive(Builder $query): void
+    public function isCloudProvisioned(): bool
     {
-        $query->where('status', ServerStatus::Active);
+        return $this->cloud_provider !== null
+            && $this->cloud_server_id !== null;
+    }
+
+    public function hasConnectionHost(): bool
+    {
+        return is_string($this->host)
+            && trim($this->host) !== '';
+    }
+
+    public function scopeActive(
+        Builder $query,
+    ): void {
+        $query->where(
+            'status',
+            ServerStatus::Active,
+        );
     }
 }

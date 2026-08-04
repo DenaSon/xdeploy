@@ -8,11 +8,13 @@ use App\Domain\Cloud\Exceptions\CloudAuthenticationException;
 use App\Domain\Cloud\Exceptions\CloudAuthorizationException;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Domain\Cloud\Exceptions\CloudConnectionException;
+use App\Domain\Cloud\Exceptions\CloudInsufficientBalanceException;
 use App\Domain\Cloud\Exceptions\CloudRateLimitException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -34,8 +36,13 @@ final class ArvanCloudClient
         int $connectTimeout = 10,
         int $requestTimeout = 90,
     ) {
-        $this->baseUrl = $this->normalizeBaseUrl($baseUrl);
-        $this->apiKey = $this->normalizeApiKey($apiKey);
+        $this->baseUrl = $this->normalizeBaseUrl(
+            $baseUrl,
+        );
+
+        $this->apiKey = $this->normalizeApiKey(
+            $apiKey,
+        );
 
         $this->connectTimeout = $this->validateTimeout(
             timeout: $connectTimeout,
@@ -49,33 +56,63 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param array<string, mixed> $query
-     *
+     * @param  array<string, mixed>  $query
      * @return array<array-key, mixed>
      */
     public function get(
         string $path,
         array $query = [],
     ): array {
+        return $this->request(
+            method: 'GET',
+            path: $path,
+            data: $query,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public function post(
+        string $path,
+        array $payload = [],
+    ): array {
+        return $this->request(
+            method: 'POST',
+            path: $path,
+            data: $payload,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<array-key, mixed>
+     */
+    private function request(
+        string $method,
+        string $path,
+        array $data,
+    ): array {
         $endpoint = $this->normalizePath($path);
         $url = "{$this->baseUrl}/{$endpoint}";
         $startedAt = microtime(true);
 
         try {
-            $response = Http::acceptJson()
-                ->asJson()
-                ->withHeaders([
-                    'Authorization' => "Apikey {$this->apiKey}",
-                ])
-                ->connectTimeout($this->connectTimeout)
-                ->timeout($this->requestTimeout)
-                ->withoutRedirecting()
-                ->get(
-                    url: $url,
-                    query: $query,
-                );
+            $response = match ($method) {
+                'GET' => $this->pendingRequest()->get(
+                    $url,
+                    $data,
+                ),
+
+                'POST' => $this->pendingRequest()->post(
+                    $url,
+                    $data,
+                ),
+            };
         } catch (ConnectionException $exception) {
             $this->logConnectionFailure(
+                method: $method,
                 endpoint: $endpoint,
                 startedAt: $startedAt,
             );
@@ -87,6 +124,7 @@ final class ArvanCloudClient
         }
 
         $this->logResponse(
+            method: $method,
             endpoint: $endpoint,
             response: $response,
             startedAt: $startedAt,
@@ -97,6 +135,22 @@ final class ArvanCloudClient
         }
 
         return $this->decodeResponse($response);
+    }
+
+    private function pendingRequest(): PendingRequest
+    {
+        return Http::acceptJson()
+            ->asJson()
+            ->withHeaders([
+                'Authorization' => "Apikey {$this->apiKey}",
+            ])
+            ->connectTimeout(
+                $this->connectTimeout,
+            )
+            ->timeout(
+                $this->requestTimeout,
+            )
+            ->withoutRedirecting();
     }
 
     private function normalizeBaseUrl(
@@ -117,7 +171,9 @@ final class ArvanCloudClient
 
         if (
             $parts === false
-            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || strtolower(
+                (string) ($parts['scheme'] ?? ''),
+            ) !== 'https'
             || ! isset($parts['host'])
             || trim((string) $parts['host']) === ''
             || isset($parts['user'])
@@ -139,8 +195,8 @@ final class ArvanCloudClient
         $apiKey = trim($apiKey);
 
         /*
-         * Environment configuration should contain only the token.
-         * This normalization prevents a duplicated "Apikey" prefix.
+         * Environment configuration contains only the token.
+         * This prevents a duplicated "Apikey" prefix.
          */
         $normalizedApiKey = preg_replace(
             '/^Apikey\s+/i',
@@ -154,7 +210,9 @@ final class ArvanCloudClient
             );
         }
 
-        $normalizedApiKey = trim($normalizedApiKey);
+        $normalizedApiKey = trim(
+            $normalizedApiKey,
+        );
 
         if ($normalizedApiKey === '') {
             throw new CloudConfigurationException(
@@ -207,14 +265,20 @@ final class ArvanCloudClient
             str_contains($path, '\\')
             || str_contains($path, '?')
             || str_contains($path, '#')
-            || preg_match('/[\x00-\x20\x7F]/', $path) === 1
+            || preg_match(
+                '/[\x00-\x20\x7F]/',
+                $path,
+            ) === 1
         ) {
             throw new CloudValidationException(
                 'Cloud provider request path is invalid.',
             );
         }
 
-        $path = ltrim($path, '/');
+        $path = ltrim(
+            $path,
+            '/',
+        );
 
         if ($path === '') {
             throw new CloudValidationException(
@@ -224,7 +288,9 @@ final class ArvanCloudClient
 
         $decodedPath = rawurldecode($path);
 
-        foreach (explode('/', $decodedPath) as $segment) {
+        foreach (
+            explode('/', $decodedPath) as $segment
+        ) {
             if (
                 $segment === ''
                 || $segment === '.'
@@ -275,7 +341,11 @@ final class ArvanCloudClient
     ): never {
         $status = $response->status();
 
-        if (in_array($status, [400, 409, 422], true)) {
+        if (in_array(
+            $status,
+            [400, 409, 422],
+            true,
+        )) {
             throw new CloudValidationException(
                 message: 'Cloud provider rejected the request.',
                 code: $status,
@@ -285,6 +355,13 @@ final class ArvanCloudClient
         if ($status === 401) {
             throw new CloudAuthenticationException(
                 message: 'Cloud provider authentication failed.',
+                code: $status,
+            );
+        }
+
+        if ($status === 402) {
+            throw new CloudInsufficientBalanceException(
+                message: 'Cloud provider account balance is insufficient.',
                 code: $status,
             );
         }
@@ -313,7 +390,10 @@ final class ArvanCloudClient
             );
         }
 
-        if ($status === 408 || $status >= 500) {
+        if (
+            $status === 408
+            || $status >= 500
+        ) {
             throw new CloudConnectionException(
                 message: 'Cloud provider is temporarily unavailable.',
                 code: $status,
@@ -333,7 +413,9 @@ final class ArvanCloudClient
         Response $response,
     ): ?int {
         $retryAfter = trim(
-            (string) $response->header('Retry-After'),
+            (string) $response->header(
+                'Retry-After',
+            ),
         );
 
         if ($retryAfter === '') {
@@ -357,6 +439,7 @@ final class ArvanCloudClient
     }
 
     private function logConnectionFailure(
+        string $method,
         string $endpoint,
         float $startedAt,
     ): void {
@@ -364,7 +447,7 @@ final class ArvanCloudClient
             'Cloud provider connection failed.',
             [
                 'provider' => 'arvan',
-                'method' => 'GET',
+                'method' => $method,
                 'endpoint' => $endpoint,
                 'duration_ms' => $this->durationMilliseconds(
                     $startedAt,
@@ -374,13 +457,18 @@ final class ArvanCloudClient
     }
 
     private function logResponse(
+        string $method,
         string $endpoint,
         Response $response,
         float $startedAt,
     ): void {
+        /*
+         * Payload and response body are deliberately excluded.
+         * Create responses can contain generated passwords.
+         */
         $context = [
             'provider' => 'arvan',
-            'method' => 'GET',
+            'method' => $method,
             'endpoint' => $endpoint,
             'status' => $response->status(),
             'duration_ms' => $this->durationMilliseconds(
@@ -389,7 +477,9 @@ final class ArvanCloudClient
         ];
 
         $requestId = trim(
-            (string) $response->header('X-Request-ID'),
+            (string) $response->header(
+                'X-Request-ID',
+            ),
         );
 
         if ($requestId !== '') {

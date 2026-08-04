@@ -10,9 +10,9 @@ use DateTimeImmutable;
 final readonly class CloudServerData
 {
     /**
-     * @param list<CloudServerAddressData> $addresses
-     * @param list<string> $networkIds
-     * @param list<string> $securityGroupIds
+     * @param  list<CloudServerAddressData>  $addresses
+     * @param  list<string>  $networkIds
+     * @param  list<string>  $securityGroupIds
      */
     public function __construct(
         public string $id,

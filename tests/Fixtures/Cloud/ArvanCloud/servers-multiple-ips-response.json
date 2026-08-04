@@ -1,1 +1,62 @@
-{}
+{
+    "data": [
+        {
+            "id": "ff83466c-c0fe-4dc4-9d1d-bde29efd0b45",
+            "name": "xdeploy-test-server",
+            "status": "ACTIVE",
+            "password": "must-be-ignored",
+            "created": "2026-08-04T06:30:00Z",
+            "flavor": {
+                "name": "eco-1-1-0"
+            },
+            "image": {
+                "id": "00aaa9d1-3e0a-468c-aaf4-334513981e42"
+            },
+            "addresses": {
+                "public-network": [
+                    {
+                        "addr": "185.204.168.213",
+                        "version": "4",
+                        "type": "fixed",
+                        "is_public": true,
+                        "is_vpc": false
+                    },
+                    {
+                        "addr": "185.204.171.249",
+                        "version": "4",
+                        "type": "fixed",
+                        "is_public": true,
+                        "is_vpc": false
+                    },
+                    {
+                        "addr": "10.10.0.10",
+                        "version": "4",
+                        "type": "fixed",
+                        "is_public": false,
+                        "is_vpc": true
+                    }
+                ]
+            },
+            "networks": [
+                {
+                    "id": "626ad7fd-3a62-4f3b-8908-7c0c3a91062d"
+                },
+                {
+                    "id": "626ad7fd-3a62-4f3b-8908-7c0c3a91062d"
+                }
+            ],
+            "security_groups": [
+                {
+                    "id": "8449a4f5-5709-4017-9e63-45496bfe5cc9",
+                    "name": "default"
+                },
+                {
+                    "id": "8449a4f5-5709-4017-9e63-45496bfe5cc9",
+                    "name": "default"
+                }
+            ],
+            "volume_backed": true,
+            "ha_enabled": false
+        }
+    ]
+}

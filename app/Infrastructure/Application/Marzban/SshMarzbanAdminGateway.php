@@ -8,7 +8,7 @@ use App\Domain\Application\Marzban\Admin\MarzbanAdminGateway;
 use App\Domain\Application\Marzban\Exceptions\MarzbanAdminProvisioningException;
 use App\Domain\Application\Marzban\Exceptions\MarzbanSetupInspectionException;
 use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
-use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Support\SSH\SSHTimeout;
 use Throwable;
 
@@ -53,14 +53,14 @@ $compose \
 BASH;
 
     public function __construct(
-        private SSHConnectionInterface $ssh,
+        private PrivilegedCommandExecutor $privileged,
     ) {}
 
     public function inspect(
         ?string $username = null,
     ): MarzbanSetupState {
         try {
-            $result = $this->ssh->executeWithResult(
+            $result = $this->privileged->executeWithResult(
                 command: $this->inspectionCommand($username),
                 timeout: SSHTimeout::QUICK,
             );
@@ -82,7 +82,7 @@ BASH;
         string $password,
     ): void {
         try {
-            $result = $this->ssh->executeWithResult(
+            $result = $this->privileged->executeWithResult(
                 command: $this->creationCommand(
                     username: $username,
                     password: $password,

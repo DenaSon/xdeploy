@@ -8,12 +8,14 @@ use App\Domain\Application\Contracts\ApplicationInterface;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Application\Shared\ValueObjects\ApplicationRequirements;
 use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 
 abstract readonly class AbstractApplication implements ApplicationInterface
 {
     public function __construct(
         protected SSHConnectionInterface $ssh,
+        protected PrivilegedCommandExecutor $privileged,
     ) {}
 
     abstract public function type(): ApplicationType;

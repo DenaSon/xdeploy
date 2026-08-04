@@ -193,7 +193,7 @@ BASH,
         string $commandFailureMessage,
         string $stateFailureMessage,
     ): void {
-        $result = $this->ssh->executeWithResult(
+        $result = $this->privileged->executeWithResult(
             command: $this->composeCommand($operation),
             timeout: SSHTimeout::DEFAULT,
         );
@@ -267,7 +267,7 @@ BASH,
             $attempt++
         ) {
             try {
-                $result = $this->ssh->executeWithResult(
+                $result = $this->privileged->executeWithResult(
                     command: <<<'BASH'
 timeout --signal=TERM 8 \
 docker ps \

@@ -7,7 +7,7 @@ namespace App\Domain\Cloud\DTOs;
 final readonly class CreateCloudServerData
 {
     /**
-     * @param list<string> $securityGroupIds
+     * @param  list<string>  $securityGroupIds
      */
     public function __construct(
         public string $name,

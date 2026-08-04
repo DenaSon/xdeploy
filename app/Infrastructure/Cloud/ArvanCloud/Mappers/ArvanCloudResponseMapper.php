@@ -10,13 +10,139 @@ use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\DTOs\CloudServerAddressData;
+use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudServerStatus;
+use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
+use DateTimeImmutable;
+use Exception;
 
 final class ArvanCloudResponseMapper
 {
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapCreatedServer(
+        array $payload,
+        string $regionId,
+        string $defaultUsername,
+        string $requestedName,
+    ): CreatedCloudServerData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        $server = $this->createdServerObject(
+            $payload,
+        );
+
+        $requestedName = trim(
+            $requestedName,
+        );
+
+        if ($requestedName === '') {
+            throw new CloudUnexpectedResponseException(
+                'Requested cloud server name cannot be empty.',
+            );
+        }
+
+        $responseName = $server['name'] ?? null;
+
+        $name = is_string($responseName)
+        && trim($responseName) !== ''
+            ? trim($responseName)
+            : $requestedName;
+
+        return new CreatedCloudServerData(
+            id: $this->requiredString(
+                $server,
+                'id',
+                'created server',
+            ),
+
+            name: $name,
+
+            regionId: $regionId,
+
+            /*
+             * A successful POST means the provisioning request was accepted.
+             * The authoritative status is read later through findServer().
+             */
+            status: CloudServerStatus::Provisioning,
+
+            username: $this->serverUsername(
+                $server,
+                $defaultUsername,
+            ),
+
+            /*
+             * The create response does not guarantee a creation timestamp.
+             * The authoritative value is obtained during polling.
+             */
+            createdAt: null,
+
+            generatedPassword: $this->optionalString(
+                $server,
+                'password',
+                'created server',
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapServer(
+        array $payload,
+        string $regionId,
+        string $serverId,
+        string $defaultUsername,
+    ): CloudServerData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        $serverId = trim($serverId);
+
+        if ($serverId === '') {
+            throw new CloudUnexpectedResponseException(
+                'Cloud server identifier cannot be empty.',
+            );
+        }
+
+        foreach (
+            $this->dataList($payload, 'servers') as $server
+        ) {
+            $currentId = $this->requiredString(
+                $server,
+                'id',
+                'server',
+            );
+
+            if ($currentId !== $serverId) {
+                continue;
+            }
+
+            return $this->mapServerObject(
+                server: $server,
+                regionId: $regionId,
+                defaultUsername: $defaultUsername,
+            );
+        }
+
+        throw new CloudResourceNotFoundException(
+            sprintf(
+                'Cloud server [%s] was not found.',
+                $serverId,
+            ),
+        );
+    }
+
     /**
      * @param  array<array-key, mixed>  $payload
      * @return list<CloudRegionData>
@@ -429,6 +555,605 @@ final class ArvanCloudResponseMapper
         throw new CloudUnexpectedResponseException(
             'ArvanCloud SSH key response schema has not been verified.',
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     */
+    private function mapServerObject(
+        array $server,
+        string $regionId,
+        string $defaultUsername,
+    ): CloudServerData {
+        $status = $this->mapServerStatus(
+            $this->requiredString(
+                $server,
+                'status',
+                'server',
+            ),
+        );
+
+        return new CloudServerData(
+            id: $this->requiredString(
+                $server,
+                'id',
+                'server',
+            ),
+
+            name: $this->requiredString(
+                $server,
+                'name',
+                'server',
+            ),
+
+            regionId: $regionId,
+
+            status: $status,
+
+            username: $this->serverUsername(
+                $server,
+                $defaultUsername,
+            ),
+
+            sizeId: $this->nestedReferenceId(
+                $server,
+                'flavor',
+                [
+                    'id',
+                    'name',
+                ],
+            ),
+
+            imageId: $this->nestedReferenceId(
+                $server,
+                'image',
+                [
+                    'id',
+                ],
+            ),
+
+            createdAt: $this->serverCreatedAt(
+                $server,
+                'server',
+            ),
+
+            addresses: $this->serverAddresses(
+                server: $server,
+                status: $status,
+            ),
+
+            networkIds: $this->serverReferenceIds(
+                server: $server,
+                key: 'networks',
+                resource: 'server networks',
+                idKeys: [
+                    'id',
+                    'network_id',
+                    'uuid',
+                ],
+                status: $status,
+            ),
+
+            securityGroupIds: $this->serverReferenceIds(
+                server: $server,
+                key: 'security_groups',
+                resource: 'server security groups',
+                idKeys: [
+                    'id',
+                    'uuid',
+                ],
+                status: $status,
+            ),
+
+            volumeBacked: $this->optionalBoolean(
+                $server,
+                'volume_backed',
+                false,
+            ),
+
+            highAvailability: $this->optionalBoolean(
+                $server,
+                'ha_enabled',
+                false,
+            ),
+        );
+    }
+
+    /**
+     * ArvanCloud may return incomplete address information while
+     * the server is still being provisioned.
+     *
+     * @param  array<string, mixed>  $server
+     * @return list<CloudServerAddressData>
+     */
+    private function serverAddresses(
+        array $server,
+        CloudServerStatus $status,
+    ): array {
+        try {
+            return $this->mapServerAddresses($server);
+        } catch (CloudUnexpectedResponseException $exception) {
+            if ($status === CloudServerStatus::Provisioning) {
+                return [];
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * ArvanCloud may temporarily return null, an object, or another
+     * incomplete shape for provider references during provisioning.
+     *
+     * Active servers must still satisfy the strict provider contract.
+     *
+     * @param  array<string, mixed>  $server
+     * @param  list<string>  $idKeys
+     * @return list<string>
+     */
+    private function serverReferenceIds(
+        array $server,
+        string $key,
+        string $resource,
+        array $idKeys,
+        CloudServerStatus $status,
+    ): array {
+        try {
+            return $this->uniqueReferenceIds(
+                data: $server,
+                key: $key,
+                resource: $resource,
+                idKeys: $idKeys,
+            );
+        } catch (CloudUnexpectedResponseException $exception) {
+            if ($status === CloudServerStatus::Provisioning) {
+                return [];
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * پاسخ Create در Discovery ممکن است Object اصلی یا data باشد.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function createdServerObject(
+        array $payload,
+    ): array {
+        if (
+            ! array_is_list($payload)
+            && isset($payload['id'])
+        ) {
+            /** @var array<string, mixed> $payload */
+            return $payload;
+        }
+
+        $data = $payload['data'] ?? null;
+
+        if (
+            is_array($data)
+            && ! array_is_list($data)
+            && isset($data['id'])
+        ) {
+            /** @var array<string, mixed> $data */
+            return $data;
+        }
+
+        if (
+            is_array($data)
+            && array_is_list($data)
+            && count($data) === 1
+            && is_array($data[0])
+            && ! array_is_list($data[0])
+            && isset($data[0]['id'])
+        ) {
+            /** @var array<string, mixed> $server */
+            $server = $data[0];
+
+            return $server;
+        }
+
+        throw new CloudUnexpectedResponseException(
+            'ArvanCloud create server response has an invalid envelope.',
+        );
+    }
+
+    private function mapServerStatus(
+        string $status,
+    ): CloudServerStatus {
+        return match (strtoupper(trim($status))) {
+            'ACTIVE' => CloudServerStatus::Active,
+
+            'BUILD',
+            'BUILDING',
+            'CREATING',
+            'PROVISIONING',
+            'QUEUED',
+            'REBUILD',
+            'REBOOT',
+            'HARD_REBOOT',
+            'RESIZE',
+            'VERIFY_RESIZE',
+            'REVERT_RESIZE',
+            'PASSWORD' => CloudServerStatus::Provisioning,
+
+            'ERROR',
+            'FAILED',
+            'DELETED' => CloudServerStatus::Failed,
+
+            default => CloudServerStatus::Unknown,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     * @return list<CloudServerAddressData>
+     */
+    private function mapServerAddresses(
+        array $server,
+    ): array {
+        if (
+            ! array_key_exists('addresses', $server)
+            || ! is_array($server['addresses'])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server field [addresses] must be an array.',
+            );
+        }
+
+        $groups = $server['addresses'];
+        $addressItems = [];
+
+        if (array_is_list($groups)) {
+            $addressItems = $groups;
+        } else {
+            foreach ($groups as $group) {
+                if (
+                    ! is_array($group)
+                    || ! array_is_list($group)
+                ) {
+                    throw new CloudUnexpectedResponseException(
+                        'ArvanCloud server address group must be a list.',
+                    );
+                }
+
+                foreach ($group as $address) {
+                    $addressItems[] = $address;
+                }
+            }
+        }
+
+        $addresses = [];
+
+        foreach ($addressItems as $address) {
+            if (
+                ! is_array($address)
+                || array_is_list($address)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server address item is invalid.',
+                );
+            }
+
+            $version = $address['version'] ?? null;
+
+            $ipVersion = match ((string) $version) {
+                '4' => CloudIpVersion::IPv4,
+                '6' => CloudIpVersion::IPv6,
+
+                default => throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server address has an unsupported IP version.',
+                ),
+            };
+
+            $addresses[] = new CloudServerAddressData(
+                address: $this->requiredString(
+                    $address,
+                    'addr',
+                    'server address',
+                ),
+
+                version: $ipVersion,
+
+                isPublic: $this->requiredBool(
+                    $address,
+                    'is_public',
+                    'server address',
+                ),
+
+                isVpc: $this->requiredBool(
+                    $address,
+                    'is_vpc',
+                    'server address',
+                ),
+
+                type: $this->optionalString(
+                    $address,
+                    'type',
+                    'server address',
+                ),
+            );
+        }
+
+        return $addresses;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $idKeys
+     * @return list<string>
+     */
+    private function uniqueReferenceIds(
+        array $data,
+        string $key,
+        string $resource,
+        array $idKeys,
+    ): array {
+        if (! array_key_exists($key, $data)) {
+            return [];
+        }
+
+        $items = $data[$key];
+
+        if (
+            ! is_array($items)
+            || ! array_is_list($items)
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s must be a list.',
+                    $resource,
+                ),
+            );
+        }
+
+        $ids = [];
+
+        foreach ($items as $item) {
+            /*
+             * ArvanCloud networks are returned as a list of UUID strings.
+             *
+             * Example:
+             * networks: ["626ad7fd-..."]
+             */
+            if (is_string($item)) {
+                $id = trim($item);
+
+                if ($id === '') {
+                    throw new CloudUnexpectedResponseException(
+                        sprintf(
+                            'ArvanCloud %s contains an empty identifier.',
+                            $resource,
+                        ),
+                    );
+                }
+
+                $ids[] = $id;
+
+                continue;
+            }
+
+            /*
+             * Security groups and some provider references are returned
+             * as objects containing an ID field.
+             *
+             * Example:
+             * security_groups: [["id" => "8449a4f5-..."]]
+             */
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s contains an invalid item.',
+                        $resource,
+                    ),
+                );
+            }
+
+            $id = $this->referenceIdFromObject(
+                item: $item,
+                idKeys: $idKeys,
+                resource: $resource,
+            );
+
+            $ids[] = $id;
+        }
+
+        return array_values(
+            array_unique($ids),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  list<string>  $idKeys
+     */
+    private function referenceIdFromObject(
+        array $item,
+        array $idKeys,
+        string $resource,
+    ): string {
+        foreach ($idKeys as $idKey) {
+            if (! array_key_exists($idKey, $item)) {
+                continue;
+            }
+
+            $value = $item[$idKey];
+
+            if (! is_string($value)) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] must be a string.',
+                        $resource,
+                        $idKey,
+                    ),
+                );
+            }
+
+            $value = trim($value);
+
+            if ($value === '') {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] cannot be empty.',
+                        $resource,
+                        $idKey,
+                    ),
+                );
+            }
+
+            return $value;
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s does not contain a valid identifier.',
+                $resource,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $idKeys
+     */
+    private function nestedReferenceId(
+        array $data,
+        string $key,
+        array $idKeys,
+    ): ?string {
+        if (! array_key_exists($key, $data)) {
+            return null;
+        }
+
+        $value = $data[$key];
+
+        if (is_string($value)) {
+            $value = trim($value);
+
+            return $value !== ''
+                ? $value
+                : null;
+        }
+
+        if (
+            ! is_array($value)
+            || array_is_list($value)
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud server field [%s] has an invalid reference.',
+                    $key,
+                ),
+            );
+        }
+
+        foreach ($idKeys as $idKey) {
+            if (
+                isset($value[$idKey])
+                && is_string($value[$idKey])
+                && trim($value[$idKey]) !== ''
+            ) {
+                return trim($value[$idKey]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     */
+    private function serverUsername(
+        array $server,
+        string $defaultUsername,
+    ): string {
+        $username = $this->optionalString(
+            $server,
+            'username',
+            'server',
+        );
+
+        if ($username !== null) {
+            return $username;
+        }
+
+        $defaultUsername = trim(
+            $defaultUsername,
+        );
+
+        if ($defaultUsername === '') {
+            throw new CloudUnexpectedResponseException(
+                'Cloud image default username is missing.',
+            );
+        }
+
+        return $defaultUsername;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function serverCreatedAt(
+        array $data,
+        string $resource,
+    ): ?DateTimeImmutable {
+        $value = $this->optionalString(
+            $data,
+            'created',
+            $resource,
+        );
+
+        $value ??= $this->optionalString(
+            $data,
+            'created_at',
+            $resource,
+        );
+
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return new DateTimeImmutable($value);
+        } catch (Exception $exception) {
+            throw new CloudUnexpectedResponseException(
+                message: sprintf(
+                    'ArvanCloud %s creation date is invalid.',
+                    $resource,
+                ),
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function optionalBoolean(
+        array $data,
+        string $key,
+        bool $default,
+    ): bool {
+        if (! array_key_exists($key, $data)) {
+            return $default;
+        }
+
+        if (! is_bool($data[$key])) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud server field [%s] must be boolean.',
+                    $key,
+                ),
+            );
+        }
+
+        return $data[$key];
     }
 
     /**

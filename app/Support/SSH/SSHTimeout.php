@@ -39,7 +39,7 @@ final class SSHTimeout
     /**
      * Docker installation.
      */
-    public const int DOCKER_INSTALL = 120;
+    public const int DOCKER_INSTALL = 400;
 
     /**
      * Operating-system package installation.

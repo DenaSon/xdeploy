@@ -46,7 +46,7 @@ abstract readonly class CommandApplication extends AbstractApplication
 
         $this->prepare();
 
-        $result = $this->ssh->executeWithResult(
+        $result = $this->privileged->executeWithResult(
             command: $this->installCommand(),
             timeout: $this->installTimeout(),
         );
@@ -65,7 +65,7 @@ abstract readonly class CommandApplication extends AbstractApplication
 
     final public function uninstall(): void
     {
-        $result = $this->ssh->executeWithResult(
+        $result = $this->privileged->executeWithResult(
             command: $this->uninstallCommand(),
             timeout: $this->uninstallTimeout(),
         );

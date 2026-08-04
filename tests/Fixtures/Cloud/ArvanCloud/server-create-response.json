@@ -1,1 +1,7 @@
-{}
+{
+    "id": "ff83466c-c0fe-4dc4-9d1d-bde29efd0b45",
+    "name": "xdeploy-test-server",
+    "status": "BUILD",
+    "password": "temporary-generated-password",
+    "created": "2026-08-04T06:30:00Z"
+}

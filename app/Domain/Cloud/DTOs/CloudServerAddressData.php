@@ -17,8 +17,8 @@ final readonly class CloudServerAddressData
         public ?string $type = null,
     ) {
         $validationFlag = match ($this->version) {
-            CloudIpVersion::V4 => FILTER_FLAG_IPV4,
-            CloudIpVersion::V6 => FILTER_FLAG_IPV6,
+            CloudIpVersion::IPv4 => FILTER_FLAG_IPV4,
+            CloudIpVersion::IPv6 => FILTER_FLAG_IPV6,
         };
 
         if (
@@ -37,13 +37,13 @@ final readonly class CloudServerAddressData
     public function isPublicIpv4(): bool
     {
         return $this->isPublic
-            && $this->version === CloudIpVersion::V4;
+            && $this->version === CloudIpVersion::IPv4;
     }
 
     public function isPublicIpv6(): bool
     {
         return $this->isPublic
-            && $this->version === CloudIpVersion::V6;
+            && $this->version === CloudIpVersion::IPv6;
     }
 
     /**

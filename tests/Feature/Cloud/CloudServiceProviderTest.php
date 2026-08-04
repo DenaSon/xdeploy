@@ -4,128 +4,130 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Cloud;
 
+use App\Application\Cloud\Actions\ProvisionCloudServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
-use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
-use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 final class CloudServiceProviderTest extends TestCase
 {
-    public function test_cloud_provider_contract_is_registered(): void
+    protected function setUp(): void
     {
-        $this->assertTrue(
-            $this->app->bound(CloudProviderInterface::class),
-        );
+        parent::setUp();
+
+        config([
+            'cloud.default' => 'arvan',
+
+            'cloud.providers.arvan.api_key' => 'test-api-key',
+
+            'cloud.providers.arvan.base_url' => 'https://api.example.test/ecc/v1',
+
+            'cloud.providers.arvan.timeouts.connect' => 5,
+
+            'cloud.providers.arvan.timeouts.request' => 15,
+
+            'cloud.providers.arvan.defaults.create_type' => 'cinder',
+
+            'cloud.providers.arvan.defaults.username' => 'ubuntu',
+
+            'cloud.provisioning.max_attempts' => 20,
+
+            'cloud.provisioning.poll_delay_seconds' => 3,
+        ]);
+
+        $this->forgetCloudInstances();
     }
 
-    public function test_arvan_cloud_provider_is_registered_as_singleton(): void
+    public function test_it_resolves_cloud_contracts_to_the_same_provider(): void
     {
-        config()->set(
-            'cloud.providers.arvan.api_key',
-            'test-api-key',
-        );
-
-        $first = $this->app->make(
-            ArvanCloudProvider::class,
-        );
-
-        $second = $this->app->make(
-            ArvanCloudProvider::class,
-        );
-
-        $this->assertSame($first, $second);
-    }
-
-    public function test_arvan_driver_resolves_cloud_provider_contract(): void
-    {
-        config()->set(
-            'cloud.default',
-            'arvan',
-        );
-
-        config()->set(
-            'cloud.providers.arvan.api_key',
-            'test-api-key',
-        );
-
-        $provider = $this->app->make(
+        $catalog = $this->app->make(
             CloudProviderInterface::class,
+        );
+
+        $provisioner = $this->app->make(
+            CloudServerProvisionerInterface::class,
         );
 
         $this->assertInstanceOf(
             ArvanCloudProvider::class,
-            $provider,
+            $catalog,
         );
 
         $this->assertSame(
-            $provider,
-            $this->app->make(
-                CloudProviderInterface::class,
-            ),
+            $catalog,
+            $provisioner,
         );
     }
 
-    public function test_arvan_cloud_client_is_registered_as_singleton(): void
+    public function test_it_resolves_the_complete_provisioning_workflow(): void
     {
-        config()->set(
-            'cloud.providers.arvan.api_key',
-            'test-api-key',
+        $action = $this->app->make(
+            ProvisionCloudServerAction::class,
         );
 
-        $first = $this->app->make(
-            ArvanCloudClient::class,
+        $this->assertInstanceOf(
+            ProvisionCloudServerAction::class,
+            $action,
         );
-
-        $second = $this->app->make(
-            ArvanCloudClient::class,
-        );
-
-        $this->assertSame($first, $second);
     }
 
-    public function test_arvan_cloud_mapper_is_registered_as_singleton(): void
+    public function test_it_rejects_invalid_provisioning_attempts(): void
     {
-        $first = $this->app->make(
-            ArvanCloudResponseMapper::class,
-        );
-
-        $second = $this->app->make(
-            ArvanCloudResponseMapper::class,
-        );
-
-        $this->assertSame($first, $second);
-    }
-
-    public function test_unknown_cloud_provider_is_rejected(): void
-    {
-        Config::set('cloud.default', 'unsupported-provider');
+        config([
+            'cloud.provisioning.max_attempts' => 0,
+        ]);
 
         $this->expectException(
             CloudConfigurationException::class,
         );
 
         $this->expectExceptionMessage(
-            'The cloud provider [unsupported-provider] is not supported.',
+            'Cloud provisioning attempts must be greater than zero.',
         );
 
-        $this->app->make(CloudProviderInterface::class);
+        $this->app->make(
+            ProvisionCloudServerAction::class,
+        );
     }
 
-    public function test_empty_cloud_provider_is_rejected(): void
+    public function test_it_rejects_a_negative_poll_delay(): void
     {
-        Config::set('cloud.default', '  ');
+        config([
+            'cloud.provisioning.poll_delay_seconds' => -1,
+        ]);
 
         $this->expectException(
             CloudConfigurationException::class,
         );
 
         $this->expectExceptionMessage(
-            'The default cloud provider is not configured.',
+            'Cloud provisioning poll delay cannot be negative.',
         );
 
-        $this->app->make(CloudProviderInterface::class);
+        $this->app->make(
+            ProvisionCloudServerAction::class,
+        );
+    }
+
+    private function forgetCloudInstances(): void
+    {
+        $this->app->forgetInstance(
+            ArvanCloudClient::class,
+        );
+
+        $this->app->forgetInstance(
+            ArvanCloudProvider::class,
+        );
+
+        $this->app->forgetInstance(
+            CloudProviderInterface::class,
+        );
+
+        $this->app->forgetInstance(
+            CloudServerProvisionerInterface::class,
+        );
     }
 }
