@@ -19,27 +19,75 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudClient();
         $this->registerArvanCloudMapper();
         $this->registerArvanCloudProvider();
-        $this->registerCloudProvider();
+        $this->registerCloudProviderContract();
     }
 
     private function registerArvanCloudClient(): void
     {
         $this->app->singleton(
             ArvanCloudClient::class,
-            static fn (): ArvanCloudClient => new ArvanCloudClient(
-                baseUrl: (string) config(
+            static function (): ArvanCloudClient {
+                $baseUrl = config(
                     'cloud.providers.arvan.base_url',
-                ),
-                apiKey: (string) config(
+                );
+
+                $apiKey = config(
                     'cloud.providers.arvan.api_key',
-                ),
-                connectTimeout: (int) config(
+                );
+
+                $connectTimeout = config(
                     'cloud.providers.arvan.timeouts.connect',
-                ),
-                requestTimeout: (int) config(
+                    10,
+                );
+
+                $requestTimeout = config(
                     'cloud.providers.arvan.timeouts.request',
-                ),
-            ),
+                    90,
+                );
+
+                if (
+                    ! is_string($baseUrl)
+                    || trim($baseUrl) === ''
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud base URL is not configured.',
+                    );
+                }
+
+                if (
+                    ! is_string($apiKey)
+                    || trim($apiKey) === ''
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud API key is not configured.',
+                    );
+                }
+
+                if (
+                    ! is_int($connectTimeout)
+                    && ! is_numeric($connectTimeout)
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud connect timeout must be an integer.',
+                    );
+                }
+
+                if (
+                    ! is_int($requestTimeout)
+                    && ! is_numeric($requestTimeout)
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud request timeout must be an integer.',
+                    );
+                }
+
+                return new ArvanCloudClient(
+                    baseUrl: trim($baseUrl),
+                    apiKey: trim($apiKey),
+                    connectTimeout: (int) $connectTimeout,
+                    requestTimeout: (int) $requestTimeout,
+                );
+            },
         );
     }
 
@@ -57,11 +105,13 @@ final class CloudServiceProvider extends ServiceProvider
         );
     }
 
-    private function registerCloudProvider(): void
+    private function registerCloudProviderContract(): void
     {
         $this->app->singleton(
             CloudProviderInterface::class,
-            function (Application $app): CloudProviderInterface {
+            function (
+                Application $app,
+            ): CloudProviderInterface {
                 $provider = $this->defaultCloudProvider();
 
                 return match ($provider) {
@@ -84,12 +134,17 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $provider = config('cloud.default');
 
-        if (! is_string($provider) || trim($provider) === '') {
+        if (
+            ! is_string($provider)
+            || trim($provider) === ''
+        ) {
             throw new CloudConfigurationException(
                 'The default cloud provider is not configured.',
             );
         }
 
-        return strtolower(trim($provider));
+        return strtolower(
+            trim($provider),
+        );
     }
 }
