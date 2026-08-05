@@ -1360,3 +1360,542 @@ Route::get(
     },
 )->whereUuid('serverId')
     ->name('dev.arvan.servers.show');
+
+/*
+|--------------------------------------------------------------------------
+| ArvanCloud Public IP Discovery
+|--------------------------------------------------------------------------
+|
+| GET:
+|   Displays current server details, public IPv4 addresses and available
+|   provider actions.
+|
+| POST:
+|   Executes one real Add Public IP request.
+|
+*/
+
+Route::match(
+    ['GET', 'POST'],
+    '/dev/arvan/servers/{serverId}/public-ip',
+    static function (
+        Request $request,
+        string $serverId,
+    ) use (
+        $guardCloudDiscovery,
+        $requiredCloudConfig,
+        $sanitizeCloudResponse,
+    ) {
+        $guardCloudDiscovery();
+
+        abort_unless(
+            preg_match(
+                '/^[0-9a-fA-F-]{36}$/',
+                $serverId,
+            ) === 1,
+            422,
+            'Invalid ArvanCloud server ID.',
+        );
+
+        $baseUrl = rtrim(
+            $requiredCloudConfig(
+                'cloud.providers.arvan.base_url',
+            ),
+            '/',
+        );
+
+        abort_unless(
+            str_starts_with($baseUrl, 'https://'),
+            500,
+            'ArvanCloud base URL must use HTTPS.',
+        );
+
+        $apiKey = $requiredCloudConfig(
+            'cloud.providers.arvan.api_key',
+        );
+
+        $region = $requiredCloudConfig(
+            'cloud.providers.arvan.region',
+        );
+
+        $securityGroupId = $requiredCloudConfig(
+            'cloud.providers.arvan.defaults.security_group_id',
+        );
+
+        $connectTimeout = (int) config(
+            'cloud.providers.arvan.timeouts.connect',
+            10,
+        );
+
+        $requestTimeout = (int) config(
+            'cloud.providers.arvan.timeouts.request',
+            90,
+        );
+
+        $serverEndpoint = sprintf(
+            '%s/regions/%s/servers/%s',
+            $baseUrl,
+            rawurlencode($region),
+            rawurlencode($serverId),
+        );
+
+        $actionsEndpoint = sprintf(
+            '%s/actions',
+            $serverEndpoint,
+        );
+
+        $addPublicIpEndpoint = sprintf(
+            '%s/add-public-ip',
+            $serverEndpoint,
+        );
+
+        $makeClient = static fn () => Http::acceptJson()
+            ->asJson()
+            ->withHeaders([
+                'Authorization' => 'Apikey '.$apiKey,
+            ])
+            ->connectTimeout($connectTimeout)
+            ->timeout($requestTimeout)
+            ->withoutRedirecting();
+
+        $decodeResponse = static function (
+            \Illuminate\Http\Client\Response $response,
+        ): array {
+            $decoded = $response->json();
+
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+
+            return [
+                '_non_json_response' => true,
+                'status' => $response->status(),
+                'length' => strlen($response->body()),
+                'sha256' => hash(
+                    'sha256',
+                    $response->body(),
+                ),
+            ];
+        };
+
+        $extractPublicIpv4 = static function (
+            array $payload,
+        ): array {
+            $addresses = [];
+
+            array_walk_recursive(
+                $payload,
+                static function (
+                    mixed $value,
+                ) use (
+                    &$addresses,
+                ): void {
+                    if (! is_string($value)) {
+                        return;
+                    }
+
+                    $address = filter_var(
+                        trim($value),
+                        FILTER_VALIDATE_IP,
+                        FILTER_FLAG_IPV4
+                        | FILTER_FLAG_NO_PRIV_RANGE
+                        | FILTER_FLAG_NO_RES_RANGE,
+                    );
+
+                    if ($address !== false) {
+                        $addresses[] = $address;
+                    }
+                },
+            );
+
+            $addresses = array_values(
+                array_unique($addresses),
+            );
+
+            sort($addresses);
+
+            return $addresses;
+        };
+
+        try {
+            $detailsResponse = $makeClient()->get(
+                $serverEndpoint,
+            );
+
+            $actionsResponse = $makeClient()->get(
+                $actionsEndpoint,
+            );
+        } catch (ConnectionException $exception) {
+            report($exception);
+
+            return response()->json(
+                [
+                    'successful' => false,
+
+                    'error' => [
+                        'type' => 'connection_error',
+                        'message' => 'Could not connect to ArvanCloud.',
+                    ],
+                ],
+                502,
+                [
+                    'Cache-Control' => 'no-store, private',
+                ],
+            );
+        }
+
+        $serverDetails = $decodeResponse(
+            $detailsResponse,
+        );
+
+        $availableActions = $decodeResponse(
+            $actionsResponse,
+        );
+
+        /*
+         * GET only inspects the server. It does not add or change an IP.
+         */
+        if ($request->isMethod('get')) {
+            $formattedDetails = htmlspecialchars(
+                json_encode(
+                    [
+                        'server_id' => $serverId,
+                        'region' => $region,
+
+                        'current_public_ipv4' => $extractPublicIpv4(
+                            $serverDetails,
+                        ),
+
+                        'server_details_status' => $detailsResponse->status(),
+
+                        'available_actions_status' => $actionsResponse->status(),
+
+                        'available_actions' => $sanitizeCloudResponse(
+                            $availableActions,
+                        ),
+
+                        'add_public_ip_endpoint' => sprintf(
+                            '/regions/%s/servers/%s/add-public-ip',
+                            $region,
+                            $serverId,
+                        ),
+                    ],
+                    JSON_PRETTY_PRINT
+                    | JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_THROW_ON_ERROR,
+                ),
+                ENT_QUOTES,
+                'UTF-8',
+            );
+
+            $action = htmlspecialchars(
+                route(
+                    'dev.arvan.public-ip.discovery',
+                    [
+                        'serverId' => $serverId,
+                    ],
+                ),
+                ENT_QUOTES,
+                'UTF-8',
+            );
+
+            $csrfToken = htmlspecialchars(
+                csrf_token(),
+                ENT_QUOTES,
+                'UTF-8',
+            );
+
+            return response(
+                <<<HTML
+                <!doctype html>
+                <html lang="en">
+                <head>
+                    <meta charset="utf-8">
+
+                    <meta
+                        name="viewport"
+                        content="width=device-width, initial-scale=1"
+                    >
+
+                    <title>ArvanCloud Public IP Discovery</title>
+
+                    <style>
+                        body {
+                            max-width: 960px;
+                            margin: 40px auto;
+                            padding: 0 20px;
+                            color: #e5e7eb;
+                            background: #111827;
+                            font-family: ui-monospace, monospace;
+                        }
+
+                        pre {
+                            overflow-x: auto;
+                            padding: 20px;
+                            border: 1px solid #374151;
+                            border-radius: 12px;
+                            background: #1f2937;
+                        }
+
+                        form,
+                        .warning {
+                            margin-top: 20px;
+                            padding: 20px;
+                            border: 1px solid #92400e;
+                            border-radius: 12px;
+                            background: #451a03;
+                        }
+
+                        select,
+                        button {
+                            padding: 12px 16px;
+                            border-radius: 10px;
+                            font: inherit;
+                        }
+
+                        button {
+                            border: 0;
+                            color: white;
+                            background: #dc2626;
+                            cursor: pointer;
+                            font-weight: 700;
+                        }
+
+                        button:disabled {
+                            cursor: not-allowed;
+                            opacity: 0.5;
+                        }
+                    </style>
+                </head>
+
+                <body>
+                    <h1>ArvanCloud Public IP Discovery</h1>
+
+                    <div class="warning">
+                        This operation may allocate a real billable public IP.
+                        Run only one successful payload mode.
+                    </div>
+
+                    <h2>Current Discovery Result</h2>
+
+                    <pre>{$formattedDetails}</pre>
+
+                    <form
+                        method="POST"
+                        action="{$action}"
+                        onsubmit="
+                            const button = this.querySelector('button');
+
+                            if (
+                                ! confirm(
+                                    'Allocate one real public IP for this server?'
+                                )
+                            ) {
+                                return false;
+                            }
+
+                            button.disabled = true;
+                            button.textContent = 'Adding public IP...';
+
+                            return true;
+                        "
+                    >
+                        <input
+                            type="hidden"
+                            name="_token"
+                            value="{$csrfToken}"
+                        >
+
+                        <label for="payload_mode">
+                            Request payload:
+                        </label>
+
+                        <select
+                            id="payload_mode"
+                            name="payload_mode"
+                        >
+                            <option value="multiple" selected>
+                                security_groups: [UUID]
+                            </option>
+
+                            <option value="single">
+                                security_group: UUID
+                            </option>
+
+                            <option value="empty">
+                                Empty payload
+                            </option>
+                        </select>
+
+                        <button type="submit">
+                            Add Public IP
+                        </button>
+                    </form>
+                </body>
+                </html>
+                HTML,
+                200,
+                [
+                    'Content-Type' => 'text/html; charset=UTF-8',
+                    'Cache-Control' => 'no-store, private',
+                ],
+            );
+        }
+
+        $validated = $request->validate([
+            'payload_mode' => [
+                'required',
+                'in:multiple,single,empty',
+            ],
+        ]);
+
+        $payload = match ($validated['payload_mode']) {
+            'multiple' => [
+                'security_groups' => [
+                    $securityGroupId,
+                ],
+            ],
+
+            'single' => [
+                'security_group' => $securityGroupId,
+            ],
+
+            'empty' => [],
+
+            default => throw new LogicException(
+                'Unsupported payload mode.',
+            ),
+        };
+
+        $lock = Cache::lock(
+            "arvan-discovery:add-public-ip:{$serverId}",
+            120,
+        );
+
+        abort_unless(
+            $lock->get(),
+            409,
+            'Another public IP discovery request is running.',
+        );
+
+        try {
+            try {
+                $addResponse = $makeClient()->post(
+                    $addPublicIpEndpoint,
+                    $payload,
+                );
+            } catch (ConnectionException $exception) {
+                report($exception);
+
+                return response()->json(
+                    [
+                        'successful' => false,
+
+                        'error' => [
+                            'type' => 'connection_error',
+                            'message' => 'Could not connect to ArvanCloud.',
+                        ],
+                    ],
+                    502,
+                    [
+                        'Cache-Control' => 'no-store, private',
+                    ],
+                );
+            }
+
+            $addBody = $decodeResponse(
+                $addResponse,
+            );
+
+            /*
+             * Give the provider a brief opportunity to attach the new
+             * network interface before fetching server details again.
+             */
+            if ($addResponse->successful()) {
+                sleep(2);
+            }
+
+            try {
+                $updatedDetailsResponse = $makeClient()->get(
+                    $serverEndpoint,
+                );
+
+                $updatedDetails = $decodeResponse(
+                    $updatedDetailsResponse,
+                );
+            } catch (ConnectionException $exception) {
+                report($exception);
+
+                $updatedDetailsResponse = null;
+
+                $updatedDetails = [
+                    '_inspection_unavailable' => true,
+                ];
+            }
+
+            $beforeAddresses = $extractPublicIpv4(
+                $serverDetails,
+            );
+
+            $afterAddresses = $extractPublicIpv4(
+                $updatedDetails,
+            );
+
+            return response()->json(
+                [
+                    'successful' => $addResponse->successful(),
+
+                    'request' => [
+                        'method' => 'POST',
+
+                        'endpoint' => sprintf(
+                            '/regions/%s/servers/%s/add-public-ip',
+                            $region,
+                            $serverId,
+                        ),
+
+                        'payload_mode' => $validated['payload_mode'],
+
+                        'payload' => $payload,
+                    ],
+
+                    'response' => [
+                        'status' => $addResponse->status(),
+
+                        'body' => $sanitizeCloudResponse(
+                            $addBody,
+                        ),
+                    ],
+
+                    'inspection' => [
+                        'before_public_ipv4' => $beforeAddresses,
+                        'after_public_ipv4' => $afterAddresses,
+
+                        'new_public_ipv4' => array_values(
+                            array_diff(
+                                $afterAddresses,
+                                $beforeAddresses,
+                            ),
+                        ),
+
+                        'server_details_status' =>
+                            $updatedDetailsResponse?->status(),
+
+                        'server_details' => $sanitizeCloudResponse(
+                            $updatedDetails,
+                        ),
+                    ],
+                ],
+                $addResponse->successful()
+                    ? 200
+                    : $addResponse->status(),
+                [
+                    'Cache-Control' => 'no-store, private',
+                ],
+            );
+        } finally {
+            $lock->release();
+        }
+    },
+)->name('dev.arvan.public-ip.discovery');

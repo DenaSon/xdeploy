@@ -53,47 +53,12 @@
 
     {{-- Server list --}}
     <section
-        class="rounded-3xl border border-base-300/70 bg-base-100/90
+        class="rounded-3xl  bg-base-100/90
                shadow-xl shadow-base-300/20 ring-1
                ring-base-content/[0.02] backdrop-blur-sm"
         aria-labelledby="servers-list-title"
     >
 
-        {{-- Card header --}}
-        <div
-            class="flex items-center justify-between rounded-t-3xl
-                   border-b border-base-300/70
-                   bg-gradient-to-l from-base-200/60 via-base-100/80 to-base-100
-                   px-4 py-4 sm:px-6 sm:py-5"
-        >
-
-            <div>
-
-                <h2
-                    id="servers-list-title"
-                    class="font-bold tracking-tight text-base-content"
-                >
-                    لیست سرورها
-                </h2>
-
-                <p class="mt-1 text-xs text-base-content/45">
-                    مدیریت اتصال و تنظیمات سرورهای شما
-                </p>
-
-            </div>
-
-            <div
-                class="flex size-10 items-center justify-center rounded-xl
-                       border border-base-300/60 bg-base-100/80
-                       text-base-content/45 shadow-sm"
-            >
-                <x-icon
-                    name="o-circle-stack"
-                    class="size-5"
-                />
-            </div>
-
-        </div>
 
         @if($servers->isNotEmpty())
 

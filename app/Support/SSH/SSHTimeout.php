@@ -9,7 +9,7 @@ final class SSHTimeout
     /**
      * Establishing the TCP/SSH connection.
      */
-    public const int CONNECTION = 15;
+    public const int CONNECTION = 20;
 
     /**
      * SSH authentication handshake.
@@ -19,7 +19,7 @@ final class SSHTimeout
     /**
      * Fast inspection commands.
      */
-    public const int QUICK = 10;
+    public const int QUICK = 20;
 
     /**
      * Normal remote commands.

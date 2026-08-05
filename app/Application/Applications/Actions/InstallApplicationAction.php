@@ -16,6 +16,8 @@ use App\Domain\Shared\DTOs\InstallReport;
 
 final readonly class InstallApplicationAction
 {
+    private const int MAX_EXECUTION_SECONDS = 400;
+
     public function __construct(
         private ApplicationRegistryInterface $registry,
         private PrivilegedExecutionPreflight $preflight,
@@ -27,6 +29,8 @@ final readonly class InstallApplicationAction
 
     public function execute(ApplicationType $type): InstallReport
     {
+        $this->extendExecutionTime();
+
         $application = $this->registry->find($type);
 
         $this->preflight->ensureRoot();
@@ -60,5 +64,39 @@ final readonly class InstallApplicationAction
         }
 
         return $report;
+    }
+
+    private function extendExecutionTime(): void
+    {
+        if (! function_exists('set_time_limit')) {
+            logger()->warning(
+                'installation.execution_time_extension_unavailable',
+            );
+
+            return;
+        }
+
+        $extended = set_time_limit(
+            self::MAX_EXECUTION_SECONDS,
+        );
+
+        if (! $extended) {
+            logger()->warning(
+                'installation.execution_time_extension_failed',
+                [
+                    'requested_seconds' => self::MAX_EXECUTION_SECONDS,
+                    'current_limit' => ini_get('max_execution_time'),
+                ],
+            );
+
+            return;
+        }
+
+        logger()->info(
+            'installation.execution_time_extended',
+            [
+                'max_execution_seconds' => self::MAX_EXECUTION_SECONDS,
+            ],
+        );
     }
 }

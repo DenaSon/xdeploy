@@ -22,6 +22,7 @@ use App\Domain\Application\Marzban\Https\ValueObjects\MarzbanDomain;
 use App\Infrastructure\Application\Marzban\Configuration\MarzbanCaddyfileFactory;
 use App\Infrastructure\Application\Marzban\Configuration\MarzbanComposeOverrideFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Support\SSH\SSHTimeout;
 
 final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
@@ -854,13 +855,14 @@ BASH;
 
     public function __construct(
         private SSHConnectionInterface $ssh,
+        private PrivilegedCommandExecutor $privileged,
         private MarzbanComposeOverrideFactory $composeOverrideFactory,
         private MarzbanCaddyfileFactory $caddyfileFactory,
     ) {}
 
     public function inspect(): MarzbanHttpsInfo
     {
-        $result = $this->ssh->executeWithResult(
+        $result = $this->privileged->executeWithResult(
             command: self::INSPECT_COMMAND,
             timeout: SSHTimeout::QUICK,
         );
@@ -932,7 +934,7 @@ BASH;
 
     public function preflightServer(): MarzbanHttpsServerPreflightResult
     {
-        $result = $this->ssh->executeWithResult(
+        $result = $this->privileged->executeWithResult(
             command: self::SERVER_PREFLIGHT_COMMAND,
             timeout: SSHTimeout::NORMAL,
         );
@@ -967,7 +969,7 @@ BASH;
             ],
         );
 
-        $result = $this->ssh->executeWithResult(
+        $result = $this->privileged->executeWithResult(
             command: $command,
             timeout: SSHTimeout::APPLICATION_INSTALL,
             sensitive: true,

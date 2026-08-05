@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Infrastructure\Application\Marzban;
 
 use App\Domain\Application\Marzban\Https\ValueObjects\MarzbanDomain;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Domain\Server\Services\PrivilegedExecutionPreflight;
 use App\Infrastructure\Application\Marzban\Configuration\MarzbanCaddyfileFactory;
 use App\Infrastructure\Application\Marzban\Configuration\MarzbanComposeOverrideFactory;
 use App\Infrastructure\Application\Marzban\SshMarzbanHttpsGateway;
@@ -18,41 +20,60 @@ final class SshMarzbanHttpsGatewayDnsPreflightTest extends TestCase
 {
     public function test_it_ignores_ipv4_mapped_ipv6_addresses(): void
     {
-        $ssh = new DnsPreflightFakeSshConnection(new SSHResult(
-            output: <<<'OUTPUT'
+        $ssh = new DnsPreflightFakeSshConnection(
+            result: new SSHResult(
+                output: <<<'OUTPUT'
 xdeploy_dns_preflight=1
 server_ipv4=91.107.140.21
 a=91.107.140.21
 aaaa=::ffff:91.107.140.21
 aaaa=0:0:0:0:0:ffff:5b6b:8c15
 OUTPUT,
-            exitCode: 0,
-        ));
+                exitCode: 0,
+            ),
+        );
 
         $result = $this->gateway($ssh)->preflightDns(
-            domain: MarzbanDomain::from('panel.xdeploy.ir'),
+            domain: MarzbanDomain::from(
+                'panel.xdeploy.ir',
+            ),
             knownServerAddress: '91.107.140.21',
         );
 
-        self::assertSame([], $result->resolvedIpv6Addresses);
-        self::assertFalse($result->hasIncompatibleIpv6());
-        self::assertTrue($result->ready());
+        self::assertSame(
+            [],
+            $result->resolvedIpv6Addresses,
+        );
+
+        self::assertFalse(
+            $result->hasIncompatibleIpv6(),
+        );
+
+        self::assertTrue(
+            $result->ready(),
+        );
+
+        $this->assertDirectDnsExecution($ssh);
     }
 
     public function test_it_keeps_a_genuine_ipv6_as_incompatible(): void
     {
-        $ssh = new DnsPreflightFakeSshConnection(new SSHResult(
-            output: <<<'OUTPUT'
+        $ssh = new DnsPreflightFakeSshConnection(
+            result: new SSHResult(
+                output: <<<'OUTPUT'
 xdeploy_dns_preflight=1
 server_ipv4=91.107.140.21
 a=91.107.140.21
 aaaa=2001:db8::10
 OUTPUT,
-            exitCode: 0,
-        ));
+                exitCode: 0,
+            ),
+        );
 
         $result = $this->gateway($ssh)->preflightDns(
-            domain: MarzbanDomain::from('panel.xdeploy.ir'),
+            domain: MarzbanDomain::from(
+                'panel.xdeploy.ir',
+            ),
             knownServerAddress: '91.107.140.21',
         );
 
@@ -61,15 +82,61 @@ OUTPUT,
             $result->resolvedIpv6Addresses,
         );
 
-        self::assertTrue($result->hasIncompatibleIpv6());
-        self::assertFalse($result->ready());
+        self::assertTrue(
+            $result->hasIncompatibleIpv6(),
+        );
+
+        self::assertFalse(
+            $result->ready(),
+        );
+
+        $this->assertDirectDnsExecution($ssh);
+    }
+
+    private function assertDirectDnsExecution(
+        DnsPreflightFakeSshConnection $ssh,
+    ): void {
+        self::assertSame(
+            1,
+            $ssh->executionCount,
+        );
+
+        self::assertSame(
+            SSHTimeout::NORMAL,
+            $ssh->timeout,
+        );
+
+        self::assertFalse(
+            $ssh->sensitive,
+        );
+
+        self::assertStringNotContainsString(
+            'sudo',
+            $ssh->command,
+        );
+
+        self::assertStringNotContainsString(
+            'id -u',
+            $ssh->command,
+        );
+
+        self::assertStringContainsString(
+            'panel.xdeploy.ir',
+            $ssh->command,
+        );
     }
 
     private function gateway(
-        DnsPreflightFakeSshConnection $ssh,
+        SSHConnectionInterface $ssh,
     ): SshMarzbanHttpsGateway {
         return new SshMarzbanHttpsGateway(
             ssh: $ssh,
+            privileged: new PrivilegedCommandExecutor(
+                ssh: $ssh,
+                preflight: new PrivilegedExecutionPreflight(
+                    ssh: $ssh,
+                ),
+            ),
             composeOverrideFactory: new MarzbanComposeOverrideFactory,
             caddyfileFactory: new MarzbanCaddyfileFactory,
         );
@@ -78,12 +145,21 @@ OUTPUT,
 
 final class DnsPreflightFakeSshConnection implements SSHConnectionInterface
 {
+    public string $command = '';
+
+    public int $timeout = 0;
+
+    public bool $sensitive = false;
+
+    public int $executionCount = 0;
+
     public function __construct(
         private readonly SSHResult $result,
     ) {}
 
-    public function connect(Server $server): bool
-    {
+    public function connect(
+        Server $server,
+    ): bool {
         return true;
     }
 
@@ -91,7 +167,10 @@ final class DnsPreflightFakeSshConnection implements SSHConnectionInterface
         string $command,
         int $timeout = SSHTimeout::DEFAULT,
     ): string {
-        return $this->result->output;
+        return $this->executeWithResult(
+            command: $command,
+            timeout: $timeout,
+        )->output;
     }
 
     public function executeWithResult(
@@ -99,6 +178,11 @@ final class DnsPreflightFakeSshConnection implements SSHConnectionInterface
         int $timeout = SSHTimeout::DEFAULT,
         bool $sensitive = false,
     ): SSHResult {
+        $this->command = $command;
+        $this->timeout = $timeout;
+        $this->sensitive = $sensitive;
+        $this->executionCount++;
+
         return $this->result;
     }
 
@@ -107,5 +191,8 @@ final class DnsPreflightFakeSshConnection implements SSHConnectionInterface
         return true;
     }
 
-    public function disconnect(): void {}
+    public function disconnect(): void
+    {
+        //
+    }
 }

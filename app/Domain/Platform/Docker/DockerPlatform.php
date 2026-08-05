@@ -13,15 +13,17 @@ use App\Domain\Platform\Exceptions\PlatformInstallationException;
 use App\Domain\Platform\Exceptions\PlatformRestartException;
 use App\Domain\Platform\Exceptions\PlatformStartException;
 use App\Domain\Platform\Exceptions\PlatformStopException;
-use App\Domain\Server\Services\PrivilegedExecutionPreflight;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 
-final readonly class DockerPlatform implements PlatformInterface, StartablePlatformInterface
+final readonly class DockerPlatform implements
+    PlatformInterface,
+    StartablePlatformInterface
 {
     public function __construct(
         private SSHConnectionInterface $ssh,
-        private PrivilegedExecutionPreflight $preflight,
+        private PrivilegedCommandExecutor $privileged,
     ) {}
 
     public function type(): PlatformType
@@ -37,27 +39,26 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
     public function inspect(): PlatformInfo
     {
         $existsResult = $this->ssh->executeWithResult(
-            'command -v docker >/dev/null 2>&1',
+            command: 'command -v docker >/dev/null 2>&1',
+            timeout: SSHTimeout::QUICK,
         );
 
         if (! $existsResult->successful()) {
-            return new PlatformInfo(
-                state: PlatformState::NotInstalled,
-            );
+            return $this->notInstalled();
         }
 
         $versionResult = $this->ssh->executeWithResult(
-            'docker --version',
+            command: 'docker --version',
+            timeout: SSHTimeout::QUICK,
         );
 
         if (! $versionResult->successful()) {
-            return new PlatformInfo(
-                state: PlatformState::Unknown,
-            );
+            return $this->unknown();
         }
 
         $serviceResult = $this->ssh->executeWithResult(
-            'systemctl is-active docker',
+            command: 'systemctl is-active docker',
+            timeout: SSHTimeout::QUICK,
         );
 
         $serviceState = trim($serviceResult->output);
@@ -85,10 +86,10 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
 
     public function install(): void
     {
-        $this->preflight->ensureRoot();
-
-        $result = $this->ssh->executeWithResult(
-            command: 'curl -fsSL https://get.docker.com | sh',
+        $result = $this->privileged->executeWithResult(
+            command: <<<'BASH'
+curl -fsSL https://get.docker.com | sh
+BASH,
             timeout: SSHTimeout::DOCKER_INSTALL,
         );
 
@@ -131,10 +132,9 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
 
     public function start(): void
     {
-        $this->preflight->ensureRoot();
-
-        $result = $this->ssh->executeWithResult(
-            'systemctl enable --now docker',
+        $result = $this->privileged->executeWithResult(
+            command: 'systemctl enable --now docker',
+            timeout: SSHTimeout::NORMAL,
         );
 
         if (! $result->successful()) {
@@ -152,10 +152,9 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
 
     public function stop(): void
     {
-        $this->preflight->ensureRoot();
-
-        $result = $this->ssh->executeWithResult(
-            'systemctl stop docker',
+        $result = $this->privileged->executeWithResult(
+            command: 'systemctl stop docker',
+            timeout: SSHTimeout::NORMAL,
         );
 
         if (! $result->successful()) {
@@ -164,7 +163,10 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
             );
         }
 
-        if ($this->inspect()->state !== PlatformState::Installed) {
+        if (
+            $this->inspect()->state
+            !== PlatformState::Installed
+        ) {
             throw new PlatformStopException(
                 'Docker did not stop successfully.',
             );
@@ -173,10 +175,9 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
 
     public function restart(): void
     {
-        $this->preflight->ensureRoot();
-
-        $result = $this->ssh->executeWithResult(
-            'systemctl restart docker',
+        $result = $this->privileged->executeWithResult(
+            command: 'systemctl restart docker',
+            timeout: SSHTimeout::NORMAL,
         );
 
         if (! $result->successful()) {
@@ -192,8 +193,9 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
         }
     }
 
-    private function extractVersion(string $output): ?string
-    {
+    private function extractVersion(
+        string $output,
+    ): ?string {
         preg_match(
             '/\d+\.\d+\.\d+/',
             $output,
@@ -201,5 +203,19 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
         );
 
         return $matches[0] ?? null;
+    }
+
+    private function notInstalled(): PlatformInfo
+    {
+        return new PlatformInfo(
+            state: PlatformState::NotInstalled,
+        );
+    }
+
+    private function unknown(): PlatformInfo
+    {
+        return new PlatformInfo(
+            state: PlatformState::Unknown,
+        );
     }
 }
