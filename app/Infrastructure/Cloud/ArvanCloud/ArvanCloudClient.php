@@ -82,12 +82,14 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * A null payload sends a POST request without a request body.
+     *
+     * @param  array<string, mixed>|null  $payload
      * @return array<array-key, mixed>
      */
     public function post(
         string $path,
-        array $payload = [],
+        ?array $payload = null,
     ): array {
         return $this->request(
             method: self::METHOD_POST,
@@ -127,13 +129,13 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $data
      * @return array<array-key, mixed>
      */
     private function request(
         string $method,
         string $path,
-        array $data,
+        ?array $data,
     ): array {
         $endpoint = $this->normalizePath(
             $path,
@@ -186,24 +188,29 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $data
      */
     private function sendRequest(
         PendingRequest $request,
         string $method,
         string $url,
-        array $data,
+        ?array $data,
     ): Response {
         return match ($method) {
             self::METHOD_GET => $request->get(
                 url: $url,
-                query: $data,
+                query: $data ?? [],
             ),
 
-            self::METHOD_POST => $request->post(
-                url: $url,
-                data: $data,
-            ),
+            self::METHOD_POST => $data === null
+                ? $request->send(
+                    method: self::METHOD_POST,
+                    url: $url,
+                )
+                : $request->post(
+                    url: $url,
+                    data: $data,
+                ),
 
             self::METHOD_PUT => $request->put(
                 url: $url,

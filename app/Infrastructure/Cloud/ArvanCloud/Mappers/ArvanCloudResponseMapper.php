@@ -11,6 +11,7 @@ use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerAddressData;
@@ -388,6 +389,43 @@ final class ArvanCloudResponseMapper
                 ),
                 currencyCode: null,
                 billingPeriod: CloudBillingPeriod::Monthly,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapRootPasswordReset(
+        array $payload,
+    ): CloudRootPasswordResetData {
+        $data = $this->dataObject(
+            payload: $payload,
+            resource: 'root password reset',
+        );
+
+        if (
+            ! array_key_exists('password', $data)
+            || ! is_string($data['password'])
+            || trim($data['password']) === ''
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud root password reset field [password] must be a non-empty string.',
+            );
+        }
+
+        /*
+         * The generated credential is returned exactly as received.
+         * Trimming a password could silently change the credential.
+         */
+        $password = $data['password'];
+
+        return new CloudRootPasswordResetData(
+            password: $password,
+            message: $this->requiredString(
+                data: $payload,
+                key: 'message',
+                resource: 'root password reset',
             ),
         );
     }

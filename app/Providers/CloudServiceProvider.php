@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
@@ -160,6 +161,7 @@ final class CloudServiceProvider extends ServiceProvider
     private function registerCloudCapabilityContracts(): void
     {
         $contracts = [
+            CloudServerCredentialManagerInterface::class,
             CloudServerProvisionerInterface::class,
             CloudServerLifecycleInterface::class,
             CloudServerNetworkingInterface::class,

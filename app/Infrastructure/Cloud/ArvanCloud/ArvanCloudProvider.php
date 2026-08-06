@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Cloud\ArvanCloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
@@ -16,6 +17,7 @@ use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerData;
@@ -30,7 +32,7 @@ use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
-final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
 
@@ -63,6 +65,8 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
     private const string ACTION_RESIZE = 'resize';
 
     private const string ACTION_RESIZE_ROOT = 'resizeRoot';
+
+    private const string ACTION_RESET_ROOT_PASSWORD = 'reset-root-password';
 
     public function __construct(
         private ArvanCloudClient $client,
@@ -655,6 +659,29 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             [
                 'new_size' => $targetDiskGiB,
             ],
+        );
+    }
+
+    public function resetRootPassword(
+        string $region,
+        string $serverId,
+    ): CloudRootPasswordResetData {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $payload = $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_RESET_ROOT_PASSWORD,
+            ),
+        );
+
+        return $this->mapper->mapRootPasswordReset(
+            $payload,
         );
     }
 
