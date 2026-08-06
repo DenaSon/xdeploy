@@ -9,6 +9,7 @@ use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\DTOs\CloudDiskPriceData;
@@ -16,11 +17,12 @@ use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
-use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
+use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerData;
+use App\Domain\Cloud\DTOs\CloudServerReportsData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CloudSshKeyData;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
@@ -28,11 +30,12 @@ use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\DTOs\ResizeCloudRootDiskData;
 use App\Domain\Cloud\DTOs\ResizeCloudServerData;
 use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudReportPeriod;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
-final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
 
@@ -51,6 +54,8 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
     private const string RESOURCE_SERVERS = 'servers';
 
     private const string RESOURCE_PORTS = 'ports';
+
+    private const string RESOURCE_REPORTS = 'reports';
 
     private const string ACTION_POWER_ON = 'power-on';
 
@@ -415,6 +420,35 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             regionId: $regionId,
             serverId: $providerServerId,
             defaultUsername: $this->normalizedDefaultUsername(),
+        );
+    }
+
+    public function getServerReports(
+        string $region,
+        string $serverId,
+        CloudReportPeriod $period,
+    ): CloudServerReportsData {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $payload = $this->client->get(
+            $this->serverReportsEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+            [
+                'period' => $period->value,
+            ],
+        );
+
+        return $this->mapper->mapServerReports(
+            payload: $payload,
+            regionId: $regionId,
+            serverId: $providerServerId,
+            period: $period,
         );
     }
 
@@ -807,6 +841,22 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             'regions/%s/servers/%s',
             rawurlencode(
                 $regionId,
+            ),
+            rawurlencode(
+                $serverId,
+            ),
+        );
+    }
+
+    private function serverReportsEndpoint(
+        string $regionId,
+        string $serverId,
+    ): string {
+        return sprintf(
+            '%s/%s',
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_REPORTS,
             ),
             rawurlencode(
                 $serverId,

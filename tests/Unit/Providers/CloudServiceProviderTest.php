@@ -9,6 +9,7 @@ use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
@@ -142,6 +143,7 @@ final class CloudServiceProviderTest extends TestCase
             CloudServerProvisionerInterface::class,
             CloudServerLifecycleInterface::class,
             CloudServerNetworkingInterface::class,
+            CloudServerReportsInterface::class,
             CloudServerResizeCatalogInterface::class,
             CloudServerResizerInterface::class,
         ];
@@ -312,6 +314,10 @@ final class CloudServiceProviderTest extends TestCase
 
             'networking' => [
                 'contract' => CloudServerNetworkingInterface::class,
+            ],
+
+            'reports' => [
+                'contract' => CloudServerReportsInterface::class,
             ],
 
             'resize catalog' => [

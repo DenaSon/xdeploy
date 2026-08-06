@@ -11,15 +11,20 @@ use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudReportChartData;
+use App\Domain\Cloud\DTOs\CloudReportSeriesData;
 use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerAddressData;
 use App\Domain\Cloud\DTOs\CloudServerData;
+use App\Domain\Cloud\DTOs\CloudServerReportsData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudReportMetric;
+use App\Domain\Cloud\Enums\CloudReportPeriod;
 use App\Domain\Cloud\Enums\CloudServerPowerState;
 use App\Domain\Cloud\Enums\CloudServerStatus;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
@@ -428,6 +433,462 @@ final class ArvanCloudResponseMapper
                 resource: 'root password reset',
             ),
         );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapServerReports(
+        array $payload,
+        string $regionId,
+        string $serverId,
+        CloudReportPeriod $period,
+    ): CloudServerReportsData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        $serverId = trim(
+            $serverId,
+        );
+
+        if ($serverId === '') {
+            throw new CloudUnexpectedResponseException(
+                'Cloud server identifier cannot be empty.',
+            );
+        }
+
+        $data = $this->dataObject(
+            payload: $payload,
+            resource: 'server reports',
+        );
+
+        $charts = $this->requiredObject(
+            data: $data,
+            key: 'charts',
+            resource: 'server reports',
+        );
+
+        $statistics = $this->requiredArrayList(
+            data: $charts,
+            key: 'statistics',
+            resource: 'server reports charts',
+        );
+
+        if ($statistics !== []) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server report statistics schema has not been verified.',
+            );
+        }
+
+        return new CloudServerReportsData(
+            regionId: $regionId,
+            serverId: $serverId,
+            period: $period,
+            cpu: $this->mapReportChart(
+                charts: $charts,
+                chartKey: 'cpu',
+                expectedMetrics: [
+                    CloudReportMetric::CpuUsage,
+                ],
+            ),
+            ram: $this->mapReportChart(
+                charts: $charts,
+                chartKey: 'ram',
+                expectedMetrics: [
+                    CloudReportMetric::RamUsage,
+                ],
+            ),
+            network: $this->mapReportChart(
+                charts: $charts,
+                chartKey: 'network',
+                expectedMetrics: [
+                    CloudReportMetric::NetworkIncoming,
+                    CloudReportMetric::NetworkOutgoing,
+                ],
+            ),
+            disk: $this->mapReportChart(
+                charts: $charts,
+                chartKey: 'disk',
+                expectedMetrics: [
+                    CloudReportMetric::DiskRead,
+                    CloudReportMetric::DiskWrite,
+                ],
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $charts
+     * @param  list<CloudReportMetric>  $expectedMetrics
+     */
+    private function mapReportChart(
+        array $charts,
+        string $chartKey,
+        array $expectedMetrics,
+    ): CloudReportChartData {
+        $resource = sprintf(
+            'server report %s chart',
+            $chartKey,
+        );
+
+        $chart = $this->requiredObject(
+            data: $charts,
+            key: $chartKey,
+            resource: 'server reports charts',
+        );
+
+        /*
+         * The provider title is intentionally validated but not exposed.
+         * It is a translation key specific to ArvanCloud, not Domain data.
+         */
+        $this->requiredString(
+            data: $chart,
+            key: 'title',
+            resource: $resource,
+        );
+
+        $timestamps = $this->reportTimestamps(
+            data: $chart,
+            key: 'categories',
+            resource: $resource,
+        );
+
+        $seriesItems = $this->reportSeriesItems(
+            data: $chart,
+            key: 'series',
+            resource: $resource,
+        );
+
+        /*
+         * ArvanCloud may expose a timestamp before the metric series is
+         * available for a newly provisioned server. In that transient state
+         * it returns series as null (or occasionally an empty list).
+         *
+         * The orphan timestamp is not a usable report point, so the Domain
+         * receives an empty chart instead of a chart with fake data.
+         */
+        if ($seriesItems === []) {
+            return new CloudReportChartData(
+                timestamps: [],
+                series: [],
+            );
+        }
+
+        $series = [];
+        $seenMetrics = [];
+
+        foreach ($seriesItems as $seriesItem) {
+            $metric = $this->mapReportMetric(
+                $this->requiredString(
+                    data: $seriesItem,
+                    key: 'name',
+                    resource: "{$resource} series",
+                ),
+            );
+
+            if (! in_array($metric, $expectedMetrics, true)) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s contains unexpected metric [%s].',
+                        $resource,
+                        $metric->value,
+                    ),
+                );
+            }
+
+            if (isset($seenMetrics[$metric->value])) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s contains duplicate metric [%s].',
+                        $resource,
+                        $metric->value,
+                    ),
+                );
+            }
+
+            $values = $this->reportNumericValues(
+                data: $seriesItem,
+                key: 'data',
+                resource: "{$resource} series",
+            );
+
+            if (count($values) !== count($timestamps)) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s metric [%s] point count does not match its timestamps.',
+                        $resource,
+                        $metric->value,
+                    ),
+                );
+            }
+
+            $seenMetrics[$metric->value] = true;
+
+            $series[] = new CloudReportSeriesData(
+                metric: $metric,
+                values: $values,
+            );
+        }
+
+        if ($timestamps !== []) {
+            foreach ($expectedMetrics as $expectedMetric) {
+                if (! isset($seenMetrics[$expectedMetric->value])) {
+                    throw new CloudUnexpectedResponseException(
+                        sprintf(
+                            'ArvanCloud %s is missing metric [%s].',
+                            $resource,
+                            $expectedMetric->value,
+                        ),
+                    );
+                }
+            }
+        }
+
+        return new CloudReportChartData(
+            timestamps: $timestamps,
+            series: $series,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<array<string, mixed>>
+     */
+    private function reportSeriesItems(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (! array_key_exists($key, $data)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] is missing.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        if ($data[$key] === null) {
+            return [];
+        }
+
+        if (
+            ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list or null.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        foreach ($data[$key] as $item) {
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] contains an invalid item.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $items */
+        $items = $data[$key];
+
+        return $items;
+    }
+
+    private function mapReportMetric(
+        string $providerMetric,
+    ): CloudReportMetric {
+        return match (strtolower(trim($providerMetric))) {
+            'iaas.reports.cpu' => CloudReportMetric::CpuUsage,
+            'iaas.reports.ram' => CloudReportMetric::RamUsage,
+            'iaas.reports.networkincoming' => CloudReportMetric::NetworkIncoming,
+            'iaas.reports.networkoutgoing' => CloudReportMetric::NetworkOutgoing,
+            'iaas.reports.diskread' => CloudReportMetric::DiskRead,
+            'iaas.reports.diskwrite' => CloudReportMetric::DiskWrite,
+
+            default => throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud returned unsupported report metric [%s].',
+                    $providerMetric,
+                ),
+            ),
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<DateTimeImmutable>
+     */
+    private function reportTimestamps(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list of ISO-8601 timestamps.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $timestamps = [];
+
+        foreach ($data[$key] as $timestamp) {
+            if (
+                ! is_string($timestamp)
+                || preg_match(
+                    '/\\A\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})\\z/',
+                    $timestamp,
+                ) !== 1
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s contains an invalid timestamp.',
+                        $resource,
+                    ),
+                );
+            }
+
+            try {
+                $timestamps[] = new DateTimeImmutable(
+                    $timestamp,
+                );
+            } catch (Exception $exception) {
+                throw new CloudUnexpectedResponseException(
+                    message: sprintf(
+                        'ArvanCloud %s contains an invalid timestamp.',
+                        $resource,
+                    ),
+                    previous: $exception,
+                );
+            }
+        }
+
+        return $timestamps;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<int|float>
+     */
+    private function reportNumericValues(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list of non-negative numbers.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $values = [];
+
+        foreach ($data[$key] as $value) {
+            if (
+                (! is_int($value) && ! is_float($value))
+                || (is_float($value) && ! is_finite($value))
+                || $value < 0
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] contains an invalid value.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+
+            $values[] = $value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function requiredObject(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be an object.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        /** @var array<string, mixed> $object */
+        $object = $data[$key];
+
+        return $object;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<mixed>
+     */
+    private function requiredArrayList(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        /** @var list<mixed> $items */
+        $items = $data[$key];
+
+        return $items;
     }
 
     public function mapImages(

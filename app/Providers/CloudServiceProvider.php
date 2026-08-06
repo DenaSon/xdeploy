@@ -9,6 +9,7 @@ use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
@@ -165,6 +166,7 @@ final class CloudServiceProvider extends ServiceProvider
             CloudServerProvisionerInterface::class,
             CloudServerLifecycleInterface::class,
             CloudServerNetworkingInterface::class,
+            CloudServerReportsInterface::class,
             CloudServerResizeCatalogInterface::class,
             CloudServerResizerInterface::class,
         ];
