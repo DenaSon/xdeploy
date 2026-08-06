@@ -139,6 +139,55 @@ final class ArvanCloudResponseMapper
 
     /**
      * @param  array<array-key, mixed>  $payload
+     * @return list<CloudServerData>
+     */
+    public function mapServers(
+        array $payload,
+        string $regionId,
+        string $defaultUsername,
+    ): array {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        $servers = $this->dataList(
+            payload: $payload,
+            resource: 'servers',
+        );
+
+        $mappedServers = [];
+        $seenServerIds = [];
+
+        foreach ($servers as $server) {
+            $serverId = $this->requiredString(
+                data: $server,
+                key: 'id',
+                resource: 'server',
+            );
+
+            if (isset($seenServerIds[$serverId])) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud servers response contains duplicate server identifier [%s].',
+                        $serverId,
+                    ),
+                );
+            }
+
+            $seenServerIds[$serverId] = true;
+
+            $mappedServers[] = $this->mapServerObject(
+                server: $server,
+                regionId: $regionId,
+                defaultUsername: $defaultUsername,
+            );
+        }
+
+        return $mappedServers;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
      * @return list<CloudRegionData>
      */
     public function mapRegions(array $payload): array

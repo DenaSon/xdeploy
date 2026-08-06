@@ -6,6 +6,7 @@ namespace App\Infrastructure\Cloud\ArvanCloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
+use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
@@ -17,8 +18,8 @@ use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
-use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerData;
@@ -35,7 +36,7 @@ use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
-final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
 
@@ -227,6 +228,30 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         return $this->mapper->mapSshKeys(
             payload: $payload,
             regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudServerData>
+     */
+    public function listServers(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SERVERS,
+            ),
+        );
+
+        return $this->mapper->mapServers(
+            payload: $payload,
+            regionId: $regionId,
+            defaultUsername: $this->normalizedDefaultUsername(),
         );
     }
 

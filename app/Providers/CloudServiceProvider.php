@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
+use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
@@ -163,6 +164,7 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $contracts = [
             CloudServerCredentialManagerInterface::class,
+            CloudServerInventoryInterface::class,
             CloudServerProvisionerInterface::class,
             CloudServerLifecycleInterface::class,
             CloudServerNetworkingInterface::class,
