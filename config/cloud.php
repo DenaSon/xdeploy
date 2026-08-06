@@ -5,8 +5,12 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Default Provider
+    | Default Cloud Provider
     |--------------------------------------------------------------------------
+    |
+    | مشخص می‌کند کدام ارائه‌دهنده Cloud به‌صورت پیش‌فرض توسط xDeploy
+    | استفاده شود.
+    |
     */
 
     'default' => env(
@@ -18,6 +22,9 @@ return [
     |--------------------------------------------------------------------------
     | Provisioning Workflow
     |--------------------------------------------------------------------------
+    |
+    | تنظیمات Polling مربوط به ساخت ابرک و انتظار برای آماده‌شدن آن.
+    |
     */
 
     'provisioning' => [
@@ -34,8 +41,67 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Temporary Discovery
+    | Resize Workflow
     |--------------------------------------------------------------------------
+    |
+    | تنظیمات مربوط به تغییر اندازه ابرک، انتظار برای خاموش‌شدن،
+    | روشن‌شدن خودکار پس از Resize و قفل عملیات هم‌زمان.
+    |
+    */
+
+    'resize' => [
+        'enabled' => filter_var(
+            env(
+                'CLOUD_RESIZE_ENABLED',
+                false,
+            ),
+            FILTER_VALIDATE_BOOL,
+        ),
+
+        'stop_polling' => [
+            'attempts' => (int) env(
+                'CLOUD_RESIZE_STOP_ATTEMPTS',
+                30,
+            ),
+
+            'delay_milliseconds' => (int) env(
+                'CLOUD_RESIZE_STOP_DELAY_MS',
+                5_000,
+            ),
+        ],
+
+        'active_polling' => [
+            'attempts' => (int) env(
+                'CLOUD_RESIZE_ACTIVE_ATTEMPTS',
+                120,
+            ),
+
+            'delay_milliseconds' => (int) env(
+                'CLOUD_RESIZE_ACTIVE_DELAY_MS',
+                5_000,
+            ),
+        ],
+
+        'operation_lock' => [
+            'ttl_seconds' => (int) env(
+                'CLOUD_RESIZE_LOCK_TTL_SECONDS',
+                1_200,
+            ),
+
+            'wait_seconds' => (int) env(
+                'CLOUD_RESIZE_LOCK_WAIT_SECONDS',
+                3,
+            ),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Temporary Cloud Discovery
+    |--------------------------------------------------------------------------
+    |
+    | Routeهای موقت Discovery و آزمایش APIهای واقعی Cloud را فعال می‌کند.
+    |
     */
 
     'discovery_enabled' => filter_var(
@@ -48,11 +114,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Providers
+    | Cloud Providers
     |--------------------------------------------------------------------------
     */
 
     'providers' => [
+        /*
+        |--------------------------------------------------------------------------
+        | ArvanCloud
+        |--------------------------------------------------------------------------
+        */
+
         'arvan' => [
             'base_url' => env(
                 'ARVAN_CLOUD_BASE_URL',
@@ -60,8 +132,8 @@ return [
             ),
 
             /*
-             * Environment contains only the token.
-             * ArvanCloudClient adds the "Apikey" prefix.
+             * مقدار Environment فقط شامل Token است.
+             * پیشوند Apikey توسط ArvanCloudClient اضافه می‌شود.
              */
             'api_key' => env(
                 'ARVAN_CLOUD_API_KEY',
@@ -71,6 +143,12 @@ return [
                 'ARVAN_CLOUD_REGION',
                 'eu-west1-a',
             ),
+
+            /*
+            |--------------------------------------------------------------------------
+            | HTTP Timeouts
+            |--------------------------------------------------------------------------
+            */
 
             'timeouts' => [
                 'connect' => (int) env(
@@ -107,8 +185,8 @@ return [
                 ),
 
                 /*
-                 * ArvanCloud expects the UUID inside
-                 * security_groups[].name.
+                 * ArvanCloud شناسه Security Group را داخل
+                 * security_groups[].name دریافت می‌کند.
                  */
                 'security_group_id' => env(
                     'ARVAN_CLOUD_DEFAULT_SECURITY_GROUP_ID',
