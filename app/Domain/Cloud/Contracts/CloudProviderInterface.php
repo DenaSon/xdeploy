@@ -22,27 +22,39 @@ interface CloudProviderInterface
     /**
      * @return list<CloudSizeData>
      */
-    public function listSizes(string $region): array;
+    public function listSizes(
+        string $region,
+    ): array;
 
     /**
      * @return list<CloudImageData>
      */
-    public function listImages(string $region): array;
+    public function listImages(
+        string $region,
+    ): array;
 
     /**
      * @return list<CloudNetworkData>
      */
-    public function listNetworks(string $region): array;
+    public function listNetworks(
+        string $region,
+    ): array;
 
     /**
      * @return list<CloudSecurityGroupData>
      */
-    public function listSecurityGroups(string $region): array;
+    public function listSecurityGroups(
+        string $region,
+    ): array;
 
-    public function getQuota(string $region): CloudQuotaData;
+    public function getQuota(
+        string $region,
+    ): CloudQuotaData;
 
     /**
      * @return list<CloudSshKeyData>
      */
-    public function listSshKeys(string $region): array;
+    public function listSshKeys(
+        string $region,
+    ): array;
 }

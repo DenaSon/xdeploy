@@ -13,10 +13,12 @@ use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerAddressData;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Enums\CloudIpVersion;
 use App\Domain\Cloud\Enums\CloudServerStatus;
+use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use DateTimeImmutable;
@@ -557,6 +559,86 @@ final class ArvanCloudResponseMapper
         );
     }
 
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudServerActionData>
+     */
+    public function mapServerActions(
+        array $payload,
+    ): array {
+        $actions = $this->serverActionItems(
+            $payload,
+        );
+
+        return array_map(
+            fn (array $action): CloudServerActionData =>
+            new CloudServerActionData(
+                action: $this->requiredString(
+                    $action,
+                    'action',
+                    'server action',
+                ),
+                message: $this->optionalString(
+                    $action,
+                    'message',
+                    'server action',
+                ),
+                startedAt: $this->optionalString(
+                    $action,
+                    'start_time',
+                    'server action',
+                ),
+            ),
+            $actions,
+        );
+    }
+    /**
+     * مستندات آروان پاسخ را به‌صورت یک Object نمایش می‌دهد،
+     * اما خروجی Domain همیشه یک List استاندارد است.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function serverActionItems(
+        array $payload,
+    ): array {
+        $data = $payload;
+
+        if (array_key_exists('data', $payload)) {
+            if (! is_array($payload['data'])) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server actions response has an invalid data envelope.',
+                );
+            }
+
+            $data = $payload['data'];
+        }
+
+        if ($data === []) {
+            return [];
+        }
+
+        if (! array_is_list($data)) {
+            /** @var array<string, mixed> $data */
+            return [
+                $data,
+            ];
+        }
+
+        foreach ($data as $action) {
+            if (
+                ! is_array($action)
+                || array_is_list($action)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server actions response contains an invalid item.',
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $data */
+        return $data;
+    }
     /**
      * @param  array<string, mixed>  $server
      */
@@ -1477,5 +1559,185 @@ final class ArvanCloudResponseMapper
         }
 
         return $regionId;
+    }
+
+    /**
+     * @param array<array-key, mixed> $payload
+     *
+     * @return list<CloudPortData>
+     */
+    public function mapPorts(
+        array $payload,
+        string $serverId,
+    ): array {
+        $ports = $this->portItems(
+            $payload,
+        );
+
+        $mappedPorts = [];
+
+        foreach ($ports as $port) {
+            $portServerId = $this->requiredString(
+                data: $port,
+                key: 'instance_id',
+                resource: 'port',
+            );
+
+            if ($portServerId !== $serverId) {
+                continue;
+            }
+
+            $mappedPorts[] = new CloudPortData(
+                id: $this->requiredString(
+                    data: $port,
+                    key: 'id',
+                    resource: 'port',
+                ),
+
+                serverId: $portServerId,
+
+                ips: $this->requiredStringList(
+                    data: $port,
+                    key: 'ips',
+                    resource: 'port',
+                ),
+
+                macAddress: $this->requiredString(
+                    data: $port,
+                    key: 'mac_address',
+                    resource: 'port',
+                ),
+
+                networkId: $this->requiredString(
+                    data: $port,
+                    key: 'network_id',
+                    resource: 'port',
+                ),
+
+                portSecurityEnabled: $this->requiredBool(
+                    data: $port,
+                    key: 'port_security_enabled',
+                    resource: 'port',
+                ),
+
+                securityGroupIds: $this->requiredStringList(
+                    data: $port,
+                    key: 'security_group_ids',
+                    resource: 'port',
+                ),
+
+                status: $this->requiredString(
+                    data: $port,
+                    key: 'status',
+                    resource: 'port',
+                ),
+            );
+        }
+
+        return $mappedPorts;
+    }
+
+    /**
+     * API Documentation پاسخ Ports را گاهی به‌صورت Object نمایش
+     * می‌دهد، درحالی‌که Endpoint به‌عنوان List معرفی شده است.
+     *
+     * @param array<array-key, mixed> $payload
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function portItems(
+        array $payload,
+    ): array {
+        $candidate = array_key_exists(
+            'data',
+            $payload,
+        )
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud ports response has an invalid data envelope.',
+            );
+        }
+
+        if ($candidate === []) {
+            return [];
+        }
+
+        if (! array_is_list($candidate)) {
+            if (! array_key_exists('id', $candidate)) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud ports response has an invalid data envelope.',
+                );
+            }
+
+            /** @var array<string, mixed> $candidate */
+            return [
+                $candidate,
+            ];
+        }
+
+        foreach ($candidate as $port) {
+            if (
+                ! is_array($port)
+                || array_is_list($port)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud ports response contains an invalid item.',
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $candidate */
+        return $candidate;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function requiredStringList(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list of strings.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $values = [];
+
+        foreach ($data[$key] as $value) {
+            if (
+                ! is_string($value)
+                || trim($value) === ''
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] contains an invalid value.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+
+            $values[] = trim(
+                $value,
+            );
+        }
+
+        return $values;
     }
 }

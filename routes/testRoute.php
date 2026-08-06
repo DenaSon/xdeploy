@@ -2,1900 +2,890 @@
 
 declare(strict_types=1);
 
-use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\JsonResponse;
+use App\Application\Cloud\Networking\AddCloudServerPublicIpAction;
+use App\Application\Cloud\Networking\DeleteCloudServerPortAction;
+use App\Application\Cloud\Networking\ListCloudServerPortsAction;
+use App\Application\Cloud\Servers\DeleteCloudServerAction;
+use App\Application\Cloud\Servers\GetCloudServerActionsAction;
+use App\Application\Cloud\Servers\PowerOffCloudServerAction;
+use App\Application\Cloud\Servers\PowerOnCloudServerAction;
+use App\Application\Cloud\Servers\RebootCloudServerAction;
+use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Models\Server;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-
-$guardCloudDiscovery = static function (): void {
-    abort_unless(
-        app()->environment('local')
-        && config('cloud.discovery_enabled') === true,
-        404,
-    );
-};
-
-$requiredCloudConfig = static function (string $key): string {
-    $value = config($key);
-
-    abort_unless(
-        is_string($value) && trim($value) !== '',
-        500,
-        "Required cloud configuration [{$key}] is missing.",
-    );
-
-    return trim($value);
-};
-
-$makeArvanProvisionPayload = static function (
-    string $serverName,
-) use (
-    $requiredCloudConfig,
-): array {
-    $driver = $requiredCloudConfig('cloud.default');
-
-    abort_unless(
-        $driver === 'arvan',
-        500,
-        'The active cloud driver must be ArvanCloud.',
-    );
-
-    return [
-        'name' => $serverName,
-
-        'network_id' => $requiredCloudConfig(
-            'cloud.providers.arvan.defaults.network_id',
-        ),
-
-        'flavor_id' => $requiredCloudConfig(
-            'cloud.providers.arvan.defaults.size_id',
-        ),
-
-        'image_id' => $requiredCloudConfig(
-            'cloud.providers.arvan.defaults.image_id',
-        ),
-
-        /*
-         * با وجود نام فیلد name، API آروان شناسه UUID
-         * گروه فایروال را در این قسمت انتظار دارد.
-         */
-        'security_groups' => [
-            [
-                'name' => $requiredCloudConfig(
-                    'cloud.providers.arvan.defaults.security_group_id',
-                ),
-            ],
-        ],
-
-        /*
-         * در این Discovery از Password تولیدشده توسط Provider
-         * استفاده می‌کنیم.
-         */
-        'ssh_key' => false,
-        'key_name' => null,
-
-        /*
-         * برای جلوگیری از ساخت چند Resource، همیشه یک است.
-         */
-        'count' => 1,
-
-        'create_type' => $requiredCloudConfig(
-            'cloud.providers.arvan.defaults.create_type',
-        ),
-
-        'disk_size' => (int) config(
-            'cloud.providers.arvan.defaults.disk_size',
-            30,
-        ),
-
-        'init_script' => '',
-        'ha_enabled' => false,
-    ];
-};
-
-$sanitizeCloudResponse = static function (array $payload): array {
-    $sanitized = $payload;
-
-    $sensitiveKeys = [
-        'password',
-        'root_password',
-        'admin_password',
-        'token',
-        'api_key',
-        'authorization',
-        'private_key',
-        'secret',
-    ];
-
-    array_walk_recursive(
-        $sanitized,
-        static function (
-            mixed &$value,
-            string|int $key,
-        ) use (
-            $sensitiveKeys,
-        ): void {
-            if (
-                ! in_array(
-                    strtolower((string) $key),
-                    $sensitiveKeys,
-                    true,
-                )
-            ) {
-                return;
-            }
-
-            if (is_string($value) && $value !== '') {
-                $value = sprintf(
-                    '[REDACTED:%d chars]',
-                    strlen($value),
-                );
-
-                return;
-            }
-
-            $value = '[REDACTED]';
-        },
-    );
-
-    return $sanitized;
-};
-
-$firstScalarValue = static function (
-    array $payload,
-    array $paths,
-): string|int|float|bool|null {
-    foreach ($paths as $path) {
-        $value = data_get($payload, $path);
-
-        if (is_scalar($value)) {
-            return $value;
-        }
-    }
-
-    return null;
-};
-
-/*
-|--------------------------------------------------------------------------
-| Discovery page
-|--------------------------------------------------------------------------
-|
-| Payload دقیق نمایش‌داده‌شده داخل Cache قرار می‌گیرد.
-| POST فقط همان Payload را یک‌بار مصرف می‌کند.
-|
-*/
-
-Route::get(
-    '/dev/arvan/provision',
-    static function () use (
-        $guardCloudDiscovery,
-        $makeArvanProvisionPayload,
-    ) {
-        $guardCloudDiscovery();
-
-        $serverName = sprintf(
-            'xdeploy-discovery-%s-%s',
-            now()->format('Ymd-His'),
-            Str::lower(Str::random(6)),
-        );
-
-        $payload = $makeArvanProvisionPayload($serverName);
-
-        $operationToken = Str::uuid()->toString();
-
-        Cache::put(
-            "arvan-discovery:operation:{$operationToken}",
-            $payload,
-            now()->addMinutes(10),
-        );
-
-        $formattedPayload = htmlspecialchars(
-            json_encode(
-                $payload,
-                JSON_PRETTY_PRINT
-                | JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_THROW_ON_ERROR,
-            ),
-            ENT_QUOTES,
-            'UTF-8',
-        );
-
-        $action = htmlspecialchars(
-            route('dev.arvan.provision.store'),
-            ENT_QUOTES,
-            'UTF-8',
-        );
-
-        $csrfToken = htmlspecialchars(
-            csrf_token(),
-            ENT_QUOTES,
-            'UTF-8',
-        );
-
-        $escapedOperationToken = htmlspecialchars(
-            $operationToken,
-            ENT_QUOTES,
-            'UTF-8',
-        );
-
-        return response(
-            <<<HTML
-            <!doctype html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8">
-
-                <meta
-                    name="viewport"
-                    content="width=device-width, initial-scale=1"
-                >
-
-                <title>ArvanCloud Provision Discovery</title>
-
-                <style>
-                    body {
-                        max-width: 900px;
-                        margin: 40px auto;
-                        padding: 0 20px;
-                        color: #e5e7eb;
-                        background: #111827;
-                        font-family: ui-monospace, monospace;
-                    }
-
-                    pre {
-                        overflow-x: auto;
-                        padding: 20px;
-                        border: 1px solid #374151;
-                        border-radius: 12px;
-                        background: #1f2937;
-                    }
-
-                    button {
-                        padding: 12px 18px;
-                        border: 0;
-                        border-radius: 10px;
-                        color: white;
-                        background: #dc2626;
-                        cursor: pointer;
-                        font-weight: 700;
-                    }
-
-                    button:disabled {
-                        cursor: not-allowed;
-                        opacity: 0.5;
-                    }
-
-                    .warning {
-                        margin: 20px 0;
-                        padding: 16px;
-                        border: 1px solid #92400e;
-                        border-radius: 12px;
-                        background: #451a03;
-                    }
-                </style>
-            </head>
-
-            <body>
-                <h1>ArvanCloud Provision Discovery</h1>
-
-                <div class="warning">
-                    This action creates one real, billable cloud server.
-                    The operation token can only be used once.
-                </div>
-
-                <h2>Request Payload</h2>
-
-                <pre>{$formattedPayload}</pre>
-
-                <form
-                    method="POST"
-                    action="{$action}"
-                    onsubmit="
-                        const button = this.querySelector('button');
-
-                        if (
-                            ! confirm(
-                                'Create one real ArvanCloud server?'
-                            )
-                        ) {
-                            return false;
-                        }
-
-                        button.disabled = true;
-                        button.textContent = 'Creating server...';
-
-                        return true;
-                    "
-                >
-                    <input
-                        type="hidden"
-                        name="_token"
-                        value="{$csrfToken}"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="operation_token"
-                        value="{$escapedOperationToken}"
-                    >
-
-                    <button type="submit">
-                        Create Discovery Server
-                    </button>
-                </form>
-            </body>
-            </html>
-            HTML,
-            200,
-            [
-                'Content-Type' => 'text/html; charset=UTF-8',
-                'Cache-Control' => 'no-store, private',
-            ],
-        );
-    },
-)->name('dev.arvan.provision.index');
-
-/*
-|--------------------------------------------------------------------------
-| Create real server
-|--------------------------------------------------------------------------
-*/
-
-Route::post(
-    '/dev/arvan/provision',
-    static function (
-        Request $request,
-    ) use (
-        $guardCloudDiscovery,
-        $requiredCloudConfig,
-        $sanitizeCloudResponse,
-        $firstScalarValue,
-    ) {
-        $guardCloudDiscovery();
-
-        $validated = $request->validate([
-            'operation_token' => [
-                'required',
-                'uuid',
-            ],
-        ]);
-
-        $operationToken = $validated['operation_token'];
-
-        /*
-         * pull باعث می‌شود Token فقط یک‌بار قابل استفاده باشد.
-         */
-        $payload = Cache::pull(
-            "arvan-discovery:operation:{$operationToken}",
-        );
-
-        abort_unless(
-            is_array($payload),
-            419,
-            'Discovery operation expired or was already used.',
-        );
-
-        /*
-         * از اجرای هم‌زمان دو درخواست Provision جلوگیری می‌کند.
-         */
-        $lock = Cache::lock(
-            'arvan-discovery:provision-lock',
-            120,
-        );
-
-        abort_unless(
-            $lock->get(),
-            409,
-            'Another ArvanCloud discovery operation is running.',
-        );
-
-        try {
-            $baseUrl = rtrim(
-                $requiredCloudConfig(
-                    'cloud.providers.arvan.base_url',
-                ),
-                '/',
-            );
-
-            abort_unless(
-                str_starts_with($baseUrl, 'https://'),
-                500,
-                'ArvanCloud base URL must use HTTPS.',
-            );
-
-            $apiKey = $requiredCloudConfig(
-                'cloud.providers.arvan.api_key',
-            );
-
-            $region = $requiredCloudConfig(
-                'cloud.providers.arvan.region',
-            );
-
-            $connectTimeout = (int) config(
-                'cloud.providers.arvan.connect_timeout',
-                10,
-            );
-
-            $timeout = (int) config(
-                'cloud.providers.arvan.timeout',
-                90,
-            );
-
-            $endpoint = sprintf(
-                '%s/regions/%s/servers',
-                $baseUrl,
-                rawurlencode($region),
-            );
-
-            try {
-                $response = Http::acceptJson()
-                    ->asJson()
-                    ->withHeaders([
-                        'Authorization' => 'Apikey '.$apiKey,
-                    ])
-                    ->connectTimeout($connectTimeout)
-                    ->timeout($timeout)
-                    ->withoutRedirecting()
-                    ->post(
-                        $endpoint,
-                        $payload,
-                    );
-            } catch (ConnectionException $exception) {
-                report($exception);
-
-                return response()->json(
-                    [
-                        'successful' => false,
-
-                        'error' => [
-                            'type' => 'connection_error',
-                            'message' => 'Could not connect to ArvanCloud.',
-                        ],
-                    ],
-                    502,
-                    [
-                        'Cache-Control' => 'no-store, private',
-                    ],
-                );
-            }
-
-            $rawBody = $response->body();
-
-            try {
-                $decodedBody = json_decode(
-                    $rawBody,
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR,
-                );
-            } catch (JsonException) {
-                $decodedBody = [
-                    '_non_json_response' => true,
-                    'length' => strlen($rawBody),
-                    'sha256' => hash('sha256', $rawBody),
-                ];
-            }
-
-            if (! is_array($decodedBody)) {
-                $decodedBody = [
-                    '_unexpected_response_type' => get_debug_type(
-                        $decodedBody,
-                    ),
-                ];
-            }
-
-            /*
-             * پاسخ کامل، شامل Password احتمالی، رمزگذاری می‌شود.
-             * Authorization Header یا API Key داخل Capture قرار نمی‌گیرد.
-             */
-            $capture = [
-                'captured_at' => now()->toIso8601String(),
-
-                'request' => [
-                    'method' => 'POST',
-
-                    'endpoint' => sprintf(
-                        '/regions/%s/servers',
-                        $region,
-                    ),
-
-                    'payload' => $payload,
-                ],
-
-                'response' => [
-                    'status' => $response->status(),
-                    'body' => $decodedBody,
-                    'raw_body' => $rawBody,
-                ],
-            ];
-
-            $capturePath = sprintf(
-                'arvan-discovery/%s-%s.enc',
-                now()->format('Ymd-His'),
-                Str::uuid()->toString(),
-            );
-
-            $captureSaved = true;
-            $captureError = null;
-
-            try {
-                Storage::disk('local')->put(
-                    $capturePath,
-                    Crypt::encryptString(
-                        json_encode(
-                            $capture,
-                            JSON_UNESCAPED_SLASHES
-                            | JSON_UNESCAPED_UNICODE
-                            | JSON_THROW_ON_ERROR,
-                        ),
-                    ),
-                );
-
-                Storage::disk('local')->put(
-                    'arvan-discovery/latest.txt',
-                    $capturePath,
-                );
-            } catch (Throwable $exception) {
-                report($exception);
-
-                $captureSaved = false;
-                $captureError =
-                    'The encrypted response capture could not be saved.';
-            }
-
-            /*
-             * مسیرهای احتمالی پاسخ تا زمان مشاهده Schema واقعی.
-             */
-            $detectedServerId = $firstScalarValue(
-                $decodedBody,
-                [
-                    'id',
-                    'data.id',
-                    'server.id',
-                    'data.server.id',
-                    'servers.0.id',
-                    'data.servers.0.id',
-                    'data.0.id',
-                    'result.id',
-                    'result.0.id',
-                ],
-            );
-
-            $detectedStatus = $firstScalarValue(
-                $decodedBody,
-                [
-                    'status',
-                    'data.status',
-                    'server.status',
-                    'data.server.status',
-                    'servers.0.status',
-                    'data.servers.0.status',
-                    'data.0.status',
-                    'result.status',
-                    'result.0.status',
-                ],
-            );
-
-            $detectedPassword = $firstScalarValue(
-                $decodedBody,
-                [
-                    'password',
-                    'data.password',
-                    'server.password',
-                    'data.server.password',
-                    'servers.0.password',
-                    'data.servers.0.password',
-                    'data.0.password',
-                    'result.password',
-                    'result.0.password',
-                ],
-            );
-
-            $detectedPassword = is_string($detectedPassword)
-                ? $detectedPassword
-                : null;
-
-            return response()->json(
-                [
-                    'request' => [
-                        'method' => 'POST',
-
-                        'endpoint' => sprintf(
-                            '/regions/%s/servers',
-                            $region,
-                        ),
-
-                        'payload' => $payload,
-                    ],
-
-                    'response' => [
-                        'status' => $response->status(),
-                        'successful' => $response->successful(),
-
-                        'body' => $sanitizeCloudResponse(
-                            $decodedBody,
-                        ),
-                    ],
-
-                    'detected' => [
-                        'server_id' => $detectedServerId !== null
-                            ? (string) $detectedServerId
-                            : null,
-
-                        'status' => $detectedStatus !== null
-                            ? (string) $detectedStatus
-                            : null,
-
-                        'password_present' => $detectedPassword !== null
-                            && $detectedPassword !== '',
-
-                        'password_length' => $detectedPassword !== null
-                                ? strlen($detectedPassword)
-                                : null,
-                    ],
-
-                    'encrypted_capture' => [
-                        'saved' => $captureSaved,
-
-                        'disk' => $captureSaved
-                            ? 'local'
-                            : null,
-
-                        'path' => $captureSaved
-                            ? $capturePath
-                            : null,
-
-                        'error' => $captureError,
-                    ],
-
-                    'next_step' => $response->successful()
-                        ? 'Copy this sanitized response. Do not submit again.'
-                        : 'Review the sanitized provider error.',
-                ],
-                $response->successful()
-                    ? 201
-                    : $response->status(),
-                [
-                    'Cache-Control' => 'no-store, private',
-                ],
-            );
-        } finally {
-            $lock->release();
-        }
-    },
-)->name('dev.arvan.provision.store');
-
-Route::get(
-    '/dev/arvan/servers/{serverId}',
-    function (string $serverId): JsonResponse {
-        abort_unless(
-            app()->environment('local')
-            && (bool) config('cloud.discovery_enabled'),
-            404,
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Input
-        |--------------------------------------------------------------------------
-        */
-
-        if (! Str::isUuid($serverId)) {
-            return response()->json(
-                [
-                    'successful' => false,
-                    'message' => 'The server ID must be a valid UUID.',
-                ],
-                422,
-            );
-        }
-
-        $region = config(
-            'cloud.providers.arvan.region',
-        );
-
-        if (
-            ! is_string($region)
-            || trim($region) === ''
-        ) {
-            return response()->json(
-                [
-                    'successful' => false,
-                    'message' => 'ArvanCloud region is not configured.',
-                ],
-                500,
-            );
-        }
-
-        $region = trim($region);
-        $endpoint = "regions/{$region}/servers";
-
-        /*
-        |--------------------------------------------------------------------------
-        | Sanitize Provider Response
-        |--------------------------------------------------------------------------
-        */
-
-        $sanitize = function (
-            mixed $value,
-        ) use (
-            &$sanitize,
-        ): mixed {
-            if (! is_array($value)) {
-                return $value;
-            }
-
-            $sanitized = [];
-
-            foreach ($value as $key => $child) {
-                $normalizedKey = strtolower(
-                    (string) $key,
-                );
-
-                $isSensitive = in_array(
-                    $normalizedKey,
-                    [
-                        'password',
-                        'root_password',
-                        'admin_password',
-                        'token',
-                        'access_token',
-                        'refresh_token',
-                        'api_key',
-                        'authorization',
-                        'secret',
-                        'private_key',
-                        'credential',
-                    ],
-                    true,
-                )
-                    || str_ends_with(
-                        $normalizedKey,
-                        '_password',
-                    )
-                    || str_ends_with(
-                        $normalizedKey,
-                        '_token',
-                    )
-                    || str_ends_with(
-                        $normalizedKey,
-                        '_secret',
-                    )
-                    || str_ends_with(
-                        $normalizedKey,
-                        '_private_key',
-                    )
-                    || str_ends_with(
-                        $normalizedKey,
-                        '_credential',
-                    );
-
-                $sanitized[$key] = $isSensitive
-                    ? '[REDACTED]'
-                    : $sanitize($child);
-            }
-
-            return $sanitized;
-        };
-
-        /*
-        |--------------------------------------------------------------------------
-        | Find Server Recursively
-        |--------------------------------------------------------------------------
-        */
-
-        $findServer = function (
-            mixed $value,
-        ) use (
-            &$findServer,
-            $serverId,
-        ): ?array {
-            if (! is_array($value)) {
-                return null;
-            }
-
-            if (
-                array_key_exists('id', $value)
-                && (string) $value['id'] === $serverId
-            ) {
-                return $value;
-            }
-
-            foreach ($value as $child) {
-                if (! is_array($child)) {
-                    continue;
-                }
-
-                $server = $findServer($child);
-
-                if ($server !== null) {
-                    return $server;
-                }
-            }
-
-            return null;
-        };
-
-        /*
-        |--------------------------------------------------------------------------
-        | Request Provider
-        |--------------------------------------------------------------------------
-        */
-
-        try {
-            $providerResponse = app(
-                ArvanCloudClient::class,
-            )->get($endpoint);
-        } catch (Throwable $exception) {
-            $status = $exception->getCode();
-
-            if (
-                ! is_int($status)
-                || $status < 400
-                || $status > 599
-            ) {
-                $status = 502;
-            }
-
-            return response()->json(
-                [
-                    'request' => [
-                        'method' => 'GET',
-                        'endpoint' => "/{$endpoint}",
-                        'region' => $region,
-                        'server_id' => $serverId,
-                    ],
-
-                    'response' => [
-                        'successful' => false,
-                        'status' => $status,
-                    ],
-
-                    'error' => [
-                        'type' => class_basename(
-                            $exception,
-                        ),
-                        'message' => $exception->getMessage(),
-                    ],
-                ],
-                $status,
-            );
-        }
-
-        $server = $findServer(
-            $providerResponse,
-        );
-
-        if ($server === null) {
-            return response()->json(
-                [
-                    'request' => [
-                        'method' => 'GET',
-                        'endpoint' => "/{$endpoint}",
-                        'region' => $region,
-                        'server_id' => $serverId,
-                    ],
-
-                    'response' => [
-                        'successful' => true,
-                        'server_found' => false,
-                        'top_level_keys' => array_keys(
-                            $providerResponse,
-                        ),
-                        'sanitized_body' => $sanitize(
-                            $providerResponse,
-                        ),
-                    ],
-
-                    'message' => 'The requested server was not found in the provider response.',
-                ],
-                404,
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normalize Addresses
-        |--------------------------------------------------------------------------
-        */
-
-        $rawAddresses = data_get(
-            $server,
-            'addresses',
-            [],
-        );
-
-        $addresses = collect(
-            is_array($rawAddresses)
-                ? $rawAddresses
-                : [],
-        )->flatMap(
-            static function (
-                mixed $items,
-                string|int $networkKey,
-            ): array {
-                if (! is_array($items)) {
-                    return [];
-                }
-
-                return collect($items)
-                    ->filter(
-                        static fn (mixed $item): bool => is_array($item),
-                    )
-                    ->map(
-                        static function (
-                            array $item,
-                        ) use (
-                            $networkKey,
-                        ): array {
-                            $address = isset($item['addr'])
-                                ? trim((string) $item['addr'])
-                                : null;
-
-                            return [
-                                'network_key' => (string) $networkKey,
-                                'address' => $address,
-                                'version' => isset($item['version'])
-                                    ? (int) $item['version']
-                                    : null,
-                                'type' => isset($item['type'])
-                                    ? (string) $item['type']
-                                    : null,
-                                'is_public' => (bool) (
-                                    $item['is_public']
-                                    ?? false
-                                ),
-                                'is_vpc' => (bool) (
-                                    $item['is_vpc']
-                                    ?? false
-                                ),
-                                'mac_address' => isset(
-                                    $item['mac_addr'],
-                                )
-                                    ? (string) $item['mac_addr']
-                                    : null,
-                            ];
-                        },
-                    )
-                    ->values()
-                    ->all();
-            },
-        )->filter(
-            static fn (array $address): bool => is_string($address['address'])
-                && filter_var(
-                    $address['address'],
-                    FILTER_VALIDATE_IP,
-                ) !== false,
-        )->unique(
-            static fn (array $address): string => implode(
-                '|',
-                [
-                    $address['address'],
-                    $address['mac_address'] ?? '',
-                    $address['network_key'],
-                ],
-            ),
-        )->values();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Detect Public and Private Addresses
-        |--------------------------------------------------------------------------
-        */
-
-        $publicIpv4s = $addresses
-            ->filter(
-                static fn (array $address): bool => $address['version'] === 4
-                    && $address['is_public'] === true
-                    && filter_var(
-                        $address['address'],
-                        FILTER_VALIDATE_IP,
-                        FILTER_FLAG_IPV4,
-                    ) !== false,
-            )
-            ->pluck('address')
-            ->unique()
-            ->values()
-            ->all();
-
-        $privateIpv4s = $addresses
-            ->filter(
-                static fn (array $address): bool => $address['version'] === 4
-                    && $address['is_public'] === false
-                    && filter_var(
-                        $address['address'],
-                        FILTER_VALIDATE_IP,
-                        FILTER_FLAG_IPV4,
-                    ) !== false,
-            )
-            ->pluck('address')
-            ->unique()
-            ->values()
-            ->all();
-
-        $publicIpv6s = $addresses
-            ->filter(
-                static fn (array $address): bool => $address['version'] === 6
-                    && $address['is_public'] === true
-                    && filter_var(
-                        $address['address'],
-                        FILTER_VALIDATE_IP,
-                        FILTER_FLAG_IPV6,
-                    ) !== false,
-            )
-            ->pluck('address')
-            ->unique()
-            ->values()
-            ->all();
-
-        $privateIpv6s = $addresses
-            ->filter(
-                static fn (array $address): bool => $address['version'] === 6
-                    && $address['is_public'] === false
-                    && filter_var(
-                        $address['address'],
-                        FILTER_VALIDATE_IP,
-                        FILTER_FLAG_IPV6,
-                    ) !== false,
-            )
-            ->pluck('address')
-            ->unique()
-            ->values()
-            ->all();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normalize Network Attachments
-        |--------------------------------------------------------------------------
-        */
-
-        $networkAttachmentIds = collect(
-            data_get(
-                $server,
-                'networks',
-                [],
-            ),
-        )->filter(
-            static fn (mixed $networkId): bool => is_string($networkId)
-                && trim($networkId) !== '',
-        )->map(
-            static fn (string $networkId): string => trim($networkId),
-        )->unique()
-            ->values()
-            ->all();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normalize Security Groups
-        |--------------------------------------------------------------------------
-        */
-
-        $securityGroups = collect(
-            data_get(
-                $server,
-                'security_groups',
-                [],
-            ),
-        )->filter(
-            static fn (mixed $group): bool => is_array($group),
-        )->unique(
-            static fn (array $group): string => (string) (
-                $group['id']
-                ?? $group['name']
-                ?? ''
-            ),
-        )->values();
-
-        $securityGroupIds = $securityGroups
-            ->pluck('id')
-            ->filter(
-                static fn (mixed $id): bool => is_string($id)
-                    && trim($id) !== '',
-            )
-            ->map(
-                static fn (string $id): string => trim($id),
-            )
-            ->unique()
-            ->values()
-            ->all();
-
-        $securityGroupNames = $securityGroups
-            ->pluck('name')
-            ->filter(
-                static fn (mixed $name): bool => is_string($name)
-                    && trim($name) !== '',
-            )
-            ->map(
-                static fn (string $name): string => trim($name),
-            )
-            ->unique()
-            ->values()
-            ->all();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normalize Flavor
-        |--------------------------------------------------------------------------
-        */
-
-        $flavor = data_get(
-            $server,
-            'flavor',
-            [],
-        );
-
-        $flavor = is_array($flavor)
-            ? $flavor
-            : [];
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normalize Image
-        |--------------------------------------------------------------------------
-        */
-
-        $image = data_get(
-            $server,
-            'image',
-            [],
-        );
-
-        $image = is_array($image)
-            ? $image
-            : [];
-
-        /*
-        |--------------------------------------------------------------------------
-        | Build Discovery Response
-        |--------------------------------------------------------------------------
-        */
-
-        $result = [
-            'request' => [
-                'method' => 'GET',
-                'endpoint' => "/{$endpoint}",
-                'region' => $region,
-                'server_id' => $serverId,
-            ],
-
-            'response' => [
-                'successful' => true,
-                'server_found' => true,
-                'top_level_keys' => array_keys(
-                    $providerResponse,
-                ),
-            ],
-
-            'detected' => [
-                'id' => data_get(
-                    $server,
-                    'id',
-                ),
-
-                'name' => data_get(
-                    $server,
-                    'name',
-                ),
-
-                'status' => data_get(
-                    $server,
-                    'status',
-                ),
-
-                'task_state' => data_get(
-                    $server,
-                    'task_state',
-                ),
-
-                'created_at' => data_get(
-                    $server,
-                    'created',
-                ),
-
-                /*
-                 * Provider does not explicitly identify a primary IP.
-                 * The first address is retained only as a convenience.
-                 */
-                'first_public_ipv4' => $publicIpv4s[0]
-                    ?? null,
-
-                'public_ipv4s' => $publicIpv4s,
-
-                'public_ipv4_count' => count(
-                    $publicIpv4s,
-                ),
-
-                'private_ipv4s' => $privateIpv4s,
-
-                'public_ipv6s' => $publicIpv6s,
-
-                'private_ipv6s' => $privateIpv6s,
-
-                'ssh_username' => data_get(
-                    $server,
-                    'image.username',
-                ) ?: data_get(
-                    $server,
-                    'image.metadata.username',
-                ) ?: data_get(
-                    $server,
-                    'username',
-                ),
-
-                'flavor' => [
-                    'id' => $flavor['id']
-                        ?? null,
-
-                    'name' => $flavor['name']
-                        ?? null,
-
-                    'vcpus' => isset($flavor['vcpus'])
-                        ? (int) $flavor['vcpus']
-                        : null,
-
-                    'ram_mib' => isset($flavor['ram'])
-                        ? (int) $flavor['ram']
-                        : null,
-
-                    'disk_gib' => isset($flavor['disk'])
-                        ? (int) $flavor['disk']
-                        : null,
-
-                    'swap' => $flavor['swap']
-                        ?? null,
-
-                    'free_server' => isset(
-                        $flavor['free_server'],
-                    )
-                        ? (bool) $flavor['free_server']
-                        : null,
-                ],
-
-                'image' => [
-                    'id' => $image['id']
-                        ?? null,
-
-                    'name' => $image['name']
-                        ?? null,
-
-                    'os' => $image['os']
-                        ?? null,
-
-                    'version' => $image['os_version']
-                        ?? null,
-
-                    'status' => $image['status']
-                        ?? null,
-
-                    'username' => $image['username']
-                        ?? data_get(
-                            $image,
-                            'metadata.username',
-                        ),
-                ],
-
-                'network_attachment_ids' => $networkAttachmentIds,
-
-                'security_group_ids' => $securityGroupIds,
-
-                'security_group_names' => $securityGroupNames,
-
-                'volume_backed' => data_get(
-                    $server,
-                    'volume_backed',
-                ),
-
-                'ha_enabled' => data_get(
-                    $server,
-                    'ha_enabled',
-                ),
-
-                'backup_enabled' => data_get(
-                    $server,
-                    'backup_enabled',
-                ),
-
-                'spot' => data_get(
-                    $server,
-                    'spot',
-                ),
-
-                'domain' => data_get(
-                    $server,
-                    'domain',
-                ),
-            ],
-
-            'provider_fields' => [
-                'addresses' => $addresses->all(),
-
-                'network_attachment_ids' => $networkAttachmentIds,
-
-                'security_groups' => $sanitize(
-                    $securityGroups->all(),
-                ),
-
-                'flavor' => $sanitize(
-                    $flavor,
-                ),
-
-                'image' => $sanitize(
-                    $image,
-                ),
-
-                'tags' => $sanitize(
-                    data_get(
-                        $server,
-                        'tags',
-                        [],
-                    ),
-                ),
-            ],
-
-            /*
-             * Full sanitized provider record for discovery only.
-             */
-            'server_record' => $sanitize(
-                $server,
-            ),
-        ];
-
-        return response()->json(
-            $result,
-            200,
-            [],
-            JSON_PRETTY_PRINT
-            | JSON_UNESCAPED_UNICODE
-            | JSON_UNESCAPED_SLASHES
-            | JSON_INVALID_UTF8_SUBSTITUTE,
-        );
-    },
-)->whereUuid('serverId')
-    ->name('dev.arvan.servers.show');
-
-/*
-|--------------------------------------------------------------------------
-| ArvanCloud Public IP Discovery
-|--------------------------------------------------------------------------
-|
-| GET:
-|   Displays current server details, public IPv4 addresses and available
-|   provider actions.
-|
-| POST:
-|   Executes one real Add Public IP request.
-|
-*/
+use Illuminate\Validation\ValidationException;
 
 Route::match(
     ['GET', 'POST'],
-    '/dev/arvan/servers/{serverId}/public-ip',
-    static function (
+    '/cloud/action-test/{server}',
+    function (
         Request $request,
-        string $serverId,
-    ) use (
-        $guardCloudDiscovery,
-        $requiredCloudConfig,
-        $sanitizeCloudResponse,
+        Server $server,
+        CloudServerProvisionerInterface $provisioner,
+        PowerOnCloudServerAction $powerOn,
+        PowerOffCloudServerAction $powerOff,
+        RebootCloudServerAction $reboot,
+        GetCloudServerActionsAction $getActions,
+        DeleteCloudServerAction $deleteServer,
+        ListCloudServerPortsAction $listPorts,
+        AddCloudServerPublicIpAction $addPublicIp,
+        DeleteCloudServerPortAction $deletePort,
     ) {
-        $guardCloudDiscovery();
-
+        /*
+         * این Route به منابع واقعی Cloud دسترسی دارد؛
+         * فقط در محیط Local یا با فعال‌سازی صریح قابل استفاده است.
+         */
         abort_unless(
-            preg_match(
-                '/^[0-9a-fA-F-]{36}$/',
-                $serverId,
-            ) === 1,
+            app()->isLocal()
+            || config('cloud.discovery_enabled'),
+            404,
+        );
+
+        $server->refresh();
+
+        $user = User::query()->findOrFail(
+            $server->user_id,
+        );
+
+        $provider = trim(
+            (string) $server->cloud_provider,
+        );
+
+        $region = trim(
+            (string) $server->cloud_region,
+        );
+
+        $providerServerId = trim(
+            (string) $server->cloud_server_id,
+        );
+
+        abort_if(
+            $provider === ''
+            || $region === ''
+            || $providerServerId === '',
             422,
-            'Invalid ArvanCloud server ID.',
-        );
-
-        $baseUrl = rtrim(
-            $requiredCloudConfig(
-                'cloud.providers.arvan.base_url',
-            ),
-            '/',
-        );
-
-        abort_unless(
-            str_starts_with($baseUrl, 'https://'),
-            500,
-            'ArvanCloud base URL must use HTTPS.',
-        );
-
-        $apiKey = $requiredCloudConfig(
-            'cloud.providers.arvan.api_key',
-        );
-
-        $region = $requiredCloudConfig(
-            'cloud.providers.arvan.region',
-        );
-
-        $securityGroupId = $requiredCloudConfig(
-            'cloud.providers.arvan.defaults.security_group_id',
-        );
-
-        $connectTimeout = (int) config(
-            'cloud.providers.arvan.timeouts.connect',
-            10,
-        );
-
-        $requestTimeout = (int) config(
-            'cloud.providers.arvan.timeouts.request',
-            90,
-        );
-
-        $serverEndpoint = sprintf(
-            '%s/regions/%s/servers/%s',
-            $baseUrl,
-            rawurlencode($region),
-            rawurlencode($serverId),
-        );
-
-        $actionsEndpoint = sprintf(
-            '%s/actions',
-            $serverEndpoint,
-        );
-
-        $addPublicIpEndpoint = sprintf(
-            '%s/add-public-ip',
-            $serverEndpoint,
-        );
-
-        $makeClient = static fn () => Http::acceptJson()
-            ->asJson()
-            ->withHeaders([
-                'Authorization' => 'Apikey '.$apiKey,
-            ])
-            ->connectTimeout($connectTimeout)
-            ->timeout($requestTimeout)
-            ->withoutRedirecting();
-
-        $decodeResponse = static function (
-            \Illuminate\Http\Client\Response $response,
-        ): array {
-            $decoded = $response->json();
-
-            if (is_array($decoded)) {
-                return $decoded;
-            }
-
-            return [
-                '_non_json_response' => true,
-                'status' => $response->status(),
-                'length' => strlen($response->body()),
-                'sha256' => hash(
-                    'sha256',
-                    $response->body(),
-                ),
-            ];
-        };
-
-        $extractPublicIpv4 = static function (
-            array $payload,
-        ): array {
-            $addresses = [];
-
-            array_walk_recursive(
-                $payload,
-                static function (
-                    mixed $value,
-                ) use (
-                    &$addresses,
-                ): void {
-                    if (! is_string($value)) {
-                        return;
-                    }
-
-                    $address = filter_var(
-                        trim($value),
-                        FILTER_VALIDATE_IP,
-                        FILTER_FLAG_IPV4
-                        | FILTER_FLAG_NO_PRIV_RANGE
-                        | FILTER_FLAG_NO_RES_RANGE,
-                    );
-
-                    if ($address !== false) {
-                        $addresses[] = $address;
-                    }
-                },
-            );
-
-            $addresses = array_values(
-                array_unique($addresses),
-            );
-
-            sort($addresses);
-
-            return $addresses;
-        };
-
-        try {
-            $detailsResponse = $makeClient()->get(
-                $serverEndpoint,
-            );
-
-            $actionsResponse = $makeClient()->get(
-                $actionsEndpoint,
-            );
-        } catch (ConnectionException $exception) {
-            report($exception);
-
-            return response()->json(
-                [
-                    'successful' => false,
-
-                    'error' => [
-                        'type' => 'connection_error',
-                        'message' => 'Could not connect to ArvanCloud.',
-                    ],
-                ],
-                502,
-                [
-                    'Cache-Control' => 'no-store, private',
-                ],
-            );
-        }
-
-        $serverDetails = $decodeResponse(
-            $detailsResponse,
-        );
-
-        $availableActions = $decodeResponse(
-            $actionsResponse,
+            'Cloud server metadata is incomplete.',
         );
 
         /*
-         * GET only inspects the server. It does not add or change an IP.
+         * اجرای عملیات POST
          */
-        if ($request->isMethod('get')) {
-            $formattedDetails = htmlspecialchars(
-                json_encode(
-                    [
-                        'server_id' => $serverId,
-                        'region' => $region,
-
-                        'current_public_ipv4' => $extractPublicIpv4(
-                            $serverDetails,
-                        ),
-
-                        'server_details_status' => $detailsResponse->status(),
-
-                        'available_actions_status' => $actionsResponse->status(),
-
-                        'available_actions' => $sanitizeCloudResponse(
-                            $availableActions,
-                        ),
-
-                        'add_public_ip_endpoint' => sprintf(
-                            '/regions/%s/servers/%s/add-public-ip',
-                            $region,
-                            $serverId,
-                        ),
-                    ],
-                    JSON_PRETTY_PRINT
-                    | JSON_UNESCAPED_SLASHES
-                    | JSON_UNESCAPED_UNICODE
-                    | JSON_THROW_ON_ERROR,
+        if ($request->isMethod('POST')) {
+            $operation = trim(
+                (string) $request->input(
+                    'operation',
                 ),
-                ENT_QUOTES,
-                'UTF-8',
             );
 
-            $action = htmlspecialchars(
-                route(
-                    'dev.arvan.public-ip.discovery',
-                    [
-                        'serverId' => $serverId,
-                    ],
-                ),
-                ENT_QUOTES,
-                'UTF-8',
-            );
+            try {
+                switch ($operation) {
+                    case 'power-on':
+                        $powerOn->handle(
+                            region: $region,
+                            serverId: $providerServerId,
+                        );
 
-            $csrfToken = htmlspecialchars(
-                csrf_token(),
-                ENT_QUOTES,
-                'UTF-8',
-            );
+                        $message = 'درخواست روشن‌کردن ابرک ارسال شد.';
 
-            return response(
-                <<<HTML
-                <!doctype html>
-                <html lang="en">
-                <head>
-                    <meta charset="utf-8">
+                        break;
 
-                    <meta
-                        name="viewport"
-                        content="width=device-width, initial-scale=1"
-                    >
+                    case 'power-off':
+                        $powerOff->handle(
+                            region: $region,
+                            serverId: $providerServerId,
+                        );
 
-                    <title>ArvanCloud Public IP Discovery</title>
+                        $message = 'درخواست خاموش‌کردن ابرک ارسال شد.';
 
-                    <style>
-                        body {
-                            max-width: 960px;
-                            margin: 40px auto;
-                            padding: 0 20px;
-                            color: #e5e7eb;
-                            background: #111827;
-                            font-family: ui-monospace, monospace;
+                        break;
+
+                    case 'reboot':
+                        $reboot->handle(
+                            region: $region,
+                            serverId: $providerServerId,
+                        );
+
+                        $message = 'درخواست ری‌استارت ابرک ارسال شد.';
+
+                        break;
+
+                    case 'add-public-ip':
+                        $version = CloudIpVersion::tryFrom(
+                            trim(
+                                (string) $request->input(
+                                    'ip_version',
+                                    CloudIpVersion::IPv4->value,
+                                ),
+                            ),
+                        );
+
+                        if ($version === null) {
+                            throw ValidationException::withMessages([
+                                'ip_version' => 'نسخه IP انتخاب‌شده معتبر نیست.',
+                            ]);
                         }
 
-                        pre {
-                            overflow-x: auto;
-                            padding: 20px;
-                            border: 1px solid #374151;
-                            border-radius: 12px;
-                            background: #1f2937;
+                        $securityGroupIds = array_values(
+                            array_unique(
+                                array_filter(
+                                    array_map(
+                                        static fn (
+                                            string $id,
+                                        ): string => trim($id),
+                                        explode(
+                                            ',',
+                                            (string) $request->input(
+                                                'security_group_ids',
+                                                '',
+                                            ),
+                                        ),
+                                    ),
+                                    static fn (
+                                        string $id,
+                                    ): bool => $id !== '',
+                                ),
+                            ),
+                        );
+
+                        $addPublicIp->handle(
+                            region: $region,
+                            serverId: $providerServerId,
+                            version: $version,
+                            securityGroupIds: $securityGroupIds,
+                        );
+
+                        $message = sprintf(
+                            'درخواست تخصیص Public %s ارسال شد.',
+                            strtoupper($version->value),
+                        );
+
+                        break;
+
+                    case 'delete-port':
+                        $portId = trim(
+                            (string) $request->input(
+                                'port_id',
+                            ),
+                        );
+
+                        if ($portId === '') {
+                            throw ValidationException::withMessages([
+                                'port_id' => 'شناسه Port الزامی است.',
+                            ]);
                         }
 
-                        form,
-                        .warning {
-                            margin-top: 20px;
-                            padding: 20px;
-                            border: 1px solid #92400e;
-                            border-radius: 12px;
-                            background: #451a03;
+                        $updatedServer = $deletePort->handle(
+                            user: $user,
+                            serverId: (int) $server->getKey(),
+                            portId: $portId,
+                        );
+
+                        $message = sprintf(
+                            'Port حذف شد. Host فعلی xDeploy: %s',
+                            $updatedServer->host ?? 'ندارد',
+                        );
+
+                        break;
+
+                    case 'delete-server':
+                        $confirmation = trim(
+                            (string) $request->input(
+                                'confirmation',
+                            ),
+                        );
+
+                        if ($confirmation !== $providerServerId) {
+                            throw ValidationException::withMessages([
+                                'confirmation' => 'برای حذف ابرک، Provider Server ID را دقیق وارد کنید.',
+                            ]);
                         }
 
-                        select,
-                        button {
-                            padding: 12px 16px;
-                            border-radius: 10px;
-                            font: inherit;
-                        }
+                        $deleteServer->handle(
+                            user: $user,
+                            serverId: (int) $server->getKey(),
+                        );
 
-                        button {
-                            border: 0;
-                            color: white;
-                            background: #dc2626;
-                            cursor: pointer;
-                            font-weight: 700;
-                        }
+                        return redirect()
+                            ->route('cloud.discovery')
+                            ->with(
+                                'status',
+                                'ابرک از Provider و xDeploy حذف شد.',
+                            );
 
-                        button:disabled {
-                            cursor: not-allowed;
-                            opacity: 0.5;
-                        }
-                    </style>
-                </head>
+                    default:
+                        throw ValidationException::withMessages([
+                            'operation' => 'عملیات انتخاب‌شده معتبر نیست.',
+                        ]);
+                }
 
-                <body>
-                    <h1>ArvanCloud Public IP Discovery</h1>
+                return redirect()
+                    ->route(
+                        'cloud.action-test',
+                        [
+                            'server' => $server->getKey(),
+                        ],
+                    )
+                    ->with(
+                        'cloud_action_message',
+                        $message,
+                    );
+            } catch (ValidationException $exception) {
+                throw $exception;
+            } catch (Throwable $exception) {
+                report(
+                    $exception,
+                );
 
-                    <div class="warning">
-                        This operation may allocate a real billable public IP.
-                        Run only one successful payload mode.
-                    </div>
-
-                    <h2>Current Discovery Result</h2>
-
-                    <pre>{$formattedDetails}</pre>
-
-                    <form
-                        method="POST"
-                        action="{$action}"
-                        onsubmit="
-                            const button = this.querySelector('button');
-
-                            if (
-                                ! confirm(
-                                    'Allocate one real public IP for this server?'
-                                )
-                            ) {
-                                return false;
-                            }
-
-                            button.disabled = true;
-                            button.textContent = 'Adding public IP...';
-
-                            return true;
-                        "
-                    >
-                        <input
-                            type="hidden"
-                            name="_token"
-                            value="{$csrfToken}"
-                        >
-
-                        <label for="payload_mode">
-                            Request payload:
-                        </label>
-
-                        <select
-                            id="payload_mode"
-                            name="payload_mode"
-                        >
-                            <option value="multiple" selected>
-                                security_groups: [UUID]
-                            </option>
-
-                            <option value="single">
-                                security_group: UUID
-                            </option>
-
-                            <option value="empty">
-                                Empty payload
-                            </option>
-                        </select>
-
-                        <button type="submit">
-                            Add Public IP
-                        </button>
-                    </form>
-                </body>
-                </html>
-                HTML,
-                200,
-                [
-                    'Content-Type' => 'text/html; charset=UTF-8',
-                    'Cache-Control' => 'no-store, private',
-                ],
-            );
+                return redirect()
+                    ->route(
+                        'cloud.action-test',
+                        [
+                            'server' => $server->getKey(),
+                        ],
+                    )
+                    ->withInput()
+                    ->with(
+                        'cloud_action_error',
+                        $exception->getMessage(),
+                    );
+            }
         }
 
-        $validated = $request->validate([
-            'payload_mode' => [
-                'required',
-                'in:multiple,single,empty',
-            ],
-        ]);
-
-        $payload = match ($validated['payload_mode']) {
-            'multiple' => [
-                'security_groups' => [
-                    $securityGroupId,
-                ],
-            ],
-
-            'single' => [
-                'security_group' => $securityGroupId,
-            ],
-
-            'empty' => [],
-
-            default => throw new LogicException(
-                'Unsupported payload mode.',
-            ),
-        };
-
-        $lock = Cache::lock(
-            "arvan-discovery:add-public-ip:{$serverId}",
-            120,
-        );
-
-        abort_unless(
-            $lock->get(),
-            409,
-            'Another public IP discovery request is running.',
-        );
-
-        try {
+        /*
+         * دریافت اطلاعات خواندنی؛ شکست یکی از APIها
+         * نباید مانع نمایش سایر بخش‌ها شود.
+         */
+        $safeCall = static function (
+            callable $callback,
+        ): array {
             try {
-                $addResponse = $makeClient()->post(
-                    $addPublicIpEndpoint,
-                    $payload,
-                );
-            } catch (ConnectionException $exception) {
-                report($exception);
-
-                return response()->json(
-                    [
-                        'successful' => false,
-
-                        'error' => [
-                            'type' => 'connection_error',
-                            'message' => 'Could not connect to ArvanCloud.',
-                        ],
-                    ],
-                    502,
-                    [
-                        'Cache-Control' => 'no-store, private',
-                    ],
-                );
-            }
-
-            $addBody = $decodeResponse(
-                $addResponse,
-            );
-
-            /*
-             * Give the provider a brief opportunity to attach the new
-             * network interface before fetching server details again.
-             */
-            if ($addResponse->successful()) {
-                sleep(2);
-            }
-
-            try {
-                $updatedDetailsResponse = $makeClient()->get(
-                    $serverEndpoint,
+                return [
+                    'successful' => true,
+                    'data' => $callback(),
+                    'error' => null,
+                ];
+            } catch (Throwable $exception) {
+                report(
+                    $exception,
                 );
 
-                $updatedDetails = $decodeResponse(
-                    $updatedDetailsResponse,
-                );
-            } catch (ConnectionException $exception) {
-                report($exception);
-
-                $updatedDetailsResponse = null;
-
-                $updatedDetails = [
-                    '_inspection_unavailable' => true,
+                return [
+                    'successful' => false,
+                    'data' => null,
+                    'error' => $exception->getMessage(),
                 ];
             }
+        };
 
-            $beforeAddresses = $extractPublicIpv4(
-                $serverDetails,
+        $providerServer = $safeCall(
+            static fn (): mixed => $provisioner->findServer(
+                region: $region,
+                serverId: $providerServerId,
+            ),
+        );
+
+        $availableActions = $safeCall(
+            static fn (): array => $getActions->handle(
+                region: $region,
+                serverId: $providerServerId,
+            ),
+        );
+
+        $ports = $safeCall(
+            static fn (): array => $listPorts->handle(
+                region: $region,
+                serverId: $providerServerId,
+            ),
+        );
+
+        return Blade::render(
+            <<<'BLADE'
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Cloud Actions Test</title>
+
+    @vite([
+        'resources/css/app.css',
+        'resources/js/app.js',
+    ])
+</head>
+
+<body class="min-h-screen bg-base-200 text-base-content">
+    @php
+        $prettyJson = static fn (mixed $value): string =>
+            json_encode(
+                $value,
+                JSON_PRETTY_PRINT
+                | JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+                | JSON_THROW_ON_ERROR,
             );
+    @endphp
 
-            $afterAddresses = $extractPublicIpv4(
-                $updatedDetails,
-            );
+    <main class="mx-auto max-w-7xl p-4 md:p-8">
+        <header class="mb-8">
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">
+                        تست Actionهای ابرک
+                    </h1>
 
-            return response()->json(
-                [
-                    'successful' => $addResponse->successful(),
+                    <p class="mt-2 text-sm opacity-70">
+                        تمام عملیات این صفحه روی ابرک واقعی اجرا می‌شوند.
+                    </p>
+                </div>
 
-                    'request' => [
-                        'method' => 'POST',
+                <a
+                    href="{{ url('/cloud/discovery') }}"
+                    class="btn btn-ghost"
+                >
+                    بازگشت به Discovery
+                </a>
+            </div>
+        </header>
 
-                        'endpoint' => sprintf(
-                            '/regions/%s/servers/%s/add-public-ip',
-                            $region,
-                            $serverId,
-                        ),
+        @if (session('cloud_action_message'))
+            <div class="alert alert-success mb-6">
+                <span>
+                    {{ session('cloud_action_message') }}
+                </span>
+            </div>
+        @endif
 
-                        'payload_mode' => $validated['payload_mode'],
+        @if (session('cloud_action_error'))
+            <div class="alert alert-error mb-6">
+                <div>
+                    <div class="font-bold">
+                        عملیات ناموفق بود
+                    </div>
 
-                        'payload' => $payload,
-                    ],
+                    <div class="mt-1 text-sm">
+                        {{ session('cloud_action_error') }}
+                    </div>
+                </div>
+            </div>
+        @endif
 
-                    'response' => [
-                        'status' => $addResponse->status(),
+        @if ($errors->any())
+            <div class="alert alert-warning mb-6">
+                <ul class="list-inside list-disc text-sm">
+                    @foreach ($errors->all() as $error)
+                        <li>
+                            {{ $error }}
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
-                        'body' => $sanitizeCloudResponse(
-                            $addBody,
-                        ),
-                    ],
+        <section class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="card-title">
+                        اطلاعات داخلی xDeploy
+                    </h2>
 
-                    'inspection' => [
-                        'before_public_ipv4' => $beforeAddresses,
-                        'after_public_ipv4' => $afterAddresses,
+                    <span class="badge badge-primary">
+                        Server #{{ $server->getKey() }}
+                    </span>
+                </div>
 
-                        'new_public_ipv4' => array_values(
-                            array_diff(
-                                $afterAddresses,
-                                $beforeAddresses,
-                            ),
-                        ),
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="rounded-box bg-base-200 p-4">
+                        <div class="text-xs opacity-60">
+                            Provider
+                        </div>
 
-                        'server_details_status' =>
-                            $updatedDetailsResponse?->status(),
+                        <div class="mt-2 font-medium">
+                            {{ $provider }}
+                        </div>
+                    </div>
 
-                        'server_details' => $sanitizeCloudResponse(
-                            $updatedDetails,
-                        ),
-                    ],
-                ],
-                $addResponse->successful()
-                    ? 200
-                    : $addResponse->status(),
-                [
-                    'Cache-Control' => 'no-store, private',
-                ],
-            );
-        } finally {
-            $lock->release();
-        }
+                    <div class="rounded-box bg-base-200 p-4">
+                        <div class="text-xs opacity-60">
+                            Region
+                        </div>
+
+                        <div
+                            dir="ltr"
+                            class="mt-2 text-left font-mono text-sm"
+                        >
+                            {{ $region }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-box bg-base-200 p-4">
+                        <div class="text-xs opacity-60">
+                            Host
+                        </div>
+
+                        <div
+                            dir="ltr"
+                            class="mt-2 text-left font-mono text-sm"
+                        >
+                            {{ $server->host ?? '—' }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-box bg-base-200 p-4">
+                        <div class="text-xs opacity-60">
+                            Local Status
+                        </div>
+
+                        <div class="mt-2">
+                            {{ $server->status->value }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-box bg-base-200 p-4 sm:col-span-2 lg:col-span-4">
+                        <div class="text-xs opacity-60">
+                            Provider Server ID
+                        </div>
+
+                        <div
+                            dir="ltr"
+                            class="mt-2 overflow-auto text-left font-mono text-sm"
+                        >
+                            {{ $providerServerId }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-6 grid gap-6 lg:grid-cols-3">
+            <form
+                method="POST"
+                class="card bg-base-100 shadow-sm"
+            >
+                @csrf
+
+                <input
+                    type="hidden"
+                    name="operation"
+                    value="power-on"
+                >
+
+                <div class="card-body">
+                    <h2 class="card-title">
+                        روشن‌کردن
+                    </h2>
+
+                    <p class="text-sm opacity-70">
+                        اجرای PowerOnCloudServerAction
+                    </p>
+
+                    <div class="card-actions mt-auto justify-end">
+                        <button class="btn btn-success">
+                            Power On
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <form
+                method="POST"
+                class="card bg-base-100 shadow-sm"
+            >
+                @csrf
+
+                <input
+                    type="hidden"
+                    name="operation"
+                    value="power-off"
+                >
+
+                <div class="card-body">
+                    <h2 class="card-title">
+                        خاموش‌کردن
+                    </h2>
+
+                    <p class="text-sm opacity-70">
+                        اجرای PowerOffCloudServerAction
+                    </p>
+
+                    <div class="card-actions mt-auto justify-end">
+                        <button class="btn btn-warning">
+                            Power Off
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <form
+                method="POST"
+                class="card bg-base-100 shadow-sm"
+            >
+                @csrf
+
+                <input
+                    type="hidden"
+                    name="operation"
+                    value="reboot"
+                >
+
+                <div class="card-body">
+                    <h2 class="card-title">
+                        ری‌استارت
+                    </h2>
+
+                    <p class="text-sm opacity-70">
+                        اجرای RebootCloudServerAction
+                    </p>
+
+                    <div class="card-actions mt-auto justify-end">
+                        <button class="btn btn-info">
+                            Reboot
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <section class="mt-6 card bg-base-100 shadow-sm">
+            <form method="POST" class="card-body">
+                @csrf
+
+                <input
+                    type="hidden"
+                    name="operation"
+                    value="add-public-ip"
+                >
+
+                <div>
+                    <h2 class="card-title">
+                        افزودن Public IP
+                    </h2>
+
+                    <p class="mt-1 text-sm opacity-70">
+                        اجرای AddCloudServerPublicIpAction
+                    </p>
+                </div>
+
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                    <label class="form-control">
+                        <span class="label-text mb-2">
+                            نسخه IP
+                        </span>
+
+                        <select
+                            name="ip_version"
+                            class="select select-bordered"
+                        >
+                            <option value="ipv4">
+                                IPv4
+                            </option>
+
+                            <option value="ipv6">
+                                IPv6
+                            </option>
+                        </select>
+                    </label>
+
+                    <label class="form-control">
+                        <span class="label-text mb-2">
+                            Security Group IDs
+                        </span>
+
+                        <input
+                            dir="ltr"
+                            type="text"
+                            name="security_group_ids"
+                            value="8449a4f5-5709-4017-9e63-45496bfe5cc9"
+                            class="input input-bordered text-left font-mono text-xs"
+                            placeholder="id-1,id-2"
+                        >
+
+                        <span class="mt-2 text-xs opacity-60">
+                            چند شناسه را با کاما جدا کنید.
+                        </span>
+                    </label>
+                </div>
+
+                <div class="card-actions mt-4 justify-end">
+                    <button class="btn btn-primary">
+                        افزودن Public IP
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <section class="mt-6 grid gap-6 lg:grid-cols-2">
+            <article class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="card-title">
+                                اطلاعات Provider
+                            </h2>
+
+                            <p class="text-xs opacity-60">
+                                findServer()
+                            </p>
+                        </div>
+
+                        @if ($providerServer['successful'])
+                            <span class="badge badge-success">
+                                موفق
+                            </span>
+                        @else
+                            <span class="badge badge-error">
+                                ناموفق
+                            </span>
+                        @endif
+                    </div>
+
+                    @if ($providerServer['successful'])
+                        <div
+                            dir="ltr"
+                            class="mt-4 max-h-[32rem] overflow-auto rounded-box bg-neutral p-4 text-neutral-content"
+                        >
+                            <pre class="text-left text-xs leading-6"><code>{{ $prettyJson(
+    $providerServer['data'],
+) }}</code></pre>
+                        </div>
+                    @else
+                        <div class="alert alert-error mt-4">
+                            {{ $providerServer['error'] }}
+                        </div>
+                    @endif
+                </div>
+            </article>
+
+            <article class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="card-title">
+                                Actionهای مجاز
+                            </h2>
+
+                            <p class="text-xs opacity-60">
+                                GetCloudServerActionsAction
+                            </p>
+                        </div>
+
+                        @if ($availableActions['successful'])
+                            <span class="badge badge-success">
+                                موفق
+                            </span>
+                        @else
+                            <span class="badge badge-error">
+                                ناموفق
+                            </span>
+                        @endif
+                    </div>
+
+                    @if ($availableActions['successful'])
+                        <div
+                            dir="ltr"
+                            class="mt-4 max-h-[32rem] overflow-auto rounded-box bg-neutral p-4 text-neutral-content"
+                        >
+                            <pre class="text-left text-xs leading-6"><code>{{ $prettyJson(
+    $availableActions['data'],
+) }}</code></pre>
+                        </div>
+                    @else
+                        <div class="alert alert-error mt-4">
+                            {{ $availableActions['error'] }}
+                        </div>
+                    @endif
+                </div>
+            </article>
+        </section>
+
+        <section class="mt-6 card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="card-title">
+                            Portها و IPها
+                        </h2>
+
+                        <p class="text-xs opacity-60">
+                            ListCloudServerPortsAction
+                        </p>
+                    </div>
+
+                    @if ($ports['successful'])
+                        <span class="badge badge-neutral">
+                            {{ count($ports['data']) }}
+                        </span>
+                    @else
+                        <span class="badge badge-error">
+                            ناموفق
+                        </span>
+                    @endif
+                </div>
+
+                @if (! $ports['successful'])
+                    <div class="alert alert-error mt-4">
+                        {{ $ports['error'] }}
+                    </div>
+                @elseif ($ports['data'] === [])
+                    <div class="mt-4 rounded-box bg-base-200 p-8 text-center opacity-60">
+                        هیچ Portی دریافت نشد.
+                    </div>
+                @else
+                    <div class="mt-4 space-y-4">
+                        @foreach ($ports['data'] as $port)
+                            <article class="rounded-box border border-base-300 p-4">
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <div class="text-xs opacity-60">
+                                            Port ID
+                                        </div>
+
+                                        <div
+                                            dir="ltr"
+                                            class="mt-1 overflow-auto text-left font-mono text-xs"
+                                        >
+                                            {{ $port->id }}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="text-xs opacity-60">
+                                            Status
+                                        </div>
+
+                                        <div class="mt-1">
+                                            {{ $port->status }}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="text-xs opacity-60">
+                                            IPs
+                                        </div>
+
+                                        <div class="mt-2 space-y-1">
+                                            @foreach ($port->ips as $ip)
+                                                <div
+                                                    dir="ltr"
+                                                    class="text-left font-mono text-xs"
+                                                >
+                                                    {{ $ip }}
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="text-xs opacity-60">
+                                            Network ID
+                                        </div>
+
+                                        <div
+                                            dir="ltr"
+                                            class="mt-1 overflow-auto text-left font-mono text-xs"
+                                        >
+                                            {{ $port->networkId }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <form
+                                    method="POST"
+                                    class="mt-4 flex justify-end"
+                                    onsubmit="return confirm('این Port و IPهای آن واقعاً حذف شوند؟')"
+                                >
+                                    @csrf
+
+                                    <input
+                                        type="hidden"
+                                        name="operation"
+                                        value="delete-port"
+                                    >
+
+                                    <input
+                                        type="hidden"
+                                        name="port_id"
+                                        value="{{ $port->id }}"
+                                    >
+
+                                    <button class="btn btn-error btn-sm">
+                                        حذف Port
+                                    </button>
+                                </form>
+                            </article>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </section>
+
+        <section class="mt-6 card border border-error/40 bg-error/5 shadow-sm">
+            <form
+                method="POST"
+                class="card-body"
+                onsubmit="return confirm('ابرک از آروان‌کلاد و xDeploy کاملاً حذف شود؟')"
+            >
+                @csrf
+
+                <input
+                    type="hidden"
+                    name="operation"
+                    value="delete-server"
+                >
+
+                <div>
+                    <h2 class="card-title text-error">
+                        حذف کامل ابرک
+                    </h2>
+
+                    <p class="mt-2 text-sm opacity-70">
+                        این عملیات ابتدا ابرک را از Provider حذف می‌کند و سپس رکورد داخلی xDeploy را پاک می‌کند.
+                    </p>
+                </div>
+
+                <label class="form-control mt-4">
+                    <span class="label-text mb-2">
+                        برای تأیید، Provider Server ID را وارد کنید
+                    </span>
+
+                    <input
+                        dir="ltr"
+                        type="text"
+                        name="confirmation"
+                        class="input input-bordered input-error text-left font-mono text-xs"
+                        placeholder="{{ $providerServerId }}"
+                    >
+                </label>
+
+                <div class="card-actions mt-4 justify-end">
+                    <button class="btn btn-error">
+                        حذف کامل ابرک
+                    </button>
+                </div>
+            </form>
+        </section>
+    </main>
+</body>
+</html>
+BLADE,
+            [
+                'server' => $server,
+                'user' => $user,
+                'provider' => $provider,
+                'region' => $region,
+                'providerServerId' => $providerServerId,
+                'providerServer' => $providerServer,
+                'availableActions' => $availableActions,
+                'ports' => $ports,
+            ],
+        );
     },
-)->name('dev.arvan.public-ip.discovery');
+)->name('cloud.action-test');

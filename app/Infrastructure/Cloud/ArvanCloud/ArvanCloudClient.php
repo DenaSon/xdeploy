@@ -19,6 +19,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use JsonException;
+use LogicException;
 
 final class ArvanCloudClient
 {
@@ -56,7 +57,8 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param  array<string, mixed>  $query
+     * @param array<string, mixed> $query
+     *
      * @return array<array-key, mixed>
      */
     public function get(
@@ -71,7 +73,8 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
+     *
      * @return array<array-key, mixed>
      */
     public function post(
@@ -86,28 +89,59 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param array<string, mixed> $payload
+     *
+     * @return array<array-key, mixed>
+     */
+    public function delete(
+        string $path,
+        array $payload = [],
+    ): array {
+        return $this->request(
+            method: 'DELETE',
+            path: $path,
+            data: $payload,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
      * @return array<array-key, mixed>
      */
     private function request(
         string $method,
         string $path,
-        array $data,
+        array $data = [],
     ): array {
         $endpoint = $this->normalizePath($path);
         $url = "{$this->baseUrl}/{$endpoint}";
         $startedAt = microtime(true);
 
         try {
+            $request = $this->pendingRequest();
+
             $response = match ($method) {
-                'GET' => $this->pendingRequest()->get(
-                    $url,
-                    $data,
+                'GET' => $request->get(
+                    url: $url,
+                    query: $data,
                 ),
 
-                'POST' => $this->pendingRequest()->post(
-                    $url,
-                    $data,
+                'POST' => $request->post(
+                    url: $url,
+                    data: $data,
+                ),
+
+                'DELETE' => $request->delete(
+                    url: $url,
+                    data: $data,
+                ),
+
+                default => throw new LogicException(
+                    sprintf(
+                        'Unsupported cloud HTTP method [%s].',
+                        $method,
+                    ),
                 ),
             };
         } catch (ConnectionException $exception) {
@@ -131,10 +165,14 @@ final class ArvanCloudClient
         );
 
         if (! $response->successful()) {
-            $this->throwForStatus($response);
+            $this->throwForStatus(
+                $response,
+            );
         }
 
-        return $this->decodeResponse($response);
+        return $this->decodeResponse(
+            $response,
+        );
     }
 
     private function pendingRequest(): PendingRequest
@@ -167,7 +205,9 @@ final class ArvanCloudClient
             );
         }
 
-        $parts = parse_url($baseUrl);
+        $parts = parse_url(
+            $baseUrl,
+        );
 
         if (
             $parts === false
@@ -192,7 +232,9 @@ final class ArvanCloudClient
     private function normalizeApiKey(
         string $apiKey,
     ): string {
-        $apiKey = trim($apiKey);
+        $apiKey = trim(
+            $apiKey,
+        );
 
         /*
          * Environment configuration contains only the token.
@@ -253,7 +295,9 @@ final class ArvanCloudClient
     private function normalizePath(
         string $path,
     ): string {
-        $path = trim($path);
+        $path = trim(
+            $path,
+        );
 
         if ($path === '') {
             throw new CloudValidationException(
@@ -286,7 +330,9 @@ final class ArvanCloudClient
             );
         }
 
-        $decodedPath = rawurldecode($path);
+        $decodedPath = rawurldecode(
+            $path,
+        );
 
         foreach (
             explode('/', $decodedPath) as $segment
@@ -341,11 +387,18 @@ final class ArvanCloudClient
     ): never {
         $status = $response->status();
 
-        if (in_array(
-            $status,
-            [400, 409, 422],
-            true,
-        )) {
+        if (
+            in_array(
+                $status,
+                [
+                    400,
+                    409,
+                    419,
+                    422,
+                ],
+                true,
+            )
+        ) {
             throw new CloudValidationException(
                 message: 'Cloud provider rejected the request.',
                 code: $status,
@@ -426,7 +479,9 @@ final class ArvanCloudClient
             return (int) $retryAfter;
         }
 
-        $retryAt = strtotime($retryAfter);
+        $retryAt = strtotime(
+            $retryAfter,
+        );
 
         if ($retryAt === false) {
             return null;
