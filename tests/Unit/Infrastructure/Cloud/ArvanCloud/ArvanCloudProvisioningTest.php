@@ -6,32 +6,34 @@ namespace Tests\Unit\Infrastructure\Cloud\ArvanCloud;
 
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
+use App\Domain\Cloud\Enums\CloudServerPowerState;
 use App\Domain\Cloud\Enums\CloudServerStatus;
+use App\Domain\Cloud\Exceptions\CloudConnectionException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
+use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use JsonException;
 use Tests\TestCase;
 
 final class ArvanCloudProvisioningTest extends TestCase
 {
-    private const BASE_URL =
+    private const string BASE_URL =
         'https://api.example.test/ecc/v1';
 
-    private const REGION_ID =
+    private const string REGION_ID =
         'eu-west1-a';
 
-    private const SERVER_ID =
+    private const string SERVER_ID =
         'ff83466c-c0fe-4dc4-9d1d-bde29efd0b45';
 
-    private const SERVER_NAME =
+    private const string SERVER_NAME =
         'xdeploy-test-server';
 
-    private const GENERATED_PASSWORD =
+    private const string GENERATED_PASSWORD =
         'temporary-generated-password';
 
     protected function setUp(): void
@@ -43,21 +45,10 @@ final class ArvanCloudProvisioningTest extends TestCase
 
     public function test_it_creates_a_password_server_from_minimal_create_response(): void
     {
-        /*
-         * The real ArvanCloud create response does not guarantee
-         * name, status, username, or created-at fields.
-         *
-         * The create response is only responsible for returning
-         * the provider server ID and generated password.
-         */
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
+            $this->serverCollectionUrl() => Http::response(
                 [
                     'id' => self::SERVER_ID,
-
                     'password' => self::GENERATED_PASSWORD,
                 ],
                 201,
@@ -73,10 +64,6 @@ final class ArvanCloudProvisioningTest extends TestCase
             $created->id,
         );
 
-        /*
-         * The response does not contain a name, so the provider
-         * must preserve the name requested by xDeploy.
-         */
         $this->assertSame(
             self::SERVER_NAME,
             $created->name,
@@ -87,28 +74,16 @@ final class ArvanCloudProvisioningTest extends TestCase
             $created->regionId,
         );
 
-        /*
-         * A successful POST only means that provisioning started.
-         * The authoritative status is retrieved later through polling.
-         */
         $this->assertSame(
             CloudServerStatus::Provisioning,
             $created->status,
         );
 
-        /*
-         * The default image username is supplied by provider
-         * configuration when the response omits it.
-         */
         $this->assertSame(
             'ubuntu',
             $created->username,
         );
 
-        /*
-         * The creation time is not guaranteed in the create response.
-         * It will be obtained later from the server-list response.
-         */
         $this->assertNull(
             $created->createdAt,
         );
@@ -122,9 +97,6 @@ final class ArvanCloudProvisioningTest extends TestCase
             $created->hasGeneratedPassword(),
         );
 
-        /*
-         * Sensitive credentials must never appear in public arrays.
-         */
         $this->assertArrayNotHasKey(
             'generated_password',
             $created->toArray(),
@@ -139,10 +111,7 @@ final class ArvanCloudProvisioningTest extends TestCase
             function (Request $request): bool {
                 return $request->method() === 'POST'
                     && $request->url() ===
-                    self::BASE_URL
-                    .'/regions/'
-                    .self::REGION_ID
-                    .'/servers'
+                    $this->serverCollectionUrl()
                     && $request->data() === [
                         'name' => self::SERVER_NAME,
 
@@ -159,17 +128,11 @@ final class ArvanCloudProvisioningTest extends TestCase
                         ],
 
                         'ssh_key' => false,
-
                         'key_name' => null,
-
                         'count' => 1,
-
                         'create_type' => 'cinder',
-
                         'disk_size' => 25,
-
                         'init_script' => '',
-
                         'ha_enabled' => false,
                     ];
             },
@@ -178,17 +141,12 @@ final class ArvanCloudProvisioningTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_it_finds_an_active_server(): void
+    public function test_it_finds_an_active_server_using_direct_endpoint(): void
     {
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
-                $this->fixture(
-                    'servers-active-response.json',
-                ),
-            ),
+            $this->serverDetailsUrl() => Http::response([
+                'data' => $this->serverObject(),
+            ]),
         ]);
 
         $server = $this->provider()->findServer(
@@ -207,14 +165,55 @@ final class ArvanCloudProvisioningTest extends TestCase
         );
 
         $this->assertSame(
+            self::SERVER_NAME,
+            $server->name,
+        );
+
+        $this->assertSame(
+            self::REGION_ID,
+            $server->regionId,
+        );
+
+        $this->assertSame(
             CloudServerStatus::Active,
             $server->status,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Running,
+            $server->powerState,
         );
 
         $this->assertSame(
             'ubuntu',
             $server->username,
         );
+
+        $this->assertSame(
+            'eco-2-2-0',
+            $server->sizeId,
+        );
+
+        $this->assertSame(
+            'eco-small4',
+            $server->sizeName,
+        );
+
+        $this->assertSame(
+            2,
+            $server->vCpu,
+        );
+
+        $this->assertSame(
+            2048,
+            $server->memoryMiB,
+        );
+
+        $this->assertSame(
+            50,
+            $server->diskGiB,
+        );
+
         $this->assertSame(
             [
                 '626ad7fd-3a62-4f3b-8908-7c0c3a91062d',
@@ -241,7 +240,19 @@ final class ArvanCloudProvisioningTest extends TestCase
         );
 
         $this->assertTrue(
+            $server->isRunning(),
+        );
+
+        $this->assertTrue(
             $server->isReadyForSshCheck(),
+        );
+
+        $this->assertNull(
+            $server->taskState,
+        );
+
+        $this->assertNull(
+            $server->providerError,
         );
 
         $this->assertArrayNotHasKey(
@@ -253,27 +264,194 @@ final class ArvanCloudProvisioningTest extends TestCase
             function (Request $request): bool {
                 return $request->method() === 'GET'
                     && $request->url() ===
-                    self::BASE_URL
-                    .'/regions/'
-                    .self::REGION_ID
-                    .'/servers';
+                    $this->serverDetailsUrl();
+            },
+        );
+
+        Http::assertNotSent(
+            function (Request $request): bool {
+                return $request->method() === 'GET'
+                    && $request->url() ===
+                    $this->serverCollectionUrl();
             },
         );
 
         Http::assertSentCount(1);
     }
 
-    public function test_it_preserves_all_public_ips_and_deduplicates_references(): void
+    public function test_it_accepts_a_direct_server_object_without_data_envelope(): void
     {
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
-                $this->fixture(
-                    'servers-multiple-ips-response.json',
-                ),
+            $this->serverDetailsUrl() => Http::response(
+                $this->serverObject(),
             ),
+        ]);
+
+        $server = $this->provider()->findServer(
+            self::REGION_ID,
+            self::SERVER_ID,
+        );
+
+        $this->assertSame(
+            self::SERVER_ID,
+            $server->id,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Running,
+            $server->powerState,
+        );
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_finds_a_stopped_server_using_direct_endpoint(): void
+    {
+        Http::fake([
+            $this->serverDetailsUrl() => Http::response([
+                'data' => $this->serverObject([
+                    'status' => 'SHUTOFF',
+                ]),
+            ]),
+        ]);
+
+        $server = $this->provider()->findServer(
+            self::REGION_ID,
+            self::SERVER_ID,
+        );
+
+        $this->assertSame(
+            CloudServerStatus::Active,
+            $server->status,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Stopped,
+            $server->powerState,
+        );
+
+        $this->assertTrue(
+            $server->isStopped(),
+        );
+
+        $this->assertFalse(
+            $server->isRunning(),
+        );
+
+        $this->assertFalse(
+            $server->isReadyForSshCheck(),
+        );
+
+        Http::assertSent(
+            fn (Request $request): bool => $request->method() === 'GET'
+                && $request->url() ===
+                $this->serverDetailsUrl(),
+        );
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_maps_server_operation_state_and_provider_error(): void
+    {
+        Http::fake([
+            $this->serverDetailsUrl() => Http::response([
+                'data' => $this->serverObject([
+                    'status' => 'ERROR',
+                    'task_state' => 'resize_failed',
+                    'error' => 'Unable to resize server.',
+                ]),
+            ]),
+        ]);
+
+        $server = $this->provider()->findServer(
+            self::REGION_ID,
+            self::SERVER_ID,
+        );
+
+        $this->assertSame(
+            CloudServerStatus::Failed,
+            $server->status,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Error,
+            $server->powerState,
+        );
+
+        $this->assertSame(
+            'resize_failed',
+            $server->taskState,
+        );
+
+        $this->assertSame(
+            'Unable to resize server.',
+            $server->providerError,
+        );
+
+        $this->assertTrue(
+            $server->hasProviderError(),
+        );
+
+        $this->assertFalse(
+            $server->isReadyForSshCheck(),
+        );
+    }
+
+    public function test_it_preserves_all_public_ips_and_deduplicates_references(): void
+    {
+        $serverObject = $this->serverObject([
+            'addresses' => [
+                'Default network' => [
+                    [
+                        'addr' => '185.204.168.213',
+                        'version' => 4,
+                        'is_public' => true,
+                        'is_vpc' => false,
+                        'type' => 'fixed',
+                    ],
+                    [
+                        'addr' => '185.204.168.213',
+                        'version' => 4,
+                        'is_public' => true,
+                        'is_vpc' => false,
+                        'type' => 'fixed',
+                    ],
+                    [
+                        'addr' => '185.204.171.249',
+                        'version' => 4,
+                        'is_public' => true,
+                        'is_vpc' => false,
+                        'type' => 'fixed',
+                    ],
+                    [
+                        'addr' => '10.0.0.5',
+                        'version' => 4,
+                        'is_public' => false,
+                        'is_vpc' => true,
+                        'type' => 'fixed',
+                    ],
+                ],
+            ],
+
+            'networks' => [
+                '626ad7fd-3a62-4f3b-8908-7c0c3a91062d',
+                '626ad7fd-3a62-4f3b-8908-7c0c3a91062d',
+            ],
+
+            'security_groups' => [
+                [
+                    'id' => '8449a4f5-5709-4017-9e63-45496bfe5cc9',
+                ],
+                [
+                    'id' => '8449a4f5-5709-4017-9e63-45496bfe5cc9',
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            $this->serverDetailsUrl() => Http::response([
+                'data' => $serverObject,
+            ]),
         ]);
 
         $server = $this->provider()->findServer(
@@ -306,44 +484,106 @@ final class ArvanCloudProvisioningTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_it_throws_when_server_is_not_found(): void
+    public function test_it_maps_direct_server_not_found_response(): void
     {
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
+            $this->serverDetailsUrl(
+                'missing-server-id',
+            ) => Http::response(
                 [
-                    'data' => [],
+                    'message' => 'Server not found.',
                 ],
+                404,
             ),
         ]);
 
+        try {
+            $this->provider()->findServer(
+                self::REGION_ID,
+                'missing-server-id',
+            );
+
+            $this->fail(
+                'Expected CloudResourceNotFoundException was not thrown.',
+            );
+        } catch (CloudResourceNotFoundException $exception) {
+            $this->assertSame(
+                404,
+                $exception->getCode(),
+            );
+
+            $this->assertSame(
+                'Cloud provider resource was not found.',
+                $exception->getMessage(),
+            );
+        }
+
+        Http::assertSent(
+            fn (Request $request): bool => $request->method() === 'GET'
+                && $request->url() ===
+                $this->serverDetailsUrl(
+                    'missing-server-id',
+                ),
+        );
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_maps_direct_server_provider_failure(): void
+    {
+        Http::fake([
+            $this->serverDetailsUrl() => Http::response(
+                [
+                    'message' => 'Internal provider error.',
+                ],
+                500,
+            ),
+        ]);
+
+        try {
+            $this->provider()->findServer(
+                self::REGION_ID,
+                self::SERVER_ID,
+            );
+
+            $this->fail(
+                'Expected CloudConnectionException was not thrown.',
+            );
+        } catch (CloudConnectionException $exception) {
+            $this->assertSame(
+                500,
+                $exception->getCode(),
+            );
+
+            $this->assertSame(
+                'Cloud provider is temporarily unavailable.',
+                $exception->getMessage(),
+            );
+        }
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_rejects_invalid_server_identifier_before_request(): void
+    {
         $this->expectException(
-            CloudResourceNotFoundException::class,
+            CloudValidationException::class,
         );
 
-        $this->expectExceptionMessage(
-            'Cloud server [missing-server-id] was not found.',
-        );
-
-        $this->provider()->findServer(
-            self::REGION_ID,
-            'missing-server-id',
-        );
+        try {
+            $this->provider()->findServer(
+                self::REGION_ID,
+                '../invalid-server-id',
+            );
+        } finally {
+            Http::assertNothingSent();
+        }
     }
 
     public function test_it_requires_a_generated_password_for_password_flow(): void
     {
-        /*
-         * The response contains a provider server ID but no password.
-         * Password-based provisioning must reject this response.
-         */
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
+            $this->serverCollectionUrl() => Http::response(
                 [
                     'id' => self::SERVER_ID,
                 ],
@@ -372,15 +612,10 @@ final class ArvanCloudProvisioningTest extends TestCase
     public function test_it_uses_response_name_when_create_response_contains_name(): void
     {
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
+            $this->serverCollectionUrl() => Http::response(
                 [
                     'id' => self::SERVER_ID,
-
                     'name' => 'provider-returned-name',
-
                     'password' => self::GENERATED_PASSWORD,
                 ],
                 201,
@@ -411,15 +646,10 @@ final class ArvanCloudProvisioningTest extends TestCase
     public function test_it_uses_requested_name_when_create_response_contains_empty_name(): void
     {
         Http::fake([
-            self::BASE_URL
-            .'/regions/'
-            .self::REGION_ID
-            .'/servers' => Http::response(
+            $this->serverCollectionUrl() => Http::response(
                 [
                     'id' => self::SERVER_ID,
-
                     'name' => '   ',
-
                     'password' => self::GENERATED_PASSWORD,
                 ],
                 201,
@@ -443,11 +673,8 @@ final class ArvanCloudProvisioningTest extends TestCase
         return new ArvanCloudProvider(
             client: new ArvanCloudClient(
                 baseUrl: self::BASE_URL,
-
                 apiKey: 'test-api-key',
-
                 connectTimeout: 5,
-
                 requestTimeout: 15,
             ),
 
@@ -487,37 +714,85 @@ final class ArvanCloudProvisioningTest extends TestCase
     }
 
     /**
-     * @return array<array-key, mixed>
-     *
-     * @throws JsonException
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
      */
-    private function fixture(
-        string $name,
+    private function serverObject(
+        array $overrides = [],
     ): array {
-        $path = base_path(
-            "tests/Fixtures/Cloud/ArvanCloud/{$name}",
-        );
+        $server = [
+            'id' => self::SERVER_ID,
+            'name' => self::SERVER_NAME,
+            'status' => 'ACTIVE',
+            'username' => 'ubuntu',
 
-        $contents = file_get_contents(
-            $path,
-        );
+            'flavor' => [
+                'id' => 'eco-2-2-0',
+                'name' => 'eco-small4',
+                'vcpus' => 2,
+                'ram' => 2048,
+                'disk' => 50,
+            ],
 
-        $this->assertNotFalse(
-            $contents,
-            "Unable to read fixture [{$name}].",
-        );
+            'image' => [
+                'id' => '00aaa9d1-3e0a-468c-aaf4-334513981e42',
 
-        $payload = json_decode(
-            $contents,
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
-        );
+                'username' => 'ubuntu',
+            ],
 
-        $this->assertIsArray(
-            $payload,
-        );
+            'created' => '2026-08-04T18:14:54+00:00',
 
-        return $payload;
+            'addresses' => [
+                'Default network' => [
+                    [
+                        'addr' => '185.204.168.213',
+                        'version' => 4,
+                        'is_public' => true,
+                        'is_vpc' => false,
+                        'type' => 'fixed',
+                    ],
+                ],
+            ],
+
+            'networks' => [
+                '626ad7fd-3a62-4f3b-8908-7c0c3a91062d',
+            ],
+
+            'security_groups' => [
+                [
+                    'id' => '8449a4f5-5709-4017-9e63-45496bfe5cc9',
+                ],
+            ],
+
+            'volume_backed' => true,
+            'ha_enabled' => false,
+            'task_state' => null,
+            'error' => null,
+        ];
+
+        return array_replace(
+            $server,
+            $overrides,
+        );
+    }
+
+    private function serverCollectionUrl(): string
+    {
+        return sprintf(
+            '%s/regions/%s/servers',
+            self::BASE_URL,
+            self::REGION_ID,
+        );
+    }
+
+    private function serverDetailsUrl(
+        string $serverId = self::SERVER_ID,
+    ): string {
+        return sprintf(
+            '%s/regions/%s/servers/%s',
+            self::BASE_URL,
+            self::REGION_ID,
+            $serverId,
+        );
     }
 }

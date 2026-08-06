@@ -11,18 +11,22 @@ use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudServerPowerState;
 use App\Domain\Cloud\Enums\CloudServerStatus;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class ArvanCloudResponseMapperTest extends TestCase
 {
-    private const REGION_ID = 'eu-west1-a';
+    private const string REGION_ID = 'eu-west1-a';
 
-    private const SERVER_ID = 'provider-server-id';
+    private const string SERVER_ID = 'provider-server-id';
+
+    private const string DEFAULT_USERNAME = 'ubuntu';
 
     private ArvanCloudResponseMapper $mapper;
 
@@ -36,7 +40,9 @@ final class ArvanCloudResponseMapperTest extends TestCase
     public function test_it_maps_regions(): void
     {
         $regions = $this->mapper->mapRegions(
-            $this->fixture('regions.json'),
+            $this->fixture(
+                'regions.json',
+            ),
         );
 
         $region = $this->findById(
@@ -92,7 +98,7 @@ final class ArvanCloudResponseMapperTest extends TestCase
                 ],
             ],
             regionId: self::REGION_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
             requestedName: 'xdeploy-server',
         );
 
@@ -117,7 +123,7 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $this->assertSame(
-            'ubuntu',
+            self::DEFAULT_USERNAME,
             $createdServer->username,
         );
 
@@ -128,6 +134,36 @@ final class ArvanCloudResponseMapperTest extends TestCase
         $this->assertSame(
             'generated-password',
             $createdServer->generatedPassword(),
+        );
+    }
+
+    public function test_it_maps_direct_create_response(): void
+    {
+        $createdServer = $this->mapper->mapCreatedServer(
+            payload: [
+                'id' => self::SERVER_ID,
+                'name' => 'provider-server-name',
+                'username' => 'root',
+                'password' => 'generated-password',
+            ],
+            regionId: self::REGION_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+            requestedName: 'requested-server-name',
+        );
+
+        $this->assertSame(
+            self::SERVER_ID,
+            $createdServer->id,
+        );
+
+        $this->assertSame(
+            'provider-server-name',
+            $createdServer->name,
+        );
+
+        $this->assertSame(
+            'root',
+            $createdServer->username,
         );
     }
 
@@ -142,7 +178,7 @@ final class ArvanCloudResponseMapperTest extends TestCase
                 ],
             ],
             regionId: self::REGION_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
             requestedName: 'requested-server-name',
         );
 
@@ -170,7 +206,7 @@ final class ArvanCloudResponseMapperTest extends TestCase
                 ],
             ],
             regionId: self::REGION_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
             requestedName: '   ',
         );
     }
@@ -178,7 +214,9 @@ final class ArvanCloudResponseMapperTest extends TestCase
     public function test_it_maps_sizes_and_exact_prices(): void
     {
         $sizes = $this->mapper->mapSizes(
-            $this->fixture('sizes.json'),
+            $this->fixture(
+                'sizes.json',
+            ),
             self::REGION_ID,
         );
 
@@ -258,7 +296,9 @@ final class ArvanCloudResponseMapperTest extends TestCase
     public function test_it_flattens_and_maps_images(): void
     {
         $images = $this->mapper->mapImages(
-            $this->fixture('images.json'),
+            $this->fixture(
+                'images.json',
+            ),
             self::REGION_ID,
         );
 
@@ -316,7 +356,9 @@ final class ArvanCloudResponseMapperTest extends TestCase
     public function test_it_maps_network_from_primary_subnet(): void
     {
         $networks = $this->mapper->mapNetworks(
-            $this->fixture('networks.json'),
+            $this->fixture(
+                'networks.json',
+            ),
             self::REGION_ID,
         );
 
@@ -357,7 +399,9 @@ final class ArvanCloudResponseMapperTest extends TestCase
     public function test_it_maps_security_groups_without_provider_fields(): void
     {
         $groups = $this->mapper->mapSecurityGroups(
-            $this->fixture('security-groups.json'),
+            $this->fixture(
+                'security-groups.json',
+            ),
             self::REGION_ID,
         );
 
@@ -402,7 +446,9 @@ final class ArvanCloudResponseMapperTest extends TestCase
     public function test_it_maps_quota_limits_and_usage(): void
     {
         $quota = $this->mapper->mapQuota(
-            $this->fixture('quota.json'),
+            $this->fixture(
+                'quota.json',
+            ),
             self::REGION_ID,
         );
 
@@ -451,170 +497,600 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
     }
 
-    public function test_it_maps_active_server_with_real_provider_reference_shapes(): void
+    public function test_it_maps_direct_server_response(): void
     {
         $server = $this->mapper->mapServer(
-            payload: $this->serverPayload(),
+            payload: $this->serverObject(),
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertCompleteServer(
+            $server,
+        );
+    }
+
+    public function test_it_maps_direct_server_inside_data_envelope(): void
+    {
+        $server = $this->mapper->mapServer(
+            payload: [
+                'data' => $this->serverObject(),
+            ],
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertCompleteServer(
+            $server,
+        );
+    }
+
+    public function test_it_remains_compatible_with_server_list_response(): void
+    {
+        $server = $this->mapper->mapServer(
+            payload: [
+                'data' => [
+                    $this->serverObject(),
+                ],
+            ],
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertCompleteServer(
+            $server,
+        );
+    }
+
+    public function test_it_maps_server_flavor_resources_and_operation_state(): void
+    {
+        $server = $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'task_state' => 'resize_complete',
+                'error' => null,
+
+                'flavor' => [
+                    'id' => 'eco-2-2-0',
+                    'name' => 'eco-small4',
+                    'vcpus' => 2,
+                    'ram' => 2048,
+                    'disk' => 50,
+                ],
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
         );
 
         $this->assertSame(
-            self::SERVER_ID,
-            $server->id,
+            'eco-2-2-0',
+            $server->sizeId,
         );
 
         $this->assertSame(
-            'xdeploy-server',
-            $server->name,
+            'eco-small4',
+            $server->sizeName,
         );
 
         $this->assertSame(
-            self::REGION_ID,
-            $server->regionId,
+            2,
+            $server->vCpu,
         );
 
         $this->assertSame(
-            CloudServerStatus::Active,
+            2048,
+            $server->memoryMiB,
+        );
+
+        $this->assertSame(
+            50,
+            $server->diskGiB,
+        );
+
+        $this->assertSame(
+            'resize_complete',
+            $server->taskState,
+        );
+
+        $this->assertNull(
+            $server->providerError,
+        );
+    }
+
+    public function test_it_maps_provider_error(): void
+    {
+        $server = $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'status' => 'ERROR',
+                'task_state' => 'resize_failed',
+                'error' => 'Unable to resize server.',
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertSame(
+            CloudServerStatus::Failed,
             $server->status,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Error,
+            $server->powerState,
+        );
+
+        $this->assertSame(
+            'resize_failed',
+            $server->taskState,
+        );
+
+        $this->assertSame(
+            'Unable to resize server.',
+            $server->providerError,
+        );
+    }
+
+    #[DataProvider('serverStatusProvider')]
+    public function test_it_maps_server_lifecycle_and_power_states(
+        string $providerStatus,
+        CloudServerStatus $expectedStatus,
+        CloudServerPowerState $expectedPowerState,
+    ): void {
+        $server = $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'status' => $providerStatus,
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertSame(
+            $expectedStatus,
+            $server->status,
+        );
+
+        $this->assertSame(
+            $expectedPowerState,
+            $server->powerState,
+        );
+    }
+
+    /**
+     * @return array<string, array{
+     *     string,
+     *     CloudServerStatus,
+     *     CloudServerPowerState
+     * }>
+     */
+    public static function serverStatusProvider(): array
+    {
+        return [
+            'active' => [
+                'ACTIVE',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Running,
+            ],
+
+            'shutoff' => [
+                'SHUTOFF',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Stopped,
+            ],
+
+            'stopped' => [
+                'STOPPED',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Stopped,
+            ],
+
+            'paused' => [
+                'PAUSED',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Stopped,
+            ],
+
+            'suspended' => [
+                'SUSPENDED',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Stopped,
+            ],
+
+            'powering on' => [
+                'POWERING_ON',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'powering off' => [
+                'POWERING_OFF',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'reboot' => [
+                'REBOOT',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'hard reboot' => [
+                'HARD_REBOOT',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'resize' => [
+                'RESIZE',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'verify resize' => [
+                'VERIFY_RESIZE',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'revert resize' => [
+                'REVERT_RESIZE',
+                CloudServerStatus::Active,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'build' => [
+                'BUILD',
+                CloudServerStatus::Provisioning,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'creating' => [
+                'CREATING',
+                CloudServerStatus::Provisioning,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'queued' => [
+                'QUEUED',
+                CloudServerStatus::Provisioning,
+                CloudServerPowerState::Transitioning,
+            ],
+
+            'error' => [
+                'ERROR',
+                CloudServerStatus::Failed,
+                CloudServerPowerState::Error,
+            ],
+
+            'failed' => [
+                'FAILED',
+                CloudServerStatus::Failed,
+                CloudServerPowerState::Error,
+            ],
+
+            'unknown' => [
+                'UNEXPECTED_PROVIDER_STATUS',
+                CloudServerStatus::Unknown,
+                CloudServerPowerState::Unknown,
+            ],
+        ];
+    }
+
+    #[DataProvider('validFlavorResourceProvider')]
+    public function test_it_normalizes_valid_flavor_resource_values(
+        int|float|string $vCpu,
+        int|float|string $memory,
+        int|float|string $disk,
+    ): void {
+        $server = $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'flavor' => [
+                    'id' => 'eco-2-2-0',
+                    'name' => 'eco-small4',
+                    'vcpus' => $vCpu,
+                    'ram' => $memory,
+                    'disk' => $disk,
+                ],
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertSame(
+            2,
+            $server->vCpu,
+        );
+
+        $this->assertSame(
+            2048,
+            $server->memoryMiB,
+        );
+
+        $this->assertSame(
+            50,
+            $server->diskGiB,
+        );
+    }
+
+    /**
+     * @return array<string, array{
+     *     int|float|string,
+     *     int|float|string,
+     *     int|float|string
+     * }>
+     */
+    public static function validFlavorResourceProvider(): array
+    {
+        return [
+            'integers' => [
+                2,
+                2048,
+                50,
+            ],
+
+            'whole floats' => [
+                2.0,
+                2048.0,
+                50.0,
+            ],
+
+            'numeric strings' => [
+                '2',
+                '2048',
+                '50',
+            ],
+        ];
+    }
+
+    #[DataProvider('invalidFlavorResourceProvider')]
+    public function test_it_rejects_invalid_flavor_resource_values(
+        string $field,
+        mixed $value,
+    ): void {
+        $flavor = [
+            'id' => 'eco-2-2-0',
+            'name' => 'eco-small4',
+            'vcpus' => 2,
+            'ram' => 2048,
+            'disk' => 50,
+        ];
+
+        $flavor[$field] = $value;
+
+        $this->expectException(
+            CloudUnexpectedResponseException::class,
+        );
+
+        $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'flavor' => $flavor,
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+    }
+
+    /**
+     * @return array<string, array{
+     *     string,
+     *     mixed
+     * }>
+     */
+    public static function invalidFlavorResourceProvider(): array
+    {
+        return [
+            'negative CPU' => [
+                'vcpus',
+                -1,
+            ],
+
+            'fractional CPU' => [
+                'vcpus',
+                1.5,
+            ],
+
+            'invalid RAM string' => [
+                'ram',
+                'two-gigabytes',
+            ],
+
+            'negative disk' => [
+                'disk',
+                -10,
+            ],
+
+            'boolean disk' => [
+                'disk',
+                true,
+            ],
+
+            'array disk' => [
+                'disk',
+                [
+                    50,
+                ],
+            ],
+        ];
+    }
+
+    public function test_it_allows_missing_optional_flavor_resources(): void
+    {
+        $server = $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'flavor' => [
+                    'id' => 'eco-2-2-0',
+                    'name' => 'eco-small4',
+                ],
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+
+        $this->assertSame(
+            'eco-2-2-0',
+            $server->sizeId,
+        );
+
+        $this->assertSame(
+            'eco-small4',
+            $server->sizeName,
+        );
+
+        $this->assertNull(
+            $server->vCpu,
+        );
+
+        $this->assertNull(
+            $server->memoryMiB,
+        );
+
+        $this->assertNull(
+            $server->diskGiB,
+        );
+    }
+
+    public function test_it_uses_server_username_first(): void
+    {
+        $server = $this->mapper->mapServer(
+            payload: $this->serverObject([
+                'username' => 'root',
+
+                'image' => [
+                    'id' => 'image-id',
+                    'username' => 'ubuntu',
+                ],
+            ]),
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: 'debian',
+        );
+
+        $this->assertSame(
+            'root',
+            $server->username,
+        );
+    }
+
+    public function test_it_uses_image_username_when_server_username_is_missing(): void
+    {
+        $serverObject = $this->serverObject([
+            'image' => [
+                'id' => 'image-id',
+                'username' => 'ubuntu',
+            ],
+        ]);
+
+        unset(
+            $serverObject['username'],
+        );
+
+        $server = $this->mapper->mapServer(
+            payload: $serverObject,
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: 'debian',
         );
 
         $this->assertSame(
             'ubuntu',
             $server->username,
         );
+    }
 
-        $this->assertSame(
-            'eco-2-1-0',
-            $server->sizeId,
-        );
-
-        $this->assertSame(
-            '3236878e-2bdc-4cdd-b082-61b3eeb3f9df',
-            $server->imageId,
-        );
-
-        $this->assertNotNull(
-            $server->createdAt,
-        );
-
-        $this->assertCount(
-            1,
-            $server->addresses,
-        );
-
-        $address = $server->addresses[0];
-
-        $this->assertSame(
-            '185.204.169.89',
-            $address->address,
-        );
-
-        $this->assertSame(
-            CloudIpVersion::IPv4,
-            $address->version,
-        );
-
-        $this->assertTrue(
-            $address->isPublic,
-        );
-
-        $this->assertFalse(
-            $address->isVpc,
-        );
-
-        $this->assertSame(
-            'fixed',
-            $address->type,
-        );
-
-        $this->assertSame(
-            [
-                'c72ea6b9-e1c1-4b72-80eb-adc6fc1941a2',
+    public function test_it_uses_default_username_when_provider_usernames_are_missing(): void
+    {
+        $serverObject = $this->serverObject([
+            'image' => [
+                'id' => 'image-id',
             ],
-            $server->networkIds,
+        ]);
+
+        unset(
+            $serverObject['username'],
+        );
+
+        $server = $this->mapper->mapServer(
+            payload: $serverObject,
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: 'debian',
         );
 
         $this->assertSame(
-            [
-                '8449a4f5-5709-4017-9e63-45496bfe5cc9',
-            ],
-            $server->securityGroupIds,
-        );
-
-        $this->assertTrue(
-            $server->volumeBacked,
-        );
-
-        $this->assertFalse(
-            $server->highAvailability,
+            'debian',
+            $server->username,
         );
     }
 
     public function test_it_deduplicates_server_networks_and_security_groups(): void
     {
-        $payload = $this->serverPayload([
-            'networks' => [
-                'network-id',
-                'network-id',
-            ],
-            'security_groups' => [
-                [
-                    'id' => 'security-group-id',
-                ],
-                [
-                    'id' => 'security-group-id',
-                ],
-            ],
-        ]);
-
         $server = $this->mapper->mapServer(
-            payload: $payload,
+            payload: $this->serverObject([
+                'networks' => [
+                    'network-id',
+                    'network-id',
+                ],
+
+                'security_groups' => [
+                    [
+                        'id' => 'security-group-id',
+                    ],
+                    [
+                        'id' => 'security-group-id',
+                    ],
+                ],
+            ]),
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
 
         $this->assertSame(
-            ['network-id'],
+            [
+                'network-id',
+            ],
             $server->networkIds,
         );
 
         $this->assertSame(
-            ['security-group-id'],
+            [
+                'security-group-id',
+            ],
             $server->securityGroupIds,
         );
     }
 
     public function test_it_tolerates_incomplete_provider_fields_while_server_is_provisioning(): void
     {
-        $payload = $this->serverPayload([
-            'status' => 'BUILD',
-
-            /*
-             * ArvanCloud may temporarily expose incomplete shapes
-             * while the server is still being built.
-             */
-            'addresses' => null,
-
-            'networks' => [
-                'temporary' => true,
-            ],
-
-            'security_groups' => null,
-        ]);
-
         $server = $this->mapper->mapServer(
-            payload: $payload,
+            payload: $this->serverObject([
+                'status' => 'BUILD',
+                'addresses' => null,
+                'networks' => [
+                    'temporary' => true,
+                ],
+                'security_groups' => null,
+            ]),
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
 
         $this->assertSame(
             CloudServerStatus::Provisioning,
             $server->status,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Transitioning,
+            $server->powerState,
         );
 
         $this->assertSame(
@@ -635,21 +1111,21 @@ final class ArvanCloudResponseMapperTest extends TestCase
 
     public function test_it_tolerates_missing_provider_fields_while_server_is_provisioning(): void
     {
-        $payload = $this->serverPayload([
+        $serverObject = $this->serverObject([
             'status' => 'CREATING',
         ]);
 
         unset(
-            $payload['data'][0]['addresses'],
-            $payload['data'][0]['networks'],
-            $payload['data'][0]['security_groups'],
+            $serverObject['addresses'],
+            $serverObject['networks'],
+            $serverObject['security_groups'],
         );
 
         $server = $this->mapper->mapServer(
-            payload: $payload,
+            payload: $serverObject,
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
 
         $this->assertSame(
@@ -675,13 +1151,6 @@ final class ArvanCloudResponseMapperTest extends TestCase
 
     public function test_it_keeps_active_server_network_validation_strict(): void
     {
-        $payload = $this->serverPayload([
-            'status' => 'ACTIVE',
-            'networks' => [
-                'temporary' => true,
-            ],
-        ]);
-
         $this->expectException(
             CloudUnexpectedResponseException::class,
         );
@@ -691,20 +1160,20 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $this->mapper->mapServer(
-            payload: $payload,
+            payload: $this->serverObject([
+                'status' => 'ACTIVE',
+                'networks' => [
+                    'temporary' => true,
+                ],
+            ]),
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
     }
 
     public function test_it_keeps_active_server_address_validation_strict(): void
     {
-        $payload = $this->serverPayload([
-            'status' => 'ACTIVE',
-            'addresses' => null,
-        ]);
-
         $this->expectException(
             CloudUnexpectedResponseException::class,
         );
@@ -714,20 +1183,18 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $this->mapper->mapServer(
-            payload: $payload,
+            payload: $this->serverObject([
+                'status' => 'ACTIVE',
+                'addresses' => null,
+            ]),
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
     }
 
     public function test_it_keeps_active_server_security_group_validation_strict(): void
     {
-        $payload = $this->serverPayload([
-            'status' => 'ACTIVE',
-            'security_groups' => null,
-        ]);
-
         $this->expectException(
             CloudUnexpectedResponseException::class,
         );
@@ -737,35 +1204,17 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $this->mapper->mapServer(
-            payload: $payload,
+            payload: $this->serverObject([
+                'status' => 'ACTIVE',
+                'security_groups' => null,
+            ]),
             regionId: self::REGION_ID,
             serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
     }
 
-    public function test_it_uses_default_username_when_provider_username_is_missing(): void
-    {
-        $payload = $this->serverPayload();
-
-        unset(
-            $payload['data'][0]['username'],
-        );
-
-        $server = $this->mapper->mapServer(
-            payload: $payload,
-            regionId: self::REGION_ID,
-            serverId: self::SERVER_ID,
-            defaultUsername: 'ubuntu',
-        );
-
-        $this->assertSame(
-            'ubuntu',
-            $server->username,
-        );
-    }
-
-    public function test_it_throws_when_requested_server_is_not_found(): void
+    public function test_it_rejects_mismatched_direct_server_identifier(): void
     {
         $this->expectException(
             CloudResourceNotFoundException::class,
@@ -776,10 +1225,72 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $this->mapper->mapServer(
-            payload: $this->serverPayload(),
+            payload: $this->serverObject(),
             regionId: self::REGION_ID,
             serverId: 'missing-server-id',
-            defaultUsername: 'ubuntu',
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+    }
+
+    public function test_it_throws_when_requested_server_is_not_found_in_list(): void
+    {
+        $this->expectException(
+            CloudResourceNotFoundException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'Cloud server [missing-server-id] was not found.',
+        );
+
+        $this->mapper->mapServer(
+            payload: [
+                'data' => [
+                    $this->serverObject(),
+                ],
+            ],
+            regionId: self::REGION_ID,
+            serverId: 'missing-server-id',
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+    }
+
+    public function test_it_rejects_invalid_direct_server_envelope(): void
+    {
+        $this->expectException(
+            CloudUnexpectedResponseException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'ArvanCloud server response has an invalid data envelope.',
+        );
+
+        $this->mapper->mapServer(
+            payload: [
+                'data' => [
+                    'name' => 'missing-id',
+                ],
+            ],
+            regionId: self::REGION_ID,
+            serverId: self::SERVER_ID,
+            defaultUsername: self::DEFAULT_USERNAME,
+        );
+    }
+
+    public function test_it_rejects_empty_server_identifier(): void
+    {
+        $this->expectException(
+            CloudUnexpectedResponseException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'Cloud server identifier cannot be empty.',
+        );
+
+        $this->mapper->mapServer(
+            payload: $this->serverObject(),
+            regionId: self::REGION_ID,
+            serverId: '   ',
+            defaultUsername: self::DEFAULT_USERNAME,
         );
     }
 
@@ -870,16 +1381,18 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $this->mapper->mapSshKeys(
-            ['data' => []],
+            [
+                'data' => [],
+            ],
             self::REGION_ID,
         );
     }
 
     /**
      * @param  array<string, mixed>  $overrides
-     * @return array{data: list<array<string, mixed>>}
+     * @return array<string, mixed>
      */
-    private function serverPayload(
+    private function serverObject(
         array $overrides = [],
     ): array {
         $server = [
@@ -889,12 +1402,16 @@ final class ArvanCloudResponseMapperTest extends TestCase
             'username' => 'ubuntu',
 
             'flavor' => [
-                'id' => 'eco-2-1-0',
-                'name' => 'eco-small2',
+                'id' => 'eco-2-2-0',
+                'name' => 'eco-small4',
+                'vcpus' => 2,
+                'ram' => 2048,
+                'disk' => 50,
             ],
 
             'image' => [
                 'id' => '3236878e-2bdc-4cdd-b082-61b3eeb3f9df',
+                'username' => 'ubuntu',
             ],
 
             'created' => '2026-08-04T18:14:54+00:00',
@@ -911,16 +1428,10 @@ final class ArvanCloudResponseMapperTest extends TestCase
                 ],
             ],
 
-            /*
-             * The real ArvanCloud schema returns networks as UUID strings.
-             */
             'networks' => [
                 'c72ea6b9-e1c1-4b72-80eb-adc6fc1941a2',
             ],
 
-            /*
-             * Security groups are returned as objects containing an ID.
-             */
             'security_groups' => [
                 [
                     'id' => '8449a4f5-5709-4017-9e63-45496bfe5cc9',
@@ -929,16 +1440,142 @@ final class ArvanCloudResponseMapperTest extends TestCase
 
             'volume_backed' => true,
             'ha_enabled' => false,
+            'task_state' => null,
+            'error' => null,
         ];
 
-        return [
-            'data' => [
-                array_replace(
-                    $server,
-                    $overrides,
-                ),
+        return array_replace(
+            $server,
+            $overrides,
+        );
+    }
+
+    private function assertCompleteServer(
+        object $server,
+    ): void {
+        $this->assertSame(
+            self::SERVER_ID,
+            $server->id,
+        );
+
+        $this->assertSame(
+            'xdeploy-server',
+            $server->name,
+        );
+
+        $this->assertSame(
+            self::REGION_ID,
+            $server->regionId,
+        );
+
+        $this->assertSame(
+            CloudServerStatus::Active,
+            $server->status,
+        );
+
+        $this->assertSame(
+            CloudServerPowerState::Running,
+            $server->powerState,
+        );
+
+        $this->assertSame(
+            'ubuntu',
+            $server->username,
+        );
+
+        $this->assertSame(
+            'eco-2-2-0',
+            $server->sizeId,
+        );
+
+        $this->assertSame(
+            'eco-small4',
+            $server->sizeName,
+        );
+
+        $this->assertSame(
+            2,
+            $server->vCpu,
+        );
+
+        $this->assertSame(
+            2048,
+            $server->memoryMiB,
+        );
+
+        $this->assertSame(
+            50,
+            $server->diskGiB,
+        );
+
+        $this->assertSame(
+            '3236878e-2bdc-4cdd-b082-61b3eeb3f9df',
+            $server->imageId,
+        );
+
+        $this->assertNotNull(
+            $server->createdAt,
+        );
+
+        $this->assertCount(
+            1,
+            $server->addresses,
+        );
+
+        $address = $server->addresses[0];
+
+        $this->assertSame(
+            '185.204.169.89',
+            $address->address,
+        );
+
+        $this->assertSame(
+            CloudIpVersion::IPv4,
+            $address->version,
+        );
+
+        $this->assertTrue(
+            $address->isPublic,
+        );
+
+        $this->assertFalse(
+            $address->isVpc,
+        );
+
+        $this->assertSame(
+            'fixed',
+            $address->type,
+        );
+
+        $this->assertSame(
+            [
+                'c72ea6b9-e1c1-4b72-80eb-adc6fc1941a2',
             ],
-        ];
+            $server->networkIds,
+        );
+
+        $this->assertSame(
+            [
+                '8449a4f5-5709-4017-9e63-45496bfe5cc9',
+            ],
+            $server->securityGroupIds,
+        );
+
+        $this->assertTrue(
+            $server->volumeBacked,
+        );
+
+        $this->assertFalse(
+            $server->highAvailability,
+        );
+
+        $this->assertNull(
+            $server->taskState,
+        );
+
+        $this->assertNull(
+            $server->providerError,
+        );
     }
 
     /**
@@ -946,13 +1583,16 @@ final class ArvanCloudResponseMapperTest extends TestCase
      *
      * @throws JsonException
      */
-    private function fixture(string $name): array
-    {
+    private function fixture(
+        string $name,
+    ): array {
         $path = base_path(
             "tests/Fixtures/Cloud/ArvanCloud/{$name}",
         );
 
-        $contents = file_get_contents($path);
+        $contents = file_get_contents(
+            $path,
+        );
 
         $this->assertNotFalse(
             $contents,
@@ -960,10 +1600,10 @@ final class ArvanCloudResponseMapperTest extends TestCase
         );
 
         $payload = json_decode(
-            $contents,
-            true,
-            512,
-            JSON_THROW_ON_ERROR,
+            json: $contents,
+            associative: true,
+            depth: 512,
+            flags: JSON_THROW_ON_ERROR,
         );
 
         $this->assertIsArray(
@@ -985,7 +1625,10 @@ final class ArvanCloudResponseMapperTest extends TestCase
     ): object {
         foreach ($items as $item) {
             if (
-                property_exists($item, 'id')
+                property_exists(
+                    $item,
+                    'id',
+                )
                 && $item->id === $id
             ) {
                 return $item;

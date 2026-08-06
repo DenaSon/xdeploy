@@ -27,12 +27,381 @@ use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
 final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface
 {
+    private const string RESOURCE_REGIONS = 'regions';
+
+    private const string RESOURCE_SIZES = 'sizes';
+
+    private const string RESOURCE_IMAGES = 'images';
+
+    private const string RESOURCE_NETWORKS = 'networks';
+
+    private const string RESOURCE_SECURITIES = 'securities';
+
+    private const string RESOURCE_QUOTA = 'quota';
+
+    private const string RESOURCE_SSH_KEYS = 'ssh-keys';
+
+    private const string RESOURCE_SERVERS = 'servers';
+
+    private const string RESOURCE_PORTS = 'ports';
+
+    private const string ACTION_POWER_ON = 'power-on';
+
+    private const string ACTION_POWER_OFF = 'power-off';
+
+    private const string ACTION_REBOOT = 'reboot';
+
+    private const string ACTION_ADD_PUBLIC_IP = 'add-public-ip';
+
+    private const string ACTIONS = 'actions';
+
     public function __construct(
         private ArvanCloudClient $client,
         private ArvanCloudResponseMapper $mapper,
         private string $createType = 'cinder',
         private string $defaultUsername = 'ubuntu',
     ) {}
+
+    /**
+     * @return list<CloudRegionData>
+     */
+    public function listRegions(): array
+    {
+        return $this->mapper->mapRegions(
+            $this->client->get(
+                self::RESOURCE_REGIONS,
+            ),
+        );
+    }
+
+    /**
+     * @return list<CloudSizeData>
+     */
+    public function listSizes(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SIZES,
+            ),
+        );
+
+        return $this->mapper->mapSizes(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudImageData>
+     */
+    public function listImages(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_IMAGES,
+            ),
+            [
+                'type' => 'distributions',
+            ],
+        );
+
+        return $this->mapper->mapImages(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudNetworkData>
+     */
+    public function listNetworks(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_NETWORKS,
+            ),
+        );
+
+        return $this->mapper->mapNetworks(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudSecurityGroupData>
+     */
+    public function listSecurityGroups(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SECURITIES,
+            ),
+        );
+
+        return $this->mapper->mapSecurityGroups(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function getQuota(
+        string $region,
+    ): CloudQuotaData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_QUOTA,
+            ),
+        );
+
+        return $this->mapper->mapQuota(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudSshKeyData>
+     */
+    public function listSshKeys(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SSH_KEYS,
+            ),
+        );
+
+        return $this->mapper->mapSshKeys(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function createServer(
+        CreateCloudServerData $data,
+    ): CreatedCloudServerData {
+        $regionId = $this->normalizeRegion(
+            $data->regionId,
+        );
+
+        $serverName = $this->normalizeServerName(
+            $data->name,
+        );
+
+        $payload = $this->createServerPayload(
+            data: $data,
+            serverName: $serverName,
+        );
+
+        $response = $this->client->post(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SERVERS,
+            ),
+            $payload,
+        );
+
+        $createdServer = $this->mapper->mapCreatedServer(
+            payload: $response,
+            regionId: $regionId,
+            defaultUsername: $this->normalizedDefaultUsername(),
+            requestedName: $serverName,
+        );
+
+        if (
+            ! $data->usesSshKey()
+            && ! $createdServer->hasGeneratedPassword()
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud create response did not contain a generated password.',
+            );
+        }
+
+        return $createdServer;
+    }
+
+    public function findServer(
+        string $region,
+        string $serverId,
+    ): CloudServerData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        /*
+         * Server details are fetched directly. This avoids loading the
+         * complete server list during provisioning and resize polling.
+         */
+        $payload = $this->client->get(
+            $this->serverEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+        );
+
+        return $this->mapper->mapServer(
+            payload: $payload,
+            regionId: $regionId,
+            serverId: $providerServerId,
+            defaultUsername: $this->normalizedDefaultUsername(),
+        );
+    }
+
+    public function powerOn(
+        string $region,
+        string $serverId,
+    ): void {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_POWER_ON,
+            ),
+        );
+    }
+
+    public function powerOff(
+        string $region,
+        string $serverId,
+    ): void {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_POWER_OFF,
+            ),
+        );
+    }
+
+    public function reboot(
+        string $region,
+        string $serverId,
+    ): void {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_REBOOT,
+            ),
+        );
+    }
+
+    public function deleteServer(
+        string $region,
+        string $serverId,
+    ): void {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $this->client->delete(
+            $this->serverEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+        );
+    }
+
+    /**
+     * @return list<CloudServerActionData>
+     */
+    public function getAvailableActions(
+        string $region,
+        string $serverId,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $payload = $this->client->get(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTIONS,
+            ),
+        );
+
+        return $this->mapper->mapServerActions(
+            $payload,
+        );
+    }
 
     /**
      * @return list<CloudPortData>
@@ -50,13 +419,15 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             resource: 'server',
         );
 
-        return $this->mapper->mapPorts(
-            payload: $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'ports',
-                ),
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_PORTS,
             ),
+        );
+
+        return $this->mapper->mapPorts(
+            payload: $payload,
             serverId: $providerServerId,
         );
     }
@@ -96,9 +467,9 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
 
         $this->client->post(
             $this->serverActionEndpoint(
-                region: $regionId,
+                regionId: $regionId,
                 serverId: $providerServerId,
-                action: 'add-public-ip',
+                action: self::ACTION_ADD_PUBLIC_IP,
             ),
             $payload,
         );
@@ -119,160 +490,24 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
 
         $this->client->delete(
             $this->portEndpoint(
-                region: $regionId,
+                regionId: $regionId,
                 portId: $providerPortId,
             ),
         );
     }
 
     /**
-     * @return list<CloudRegionData>
+     * @return array<string, mixed>
      */
-    public function listRegions(): array
-    {
-        return $this->mapper->mapRegions(
-            $this->client->get('regions'),
-        );
-    }
-
-    /**
-     * @return list<CloudSizeData>
-     */
-    public function listSizes(
-        string $region,
-    ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        return $this->mapper->mapSizes(
-            $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'sizes',
-                ),
-            ),
-            $regionId,
-        );
-    }
-
-    /**
-     * @return list<CloudImageData>
-     */
-    public function listImages(
-        string $region,
-    ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        return $this->mapper->mapImages(
-            $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'images',
-                ),
-                [
-                    'type' => 'distributions',
-                ],
-            ),
-            $regionId,
-        );
-    }
-
-    /**
-     * @return list<CloudNetworkData>
-     */
-    public function listNetworks(
-        string $region,
-    ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        return $this->mapper->mapNetworks(
-            $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'networks',
-                ),
-            ),
-            $regionId,
-        );
-    }
-
-    /**
-     * @return list<CloudSecurityGroupData>
-     */
-    public function listSecurityGroups(
-        string $region,
-    ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        return $this->mapper->mapSecurityGroups(
-            $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'securities',
-                ),
-            ),
-            $regionId,
-        );
-    }
-
-    public function getQuota(
-        string $region,
-    ): CloudQuotaData {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        return $this->mapper->mapQuota(
-            $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'quota',
-                ),
-            ),
-            $regionId,
-        );
-    }
-
-    /**
-     * @return list<CloudSshKeyData>
-     */
-    public function listSshKeys(
-        string $region,
-    ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        return $this->mapper->mapSshKeys(
-            $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'ssh-keys',
-                ),
-            ),
-            $regionId,
-        );
-    }
-
-    public function createServer(
+    private function createServerPayload(
         CreateCloudServerData $data,
-    ): CreatedCloudServerData {
-        $regionId = $this->normalizeRegion(
-            $data->regionId,
+        string $serverName,
+    ): array {
+        $securityGroupIds = $this->normalizeSecurityGroupIds(
+            $data->securityGroupIds,
         );
 
-        $serverName = $this->normalizeServerName(
-            $data->name,
-        );
-
-        $payload = [
+        return [
             'name' => $serverName,
 
             'network_id' => $this->normalizeResourceId(
@@ -290,13 +525,15 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
                 resource: 'image',
             ),
 
+            /*
+             * ArvanCloud expects the security group UUID inside
+             * security_groups[].name.
+             */
             'security_groups' => array_map(
                 static fn (string $id): array => [
                     'name' => $id,
                 ],
-                $this->normalizeSecurityGroupIds(
-                    $data->securityGroupIds,
-                ),
+                $securityGroupIds,
             ),
 
             'ssh_key' => $data->usesSshKey(),
@@ -317,172 +554,67 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
 
             'ha_enabled' => $data->highAvailability,
         ];
-
-        $response = $this->client->post(
-            $this->regionEndpoint(
-                region: $regionId,
-                resource: 'servers',
-            ),
-            $payload,
-        );
-
-        $createdServer = $this->mapper->mapCreatedServer(
-            payload: $response,
-            regionId: $regionId,
-            defaultUsername: $this->normalizedDefaultUsername(),
-            requestedName: $serverName,
-        );
-
-        if (
-            ! $data->usesSshKey()
-            && ! $createdServer->hasGeneratedPassword()
-        ) {
-            throw new CloudUnexpectedResponseException(
-                'ArvanCloud create response did not contain a generated password.',
-            );
-        }
-
-        return $createdServer;
-    }
-
-    public function findServer(
-        string $region,
-        string $serverId,
-    ): CloudServerData {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
-
-        return $this->mapper->mapServer(
-            payload: $this->client->get(
-                $this->regionEndpoint(
-                    region: $regionId,
-                    resource: 'servers',
-                ),
-            ),
-            regionId: $regionId,
-            serverId: $providerServerId,
-            defaultUsername: $this->normalizedDefaultUsername(),
-        );
-    }
-
-    public function powerOn(
-        string $region,
-        string $serverId,
-    ): void {
-        $this->client->post(
-            $this->serverActionEndpoint(
-                region: $region,
-                serverId: $serverId,
-                action: 'power-on',
-            ),
-        );
-    }
-
-    public function powerOff(
-        string $region,
-        string $serverId,
-    ): void {
-        $this->client->post(
-            $this->serverActionEndpoint(
-                region: $region,
-                serverId: $serverId,
-                action: 'power-off',
-            ),
-        );
-    }
-
-    public function reboot(
-        string $region,
-        string $serverId,
-    ): void {
-        $this->client->post(
-            $this->serverActionEndpoint(
-                region: $region,
-                serverId: $serverId,
-                action: 'reboot',
-            ),
-        );
-    }
-
-    public function deleteServer(
-        string $region,
-        string $serverId,
-    ): void {
-        $this->client->delete(
-            $this->serverEndpoint(
-                region: $region,
-                serverId: $serverId,
-            ),
-        );
-    }
-
-    /**
-     * @return list<CloudServerActionData>
-     */
-    public function getAvailableActions(
-        string $region,
-        string $serverId,
-    ): array {
-        return $this->mapper->mapServerActions(
-            $this->client->get(
-                $this->serverActionEndpoint(
-                    region: $region,
-                    serverId: $serverId,
-                    action: 'actions',
-                ),
-            ),
-        );
     }
 
     private function regionEndpoint(
-        string $region,
+        string $regionId,
         string $resource,
     ): string {
         return sprintf(
             'regions/%s/%s',
-            rawurlencode($region),
-            $resource,
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $resource,
+            ),
         );
     }
 
     private function serverEndpoint(
-        string $region,
+        string $regionId,
         string $serverId,
     ): string {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
-
         return sprintf(
             'regions/%s/servers/%s',
-            rawurlencode($regionId),
-            rawurlencode($providerServerId),
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $serverId,
+            ),
         );
     }
 
     private function serverActionEndpoint(
-        string $region,
+        string $regionId,
         string $serverId,
         string $action,
     ): string {
         return sprintf(
             '%s/%s',
             $this->serverEndpoint(
-                region: $region,
+                regionId: $regionId,
                 serverId: $serverId,
             ),
-            $action,
+            rawurlencode(
+                $action,
+            ),
+        );
+    }
+
+    private function portEndpoint(
+        string $regionId,
+        string $portId,
+    ): string {
+        return sprintf(
+            'regions/%s/ports/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $portId,
+            ),
         );
     }
 
@@ -490,8 +622,7 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
     ): string {
         if (
-            $region === ''
-            || preg_match(
+            preg_match(
                 '/[\x00-\x1F\x7F]/',
                 $region,
             ) === 1
@@ -530,8 +661,7 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $resource,
     ): string {
         if (
-            $id === ''
-            || preg_match(
+            preg_match(
                 '/[\x00-\x1F\x7F]/',
                 $id,
             ) === 1
@@ -548,9 +678,17 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             $id,
         );
 
+        if ($id === '') {
+            throw new CloudValidationException(
+                sprintf(
+                    'Cloud %s identifier cannot be empty.',
+                    $resource,
+                ),
+            );
+        }
+
         if (
-            $id === ''
-            || preg_match(
+            preg_match(
                 '/\A[a-zA-Z0-9]+(?:[._-][a-zA-Z0-9]+)*\z/',
                 $id,
             ) !== 1
@@ -575,7 +713,9 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
 
         if (
             $name === ''
-            || mb_strlen($name) > 255
+            || mb_strlen(
+                $name,
+            ) > 255
             || preg_match(
                 '/[\x00-\x1F\x7F]/',
                 $name,
@@ -596,23 +736,9 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
     private function normalizeSecurityGroupIds(
         array $ids,
     ): array {
-        $normalized = [];
-
-        foreach ($ids as $id) {
-            if (! is_string($id)) {
-                throw new CloudValidationException(
-                    'Cloud security group identifier must be a string.',
-                );
-            }
-
-            $normalized[] = $this->normalizeResourceId(
-                id: $id,
-                resource: 'security group',
-            );
-        }
-
-        $normalized = array_values(
-            array_unique($normalized),
+        $normalized = $this->normalizeOptionalResourceIds(
+            ids: $ids,
+            resource: 'security group',
         );
 
         if ($normalized === []) {
@@ -622,6 +748,39 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    private function normalizeOptionalResourceIds(
+        array $ids,
+        string $resource,
+    ): array {
+        $normalized = [];
+
+        foreach ($ids as $id) {
+            if (! is_string($id)) {
+                throw new CloudValidationException(
+                    sprintf(
+                        'Cloud %s identifier must be a string.',
+                        $resource,
+                    ),
+                );
+            }
+
+            $normalized[] = $this->normalizeResourceId(
+                id: $id,
+                resource: $resource,
+            );
+        }
+
+        return array_values(
+            array_unique(
+                $normalized,
+            ),
+        );
     }
 
     private function normalizeDiskSize(
@@ -663,47 +822,5 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         }
 
         return $username;
-    }
-
-    private function portEndpoint(
-        string $region,
-        string $portId,
-    ): string {
-        return sprintf(
-            'regions/%s/ports/%s',
-            rawurlencode($region),
-            rawurlencode($portId),
-        );
-    }
-
-    /**
-     * @param  list<string>  $ids
-     * @return list<string>
-     */
-    private function normalizeOptionalResourceIds(
-        array $ids,
-        string $resource,
-    ): array {
-        $normalized = [];
-
-        foreach ($ids as $id) {
-            if (! is_string($id)) {
-                throw new CloudValidationException(
-                    sprintf(
-                        'Cloud %s identifier must be a string.',
-                        $resource,
-                    ),
-                );
-            }
-
-            $normalized[] = $this->normalizeResourceId(
-                id: $id,
-                resource: $resource,
-            );
-        }
-
-        return array_values(
-            array_unique($normalized),
-        );
     }
 }

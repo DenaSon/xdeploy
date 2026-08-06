@@ -18,6 +18,7 @@ use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudServerPowerState;
 use App\Domain\Cloud\Enums\CloudServerStatus;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
@@ -109,7 +110,9 @@ final class ArvanCloudResponseMapper
             $regionId,
         );
 
-        $serverId = trim($serverId);
+        $serverId = trim(
+            $serverId,
+        );
 
         if ($serverId === '') {
             throw new CloudUnexpectedResponseException(
@@ -117,31 +120,13 @@ final class ArvanCloudResponseMapper
             );
         }
 
-        foreach (
-            $this->dataList($payload, 'servers') as $server
-        ) {
-            $currentId = $this->requiredString(
-                $server,
-                'id',
-                'server',
-            );
-
-            if ($currentId !== $serverId) {
-                continue;
-            }
-
-            return $this->mapServerObject(
-                server: $server,
-                regionId: $regionId,
-                defaultUsername: $defaultUsername,
-            );
-        }
-
-        throw new CloudResourceNotFoundException(
-            sprintf(
-                'Cloud server [%s] was not found.',
-                $serverId,
+        return $this->mapServerObject(
+            server: $this->serverObject(
+                payload: $payload,
+                serverId: $serverId,
             ),
+            regionId: $regionId,
+            defaultUsername: $defaultUsername,
         );
     }
 
@@ -641,6 +626,114 @@ final class ArvanCloudResponseMapper
     }
 
     /**
+     * GetServerDetails normally returns one server object directly.
+     *
+     * This parser also accepts the previous list response and an optional
+     * data envelope so existing tests and discovery responses remain valid.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function serverObject(
+        array $payload,
+        string $serverId,
+    ): array {
+        $candidate = array_key_exists(
+            'data',
+            $payload,
+        )
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server response has an invalid data envelope.',
+            );
+        }
+
+        if ($candidate === []) {
+            throw new CloudResourceNotFoundException(
+                sprintf(
+                    'Cloud server [%s] was not found.',
+                    $serverId,
+                ),
+            );
+        }
+
+        if (! array_is_list($candidate)) {
+            if (! array_key_exists('id', $candidate)) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server response has an invalid data envelope.',
+                );
+            }
+
+            /** @var array<string, mixed> $candidate */
+            $server = $candidate;
+
+            $this->assertExpectedServerId(
+                server: $server,
+                serverId: $serverId,
+            );
+
+            return $server;
+        }
+
+        foreach ($candidate as $item) {
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud servers response contains an invalid item.',
+                );
+            }
+
+            /** @var array<string, mixed> $item */
+            $currentId = $this->requiredString(
+                $item,
+                'id',
+                'server',
+            );
+
+            if ($currentId === $serverId) {
+                return $item;
+            }
+        }
+
+        throw new CloudResourceNotFoundException(
+            sprintf(
+                'Cloud server [%s] was not found.',
+                $serverId,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     */
+    private function assertExpectedServerId(
+        array $server,
+        string $serverId,
+    ): void {
+        $responseServerId = $this->requiredString(
+            $server,
+            'id',
+            'server',
+        );
+
+        if ($responseServerId === $serverId) {
+            return;
+        }
+
+        throw new CloudResourceNotFoundException(
+            sprintf(
+                'Cloud server [%s] was not found.',
+                $serverId,
+            ),
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $server
      */
     private function mapServerObject(
@@ -648,12 +741,14 @@ final class ArvanCloudResponseMapper
         string $regionId,
         string $defaultUsername,
     ): CloudServerData {
+        $providerStatus = $this->requiredString(
+            $server,
+            'status',
+            'server',
+        );
+
         $status = $this->mapServerStatus(
-            $this->requiredString(
-                $server,
-                'status',
-                'server',
-            ),
+            $providerStatus,
         );
 
         return new CloudServerData(
@@ -738,6 +833,50 @@ final class ArvanCloudResponseMapper
                 $server,
                 'ha_enabled',
                 false,
+            ),
+
+            sizeName: $this->nestedOptionalString(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'name',
+                resource: 'server flavor',
+            ),
+
+            vCpu: $this->nestedOptionalNonNegativeInt(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'vcpus',
+                resource: 'server flavor',
+            ),
+
+            memoryMiB: $this->nestedOptionalNonNegativeInt(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'ram',
+                resource: 'server flavor',
+            ),
+
+            diskGiB: $this->nestedOptionalNonNegativeInt(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'disk',
+                resource: 'server flavor',
+            ),
+
+            taskState: $this->optionalString(
+                $server,
+                'task_state',
+                'server',
+            ),
+
+            providerError: $this->optionalString(
+                $server,
+                'error',
+                'server',
+            ),
+
+            powerState: $this->mapServerPowerState(
+                $providerStatus,
             ),
         );
     }
@@ -847,28 +986,84 @@ final class ArvanCloudResponseMapper
     private function mapServerStatus(
         string $status,
     ): CloudServerStatus {
-        return match (strtoupper(trim($status))) {
-            'ACTIVE' => CloudServerStatus::Active,
-
-            'BUILD',
-            'BUILDING',
-            'CREATING',
-            'PROVISIONING',
-            'QUEUED',
+        return match ($this->normalizeProviderStatus($status)) {
+            'ACTIVE',
+            'SHUTOFF',
+            'STOPPED',
+            'PAUSED',
+            'SUSPENDED',
+            'POWERING_ON',
+            'POWERING_OFF',
+            'STARTING',
+            'STOPPING',
             'REBUILD',
             'REBOOT',
             'HARD_REBOOT',
             'RESIZE',
             'VERIFY_RESIZE',
             'REVERT_RESIZE',
-            'PASSWORD' => CloudServerStatus::Provisioning,
+            'PASSWORD' => CloudServerStatus::Active,
+
+            'BUILD',
+            'BUILDING',
+            'CREATING',
+            'PROVISIONING',
+            'QUEUED' => CloudServerStatus::Provisioning,
 
             'ERROR',
             'FAILED',
-            'DELETED' => CloudServerStatus::Failed,
+            'DELETED',
+            'TERMINATED' => CloudServerStatus::Failed,
 
             default => CloudServerStatus::Unknown,
         };
+    }
+
+    private function mapServerPowerState(
+        string $status,
+    ): CloudServerPowerState {
+        return match ($this->normalizeProviderStatus($status)) {
+            'ACTIVE' => CloudServerPowerState::Running,
+
+            'SHUTOFF',
+            'STOPPED',
+            'PAUSED',
+            'SUSPENDED' => CloudServerPowerState::Stopped,
+
+            'BUILD',
+            'BUILDING',
+            'CREATING',
+            'PROVISIONING',
+            'QUEUED',
+            'POWERING_ON',
+            'POWERING_OFF',
+            'STARTING',
+            'STOPPING',
+            'REBUILD',
+            'REBOOT',
+            'HARD_REBOOT',
+            'RESIZE',
+            'VERIFY_RESIZE',
+            'REVERT_RESIZE',
+            'PASSWORD' => CloudServerPowerState::Transitioning,
+
+            'ERROR',
+            'FAILED',
+            'DELETED',
+            'TERMINATED' => CloudServerPowerState::Error,
+
+            default => CloudServerPowerState::Unknown,
+        };
+    }
+
+    private function normalizeProviderStatus(
+        string $status,
+    ): string {
+        return strtoupper(
+            trim(
+                $status,
+            ),
+        );
     }
 
     /**
@@ -1150,6 +1345,170 @@ final class ArvanCloudResponseMapper
     }
 
     /**
+     * @param  array<string, mixed>  $data
+     */
+    private function nestedOptionalString(
+        array $data,
+        string $objectKey,
+        string $valueKey,
+        string $resource,
+    ): ?string {
+        $object = $this->optionalNestedObject(
+            data: $data,
+            key: $objectKey,
+            resource: $resource,
+        );
+
+        if ($object === null) {
+            return null;
+        }
+
+        return $this->optionalString(
+            $object,
+            $valueKey,
+            $resource,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function nestedOptionalNonNegativeInt(
+        array $data,
+        string $objectKey,
+        string $valueKey,
+        string $resource,
+    ): ?int {
+        $object = $this->optionalNestedObject(
+            data: $data,
+            key: $objectKey,
+            resource: $resource,
+        );
+
+        if ($object === null) {
+            return null;
+        }
+
+        return $this->optionalNonNegativeInt(
+            data: $object,
+            key: $valueKey,
+            resource: $resource,
+        );
+    }
+
+    /**
+     * String references are valid for fields such as flavor and image,
+     * but they do not contain nested metadata.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|null
+     */
+    private function optionalNestedObject(
+        array $data,
+        string $key,
+        string $resource,
+    ): ?array {
+        if (
+            ! array_key_exists($key, $data)
+            || $data[$key] === null
+            || is_string($data[$key])
+        ) {
+            return null;
+        }
+
+        if (
+            ! is_array($data[$key])
+            || array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s must be an object, string, or null.',
+                    $resource,
+                ),
+            );
+        }
+
+        /** @var array<string, mixed> $object */
+        $object = $data[$key];
+
+        return $object;
+    }
+
+    /**
+     * OpenAPI describes some server flavor values as numbers rather than
+     * strict integers, while xDeploy requires whole resource units.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function optionalNonNegativeInt(
+        array $data,
+        string $key,
+        string $resource,
+    ): ?int {
+        if (
+            ! array_key_exists($key, $data)
+            || $data[$key] === null
+            || $data[$key] === ''
+        ) {
+            return null;
+        }
+
+        $value = $data[$key];
+
+        if (is_int($value)) {
+            if ($value < 0) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] must be a non-negative integer.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+
+            return $value;
+        }
+
+        if (
+            is_float($value)
+            && is_finite($value)
+            && $value >= 0
+            && floor($value) === $value
+            && $value <= PHP_INT_MAX
+        ) {
+            return (int) $value;
+        }
+
+        if (is_string($value)) {
+            $value = trim(
+                $value,
+            );
+
+            $normalized = filter_var(
+                $value,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 0,
+                    ],
+                ],
+            );
+
+            if ($normalized !== false) {
+                return $normalized;
+            }
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s field [%s] must be a non-negative integer.',
+                $resource,
+                $key,
+            ),
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $server
      */
     private function serverUsername(
@@ -1160,6 +1519,13 @@ final class ArvanCloudResponseMapper
             $server,
             'username',
             'server',
+        );
+
+        $username ??= $this->nestedOptionalString(
+            data: $server,
+            objectKey: 'image',
+            valueKey: 'username',
+            resource: 'server image',
         );
 
         if ($username !== null) {
