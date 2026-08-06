@@ -23,6 +23,16 @@ use LogicException;
 
 final class ArvanCloudClient
 {
+    private const string PROVIDER = 'arvan';
+
+    private const string METHOD_GET = 'GET';
+
+    private const string METHOD_POST = 'POST';
+
+    private const string METHOD_PUT = 'PUT';
+
+    private const string METHOD_DELETE = 'DELETE';
+
     private readonly string $baseUrl;
 
     private readonly string $apiKey;
@@ -65,7 +75,7 @@ final class ArvanCloudClient
         array $query = [],
     ): array {
         return $this->request(
-            method: 'GET',
+            method: self::METHOD_GET,
             path: $path,
             data: $query,
         );
@@ -80,7 +90,22 @@ final class ArvanCloudClient
         array $payload = [],
     ): array {
         return $this->request(
-            method: 'POST',
+            method: self::METHOD_POST,
+            path: $path,
+            data: $payload,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public function put(
+        string $path,
+        array $payload = [],
+    ): array {
+        return $this->request(
+            method: self::METHOD_PUT,
             path: $path,
             data: $payload,
         );
@@ -95,7 +120,7 @@ final class ArvanCloudClient
         array $payload = [],
     ): array {
         return $this->request(
-            method: 'DELETE',
+            method: self::METHOD_DELETE,
             path: $path,
             data: $payload,
         );
@@ -108,38 +133,27 @@ final class ArvanCloudClient
     private function request(
         string $method,
         string $path,
-        array $data = [],
+        array $data,
     ): array {
-        $endpoint = $this->normalizePath($path);
-        $url = "{$this->baseUrl}/{$endpoint}";
+        $endpoint = $this->normalizePath(
+            $path,
+        );
+
+        $url = sprintf(
+            '%s/%s',
+            $this->baseUrl,
+            $endpoint,
+        );
+
         $startedAt = microtime(true);
 
         try {
-            $request = $this->pendingRequest();
-
-            $response = match ($method) {
-                'GET' => $request->get(
-                    url: $url,
-                    query: $data,
-                ),
-
-                'POST' => $request->post(
-                    url: $url,
-                    data: $data,
-                ),
-
-                'DELETE' => $request->delete(
-                    url: $url,
-                    data: $data,
-                ),
-
-                default => throw new LogicException(
-                    sprintf(
-                        'Unsupported cloud HTTP method [%s].',
-                        $method,
-                    ),
-                ),
-            };
+            $response = $this->sendRequest(
+                request: $this->pendingRequest(),
+                method: $method,
+                url: $url,
+                data: $data,
+            );
         } catch (ConnectionException $exception) {
             $this->logConnectionFailure(
                 method: $method,
@@ -171,12 +185,54 @@ final class ArvanCloudClient
         );
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function sendRequest(
+        PendingRequest $request,
+        string $method,
+        string $url,
+        array $data,
+    ): Response {
+        return match ($method) {
+            self::METHOD_GET => $request->get(
+                url: $url,
+                query: $data,
+            ),
+
+            self::METHOD_POST => $request->post(
+                url: $url,
+                data: $data,
+            ),
+
+            self::METHOD_PUT => $request->put(
+                url: $url,
+                data: $data,
+            ),
+
+            self::METHOD_DELETE => $request->delete(
+                url: $url,
+                data: $data,
+            ),
+
+            default => throw new LogicException(
+                sprintf(
+                    'Unsupported cloud HTTP method [%s].',
+                    $method,
+                ),
+            ),
+        };
+    }
+
     private function pendingRequest(): PendingRequest
     {
         return Http::acceptJson()
             ->asJson()
             ->withHeaders([
-                'Authorization' => "Apikey {$this->apiKey}",
+                'Authorization' => sprintf(
+                    'Apikey %s',
+                    $this->apiKey,
+                ),
             ])
             ->connectTimeout(
                 $this->connectTimeout,
@@ -331,7 +387,10 @@ final class ArvanCloudClient
         );
 
         foreach (
-            explode('/', $decodedPath) as $segment
+            explode(
+                '/',
+                $decodedPath,
+            ) as $segment
         ) {
             if (
                 $segment === ''
@@ -353,9 +412,24 @@ final class ArvanCloudClient
     private function decodeResponse(
         Response $response,
     ): array {
+        $body = trim(
+            $response->body(),
+        );
+
+        /*
+         * Mutation endpoints may return 204 No Content or an
+         * otherwise successful response with an empty body.
+         */
+        if (
+            $response->status() === 204
+            || $body === ''
+        ) {
+            return [];
+        }
+
         try {
             $payload = json_decode(
-                json: $response->body(),
+                json: $body,
                 associative: true,
                 depth: 512,
                 flags: JSON_THROW_ON_ERROR,
@@ -497,7 +571,7 @@ final class ArvanCloudClient
         Log::warning(
             'Cloud provider connection failed.',
             [
-                'provider' => 'arvan',
+                'provider' => self::PROVIDER,
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'duration_ms' => $this->durationMilliseconds(
@@ -518,7 +592,7 @@ final class ArvanCloudClient
          * Create responses can contain generated passwords.
          */
         $context = [
-            'provider' => 'arvan',
+            'provider' => self::PROVIDER,
             'method' => $method,
             'endpoint' => $endpoint,
             'status' => $response->status(),
@@ -558,7 +632,7 @@ final class ArvanCloudClient
         float $startedAt,
     ): float {
         return round(
-            (microtime(true) - $startedAt) * 1000,
+            (microtime(true) - $startedAt) * 1_000,
             2,
         );
     }

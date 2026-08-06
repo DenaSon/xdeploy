@@ -16,11 +16,19 @@ use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Throwable;
 
 final class ArvanCloudClientTest extends TestCase
 {
+    private const string BASE_URL =
+        'https://api.example.test/ecc/v1';
+
+    private const string API_KEY =
+        'test-api-key';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,7 +39,7 @@ final class ArvanCloudClientTest extends TestCase
     public function test_it_sends_an_authenticated_get_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' => Http::response([
+            self::BASE_URL.'/*' => Http::response([
                 'data' => [],
             ]),
         ]);
@@ -53,11 +61,12 @@ final class ArvanCloudClientTest extends TestCase
         Http::assertSent(
             function (Request $request): bool {
                 return $request->method() === 'GET'
-                    && $request->url() ===
-                    'https://api.example.test/ecc/v1/regions/eu-west1-a/images?type=distributions'
+                    && $request->url() === self::BASE_URL
+                    .'/regions/eu-west1-a/images'
+                    .'?type=distributions'
                     && $request->hasHeader(
                         'Authorization',
-                        'Apikey test-api-key',
+                        'Apikey '.self::API_KEY,
                     )
                     && $request->hasHeader(
                         'Accept',
@@ -65,12 +74,14 @@ final class ArvanCloudClientTest extends TestCase
                     );
             },
         );
+
+        Http::assertSentCount(1);
     }
 
     public function test_it_sends_an_authenticated_post_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' => Http::response(
+            self::BASE_URL.'/*' => Http::response(
                 [
                     'id' => 'cloud-server-id',
                     'status' => 'BUILD',
@@ -104,11 +115,11 @@ final class ArvanCloudClientTest extends TestCase
         Http::assertSent(
             function (Request $request) use ($payload): bool {
                 return $request->method() === 'POST'
-                    && $request->url() ===
-                    'https://api.example.test/ecc/v1/regions/eu-west1-a/servers'
+                    && $request->url() === self::BASE_URL
+                    .'/regions/eu-west1-a/servers'
                     && $request->hasHeader(
                         'Authorization',
-                        'Apikey test-api-key',
+                        'Apikey '.self::API_KEY,
                     )
                     && $request->hasHeader(
                         'Accept',
@@ -121,12 +132,14 @@ final class ArvanCloudClientTest extends TestCase
                     && $request->data() === $payload;
             },
         );
+
+        Http::assertSentCount(1);
     }
 
     public function test_it_sends_post_request_without_payload(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' => Http::response(
+            self::BASE_URL.'/*' => Http::response(
                 [
                     'message' => 'Server is powering on.',
                 ],
@@ -146,17 +159,100 @@ final class ArvanCloudClientTest extends TestCase
         Http::assertSent(
             function (Request $request): bool {
                 return $request->method() === 'POST'
-                    && $request->url() ===
-                    'https://api.example.test/ecc/v1/regions/eu-west1-a/servers/server-123/power-on'
+                    && $request->url() === self::BASE_URL
+                    .'/regions/eu-west1-a/servers/'
+                    .'server-123/power-on'
                     && $request->data() === [];
             },
         );
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_sends_an_authenticated_put_request(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/*' => Http::response(
+                [
+                    'message' => 'Root volume resize accepted.',
+                ],
+                202,
+            ),
+        ]);
+
+        $payload = [
+            'new_size' => 75,
+        ];
+
+        $result = $this->client()->put(
+            'regions/eu-west1-a/servers/server-123/resizeRoot',
+            $payload,
+        );
+
+        $this->assertSame(
+            'Root volume resize accepted.',
+            $result['message'],
+        );
+
+        Http::assertSent(
+            function (Request $request) use ($payload): bool {
+                return $request->method() === 'PUT'
+                    && $request->url() === self::BASE_URL
+                    .'/regions/eu-west1-a/servers/'
+                    .'server-123/resizeRoot'
+                    && $request->hasHeader(
+                        'Authorization',
+                        'Apikey '.self::API_KEY,
+                    )
+                    && $request->hasHeader(
+                        'Accept',
+                        'application/json',
+                    )
+                    && $request->hasHeader(
+                        'Content-Type',
+                        'application/json',
+                    )
+                    && $request->data() === $payload;
+            },
+        );
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_sends_put_request_without_payload(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/*' => Http::response(
+                [
+                    'message' => 'Operation accepted.',
+                ],
+                202,
+            ),
+        ]);
+
+        $result = $this->client()->put(
+            'regions/eu-west1-a/resources/resource-123',
+        );
+
+        $this->assertSame(
+            'Operation accepted.',
+            $result['message'],
+        );
+
+        Http::assertSent(
+            function (Request $request): bool {
+                return $request->method() === 'PUT'
+                    && $request->data() === [];
+            },
+        );
+
+        Http::assertSentCount(1);
     }
 
     public function test_it_sends_an_authenticated_delete_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' => Http::response([
+            self::BASE_URL.'/*' => Http::response([
                 'message' => 'Port deleted.',
             ]),
         ]);
@@ -173,11 +269,11 @@ final class ArvanCloudClientTest extends TestCase
         Http::assertSent(
             function (Request $request): bool {
                 return $request->method() === 'DELETE'
-                    && $request->url() ===
-                    'https://api.example.test/ecc/v1/regions/eu-west1-a/ports/port-123'
+                    && $request->url() === self::BASE_URL
+                    .'/regions/eu-west1-a/ports/port-123'
                     && $request->hasHeader(
                         'Authorization',
-                        'Apikey test-api-key',
+                        'Apikey '.self::API_KEY,
                     )
                     && $request->hasHeader(
                         'Accept',
@@ -190,12 +286,14 @@ final class ArvanCloudClientTest extends TestCase
                     && $request->data() === [];
             },
         );
+
+        Http::assertSentCount(1);
     }
 
     public function test_it_sends_payload_with_delete_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' => Http::response([
+            self::BASE_URL.'/*' => Http::response([
                 'message' => 'Resource deleted.',
             ]),
         ]);
@@ -212,9 +310,14 @@ final class ArvanCloudClientTest extends TestCase
         Http::assertSent(
             function (Request $request) use ($payload): bool {
                 return $request->method() === 'DELETE'
+                    && $request->url() === self::BASE_URL
+                    .'/regions/eu-west1-a/resources/'
+                    .'resource-123'
                     && $request->data() === $payload;
             },
         );
+
+        Http::assertSentCount(1);
     }
 
     public function test_it_does_not_use_bearer_authentication(): void
@@ -225,12 +328,14 @@ final class ArvanCloudClientTest extends TestCase
             ]),
         ]);
 
-        $this->client()->get('regions');
+        $this->client()->get(
+            'regions',
+        );
 
         Http::assertSent(
             fn (Request $request): bool => ! $request->hasHeader(
                 'Authorization',
-                'Bearer test-api-key',
+                'Bearer '.self::API_KEY,
             ),
         );
     }
@@ -244,23 +349,25 @@ final class ArvanCloudClientTest extends TestCase
         ]);
 
         $client = new ArvanCloudClient(
-            baseUrl: 'https://api.example.test/ecc/v1',
-            apiKey: 'Apikey test-api-key',
+            baseUrl: self::BASE_URL,
+            apiKey: 'Apikey '.self::API_KEY,
             connectTimeout: 5,
             requestTimeout: 15,
         );
 
-        $client->get('regions');
+        $client->get(
+            'regions',
+        );
 
         Http::assertSent(
             function (Request $request): bool {
                 return $request->hasHeader(
                     'Authorization',
-                    'Apikey test-api-key',
+                    'Apikey '.self::API_KEY,
                 )
                     && ! $request->hasHeader(
                         'Authorization',
-                        'Apikey Apikey test-api-key',
+                        'Apikey Apikey '.self::API_KEY,
                     );
             },
         );
@@ -275,17 +382,19 @@ final class ArvanCloudClientTest extends TestCase
         ]);
 
         $client = new ArvanCloudClient(
-            baseUrl: 'https://api.example.test/ecc/v1/',
-            apiKey: 'test-api-key',
+            baseUrl: self::BASE_URL.'/',
+            apiKey: self::API_KEY,
             connectTimeout: 5,
             requestTimeout: 15,
         );
 
-        $client->get('regions');
+        $client->get(
+            'regions',
+        );
 
         Http::assertSent(
             fn (Request $request): bool => $request->url() ===
-                'https://api.example.test/ecc/v1/regions',
+                self::BASE_URL.'/regions',
         );
     }
 
@@ -332,6 +441,66 @@ final class ArvanCloudClientTest extends TestCase
         );
     }
 
+    public function test_it_accepts_successful_204_response(): void
+    {
+        Http::fake([
+            '*' => Http::response(
+                '',
+                204,
+            ),
+        ]);
+
+        $result = $this->client()->put(
+            'regions/eu-west1-a/servers/server-123/resizeRoot',
+            [
+                'new_size' => 75,
+            ],
+        );
+
+        $this->assertSame(
+            [],
+            $result,
+        );
+    }
+
+    public function test_it_accepts_successful_response_with_empty_body(): void
+    {
+        Http::fake([
+            '*' => Http::response(
+                '',
+                200,
+            ),
+        ]);
+
+        $result = $this->client()->delete(
+            'regions/eu-west1-a/ports/port-123',
+        );
+
+        $this->assertSame(
+            [],
+            $result,
+        );
+    }
+
+    public function test_it_accepts_successful_response_with_whitespace_body(): void
+    {
+        Http::fake([
+            '*' => Http::response(
+                " \n\t ",
+                200,
+            ),
+        ]);
+
+        $result = $this->client()->post(
+            'regions/eu-west1-a/servers/server-123/power-off',
+        );
+
+        $this->assertSame(
+            [],
+            $result,
+        );
+    }
+
     public function test_it_rejects_invalid_json(): void
     {
         Http::fake([
@@ -352,7 +521,9 @@ final class ArvanCloudClientTest extends TestCase
             'Cloud provider returned invalid JSON.',
         );
 
-        $this->client()->get('regions');
+        $this->client()->get(
+            'regions',
+        );
     }
 
     public function test_it_rejects_scalar_json(): void
@@ -375,7 +546,9 @@ final class ArvanCloudClientTest extends TestCase
             'Cloud provider returned an unexpected JSON payload.',
         );
 
-        $this->client()->get('regions');
+        $this->client()->get(
+            'regions',
+        );
     }
 
     #[DataProvider('mappedStatusProvider')]
@@ -396,13 +569,15 @@ final class ArvanCloudClientTest extends TestCase
             $expectedException,
         );
 
-        $this->client()->get('regions');
+        $this->client()->get(
+            'regions',
+        );
     }
 
     /**
      * @return array<string, array{
      *     int,
-     *     class-string<\Throwable>
+     *     class-string<Throwable>
      * }>
      */
     public static function mappedStatusProvider(): array
@@ -447,6 +622,10 @@ final class ArvanCloudClientTest extends TestCase
                 409,
                 CloudValidationException::class,
             ],
+
+            'terminated server' => [
+                419,
+                CloudValidationException::class,           ],
 
             'terminated server' => [
                 419,
@@ -532,7 +711,9 @@ final class ArvanCloudClientTest extends TestCase
         ]);
 
         try {
-            $this->client()->get('regions');
+            $this->client()->get(
+                'regions',
+            );
 
             $this->fail(
                 'Expected rate limit exception was not thrown.',
@@ -564,7 +745,9 @@ final class ArvanCloudClientTest extends TestCase
         ]);
 
         try {
-            $this->client()->get('regions');
+            $this->client()->get(
+                'regions',
+            );
 
             $this->fail(
                 'Expected rate limit exception was not thrown.',
@@ -578,8 +761,12 @@ final class ArvanCloudClientTest extends TestCase
         }
     }
 
-    public function test_it_maps_get_transport_failure(): void
-    {
+    #[DataProvider('transportFailureProvider')]
+    public function test_it_maps_transport_failures(
+        string $method,
+        string $path,
+        array $data,
+    ): void {
         Http::fake([
             '*' => Http::failedConnection(
                 'Connection failed.',
@@ -594,52 +781,76 @@ final class ArvanCloudClientTest extends TestCase
             'Could not connect to the cloud provider.',
         );
 
-        $this->client()->get('regions');
+        $client = $this->client();
+
+        match ($method) {
+            'GET' => $client->get(
+                $path,
+                $data,
+            ),
+
+            'POST' => $client->post(
+                $path,
+                $data,
+            ),
+
+            'PUT' => $client->put(
+                $path,
+                $data,
+            ),
+
+            'DELETE' => $client->delete(
+                $path,
+                $data,
+            ),
+
+            default => throw new LogicException(
+                sprintf(
+                    'Unsupported test HTTP method [%s].',
+                    $method,
+                ),
+            ),
+        };
     }
 
-    public function test_it_maps_post_transport_failure(): void
+    /**
+     * @return array<string, array{
+     *     string,
+     *     string,
+     *     array<string, mixed>
+     * }>
+     */
+    public static function transportFailureProvider(): array
     {
-        Http::fake([
-            '*' => Http::failedConnection(
-                'Connection failed.',
-            ),
-        ]);
-
-        $this->expectException(
-            CloudConnectionException::class,
-        );
-
-        $this->expectExceptionMessage(
-            'Could not connect to the cloud provider.',
-        );
-
-        $this->client()->post(
-            'regions/eu-west1-a/servers',
-            [
-                'name' => 'xdeploy-server',
+        return [
+            'get request' => [
+                'GET',
+                'regions',
+                [],
             ],
-        );
-    }
 
-    public function test_it_maps_delete_transport_failure(): void
-    {
-        Http::fake([
-            '*' => Http::failedConnection(
-                'Connection failed.',
-            ),
-        ]);
+            'post request' => [
+                'POST',
+                'regions/eu-west1-a/servers',
+                [
+                    'name' => 'xdeploy-server',
+                ],
+            ],
 
-        $this->expectException(
-            CloudConnectionException::class,
-        );
+            'put request' => [
+                'PUT',
+                'regions/eu-west1-a/servers/server-123/resizeRoot',
+                [
+                    'new_size' => 75,
+                ],
+            ],
 
-        $this->expectExceptionMessage(
-            'Could not connect to the cloud provider.',
-        );
-
-        $this->client()->delete(
-            'regions/eu-west1-a/ports/port-123',
-        );
+            'delete request' => [
+                'DELETE',
+                'regions/eu-west1-a/ports/port-123',
+                [],
+            ],
+        ];
     }
 
     #[DataProvider('invalidPathProvider')]
@@ -650,9 +861,13 @@ final class ArvanCloudClientTest extends TestCase
             CloudValidationException::class,
         );
 
-        $this->client()->get(
-            $path,
-        );
+        try {
+            $this->client()->get(
+                $path,
+            );
+        } finally {
+            Http::assertNothingSent();
+        }
     }
 
     /**
@@ -713,7 +928,7 @@ final class ArvanCloudClientTest extends TestCase
 
         Http::assertSent(
             fn (Request $request): bool => $request->url() ===
-                'https://api.example.test/ecc/v1/regions',
+                self::BASE_URL.'/regions',
         );
     }
 
@@ -725,7 +940,7 @@ final class ArvanCloudClientTest extends TestCase
 
         new ArvanCloudClient(
             baseUrl: 'http://api.example.test',
-            apiKey: 'test-api-key',
+            apiKey: self::API_KEY,
             connectTimeout: 5,
             requestTimeout: 15,
         );
@@ -741,7 +956,7 @@ final class ArvanCloudClientTest extends TestCase
 
         new ArvanCloudClient(
             baseUrl: $baseUrl,
-            apiKey: 'test-api-key',
+            apiKey: self::API_KEY,
             connectTimeout: 5,
             requestTimeout: 15,
         );
@@ -786,7 +1001,7 @@ final class ArvanCloudClientTest extends TestCase
         );
 
         new ArvanCloudClient(
-            baseUrl: 'https://api.example.test',
+            baseUrl: self::BASE_URL,
             apiKey: ' ',
             connectTimeout: 5,
             requestTimeout: 15,
@@ -800,7 +1015,7 @@ final class ArvanCloudClientTest extends TestCase
         );
 
         new ArvanCloudClient(
-            baseUrl: 'https://api.example.test',
+            baseUrl: self::BASE_URL,
             apiKey: 'invalid api key',
             connectTimeout: 5,
             requestTimeout: 15,
@@ -814,8 +1029,8 @@ final class ArvanCloudClientTest extends TestCase
         );
 
         new ArvanCloudClient(
-            baseUrl: 'https://api.example.test',
-            apiKey: 'test-api-key',
+            baseUrl: self::BASE_URL,
+            apiKey: self::API_KEY,
             connectTimeout: 0,
             requestTimeout: 15,
         );
@@ -828,8 +1043,8 @@ final class ArvanCloudClientTest extends TestCase
         );
 
         new ArvanCloudClient(
-            baseUrl: 'https://api.example.test',
-            apiKey: 'test-api-key',
+            baseUrl: self::BASE_URL,
+            apiKey: self::API_KEY,
             connectTimeout: 5,
             requestTimeout: 0,
         );
@@ -838,8 +1053,8 @@ final class ArvanCloudClientTest extends TestCase
     private function client(): ArvanCloudClient
     {
         return new ArvanCloudClient(
-            baseUrl: 'https://api.example.test/ecc/v1',
-            apiKey: 'test-api-key',
+            baseUrl: self::BASE_URL,
+            apiKey: self::API_KEY,
             connectTimeout: 5,
             requestTimeout: 15,
         );
