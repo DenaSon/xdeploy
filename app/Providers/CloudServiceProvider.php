@@ -8,6 +8,8 @@ use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
@@ -22,7 +24,9 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudClient();
         $this->registerArvanCloudMapper();
         $this->registerArvanCloudProvider();
-        $this->registerCloudContracts();
+
+        $this->registerCloudProviderContract();
+        $this->registerCloudCapabilityContracts();
     }
 
     private function registerArvanCloudClient(): void
@@ -113,26 +117,12 @@ final class CloudServiceProvider extends ServiceProvider
                     'cinder',
                 );
 
-                $defaultUsername = config(
-                    'cloud.providers.arvan.defaults.default_username',
-                    'ubuntu',
-                );
-
                 if (
                     ! is_string($createType)
                     || trim($createType) === ''
                 ) {
                     throw new CloudConfigurationException(
-                        'ArvanCloud create type is not configured.',
-                    );
-                }
-
-                if (
-                    ! is_string($defaultUsername)
-                    || trim($defaultUsername) === ''
-                ) {
-                    throw new CloudConfigurationException(
-                        'ArvanCloud default username is not configured.',
+                        'ArvanCloud default create type is not configured.',
                     );
                 }
 
@@ -145,44 +135,68 @@ final class CloudServiceProvider extends ServiceProvider
                         ArvanCloudResponseMapper::class,
                     ),
 
-                    createType: trim(
-                        $createType,
-                    ),
+                    createType: trim($createType),
 
-                    defaultUsername: trim(
-                        $defaultUsername,
-                    ),
+                    defaultUsername: 'ubuntu',
                 );
             },
         );
     }
 
-    private function registerCloudContracts(): void
+    private function registerCloudProviderContract(): void
+    {
+        $this->app->singleton(
+            CloudProviderInterface::class,
+            function (
+                Application $app,
+            ): CloudProviderInterface {
+                return $this->resolveDefaultCloudProvider(
+                    $app,
+                );
+            },
+        );
+    }
+
+    private function registerCloudCapabilityContracts(): void
     {
         $contracts = [
-            CloudProviderInterface::class,
             CloudServerProvisionerInterface::class,
             CloudServerLifecycleInterface::class,
             CloudServerNetworkingInterface::class,
+            CloudServerResizeCatalogInterface::class,
+            CloudServerResizerInterface::class,
         ];
 
         foreach ($contracts as $contract) {
             $this->app->singleton(
                 $contract,
-                function (
+                static function (
                     Application $app,
-                ): ArvanCloudProvider {
-                    return $this->resolveDefaultProvider(
-                        $app,
+                ) use (
+                    $contract,
+                ): object {
+                    $provider = $app->make(
+                        CloudProviderInterface::class,
                     );
+
+                    if (! $provider instanceof $contract) {
+                        throw new CloudConfigurationException(
+                            sprintf(
+                                'The default cloud provider does not support contract [%s].',
+                                $contract,
+                            ),
+                        );
+                    }
+
+                    return $provider;
                 },
             );
         }
     }
 
-    private function resolveDefaultProvider(
+    private function resolveDefaultCloudProvider(
         Application $app,
-    ): ArvanCloudProvider {
+    ): CloudProviderInterface {
         $provider = $this->defaultCloudProvider();
 
         return match ($provider) {

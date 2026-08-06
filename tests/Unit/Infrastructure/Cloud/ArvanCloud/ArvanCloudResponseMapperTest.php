@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Infrastructure\Cloud\ArvanCloud;
 
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
@@ -291,6 +292,276 @@ final class ArvanCloudResponseMapperTest extends TestCase
             CloudBillingPeriod::Monthly,
             $size->monthlyPrice->billingPeriod,
         );
+    }
+
+    public function test_it_maps_server_resize_plans(): void
+    {
+        $plans = $this->mapper->mapServerResizePlans(
+            payload: [
+                'data' => [
+                    $this->resizePlanObject(),
+                    $this->resizePlanObject([
+                        'id' => 'eco-4-8-0',
+                        'name' => 'eco-large',
+                        'cpu_count' => 4,
+                        'memory_in_bytes' => 8_589_934_592,
+                        'disk_in_bytes' => 107_374_182_400,
+                        'price_per_hour' => 46_400.5,
+                        'price_per_month' => 33_408_000,
+                    ]),
+                ],
+            ],
+            regionId: self::REGION_ID,
+        );
+
+        $this->assertCount(
+            2,
+            $plans,
+        );
+
+        $plan = $this->findById(
+            $plans,
+            'eco-2-2-0',
+        );
+
+        $this->assertSame(
+            self::REGION_ID,
+            $plan->regionId,
+        );
+
+        $this->assertSame(
+            2,
+            $plan->vCpu,
+        );
+
+        $this->assertSame(
+            2048,
+            $plan->memoryMiB,
+        );
+
+        $this->assertSame(
+            50,
+            $plan->diskGiB,
+        );
+
+        $this->assertSame(
+            'economic',
+            $plan->category,
+        );
+
+        $this->assertSame(
+            '23200.5',
+            $plan->hourlyPrice?->amount,
+        );
+
+        $this->assertSame(
+            CloudBillingPeriod::Hourly,
+            $plan->hourlyPrice?->billingPeriod,
+        );
+
+        $this->assertSame(
+            '16704000',
+            $plan->monthlyPrice?->amount,
+        );
+    }
+
+    public function test_it_accepts_direct_resize_plan_object(): void
+    {
+        $plans = $this->mapper->mapServerResizePlans(
+            payload: $this->resizePlanObject(),
+            regionId: self::REGION_ID,
+        );
+
+        $this->assertCount(
+            1,
+            $plans,
+        );
+
+        $this->assertSame(
+            'eco-2-2-0',
+            $plans[0]->id,
+        );
+    }
+
+    public function test_it_maps_single_size_response(): void
+    {
+        $size = $this->mapper->mapSize(
+            payload: [
+                'data' => $this->singleSizeObject(),
+            ],
+            regionId: self::REGION_ID,
+        );
+
+        $this->assertSame(
+            'eco-2-2-0',
+            $size->id,
+        );
+
+        $this->assertSame(
+            'eco-small4',
+            $size->name,
+        );
+
+        $this->assertSame(
+            2,
+            $size->vCpu,
+        );
+
+        $this->assertSame(
+            2048,
+            $size->memoryMiB,
+        );
+
+        $this->assertSame(
+            50,
+            $size->diskGiB,
+        );
+
+        $this->assertSame(
+            '23200',
+            $size->hourlyPrice?->amount,
+        );
+
+        $this->assertSame(
+            '16704000',
+            $size->monthlyPrice?->amount,
+        );
+    }
+
+    public function test_it_maps_calculated_size_response(): void
+    {
+        $size = $this->mapper->mapCalculatedSize(
+            payload: $this->singleSizeObject([
+                'disk' => 80,
+                'price_per_hour' => 25_750.75,
+                'price_per_month' => '18540540.50',
+            ]),
+            regionId: self::REGION_ID,
+        );
+
+        $this->assertSame(
+            80,
+            $size->diskGiB,
+        );
+
+        $this->assertSame(
+            '25750.75',
+            $size->hourlyPrice?->amount,
+        );
+
+        $this->assertSame(
+            '18540540.50',
+            $size->monthlyPrice?->amount,
+        );
+    }
+
+    public function test_it_maps_disk_price_response(): void
+    {
+        $price = $this->mapper->mapDiskPrice([
+            'data' => [
+                'disk' => 80,
+                'price_per_hour' => 2550.25,
+                'price_per_month' => '1836180.50',
+            ],
+        ]);
+
+        $this->assertInstanceOf(
+            CloudDiskPriceData::class,
+            $price,
+        );
+
+        $this->assertSame(
+            80,
+            $price->diskGiB,
+        );
+
+        $this->assertSame(
+            '2550.25',
+            $price->hourlyPrice->amount,
+        );
+
+        $this->assertSame(
+            CloudBillingPeriod::Hourly,
+            $price->hourlyPrice->billingPeriod,
+        );
+
+        $this->assertSame(
+            '1836180.50',
+            $price->monthlyPrice->amount,
+        );
+
+        $this->assertSame(
+            CloudBillingPeriod::Monthly,
+            $price->monthlyPrice->billingPeriod,
+        );
+    }
+
+    public function test_it_rejects_resize_plan_from_unexpected_region(): void
+    {
+        $this->expectException(
+            CloudUnexpectedResponseException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'ArvanCloud server resize plan belongs to unexpected region [ir-thr-at1].',
+        );
+
+        $this->mapper->mapServerResizePlans(
+            payload: $this->resizePlanObject([
+                'availabilityZone' => 'ir-thr-at1',
+            ]),
+            regionId: self::REGION_ID,
+        );
+    }
+
+    #[DataProvider('invalidResizePriceProvider')]
+    public function test_it_rejects_invalid_resize_prices(
+        mixed $value,
+    ): void {
+        $this->expectException(
+            CloudUnexpectedResponseException::class,
+        );
+
+        $this->mapper->mapCalculatedSize(
+            payload: $this->singleSizeObject([
+                'price_per_hour' => $value,
+            ]),
+            regionId: self::REGION_ID,
+        );
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function invalidResizePriceProvider(): array
+    {
+        return [
+            'negative integer' => [
+                -1,
+            ],
+
+            'negative float' => [
+                -0.5,
+            ],
+
+            'negative numeric string' => [
+                '-1.25',
+            ],
+
+            'non numeric string' => [
+                'invalid-price',
+            ],
+
+            'boolean' => [
+                true,
+            ],
+
+            'array' => [
+                [
+                    100,
+                ],
+            ],
+        ];
     }
 
     public function test_it_flattens_and_maps_images(): void
@@ -1385,6 +1656,51 @@ final class ArvanCloudResponseMapperTest extends TestCase
                 'data' => [],
             ],
             self::REGION_ID,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function resizePlanObject(
+        array $overrides = [],
+    ): array {
+        return array_replace(
+            [
+                'availabilityZone' => self::REGION_ID,
+                'id' => 'eco-2-2-0',
+                'name' => 'eco-small4',
+                'cpu_count' => 2,
+                'memory_in_bytes' => 2_147_483_648,
+                'disk_in_bytes' => 53_687_091_200,
+                'type' => 'economic',
+                'price_per_hour' => 23_200.5,
+                'price_per_month' => 16_704_000,
+            ],
+            $overrides,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function singleSizeObject(
+        array $overrides = [],
+    ): array {
+        return array_replace(
+            [
+                'id' => 'eco-2-2-0',
+                'name' => 'eco-small4',
+                'cpu_count' => 2,
+                'memory' => 2048,
+                'disk' => 50,
+                'type' => 'economic',
+                'price_per_hour' => 23_200,
+                'price_per_month' => 16_704_000,
+            ],
+            $overrides,
         );
     }
 

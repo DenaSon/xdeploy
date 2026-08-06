@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Cloud\ArvanCloud\Mappers;
 
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudPortData;
@@ -283,6 +284,111 @@ final class ArvanCloudResponseMapper
                 );
             },
             $sizes,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudSizeData>
+     */
+    public function mapServerResizePlans(
+        array $payload,
+        string $regionId,
+    ): array {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        return array_map(
+            fn (array $size): CloudSizeData => $this->mapResizeSizeObject(
+                size: $size,
+                regionId: $regionId,
+                resource: 'server resize plan',
+            ),
+            $this->resourceItems(
+                payload: $payload,
+                resource: 'server resize plans',
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapSize(
+        array $payload,
+        string $regionId,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        return $this->mapResizeSizeObject(
+            size: $this->resourceObject(
+                payload: $payload,
+                resource: 'size',
+            ),
+            regionId: $regionId,
+            resource: 'size',
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapCalculatedSize(
+        array $payload,
+        string $regionId,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        return $this->mapResizeSizeObject(
+            size: $this->resourceObject(
+                payload: $payload,
+                resource: 'calculated size',
+            ),
+            regionId: $regionId,
+            resource: 'calculated size',
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapDiskPrice(
+        array $payload,
+    ): CloudDiskPriceData {
+        $diskPrice = $this->resourceObject(
+            payload: $payload,
+            resource: 'disk price',
+        );
+
+        return new CloudDiskPriceData(
+            diskGiB: $this->requiredFlexibleNonNegativeInt(
+                data: $diskPrice,
+                key: 'disk',
+                resource: 'disk price',
+            ),
+            hourlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $diskPrice,
+                    key: 'price_per_hour',
+                    resource: 'disk price',
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Hourly,
+            ),
+            monthlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $diskPrice,
+                    key: 'price_per_month',
+                    resource: 'disk price',
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Monthly,
+            ),
         );
     }
 
@@ -1397,6 +1503,156 @@ final class ArvanCloudResponseMapper
     }
 
     /**
+     * @param  array<string, mixed>  $size
+     */
+    private function mapResizeSizeObject(
+        array $size,
+        string $regionId,
+        string $resource,
+    ): CloudSizeData {
+        $availabilityZone = $this->optionalString(
+            data: $size,
+            key: 'availabilityZone',
+            resource: $resource,
+        );
+
+        if (
+            $availabilityZone !== null
+            && $availabilityZone !== $regionId
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s belongs to unexpected region [%s].',
+                    $resource,
+                    $availabilityZone,
+                ),
+            );
+        }
+
+        $category = $this->optionalString(
+            data: $size,
+            key: 'type',
+            resource: $resource,
+        );
+
+        $category ??= $this->optionalString(
+            data: $size,
+            key: 'category',
+            resource: $resource,
+        );
+
+        return new CloudSizeData(
+            id: $this->requiredString(
+                data: $size,
+                key: 'id',
+                resource: $resource,
+            ),
+            name: $this->requiredString(
+                data: $size,
+                key: 'name',
+                resource: $resource,
+            ),
+            regionId: $regionId,
+            vCpu: $this->requiredFlexibleNonNegativeInt(
+                data: $size,
+                key: 'cpu_count',
+                resource: $resource,
+            ),
+            memoryMiB: $this->sizeMemoryMiB(
+                size: $size,
+                resource: $resource,
+            ),
+            diskGiB: $this->sizeDiskGiB(
+                size: $size,
+                resource: $resource,
+            ),
+            category: $category,
+            hourlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $size,
+                    key: 'price_per_hour',
+                    resource: $resource,
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Hourly,
+            ),
+            monthlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $size,
+                    key: 'price_per_month',
+                    resource: $resource,
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Monthly,
+            ),
+        );
+    }
+
+    /**
+     * Resize-plan responses expose byte fields while single-plan responses
+     * expose memory directly in MiB.
+     *
+     * @param  array<string, mixed>  $size
+     */
+    private function sizeMemoryMiB(
+        array $size,
+        string $resource,
+    ): int {
+        if (
+            array_key_exists('memory_in_bytes', $size)
+            && $size['memory_in_bytes'] !== null
+            && $size['memory_in_bytes'] !== ''
+        ) {
+            return $this->bytesToMiB(
+                $this->requiredFlexibleNonNegativeInt(
+                    data: $size,
+                    key: 'memory_in_bytes',
+                    resource: $resource,
+                ),
+                "{$resource}.memory_in_bytes",
+            );
+        }
+
+        return $this->requiredFlexibleNonNegativeInt(
+            data: $size,
+            key: 'memory',
+            resource: $resource,
+        );
+    }
+
+    /**
+     * Resize-plan responses expose byte fields while single-plan responses
+     * expose disk directly in GiB.
+     *
+     * @param  array<string, mixed>  $size
+     */
+    private function sizeDiskGiB(
+        array $size,
+        string $resource,
+    ): int {
+        if (
+            array_key_exists('disk_in_bytes', $size)
+            && $size['disk_in_bytes'] !== null
+            && $size['disk_in_bytes'] !== ''
+        ) {
+            return $this->bytesToGiB(
+                $this->requiredFlexibleNonNegativeInt(
+                    data: $size,
+                    key: 'disk_in_bytes',
+                    resource: $resource,
+                ),
+                "{$resource}.disk_in_bytes",
+            );
+        }
+
+        return $this->requiredFlexibleNonNegativeInt(
+            data: $size,
+            key: 'disk',
+            resource: $resource,
+        );
+    }
+
+    /**
      * String references are valid for fields such as flavor and image,
      * but they do not contain nested metadata.
      *
@@ -1606,6 +1862,105 @@ final class ArvanCloudResponseMapper
     }
 
     /**
+     * Accept direct objects, direct lists, and optional data envelopes.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function resourceItems(
+        array $payload,
+        string $resource,
+    ): array {
+        $candidate = array_key_exists('data', $payload)
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s response has an invalid data envelope.',
+                    $resource,
+                ),
+            );
+        }
+
+        if ($candidate === []) {
+            return [];
+        }
+
+        if (! array_is_list($candidate)) {
+            /** @var array<string, mixed> $candidate */
+            return [
+                $candidate,
+            ];
+        }
+
+        foreach ($candidate as $item) {
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s response contains an invalid item.',
+                        $resource,
+                    ),
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $candidate */
+        return $candidate;
+    }
+
+    /**
+     * Accept direct objects, one-item lists, and optional data envelopes.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function resourceObject(
+        array $payload,
+        string $resource,
+    ): array {
+        $candidate = array_key_exists('data', $payload)
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s response has an invalid data envelope.',
+                    $resource,
+                ),
+            );
+        }
+
+        if (! array_is_list($candidate)) {
+            /** @var array<string, mixed> $candidate */
+            return $candidate;
+        }
+
+        if (
+            count($candidate) === 1
+            && is_array($candidate[0])
+            && ! array_is_list($candidate[0])
+        ) {
+            /** @var array<string, mixed> $object */
+            $object = $candidate[0];
+
+            return $object;
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s response has an invalid data envelope.',
+                $resource,
+            ),
+        );
+    }
+
+    /**
      * @param  array<array-key, mixed>  $payload
      * @return list<array<string, mixed>>
      */
@@ -1789,6 +2144,101 @@ final class ArvanCloudResponseMapper
         }
 
         return $data[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredFlexibleNonNegativeInt(
+        array $data,
+        string $key,
+        string $resource,
+    ): int {
+        $value = $this->optionalNonNegativeInt(
+            data: $data,
+            key: $key,
+            resource: $resource,
+        );
+
+        if ($value === null) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a non-negative integer.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Prices are preserved as decimal strings to avoid float arithmetic.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredNonNegativeDecimalString(
+        array $data,
+        string $key,
+        string $resource,
+    ): string {
+        if (! array_key_exists($key, $data)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a non-negative number.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $value = $data[$key];
+
+        if (is_int($value) && $value >= 0) {
+            return (string) $value;
+        }
+
+        if (
+            is_float($value)
+            && is_finite($value)
+            && $value >= 0
+        ) {
+            $normalized = rtrim(
+                rtrim(
+                    sprintf('%.14F', $value),
+                    '0',
+                ),
+                '.',
+            );
+
+            return $normalized === '-0'
+                ? '0'
+                : $normalized;
+        }
+
+        if (is_string($value)) {
+            $value = trim(
+                $value,
+            );
+
+            if (
+                preg_match(
+                    '/\A\d+(?:\.\d+)?\z/',
+                    $value,
+                ) === 1
+            ) {
+                return $value;
+            }
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s field [%s] must be a non-negative number.',
+                $resource,
+                $key,
+            ),
+        );
     }
 
     /**

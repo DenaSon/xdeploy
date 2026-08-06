@@ -8,6 +8,9 @@ use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudPortData;
@@ -20,12 +23,14 @@ use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CloudSshKeyData;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
+use App\Domain\Cloud\DTOs\ResizeCloudRootDiskData;
+use App\Domain\Cloud\DTOs\ResizeCloudServerData;
 use App\Domain\Cloud\Enums\CloudIpVersion;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
-final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
 
@@ -51,9 +56,13 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
 
     private const string ACTION_REBOOT = 'reboot';
 
+    private const string ACTIONS = 'actions';
+
     private const string ACTION_ADD_PUBLIC_IP = 'add-public-ip';
 
-    private const string ACTIONS = 'actions';
+    private const string ACTION_RESIZE = 'resize';
+
+    private const string ACTION_RESIZE_ROOT = 'resizeRoot';
 
     public function __construct(
         private ArvanCloudClient $client,
@@ -212,6 +221,128 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         );
     }
 
+    /**
+     * @return list<CloudSizeData>
+     */
+    public function listServerResizePlans(
+        string $region,
+        string $serverId,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $payload = $this->client->get(
+            $this->serverResizePlansEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+        );
+
+        return $this->mapper->mapServerResizePlans(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function findSize(
+        string $region,
+        string $sizeId,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $payload = $this->client->get(
+            $this->sizeEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+        );
+
+        return $this->mapper->mapSize(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function calculateSize(
+        string $region,
+        string $sizeId,
+        int $diskGiB,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $normalizedDiskGiB = $this->normalizeDiskSize(
+            $diskGiB,
+        );
+
+        $payload = $this->client->post(
+            $this->sizeEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+            [
+                'volume_size' => $normalizedDiskGiB,
+            ],
+        );
+
+        return $this->mapper->mapCalculatedSize(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function calculateDiskPrice(
+        string $region,
+        string $sizeId,
+        int $diskGiB,
+    ): CloudDiskPriceData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $normalizedDiskGiB = $this->normalizeDiskSize(
+            $diskGiB,
+        );
+
+        $payload = $this->client->post(
+            $this->sizeDiskEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+            [
+                'volume_size' => $normalizedDiskGiB,
+            ],
+        );
+
+        return $this->mapper->mapDiskPrice(
+            $payload,
+        );
+    }
+
     public function createServer(
         CreateCloudServerData $data,
     ): CreatedCloudServerData {
@@ -268,10 +399,6 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             resource: 'server',
         );
 
-        /*
-         * Server details are fetched directly. This avoids loading the
-         * complete server list during provisioning and resize polling.
-         */
         $payload = $this->client->get(
             $this->serverEndpoint(
                 regionId: $regionId,
@@ -291,14 +418,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
         string $serverId,
     ): void {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $this->client->post(
             $this->serverActionEndpoint(
@@ -313,14 +437,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
         string $serverId,
     ): void {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $this->client->post(
             $this->serverActionEndpoint(
@@ -335,14 +456,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
         string $serverId,
     ): void {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $this->client->post(
             $this->serverActionEndpoint(
@@ -357,14 +475,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
         string $serverId,
     ): void {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $this->client->delete(
             $this->serverEndpoint(
@@ -381,14 +496,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
         string $serverId,
     ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $payload = $this->client->get(
             $this->serverActionEndpoint(
@@ -410,14 +522,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $region,
         string $serverId,
     ): array {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $payload = $this->client->get(
             $this->regionEndpoint(
@@ -441,14 +550,11 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         CloudIpVersion $version = CloudIpVersion::IPv4,
         array $securityGroupIds = [],
     ): void {
-        $regionId = $this->normalizeRegion(
-            $region,
-        );
-
-        $providerServerId = $this->normalizeResourceId(
-            id: $serverId,
-            resource: 'server',
-        );
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
 
         $normalizedSecurityGroupIds =
             $this->normalizeOptionalResourceIds(
@@ -496,6 +602,62 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         );
     }
 
+    public function resizeServer(
+        ResizeCloudServerData $data,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $data->regionId,
+                serverId: $data->serverId,
+            );
+
+        $targetSizeId = $this->normalizeResourceId(
+            id: $data->targetSizeId,
+            resource: 'size',
+        );
+
+        $targetDiskGiB = $this->normalizeDiskSize(
+            $data->targetDiskGiB,
+        );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_RESIZE,
+            ),
+            [
+                'disk_size' => $targetDiskGiB,
+                'flavor_id' => $targetSizeId,
+            ],
+        );
+    }
+
+    public function resizeRootDisk(
+        ResizeCloudRootDiskData $data,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $data->regionId,
+                serverId: $data->serverId,
+            );
+
+        $targetDiskGiB = $this->normalizeDiskSize(
+            $data->targetDiskGiB,
+        );
+
+        $this->client->put(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_RESIZE_ROOT,
+            ),
+            [
+                'new_size' => $targetDiskGiB,
+            ],
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -525,10 +687,6 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
                 resource: 'image',
             ),
 
-            /*
-             * ArvanCloud expects the security group UUID inside
-             * security_groups[].name.
-             */
             'security_groups' => array_map(
                 static fn (string $id): array => [
                     'name' => $id,
@@ -567,6 +725,49 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             ),
             rawurlencode(
                 $resource,
+            ),
+        );
+    }
+
+    private function serverResizePlansEndpoint(
+        string $regionId,
+        string $serverId,
+    ): string {
+        return sprintf(
+            'regions/%s/sizes/by-server/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $serverId,
+            ),
+        );
+    }
+
+    private function sizeEndpoint(
+        string $regionId,
+        string $sizeId,
+    ): string {
+        return sprintf(
+            'regions/%s/sizes/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $sizeId,
+            ),
+        );
+    }
+
+    private function sizeDiskEndpoint(
+        string $regionId,
+        string $sizeId,
+    ): string {
+        return sprintf(
+            '%s/disk',
+            $this->sizeEndpoint(
+                regionId: $regionId,
+                sizeId: $sizeId,
             ),
         );
     }
@@ -618,11 +819,31 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         );
     }
 
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function normalizeServerReference(
+        string $region,
+        string $serverId,
+    ): array {
+        return [
+            $this->normalizeRegion(
+                $region,
+            ),
+
+            $this->normalizeResourceId(
+                id: $serverId,
+                resource: 'server',
+            ),
+        ];
+    }
+
     private function normalizeRegion(
         string $region,
     ): string {
         if (
-            preg_match(
+            $region === ''
+            || preg_match(
                 '/[\x00-\x1F\x7F]/',
                 $region,
             ) === 1
@@ -661,7 +882,8 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         string $resource,
     ): string {
         if (
-            preg_match(
+            $id === ''
+            || preg_match(
                 '/[\x00-\x1F\x7F]/',
                 $id,
             ) === 1
@@ -678,17 +900,9 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             $id,
         );
 
-        if ($id === '') {
-            throw new CloudValidationException(
-                sprintf(
-                    'Cloud %s identifier cannot be empty.',
-                    $resource,
-                ),
-            );
-        }
-
         if (
-            preg_match(
+            $id === ''
+            || preg_match(
                 '/\A[a-zA-Z0-9]+(?:[._-][a-zA-Z0-9]+)*\z/',
                 $id,
             ) !== 1
