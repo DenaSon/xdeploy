@@ -31,10 +31,9 @@ final class ArvanCloudClientTest extends TestCase
     public function test_it_sends_an_authenticated_get_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' =>
-                Http::response([
-                    'data' => [],
-                ]),
+            'https://api.example.test/ecc/v1/*' => Http::response([
+                'data' => [],
+            ]),
         ]);
 
         $result = $this->client()->get(
@@ -71,14 +70,13 @@ final class ArvanCloudClientTest extends TestCase
     public function test_it_sends_an_authenticated_post_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' =>
-                Http::response(
-                    [
-                        'id' => 'cloud-server-id',
-                        'status' => 'BUILD',
-                    ],
-                    201,
-                ),
+            'https://api.example.test/ecc/v1/*' => Http::response(
+                [
+                    'id' => 'cloud-server-id',
+                    'status' => 'BUILD',
+                ],
+                201,
+            ),
         ]);
 
         $payload = [
@@ -128,13 +126,12 @@ final class ArvanCloudClientTest extends TestCase
     public function test_it_sends_post_request_without_payload(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' =>
-                Http::response(
-                    [
-                        'message' => 'Server is powering on.',
-                    ],
-                    202,
-                ),
+            'https://api.example.test/ecc/v1/*' => Http::response(
+                [
+                    'message' => 'Server is powering on.',
+                ],
+                202,
+            ),
         ]);
 
         $result = $this->client()->post(
@@ -159,10 +156,9 @@ final class ArvanCloudClientTest extends TestCase
     public function test_it_sends_an_authenticated_delete_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' =>
-                Http::response([
-                    'message' => 'Port deleted.',
-                ]),
+            'https://api.example.test/ecc/v1/*' => Http::response([
+                'message' => 'Port deleted.',
+            ]),
         ]);
 
         $result = $this->client()->delete(
@@ -199,10 +195,9 @@ final class ArvanCloudClientTest extends TestCase
     public function test_it_sends_payload_with_delete_request(): void
     {
         Http::fake([
-            'https://api.example.test/ecc/v1/*' =>
-                Http::response([
-                    'message' => 'Resource deleted.',
-                ]),
+            'https://api.example.test/ecc/v1/*' => Http::response([
+                'message' => 'Resource deleted.',
+            ]),
         ]);
 
         $payload = [
@@ -233,8 +228,7 @@ final class ArvanCloudClientTest extends TestCase
         $this->client()->get('regions');
 
         Http::assertSent(
-            fn (Request $request): bool =>
-            ! $request->hasHeader(
+            fn (Request $request): bool => ! $request->hasHeader(
                 'Authorization',
                 'Bearer test-api-key',
             ),
@@ -261,9 +255,9 @@ final class ArvanCloudClientTest extends TestCase
         Http::assertSent(
             function (Request $request): bool {
                 return $request->hasHeader(
-                        'Authorization',
-                        'Apikey test-api-key',
-                    )
+                    'Authorization',
+                    'Apikey test-api-key',
+                )
                     && ! $request->hasHeader(
                         'Authorization',
                         'Apikey Apikey test-api-key',
@@ -290,8 +284,7 @@ final class ArvanCloudClientTest extends TestCase
         $client->get('regions');
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->url() ===
+            fn (Request $request): bool => $request->url() ===
                 'https://api.example.test/ecc/v1/regions',
         );
     }
@@ -487,8 +480,7 @@ final class ArvanCloudClientTest extends TestCase
         Http::fake([
             '*' => Http::response(
                 [
-                    'message' =>
-                        'Account balance is insufficient.',
+                    'message' => 'Account balance is insufficient.',
                 ],
                 402,
             ),
@@ -506,7 +498,7 @@ final class ArvanCloudClientTest extends TestCase
                 'Expected insufficient balance exception was not thrown.',
             );
         } catch (
-        CloudInsufficientBalanceException $exception
+            CloudInsufficientBalanceException $exception
         ) {
             $this->assertSame(
                 402,
@@ -546,7 +538,7 @@ final class ArvanCloudClientTest extends TestCase
                 'Expected rate limit exception was not thrown.',
             );
         } catch (
-        CloudRateLimitException $exception
+            CloudRateLimitException $exception
         ) {
             $this->assertSame(
                 120,
@@ -578,7 +570,7 @@ final class ArvanCloudClientTest extends TestCase
                 'Expected rate limit exception was not thrown.',
             );
         } catch (
-        CloudRateLimitException $exception
+            CloudRateLimitException $exception
         ) {
             $this->assertNull(
                 $exception->retryAfterSeconds,
@@ -720,8 +712,7 @@ final class ArvanCloudClientTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->url() ===
+            fn (Request $request): bool => $request->url() ===
                 'https://api.example.test/ecc/v1/regions',
         );
     }

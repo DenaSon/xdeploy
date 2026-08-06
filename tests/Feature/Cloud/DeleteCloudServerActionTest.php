@@ -263,7 +263,7 @@ final class DeleteCloudServerActionTest extends TestCase
     ): DeleteCloudServerAction {
         return new DeleteCloudServerAction(
             lifecycle: $lifecycle,
-            deleteServer: new DeleteServerAction(),
+            deleteServer: new DeleteServerAction,
         );
     }
 

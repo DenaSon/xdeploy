@@ -387,7 +387,7 @@ final class DeleteCloudServerPortActionTest extends TestCase
     }
 
     /**
-     * @param list<string> $ips
+     * @param  list<string>  $ips
      */
     private function port(
         string $id,

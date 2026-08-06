@@ -23,23 +23,17 @@ final class CloudServiceProviderTest extends TestCase
         config([
             'cloud.default' => 'arvan',
 
-            'cloud.providers.arvan.base_url' =>
-                'https://api.example.test/ecc/v1',
+            'cloud.providers.arvan.base_url' => 'https://api.example.test/ecc/v1',
 
-            'cloud.providers.arvan.api_key' =>
-                'test-api-key',
+            'cloud.providers.arvan.api_key' => 'test-api-key',
 
-            'cloud.providers.arvan.timeouts.connect' =>
-                5,
+            'cloud.providers.arvan.timeouts.connect' => 5,
 
-            'cloud.providers.arvan.timeouts.request' =>
-                15,
+            'cloud.providers.arvan.timeouts.request' => 15,
 
-            'cloud.providers.arvan.defaults.create_type' =>
-                'cinder',
+            'cloud.providers.arvan.defaults.create_type' => 'cinder',
 
-            'cloud.providers.arvan.defaults.default_username' =>
-                'ubuntu',
+            'cloud.providers.arvan.defaults.default_username' => 'ubuntu',
         ]);
     }
 
@@ -202,8 +196,7 @@ final class CloudServiceProviderTest extends TestCase
     public function test_it_rejects_missing_default_username(): void
     {
         config([
-            'cloud.providers.arvan.defaults.default_username' =>
-                '',
+            'cloud.providers.arvan.defaults.default_username' => '',
         ]);
 
         $this->expectException(
@@ -222,8 +215,7 @@ final class CloudServiceProviderTest extends TestCase
     public function test_it_rejects_missing_create_type(): void
     {
         config([
-            'cloud.providers.arvan.defaults.create_type' =>
-                '',
+            'cloud.providers.arvan.defaults.create_type' => '',
         ]);
 
         $this->expectException(

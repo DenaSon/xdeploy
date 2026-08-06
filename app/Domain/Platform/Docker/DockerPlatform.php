@@ -17,9 +17,7 @@ use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 
-final readonly class DockerPlatform implements
-    PlatformInterface,
-    StartablePlatformInterface
+final readonly class DockerPlatform implements PlatformInterface, StartablePlatformInterface
 {
     public function __construct(
         private SSHConnectionInterface $ssh,

@@ -36,7 +36,7 @@ final readonly class AptPackageManager implements SystemPackageManager
     }
 
     /**
-     * @param list<string> $packages
+     * @param  list<string>  $packages
      */
     public function install(
         array $packages,
@@ -80,7 +80,7 @@ COMMAND,
     }
 
     /**
-     * @param list<string> $packages
+     * @param  list<string>  $packages
      */
     private function verifyInstalledPackages(
         array $packages,
@@ -100,8 +100,7 @@ COMMAND,
     }
 
     /**
-     * @param array<int, string> $packages
-     *
+     * @param  array<int, string>  $packages
      * @return list<string>
      */
     private function normalizePackages(

@@ -7,8 +7,8 @@ namespace App\Domain\Cloud\DTOs;
 final readonly class CloudPortData
 {
     /**
-     * @param list<string> $ips
-     * @param list<string> $securityGroupIds
+     * @param  list<string>  $ips
+     * @param  list<string>  $securityGroupIds
      */
     public function __construct(
         public string $id,

@@ -99,8 +99,7 @@ final class ArvanCloudServerNetworkingTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'GET'
+            fn (Request $request): bool => $request->method() === 'GET'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/ports',
         );
@@ -165,8 +164,7 @@ final class ArvanCloudServerNetworkingTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'POST'
+            fn (Request $request): bool => $request->method() === 'POST'
                 && $request->data() === [
                     'type' => 'ipv6',
                 ],
@@ -189,8 +187,7 @@ final class ArvanCloudServerNetworkingTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'DELETE'
+            fn (Request $request): bool => $request->method() === 'DELETE'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/ports/port-123',
         );
@@ -249,8 +246,7 @@ final class ArvanCloudServerNetworkingTest extends TestCase
     {
         return new ArvanCloudProvider(
             client: new ArvanCloudClient(
-                baseUrl:
-                'https://api.example.test/ecc/v1',
+                baseUrl: 'https://api.example.test/ecc/v1',
                 apiKey: 'test-api-key',
                 connectTimeout: 5,
                 requestTimeout: 15,

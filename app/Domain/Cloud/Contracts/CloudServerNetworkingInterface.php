@@ -18,7 +18,7 @@ interface CloudServerNetworkingInterface
     ): array;
 
     /**
-     * @param list<string> $securityGroupIds
+     * @param  list<string>  $securityGroupIds
      */
     public function addPublicIp(
         string $region,

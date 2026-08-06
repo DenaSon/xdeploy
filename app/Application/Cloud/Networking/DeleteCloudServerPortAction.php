@@ -112,7 +112,7 @@ final readonly class DeleteCloudServerPortAction
     }
 
     /**
-     * @param list<CloudPortData> $ports
+     * @param  list<CloudPortData>  $ports
      */
     private function findPort(
         array $ports,
@@ -158,7 +158,7 @@ final readonly class DeleteCloudServerPortAction
     }
 
     /**
-     * @param list<CloudPortData> $ports
+     * @param  list<CloudPortData>  $ports
      */
     private function replacementHost(
         array $ports,

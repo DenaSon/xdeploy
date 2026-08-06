@@ -14,7 +14,7 @@ final readonly class AddCloudServerPublicIpAction
     ) {}
 
     /**
-     * @param list<string> $securityGroupIds
+     * @param  list<string>  $securityGroupIds
      */
     public function handle(
         string $region,

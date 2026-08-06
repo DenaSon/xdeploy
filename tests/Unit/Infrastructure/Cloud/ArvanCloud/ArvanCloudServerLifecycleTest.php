@@ -47,8 +47,7 @@ final class ArvanCloudServerLifecycleTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'POST'
+            fn (Request $request): bool => $request->method() === 'POST'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/servers/server-123/power-on'
                 && $request->data() === [],
@@ -71,8 +70,7 @@ final class ArvanCloudServerLifecycleTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'POST'
+            fn (Request $request): bool => $request->method() === 'POST'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/servers/server-123/power-off'
                 && $request->data() === [],
@@ -98,8 +96,7 @@ final class ArvanCloudServerLifecycleTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'POST'
+            fn (Request $request): bool => $request->method() === 'POST'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/servers/server-123/reboot',
         );
@@ -121,8 +118,7 @@ final class ArvanCloudServerLifecycleTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'DELETE'
+            fn (Request $request): bool => $request->method() === 'DELETE'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/servers/server-123',
         );
@@ -136,10 +132,8 @@ final class ArvanCloudServerLifecycleTest extends TestCase
             '*' => Http::response(
                 [
                     'action' => 'reboot',
-                    'message' =>
-                        'Reboot operation is available.',
-                    'start_time' =>
-                        '2026-08-05T20:00:00Z',
+                    'message' => 'Reboot operation is available.',
+                    'start_time' => '2026-08-05T20:00:00Z',
                 ],
                 202,
             ),
@@ -177,8 +171,7 @@ final class ArvanCloudServerLifecycleTest extends TestCase
         );
 
         Http::assertSent(
-            fn (Request $request): bool =>
-                $request->method() === 'GET'
+            fn (Request $request): bool => $request->method() === 'GET'
                 && $request->url() ===
                 'https://api.example.test/ecc/v1/regions/eu-west1-a/servers/server-123/actions',
         );
@@ -314,8 +307,7 @@ final class ArvanCloudServerLifecycleTest extends TestCase
     {
         return new ArvanCloudProvider(
             client: new ArvanCloudClient(
-                baseUrl:
-                'https://api.example.test/ecc/v1',
+                baseUrl: 'https://api.example.test/ecc/v1',
                 apiKey: 'test-api-key',
                 connectTimeout: 5,
                 requestTimeout: 15,

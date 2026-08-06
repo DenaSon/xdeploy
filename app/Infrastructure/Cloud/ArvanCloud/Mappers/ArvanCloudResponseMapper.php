@@ -6,19 +6,19 @@ namespace App\Infrastructure\Cloud\ArvanCloud\Mappers;
 
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
+use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudQuotaData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerAddressData;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
-use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Enums\CloudIpVersion;
 use App\Domain\Cloud\Enums\CloudServerStatus;
-use App\Domain\Cloud\DTOs\CloudPortData;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use DateTimeImmutable;
@@ -571,8 +571,7 @@ final class ArvanCloudResponseMapper
         );
 
         return array_map(
-            fn (array $action): CloudServerActionData =>
-            new CloudServerActionData(
+            fn (array $action): CloudServerActionData => new CloudServerActionData(
                 action: $this->requiredString(
                     $action,
                     'action',
@@ -592,6 +591,7 @@ final class ArvanCloudResponseMapper
             $actions,
         );
     }
+
     /**
      * مستندات آروان پاسخ را به‌صورت یک Object نمایش می‌دهد،
      * اما خروجی Domain همیشه یک List استاندارد است.
@@ -639,6 +639,7 @@ final class ArvanCloudResponseMapper
         /** @var list<array<string, mixed>> $data */
         return $data;
     }
+
     /**
      * @param  array<string, mixed>  $server
      */
@@ -1562,8 +1563,7 @@ final class ArvanCloudResponseMapper
     }
 
     /**
-     * @param array<array-key, mixed> $payload
-     *
+     * @param  array<array-key, mixed>  $payload
      * @return list<CloudPortData>
      */
     public function mapPorts(
@@ -1641,8 +1641,7 @@ final class ArvanCloudResponseMapper
      * API Documentation پاسخ Ports را گاهی به‌صورت Object نمایش
      * می‌دهد، درحالی‌که Endpoint به‌عنوان List معرفی شده است.
      *
-     * @param array<array-key, mixed> $payload
-     *
+     * @param  array<array-key, mixed>  $payload
      * @return list<array<string, mixed>>
      */
     private function portItems(
@@ -1694,8 +1693,7 @@ final class ArvanCloudResponseMapper
     }
 
     /**
-     * @param array<string, mixed> $data
-     *
+     * @param  array<string, mixed>  $data
      * @return list<string>
      */
     private function requiredStringList(

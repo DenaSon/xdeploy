@@ -57,8 +57,7 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param array<string, mixed> $query
-     *
+     * @param  array<string, mixed>  $query
      * @return array<array-key, mixed>
      */
     public function get(
@@ -73,8 +72,7 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param array<string, mixed> $payload
-     *
+     * @param  array<string, mixed>  $payload
      * @return array<array-key, mixed>
      */
     public function post(
@@ -89,8 +87,7 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param array<string, mixed> $payload
-     *
+     * @param  array<string, mixed>  $payload
      * @return array<array-key, mixed>
      */
     public function delete(
@@ -105,8 +102,7 @@ final class ArvanCloudClient
     }
 
     /**
-     * @param array<string, mixed> $data
-     *
+     * @param  array<string, mixed>  $data
      * @return array<array-key, mixed>
      */
     private function request(
