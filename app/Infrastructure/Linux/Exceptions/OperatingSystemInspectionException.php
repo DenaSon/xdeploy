@@ -6,6 +6,4 @@ namespace App\Infrastructure\Linux\Exceptions;
 
 use RuntimeException;
 
-final class OperatingSystemInspectionException extends RuntimeException
-{
-}
+final class OperatingSystemInspectionException extends RuntimeException {}

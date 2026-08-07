@@ -14,8 +14,8 @@ final readonly class OperatingSystemInspector
 
     private const string OS_RELEASE_COMMAND =
         'if [ -r /etc/os-release ]; then cat /etc/os-release; '
-        . 'elif [ -r /usr/lib/os-release ]; then cat /usr/lib/os-release; '
-        . 'else exit 1; fi';
+        .'elif [ -r /usr/lib/os-release ]; then cat /usr/lib/os-release; '
+        .'else exit 1; fi';
 
     public function __construct(
         private SSHConnectionInterface $ssh,
@@ -202,8 +202,7 @@ final readonly class OperatingSystemInspector
         return array_values(
             array_filter(
                 array_unique($items),
-                static fn (string $item): bool =>
-                    $item !== '',
+                static fn (string $item): bool => $item !== '',
             ),
         );
     }

@@ -83,7 +83,7 @@ final readonly class VerifyCloudServerSshReadinessAction
             );
         } catch (
             CloudServerProvisioningException
-            | CloudServerSshUnavailableException $exception
+            |CloudServerSshUnavailableException $exception
         ) {
             throw $exception;
         } catch (Throwable $exception) {

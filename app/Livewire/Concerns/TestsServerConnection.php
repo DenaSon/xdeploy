@@ -58,33 +58,32 @@ trait TestsServerConnection
         TestServerConnectionResult $result,
     ): void {
         match ($result->status) {
-            ServerConnectionTestStatus::Ready =>
-                $this->showReadyConnection(
-                    $result,
-                ),
+            ServerConnectionTestStatus::Ready => $this->showReadyConnection(
+                $result,
+            ),
+            ServerConnectionTestStatus::InsufficientPrivileges => $this->error(
+                'دسترسی مدیریتی کافی نیست',
+                'اتصال SSH و سیستم‌عامل سرور تأیید شدند، اما حساب کاربری باید root باشد یا امکان اجرای sudo بدون درخواست رمز عبور را داشته باشد.',
+            ),
 
-            ServerConnectionTestStatus::ConnectionFailed =>
-                $this->error(
-                    'اتصال ناموفق',
-                    'امکان برقراری ارتباط SSH با سرور وجود ندارد. اطلاعات اتصال، شبکه و پورت SSH را بررسی کنید.',
-                ),
+            ServerConnectionTestStatus::ConnectionFailed => $this->error(
+                'اتصال ناموفق',
+                'امکان برقراری ارتباط SSH با سرور وجود ندارد. اطلاعات اتصال، شبکه و پورت SSH را بررسی کنید.',
+            ),
 
-            ServerConnectionTestStatus::PasswordChangeRequired =>
-                $this->error(
-                    'تغییر رمز عبور الزامی است',
-                    'اتصال SSH برقرار شد، اما سیستم‌عامل پیش از اجرای دستورات درخواست تغییر رمز عبور دارد. یک‌بار مستقیماً از طریق SSH وارد سرور شوید، رمز را تغییر دهید و سپس دوباره اتصال را بررسی کنید.',
-                ),
+            ServerConnectionTestStatus::PasswordChangeRequired => $this->error(
+                'تغییر رمز عبور الزامی است',
+                'اتصال SSH برقرار شد، اما سیستم‌عامل پیش از اجرای دستورات درخواست تغییر رمز عبور دارد. یک‌بار مستقیماً از طریق SSH وارد سرور شوید، رمز را تغییر دهید و سپس دوباره اتصال را بررسی کنید.',
+            ),
 
-            ServerConnectionTestStatus::CommandUnavailable =>
-                $this->error(
-                    'امکان اجرای دستورات وجود ندارد',
-                    'اتصال SSH برقرار شد، اما xDeploy نمی‌تواند دستورات موردنیاز را روی این سرور اجرا کند.',
-                ),
+            ServerConnectionTestStatus::CommandUnavailable => $this->error(
+                'امکان اجرای دستورات وجود ندارد',
+                'اتصال SSH برقرار شد، اما xDeploy نمی‌تواند دستورات موردنیاز را روی این سرور اجرا کند.',
+            ),
 
-            ServerConnectionTestStatus::UnsupportedOperatingSystem =>
-                $this->showUnsupportedOperatingSystem(
-                    $result,
-                ),
+            ServerConnectionTestStatus::UnsupportedOperatingSystem => $this->showUnsupportedOperatingSystem(
+                $result,
+            ),
         };
     }
 

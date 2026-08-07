@@ -15,4 +15,6 @@ enum ServerConnectionTestStatus: string
     case CommandUnavailable = 'command_unavailable';
 
     case UnsupportedOperatingSystem = 'unsupported_operating_system';
+
+    case InsufficientPrivileges = 'insufficient_privileges';
 }

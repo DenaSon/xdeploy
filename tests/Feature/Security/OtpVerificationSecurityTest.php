@@ -253,8 +253,7 @@ final class OtpVerificationSecurityTest extends TestCase
     private function createOtpService(): OtpService
     {
         return new OtpService(
-            repository:
-                new EloquentOtpRepository,
+            repository: new EloquentOtpRepository,
         );
     }
 
@@ -268,9 +267,8 @@ final class OtpVerificationSecurityTest extends TestCase
         return $repository->store(
             phone: $phone,
             code: $code,
-            expiresAt:
-                CarbonImmutable::now()
-                    ->addMinutes(2),
+            expiresAt: CarbonImmutable::now()
+                ->addMinutes(2),
         );
     }
 

@@ -14,6 +14,15 @@ final readonly class TestServerConnectionResult
         public ?OperatingSystemInfo $operatingSystem = null,
     ) {}
 
+    public static function insufficientPrivileges(
+        OperatingSystemInfo $operatingSystem,
+    ): self {
+        return new self(
+            status: ServerConnectionTestStatus::InsufficientPrivileges,
+            operatingSystem: $operatingSystem,
+        );
+    }
+
     public static function ready(
         OperatingSystemInfo $operatingSystem,
     ): self {

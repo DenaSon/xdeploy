@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Cloud;
 
 require_once __DIR__
-    . '/../../Support/SSH/FakeSshPortSocket.php';
+    .'/../../Support/SSH/FakeSshPortSocket.php';
 
 use App\Application\Cloud\Actions\ProvisionCloudServerAction;
 use App\Application\Cloud\Actions\VerifyCloudServerSshReadinessAction;
@@ -29,7 +29,6 @@ use App\Domain\Cloud\Exceptions\CloudServerProvisioningException;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
-use App\Infrastructure\SSH\Services\FakeSshPortSocket;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\SSH\SSHTimeout;
@@ -37,6 +36,7 @@ use DateTimeImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Support\SSH\FakeSshPortSocket;
 use Tests\TestCase;
 
 final class ProvisionCloudServerWorkflowTest extends TestCase
@@ -99,8 +99,7 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
             ->once()
             ->with(
                 Mockery::on(
-                    static fn (Server $server): bool =>
-                        $server->cloud_server_id
+                    static fn (Server $server): bool => $server->cloud_server_id
                             === 'provider-server-id'
                         && $server->host
                             === '185.204.168.213'
@@ -192,13 +191,11 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
 
                 'cloud_provider' => 'arvan',
 
-                'cloud_server_id' =>
-                    'provider-server-id',
+                'cloud_server_id' => 'provider-server-id',
 
                 'cloud_region' => 'eu-west1-a',
 
-                'status' =>
-                    ServerStatus::Active->value,
+                'status' => ServerStatus::Active->value,
             ],
         );
     }
@@ -440,8 +437,7 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
 
             createServer: new CreateServerAction,
 
-            verifySshReadiness:
-                $verifySshReadiness,
+            verifySshReadiness: $verifySshReadiness,
 
             providerName: 'arvan',
 
@@ -460,18 +456,16 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
             ->ordered()
             ->with(
                 Mockery::on(
-                    static fn (string $command): bool =>
-                        str_contains(
-                            $command,
-                            '__xdeploy_ssh_ready__',
-                        ),
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        '__xdeploy_ssh_ready__',
+                    ),
                 ),
                 Mockery::type('int'),
             )
             ->andReturn(
                 new SSHResult(
-                    output:
-                        '__xdeploy_ssh_ready__',
+                    output: '__xdeploy_ssh_ready__',
                     exitCode: 0,
                 ),
             );
@@ -486,11 +480,10 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
             ->ordered()
             ->with(
                 Mockery::on(
-                    static fn (string $command): bool =>
-                        str_contains(
-                            $command,
-                            '/etc/os-release',
-                        ),
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        '/etc/os-release',
+                    ),
                 ),
                 Mockery::type('int'),
             )
@@ -667,13 +660,12 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
                 '2026-08-04T07:00:00Z',
             ),
 
-            generatedPassword:
-                'temporary-generated-password',
+            generatedPassword: 'temporary-generated-password',
         );
     }
 
     /**
-     * @param list<CloudServerAddressData> $addresses
+     * @param  list<CloudServerAddressData>  $addresses
      */
     private function cloudServer(
         CloudServerStatus $status,

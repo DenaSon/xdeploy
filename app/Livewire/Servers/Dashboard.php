@@ -80,8 +80,7 @@ final class Dashboard extends Component
                 ssh: $ssh,
                 circuitBreaker: $circuitBreaker,
                 commandReadiness: $commandReadiness,
-                ensureSupportedOperatingSystem:
-                    $ensureSupportedOperatingSystem,
+                ensureSupportedOperatingSystem: $ensureSupportedOperatingSystem,
             )
         ) {
             return;
@@ -112,8 +111,7 @@ final class Dashboard extends Component
             ssh: $ssh,
             circuitBreaker: $circuitBreaker,
             commandReadiness: $commandReadiness,
-            ensureSupportedOperatingSystem:
-                $ensureSupportedOperatingSystem,
+            ensureSupportedOperatingSystem: $ensureSupportedOperatingSystem,
             message: 'ارتباط SSH با سرور قطع شده است و تلاش‌های خودکار موقتاً متوقف شدند.',
             notifyOnFailure: true,
             requireOpenCircuit: true,
@@ -146,8 +144,7 @@ final class Dashboard extends Component
                 ssh: $ssh,
                 circuitBreaker: $circuitBreaker,
                 commandReadiness: $commandReadiness,
-                ensureSupportedOperatingSystem:
-                    $ensureSupportedOperatingSystem,
+                ensureSupportedOperatingSystem: $ensureSupportedOperatingSystem,
                 message: 'برقراری دوباره ارتباط SSH با سرور ناموفق بود.',
             )
         ) {
@@ -304,8 +301,7 @@ final class Dashboard extends Component
             ) {
                 $this->markReadinessIssue(
                     issue: DashboardReadinessIssue::UnsupportedOperatingSystem,
-                    operatingSystem:
-                        $exception->operatingSystem->displayName(),
+                    operatingSystem: $exception->operatingSystem->displayName(),
                 );
 
                 return false;

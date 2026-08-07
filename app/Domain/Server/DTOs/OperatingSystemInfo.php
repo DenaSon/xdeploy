@@ -7,7 +7,7 @@ namespace App\Domain\Server\DTOs;
 final readonly class OperatingSystemInfo
 {
     /**
-     * @param list<string> $idLike
+     * @param  list<string>  $idLike
      */
     public function __construct(
         public string $id,

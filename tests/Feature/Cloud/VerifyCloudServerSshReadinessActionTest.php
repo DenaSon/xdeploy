@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Cloud;
 
 require_once __DIR__
-    . '/../../Support/SSH/FakeSshPortSocket.php';
+    .'/../../Support/SSH/FakeSshPortSocket.php';
 
 use App\Application\Cloud\Actions\VerifyCloudServerSshReadinessAction;
 use App\Application\Server\Actions\CreateServerAction;
@@ -15,13 +15,13 @@ use App\Domain\Server\Enums\PrivilegedExecutionMode;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
-use App\Infrastructure\SSH\Services\FakeSshPortSocket;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\SSH\SSHTimeout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Support\SSH\FakeSshPortSocket;
 use Tests\TestCase;
 
 final class VerifyCloudServerSshReadinessActionTest extends TestCase
@@ -53,8 +53,7 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
             ->once()
             ->with(
                 Mockery::on(
-                    fn (Server $value): bool =>
-                        $value->is($server),
+                    fn (Server $value): bool => $value->is($server),
                 ),
             )
             ->andReturnTrue();
@@ -241,11 +240,10 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
             ->ordered()
             ->with(
                 Mockery::on(
-                    static fn (string $command): bool =>
-                        str_contains(
-                            $command,
-                            '__xdeploy_ssh_ready__',
-                        ),
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        '__xdeploy_ssh_ready__',
+                    ),
                 ),
                 Mockery::type('int'),
             )
@@ -266,11 +264,10 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
             ->ordered()
             ->with(
                 Mockery::on(
-                    static fn (string $command): bool =>
-                        str_contains(
-                            $command,
-                            '/etc/os-release',
-                        ),
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        '/etc/os-release',
+                    ),
                 ),
                 Mockery::type('int'),
             )
@@ -325,24 +322,20 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
 
                 'username' => 'ubuntu',
 
-                'authentication_type' =>
-                    AuthenticationType::Password,
+                'authentication_type' => AuthenticationType::Password,
 
-                'credential' =>
-                    'temporary-generated-password',
+                'credential' => 'temporary-generated-password',
 
                 'cloud_provider' => 'arvan',
 
-                'cloud_server_id' =>
-                    'provider-server-id',
+                'cloud_server_id' => 'provider-server-id',
 
                 'cloud_region' => 'eu-west1-a',
 
                 'provisioned_at' => now(),
             ],
 
-            explicitStatus:
-                ServerStatus::Inactive,
+            explicitStatus: ServerStatus::Inactive,
         );
     }
 }

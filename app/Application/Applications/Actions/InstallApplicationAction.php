@@ -109,10 +109,8 @@ final readonly class InstallApplicationAction
             logger()->warning(
                 'installation.execution_time_extension_failed',
                 [
-                    'requested_seconds' =>
-                        self::MAX_EXECUTION_SECONDS,
-                    'current_limit' =>
-                        ini_get('max_execution_time'),
+                    'requested_seconds' => self::MAX_EXECUTION_SECONDS,
+                    'current_limit' => ini_get('max_execution_time'),
                 ],
             );
 
@@ -122,8 +120,7 @@ final readonly class InstallApplicationAction
         logger()->info(
             'installation.execution_time_extended',
             [
-                'max_execution_seconds' =>
-                    self::MAX_EXECUTION_SECONDS,
+                'max_execution_seconds' => self::MAX_EXECUTION_SECONDS,
             ],
         );
     }

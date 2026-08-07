@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Infrastructure\SSH\Services;
+namespace Tests\Support\SSH;
 
 /**
  * Test-only socket seam for SSHPortReadinessProbe.
@@ -41,8 +41,8 @@ final class FakeSshPortSocket
  * Test-only replacement for the global fsockopen() used by
  * SSHPortReadinessProbe.
  *
- * @param mixed $errorCode
- * @param mixed $errorMessage
+ * @param  mixed  $errorCode
+ * @param  mixed  $errorMessage
  * @return resource|false
  */
 function fsockopen(
