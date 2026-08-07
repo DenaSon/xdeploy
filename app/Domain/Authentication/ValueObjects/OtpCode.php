@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 final readonly class OtpCode
 {
-    private const int LENGTH = 4;
+    private const int LENGTH = 5;
 
     public function __construct(
         public string $value,
@@ -24,11 +24,13 @@ final readonly class OtpCode
 
     public static function generate(): self
     {
-        $min = 10 ** (self::LENGTH - 1);
-        $max = (10 ** self::LENGTH) - 1;
-
         return new self(
-            (string) random_int($min, $max),
+            str_pad(
+                (string) random_int(0, 99_999),
+                self::LENGTH,
+                '0',
+                STR_PAD_LEFT,
+            ),
         );
     }
 

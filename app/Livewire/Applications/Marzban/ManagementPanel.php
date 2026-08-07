@@ -34,17 +34,21 @@ final class ManagementPanel extends Component
     ): void {
         $this->serverId = $serverId;
 
-        $this->loadManagement($manager);
+        $this->loadManagement(
+            $manager,
+        );
     }
 
     public function refreshManagement(
         MarzbanManager $manager,
     ): void {
-        $this->loadManagement($manager);
+        $this->loadManagement(
+            $manager,
+        );
     }
 
     /**
-     * @param  array<string, mixed>  $management
+     * @param array<string, mixed> $management
      */
     #[On('marzban-management-updated.{serverId}')]
     public function updateManagement(
@@ -76,8 +80,8 @@ final class ManagementPanel extends Component
     #[On('marzban-setup-completed.{serverId}')]
     public function markSetupCompleted(): void
     {
-        $this->management['setup']['state']
-            = MarzbanSetupState::Complete->value;
+        $this->management['setup']['state'] =
+            MarzbanSetupState::Complete->value;
 
         $this->managementUnavailable = false;
     }
@@ -87,18 +91,6 @@ final class ManagementPanel extends Component
         return view(
             'livewire.applications.marzban.management-panel',
         );
-    }
-
-    private function authenticatedUser(): User
-    {
-        $user = Auth::user();
-
-        abort_unless(
-            $user instanceof User,
-            401,
-        );
-
-        return $user;
     }
 
     private function loadManagement(
@@ -120,16 +112,26 @@ final class ManagementPanel extends Component
                 )
                 ->toArray();
 
-            $this->management = $manager
-                ->overview($server)
-                ->toArray();
-
             $this->managementUnavailable = false;
         } catch (Throwable $exception) {
-            report($exception);
+            report(
+                $exception,
+            );
 
             $this->management = [];
             $this->managementUnavailable = true;
         }
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }

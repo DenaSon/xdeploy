@@ -18,12 +18,20 @@ final readonly class EloquentOtpRepository implements OtpRepositoryInterface
         CarbonInterface $expiresAt,
     ): Otp {
         Otp::query()
-            ->where('phone', (string) $phone)
+            ->where(
+                'phone',
+                (string) $phone,
+            )
             ->delete();
 
         return Otp::create([
             'phone' => (string) $phone,
-            'code' => (string) $code,
+
+            'code' => password_hash(
+                (string) $code,
+                PASSWORD_DEFAULT,
+            ),
+
             'expires_at' => $expiresAt,
         ]);
     }

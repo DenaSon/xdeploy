@@ -10,18 +10,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('otps', function (Blueprint $table) {
+        Schema::create('otps', function (Blueprint $table): void {
             $table->engine = 'InnoDB';
 
             $table->id();
 
-            $table->string('phone', 11)->unique();
-            $table->string('code', 8);
+            $table->string('phone', 11)
+                ->unique();
 
-            $table->timestamp('expires_at');
+            $table->string('code', 255);
+
+            $table->timestamp('expires_at')
+                ->index();
 
             $table->timestamps();
-
         });
     }
 

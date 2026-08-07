@@ -14,8 +14,10 @@ Route::middleware(['web', 'guest'])->group(function (): void {
     Route::livewire('/login', 'auth.login-page')
         ->name('login');
 
-    Route::livewire('/verify/{phone}', 'auth.verify-otp-page')
-        ->name('verify');
+    Route::livewire(
+        '/verify',
+        'auth.verify-otp-page',
+    )->name('verify');
 });
 
 Route::middleware(['web', 'auth'])

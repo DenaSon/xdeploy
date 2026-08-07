@@ -65,19 +65,17 @@ final readonly class OtpService
         PhoneNumber $phone,
         OtpCode $code,
     ): void {
-        $rateLimitKey =
-            $this->verifyRateLimitKey(
-                $phone,
-            );
+        $rateLimitKey = $this->verifyRateLimitKey(
+            $phone,
+        );
 
         $this->guardVerificationRateLimit(
             $rateLimitKey,
         );
 
-        $otp = $this->repository
-            ->findByPhone(
-                $phone,
-            );
+        $otp = $this->repository->findByPhone(
+            $phone,
+        );
 
         if ($otp === null) {
             $this->recordFailedVerification(
@@ -96,9 +94,9 @@ final readonly class OtpService
         }
 
         if (
-            ! hash_equals(
-                (string) $otp->code,
-                (string) $code,
+            ! password_verify(
+                password: (string) $code,
+                hash: (string) $otp->code,
             )
         ) {
             $this->recordFailedVerification(
@@ -108,10 +106,6 @@ final readonly class OtpService
             throw new InvalidOtpException;
         }
 
-        /*
-         * Successful verification removes both the OTP
-         * and its failed-attempt counter.
-         */
         RateLimiter::clear(
             $rateLimitKey,
         );
