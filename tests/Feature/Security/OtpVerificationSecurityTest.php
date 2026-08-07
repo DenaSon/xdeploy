@@ -26,13 +26,10 @@ final class OtpVerificationSecurityTest extends TestCase
             '09127777777',
         );
 
-        $validCode = OtpCode::from(
-            '1234',
-        );
-
-        $invalidCode = OtpCode::from(
-            '9999',
-        );
+        [
+            $validCode,
+            $invalidCode,
+        ] = $this->distinctOtpCodes();
 
         $service = $this->createOtpService();
 
@@ -150,13 +147,10 @@ final class OtpVerificationSecurityTest extends TestCase
             '09128888888',
         );
 
-        $validCode = OtpCode::from(
-            '1234',
-        );
-
-        $invalidCode = OtpCode::from(
-            '9999',
-        );
+        [
+            $validCode,
+            $invalidCode,
+        ] = $this->distinctOtpCodes();
 
         $service = $this->createOtpService();
 
@@ -231,10 +225,36 @@ final class OtpVerificationSecurityTest extends TestCase
         );
     }
 
+    /**
+     * Build two valid OTP values without coupling this security test
+     * to the current OTP length or generation format.
+     *
+     * @return array{OtpCode, OtpCode}
+     */
+    private function distinctOtpCodes(): array
+    {
+        $validCode = OtpCode::generate();
+
+        do {
+            $invalidCode = OtpCode::generate();
+        } while (
+            hash_equals(
+                (string) $validCode,
+                (string) $invalidCode,
+            )
+        );
+
+        return [
+            $validCode,
+            $invalidCode,
+        ];
+    }
+
     private function createOtpService(): OtpService
     {
         return new OtpService(
-            repository: new EloquentOtpRepository,
+            repository:
+                new EloquentOtpRepository,
         );
     }
 
@@ -248,8 +268,9 @@ final class OtpVerificationSecurityTest extends TestCase
         return $repository->store(
             phone: $phone,
             code: $code,
-            expiresAt: CarbonImmutable::now()
-                ->addMinutes(2),
+            expiresAt:
+                CarbonImmutable::now()
+                    ->addMinutes(2),
         );
     }
 

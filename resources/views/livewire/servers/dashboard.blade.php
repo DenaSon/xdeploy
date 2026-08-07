@@ -1,6 +1,10 @@
 <div
     class="relative isolate mx-auto w-full max-w-[1600px]"
-    @if (! $sshUnavailable)
+    @if (
+        ! $sshUnavailable
+        && $readinessIssue === null
+        && $errorMessage === null
+    )
         wire:poll.visible.30s="checkConnection"
     @endif
 >
@@ -58,6 +62,49 @@
                 >
                     تا زمانی که ارتباط SSH دوباره برقرار نشود، دریافت اطلاعات
                     سیستم، وضعیت سرویس‌ها و مصرف منابع متوقف می‌ماند.
+                </p>
+            </x-card>
+        </div>
+
+    @elseif ($readinessIssue !== null)
+
+        {{-- Persistent runtime readiness state --}}
+        <div
+            wire:key="dashboard-readiness-{{ $server->getKey() }}-{{ $readinessIssue }}"
+            class="space-y-6"
+        >
+            <x-dashboard.readiness-alert
+                :issue="$readinessIssue"
+                :operating-system="$readinessOperatingSystem"
+                retry-action="retryConnection"
+                :edit-url="route('panel.servers.edit', $server)"
+            />
+
+            <x-card
+                class="border border-base-300 bg-base-100/70
+                       py-14 text-center shadow-sm"
+            >
+                <div
+                    class="mx-auto flex size-16 items-center justify-center
+                           rounded-2xl bg-base-200"
+                >
+                    <x-icon
+                        name="o-shield-exclamation"
+                        class="size-8 text-base-content/30"
+                    />
+                </div>
+
+                <h2 class="mt-5 text-lg font-semibold text-base-content">
+                    داشبورد موقتاً متوقف شده است
+                </h2>
+
+                <p
+                    class="mx-auto mt-2 max-w-lg text-sm leading-7
+                           text-base-content/55"
+                >
+                    xDeploy تا برطرف‌شدن مشکل آمادگی سرور، اطلاعات منابع،
+                    سرویس‌ها و وضعیت سیستم را نمایش نمی‌دهد تا داده قدیمی یا
+                    ناقص به‌عنوان وضعیت فعلی سرور ارائه نشود.
                 </p>
             </x-card>
         </div>
@@ -122,10 +169,9 @@
             </div>
 
             {{-- Service status --}}
-            {{-- Service status --}}
             <div
                 class="min-w-0 xl:col-span-4
-           [&>*]:h-full [&>*]:w-full"
+                       [&>*]:h-full [&>*]:w-full"
             >
                 <x-dashboard.services-card
                     :services="$overview['services'] ?? []"
@@ -163,11 +209,11 @@
         <span class="loading loading-spinner loading-xs"></span>
 
         <span wire:loading wire:target="checkConnection">
-            در حال بررسی ارتباط سرور...
+            در حال بررسی آمادگی سرور...
         </span>
 
         <span wire:loading wire:target="retryConnection">
-            در حال تلاش برای اتصال مجدد...
+            در حال بررسی مجدد سرور...
         </span>
     </div>
 </div>

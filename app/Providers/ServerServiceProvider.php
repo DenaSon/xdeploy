@@ -6,7 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Server\Contracts\SystemPackageManager;
 use App\Infrastructure\Linux\Contracts\LinuxDistribution;
-use App\Infrastructure\Linux\Distributions\UbuntuDistribution;
+use App\Infrastructure\Linux\Distributions\DebianFamilyDistribution;
 use App\Infrastructure\Linux\Packages\AptPackageManager;
 use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
@@ -30,6 +30,7 @@ final class ServerServiceProvider extends ServiceProvider
             SSHConnectionInterface::class,
             SSHConnection::class,
         );
+
         $this->app->singleton(
             SSHHostResolverInterface::class,
             SystemSSHHostResolver::class,
@@ -38,6 +39,9 @@ final class ServerServiceProvider extends ServiceProvider
         /*
          * AptPackageManager captures SSHConnectionInterface
          * in its constructor, so it must use the same lifecycle.
+         *
+         * The supported OS policy guarantees this package manager
+         * is used only for explicitly supported Debian-family systems.
          */
         $this->app->scoped(
             SystemPackageManager::class,
@@ -45,12 +49,13 @@ final class ServerServiceProvider extends ServiceProvider
         );
 
         /*
-         * UbuntuDistribution only contains command definitions
-         * and has no server/request state.
+         * Ubuntu and Debian share the command strategy currently
+         * supported by xDeploy. OS support itself is enforced by
+         * SupportedOperatingSystemPolicy, not by this binding.
          */
         $this->app->singleton(
             LinuxDistribution::class,
-            UbuntuDistribution::class,
+            DebianFamilyDistribution::class,
         );
 
         /*

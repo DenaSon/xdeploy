@@ -710,10 +710,6 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
             version: CloudIpVersion::IPv4,
 
             isPublic: true,
-
-            isVpc: false,
-
-            type: 'public',
         );
     }
 

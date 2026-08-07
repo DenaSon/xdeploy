@@ -79,13 +79,13 @@ final class VerifyOtpPage extends Component
                 navigate: true,
             );
         } catch (
-        TooManyOtpAttemptsException $exception
+            TooManyOtpAttemptsException $exception
         ) {
             $this->showRateLimitError(
                 $exception,
             );
         } catch (
-        InvalidOtpException $exception
+            InvalidOtpException $exception
         ) {
             $this->handleInvalidOtp(
                 exception: $exception,
@@ -93,7 +93,7 @@ final class VerifyOtpPage extends Component
                 clientRateLimiter: $clientRateLimiter,
             );
         } catch (
-        OtpExpiredException $exception
+            OtpExpiredException $exception
         ) {
             $this->addError(
                 'code',
@@ -136,7 +136,7 @@ final class VerifyOtpPage extends Component
                     $clientIdentifier,
                 );
         } catch (
-        TooManyOtpAttemptsException $rateLimitException
+            TooManyOtpAttemptsException $rateLimitException
         ) {
             $this->showRateLimitError(
                 $rateLimitException,

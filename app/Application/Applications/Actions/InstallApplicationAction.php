@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Applications\Actions;
 
+use App\Application\Server\Actions\EnsureServerOperationReadinessAction;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Contracts\StartableInterface;
 use App\Domain\Application\Services\ApplicationInstallationService;
@@ -20,6 +21,7 @@ final readonly class InstallApplicationAction
 
     public function __construct(
         private ApplicationRegistryInterface $registry,
+        private EnsureServerOperationReadinessAction $serverReadiness,
         private PrivilegedExecutionPreflight $preflight,
         private SystemDependencyService $systemDependencies,
         private PlatformInstallationService $platformInstallationService,
@@ -27,15 +29,29 @@ final readonly class InstallApplicationAction
         private ApplicationLifecycleService $lifecycleService,
     ) {}
 
-    public function execute(ApplicationType $type): InstallReport
-    {
+    public function execute(
+        ApplicationType $type,
+    ): InstallReport {
         $this->extendExecutionTime();
 
-        $application = $this->registry->find($type);
+        /*
+         * ApplicationManager establishes the SSH session before invoking this
+         * action. No distro-dependent command may run before this guard.
+         *
+         * This check is authoritative and must remain in the installation
+         * workflow even when Presentation already validated the same server.
+         */
+        $this->serverReadiness
+            ->handle();
 
-        $this->preflight->ensureRoot();
+        $application = $this->registry
+            ->find($type);
 
-        $requirements = $application->requirements();
+        $this->preflight
+            ->ensureRoot();
+
+        $requirements = $application
+            ->requirements();
 
         $report = new InstallReport;
 
@@ -45,7 +61,9 @@ final readonly class InstallApplicationAction
             ),
         );
 
-        foreach ($requirements->platforms as $platformType) {
+        foreach (
+            $requirements->platforms as $platformType
+        ) {
             $report = $report->merge(
                 $this->platformInstallationService->ensure(
                     $platformType,
@@ -54,12 +72,19 @@ final readonly class InstallApplicationAction
         }
 
         $report = $report->merge(
-            $this->installationService->install($type),
+            $this->installationService->install(
+                $type,
+            ),
         );
 
-        if ($application instanceof StartableInterface) {
+        if (
+            $application
+            instanceof StartableInterface
+        ) {
             $report = $report->merge(
-                $this->lifecycleService->start($type),
+                $this->lifecycleService->start(
+                    $type,
+                ),
             );
         }
 
@@ -84,8 +109,10 @@ final readonly class InstallApplicationAction
             logger()->warning(
                 'installation.execution_time_extension_failed',
                 [
-                    'requested_seconds' => self::MAX_EXECUTION_SECONDS,
-                    'current_limit' => ini_get('max_execution_time'),
+                    'requested_seconds' =>
+                        self::MAX_EXECUTION_SECONDS,
+                    'current_limit' =>
+                        ini_get('max_execution_time'),
                 ],
             );
 
@@ -95,7 +122,8 @@ final readonly class InstallApplicationAction
         logger()->info(
             'installation.execution_time_extended',
             [
-                'max_execution_seconds' => self::MAX_EXECUTION_SECONDS,
+                'max_execution_seconds' =>
+                    self::MAX_EXECUTION_SECONDS,
             ],
         );
     }
