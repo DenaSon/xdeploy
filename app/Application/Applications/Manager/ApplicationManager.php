@@ -16,6 +16,7 @@ use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Shared\DTOs\InstallReport;
 use App\Models\Server;
+use App\Models\User;
 use Closure;
 
 final readonly class ApplicationManager
@@ -38,74 +39,93 @@ final readonly class ApplicationManager
      *     info: ApplicationInfo,
      * }>
      */
-    public function overview(Server $server): array
-    {
+    public function overview(
+        User $user,
+        Server $server,
+    ): array {
         return $this->onServer(
-            $server,
-            fn (): array => $this->getApplicationOverviewAction->execute(),
+            user: $user,
+            server: $server,
+            operation: fn (): array => $this->getApplicationOverviewAction->execute(),
         );
     }
 
     public function inspect(
+        User $user,
         Server $server,
         ApplicationType $type,
     ): ApplicationInfo {
         return $this->onServer(
-            $server,
-            fn (): ApplicationInfo => $this->applicationRegistry
+            user: $user,
+            server: $server,
+            operation: fn (): ApplicationInfo => $this->applicationRegistry
                 ->find($type)
                 ->inspect(),
         );
     }
 
     public function install(
+        User $user,
         Server $server,
         ApplicationType $type,
     ): InstallReport {
         return $this->onServer(
-            $server,
-            fn (): InstallReport => $this->installApplicationAction
+            user: $user,
+            server: $server,
+            operation: fn (): InstallReport => $this->installApplicationAction
                 ->execute($type),
         );
     }
 
     public function uninstall(
+        User $user,
         Server $server,
         ApplicationType $type,
     ): void {
         $this->onServer(
-            $server,
-            fn () => $this->uninstallApplicationAction->execute($type),
+            user: $user,
+            server: $server,
+            operation: fn () => $this->uninstallApplicationAction
+                ->execute($type),
         );
     }
 
     public function start(
+        User $user,
         Server $server,
         ApplicationType $type,
     ): void {
         $this->onServer(
-            $server,
-            fn () => $this->startApplicationAction->execute($type),
+            user: $user,
+            server: $server,
+            operation: fn () => $this->startApplicationAction
+                ->execute($type),
         );
     }
 
     public function stop(
+        User $user,
         Server $server,
         ApplicationType $type,
     ): void {
         $this->onServer(
-            $server,
-            fn () => $this->stopApplicationAction->execute($type),
+            user: $user,
+            server: $server,
+            operation: fn () => $this->stopApplicationAction
+                ->execute($type),
         );
     }
 
     public function restart(
+        User $user,
         Server $server,
         ApplicationType $type,
     ): void {
         $this->onServer(
-            $server,
-            fn () => $this->restartApplicationAction->execute($type),
+            user: $user,
+            server: $server,
+            operation: fn () => $this->restartApplicationAction
+                ->execute($type),
         );
     }
 
@@ -116,10 +136,26 @@ final readonly class ApplicationManager
      * @return TResult
      */
     private function onServer(
+        User $user,
         Server $server,
         Closure $operation,
     ): mixed {
-        $this->connectServerAction->handle($server);
+        /*
+         * Re-resolve the server through the authenticated user.
+         *
+         * Presentation mistakes must never allow a remote operation
+         * against another tenant's server.
+         */
+        $ownedServer = Server::query()
+            ->ownedBy($user)
+            ->whereKey(
+                $server->getKey(),
+            )
+            ->firstOrFail();
+
+        $this->connectServerAction->handle(
+            $ownedServer,
+        );
 
         return $operation();
     }

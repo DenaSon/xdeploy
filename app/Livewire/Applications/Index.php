@@ -8,7 +8,9 @@ use App\Application\Applications\Manager\ApplicationManager;
 use App\Infrastructure\SSH\Services\SSHConnectionCircuitBreaker;
 use App\Livewire\Concerns\HandlesSshAvailability;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Throwable;
@@ -149,7 +151,10 @@ final class Index extends Component
         bool $clearSshStateOnSuccess = true,
     ): bool {
         try {
-            $overview = $applicationManager->overview($server);
+            $overview = $applicationManager->overview(
+                user: $this->authenticatedUser(),
+                server: $server,
+            );
 
             $applications = array_map(
                 static fn (array $application): array => [
@@ -262,7 +267,21 @@ final class Index extends Component
     private function activeServer(): ?Server
     {
         return Server::query()
-            ->active()
+            ->activeFor(
+                $this->authenticatedUser(),
+            )
             ->first();
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }

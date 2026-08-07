@@ -11,8 +11,10 @@ use App\Infrastructure\SSH\Services\SSHConnectionCircuitBreaker;
 use App\Livewire\Applications\Resolvers\ApplicationManagementPanelResolver;
 use App\Livewire\Concerns\HandlesSshAvailability;
 use App\Models\Server;
+use App\Models\User;
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -67,7 +69,9 @@ final class Show extends Component
         SSHConnectionCircuitBreaker $circuitBreaker,
         ApplicationManagementPanelResolver $managementPanelResolver,
     ): void {
-        $type = ApplicationType::tryFrom($application);
+        $type = ApplicationType::tryFrom(
+            $application,
+        );
 
         abort_if(
             $type === null,
@@ -76,8 +80,14 @@ final class Show extends Component
         );
 
         $this->application = $type->value;
-        $this->name = ucfirst($type->value);
-        $this->managementPanel = $managementPanelResolver->resolve($type);
+        $this->name = ucfirst(
+            $type->value,
+        );
+
+        $this->managementPanel =
+            $managementPanelResolver->resolve(
+                $type,
+            );
 
         $this->loadApplication(
             applicationManager: $applicationManager,
@@ -164,10 +174,12 @@ final class Show extends Component
             circuitBreaker: $circuitBreaker,
             operation: static function (
                 ApplicationManager $manager,
+                User $user,
                 Server $server,
                 ApplicationType $type,
             ): void {
                 $manager->install(
+                    user: $user,
                     server: $server,
                     type: $type,
                 );
@@ -192,10 +204,12 @@ final class Show extends Component
             circuitBreaker: $circuitBreaker,
             operation: static function (
                 ApplicationManager $manager,
+                User $user,
                 Server $server,
                 ApplicationType $type,
             ): void {
                 $manager->uninstall(
+                    user: $user,
                     server: $server,
                     type: $type,
                 );
@@ -220,10 +234,12 @@ final class Show extends Component
             circuitBreaker: $circuitBreaker,
             operation: static function (
                 ApplicationManager $manager,
+                User $user,
                 Server $server,
                 ApplicationType $type,
             ): void {
                 $manager->start(
+                    user: $user,
                     server: $server,
                     type: $type,
                 );
@@ -248,10 +264,12 @@ final class Show extends Component
             circuitBreaker: $circuitBreaker,
             operation: static function (
                 ApplicationManager $manager,
+                User $user,
                 Server $server,
                 ApplicationType $type,
             ): void {
                 $manager->stop(
+                    user: $user,
                     server: $server,
                     type: $type,
                 );
@@ -276,10 +294,12 @@ final class Show extends Component
             circuitBreaker: $circuitBreaker,
             operation: static function (
                 ApplicationManager $manager,
+                User $user,
                 Server $server,
                 ApplicationType $type,
             ): void {
                 $manager->restart(
+                    user: $user,
                     server: $server,
                     type: $type,
                 );
@@ -297,13 +317,17 @@ final class Show extends Component
 
     public function render(): View
     {
-        return view('livewire.applications.show')
-            ->title($this->name);
+        return view(
+            'livewire.applications.show',
+        )->title(
+            $this->name,
+        );
     }
 
     /**
      * @param Closure(
      *     ApplicationManager,
+     *     User,
      *     Server,
      *     ApplicationType
      * ): void $operation
@@ -326,6 +350,7 @@ final class Show extends Component
         $this->resetMessages();
 
         $server = null;
+        $user = $this->authenticatedUser();
 
         try {
             $server = $this->activeServer();
@@ -340,6 +365,7 @@ final class Show extends Component
 
             $operation(
                 $applicationManager,
+                $user,
                 $server,
                 $this->applicationType(),
             );
@@ -360,13 +386,15 @@ final class Show extends Component
                     ! $this->sshUnavailable
                     && $this->errorMessage === null
                 ) {
-                    $this->errorMessage = $failureMessage;
+                    $this->errorMessage =
+                        $failureMessage;
                 }
 
                 return;
             }
 
-            $this->successMessage = $successMessage;
+            $this->successMessage =
+                $successMessage;
         } catch (Throwable $exception) {
             if (
                 $this->handleSshFailure(
@@ -382,9 +410,12 @@ final class Show extends Component
                 return;
             }
 
-            report($exception);
+            report(
+                $exception,
+            );
 
-            $this->errorMessage = $failureMessage;
+            $this->errorMessage =
+                $failureMessage;
         } finally {
             $this->processing = false;
         }
@@ -411,6 +442,7 @@ final class Show extends Component
             $this->serverMissing = false;
 
             $info = $applicationManager->inspect(
+                user: $this->authenticatedUser(),
                 server: $server,
                 type: $this->applicationType(),
             );
@@ -441,7 +473,10 @@ final class Show extends Component
                 return false;
             }
 
-            $this->setApplicationInfo($info);
+            $this->setApplicationInfo(
+                $info,
+            );
+
             $this->managementPanelRevision++;
 
             $this->errorMessage = null;
@@ -465,9 +500,13 @@ final class Show extends Component
                 return false;
             }
 
-            report($exception);
+            report(
+                $exception,
+            );
 
-            $this->info = $this->unknownApplicationInfo();
+            $this->info =
+                $this->unknownApplicationInfo();
+
             $this->errorMessage =
                 'دریافت وضعیت برنامه از سرور با خطا مواجه شد.';
 
@@ -477,7 +516,9 @@ final class Show extends Component
 
     private function prepareUnavailableApplicationState(): void
     {
-        $this->info = $this->unknownApplicationInfo();
+        $this->info =
+            $this->unknownApplicationInfo();
+
         $this->successMessage = null;
         $this->errorMessage = null;
     }
@@ -486,8 +527,12 @@ final class Show extends Component
     {
         $this->serverId = null;
         $this->serverMissing = true;
-        $this->info = $this->unknownApplicationInfo();
+
+        $this->info =
+            $this->unknownApplicationInfo();
+
         $this->successMessage = null;
+
         $this->errorMessage =
             'هیچ سرور فعالی وجود ندارد.';
 
@@ -517,8 +562,22 @@ final class Show extends Component
     private function activeServer(): ?Server
     {
         return Server::query()
-            ->active()
+            ->activeFor(
+                $this->authenticatedUser(),
+            )
             ->first();
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 
     private function resetMessages(): void
@@ -529,7 +588,15 @@ final class Show extends Component
 
     /**
      * @return array{
-     *     state: string,
+     * );
+
+    return $user;
+    }
+
+    private function resetMessages(): void
+    {
+    $this->successMessage = null;
+    $this->error     state: string,
      *     version: null,
      *     is_installed: false,
      *     is_running: false,

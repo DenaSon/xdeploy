@@ -9,7 +9,9 @@ use App\Application\Applications\Marzban\MarzbanManager;
 use App\Domain\Application\Marzban\Exceptions\MarzbanAdminAlreadyConfiguredException;
 use App\Domain\Application\Marzban\Exceptions\MarzbanAdminProvisioningException;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
@@ -47,12 +49,16 @@ final class SetupAdmin extends Component
     ): void {
         try {
             $validated = $this->validate();
+            $user = $this->authenticatedUser();
 
-            $server = Server::query()->findOrFail(
-                $this->serverId,
-            );
+            $server = Server::query()
+                ->ownedBy($user)
+                ->findOrFail(
+                    $this->serverId,
+                );
 
             $snapshot = $manager->createAdmin(
+                user: $user,
                 server: $server,
                 data: new CreateMarzbanAdminData(
                     username: $validated['username'],
@@ -170,5 +176,17 @@ final class SetupAdmin extends Component
             'password' => 'رمز عبور',
             'passwordConfirmation' => 'تکرار رمز عبور',
         ];
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }

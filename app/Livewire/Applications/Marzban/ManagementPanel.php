@@ -8,7 +8,9 @@ use App\Application\Applications\Marzban\MarzbanManager;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -87,13 +89,36 @@ final class ManagementPanel extends Component
         );
     }
 
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
+    }
+
     private function loadManagement(
         MarzbanManager $manager,
     ): void {
         try {
-            $server = Server::query()->findOrFail(
-                $this->serverId,
-            );
+            $user = $this->authenticatedUser();
+
+            $server = Server::query()
+                ->ownedBy($user)
+                ->findOrFail(
+                    $this->serverId,
+                );
+
+            $this->management = $manager
+                ->overview(
+                    user: $user,
+                    server: $server,
+                )
+                ->toArray();
 
             $this->management = $manager
                 ->overview($server)

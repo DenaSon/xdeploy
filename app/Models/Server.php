@@ -83,4 +83,29 @@ class Server extends Model
             ServerStatus::Active,
         );
     }
+
+    public function scopeOwnedBy(
+        Builder $query,
+        User $user,
+    ): void {
+        $query->where(
+            'user_id',
+            $user->getKey(),
+        );
+    }
+
+    public function scopeActiveFor(
+        Builder $query,
+        User $user,
+    ): void {
+        $query
+            ->where(
+                'user_id',
+                $user->getKey(),
+            )
+            ->where(
+                'status',
+                ServerStatus::Active,
+            );
+    }
 }

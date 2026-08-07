@@ -10,7 +10,9 @@ use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsApplyException;
 use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsPreflightException;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsApplyFailure;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
@@ -99,11 +101,19 @@ final class SetupHttps extends Component
                 $this->serverId,
             );
 
+            $user = $this->authenticatedUser();
+
+            $server = Server::query()
+                ->ownedBy($user)
+                ->findOrFail(
+                    $this->serverId,
+                );
+
             $result = $manager->preflightHttps(
+                user: $user,
                 server: $server,
                 domain: $this->domain,
             );
-
             $this->domain = $result->dns->domain;
             $this->dnsPreflight = $result->dns->toArray();
             $this->serverPreflight = $result->server?->toArray();
@@ -143,8 +153,16 @@ final class SetupHttps extends Component
             $server = Server::query()->findOrFail(
                 $this->serverId,
             );
+            $user = $this->authenticatedUser();
+
+            $server = Server::query()
+                ->ownedBy($user)
+                ->findOrFail(
+                    $this->serverId,
+                );
 
             $management = $manager->enableHttps(
+                user: $user,
                 server: $server,
                 domain: $this->domain,
             )->toArray();
@@ -212,5 +230,17 @@ final class SetupHttps extends Component
             MarzbanHttpsApplyFailure::Mutation,
             MarzbanHttpsApplyFailure::Verification => 'فعال‌سازی HTTPS کامل نشد. پیش از تلاش دوباره وضعیت Marzban را بروزرسانی کنید.',
         };
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }
