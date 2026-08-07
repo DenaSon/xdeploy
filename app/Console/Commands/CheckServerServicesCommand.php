@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Application\Server\Actions\GetServerServicesAction;
+use App\Application\Server\ServerManager;
 use App\Domain\Server\DTOs\ServiceStatusData;
 use App\Models\Server;
 use Illuminate\Console\Command;
@@ -17,7 +17,7 @@ final class CheckServerServicesCommand extends Command
     protected $description = 'Show service statuses for a server';
 
     public function __construct(
-        private readonly GetServerServicesAction $getServerServices,
+        private readonly ServerManager $serverManager,
     ) {
         parent::__construct();
     }
@@ -39,7 +39,7 @@ final class CheckServerServicesCommand extends Command
         ));
 
         try {
-            $services = $this->getServerServices->handle($server);
+            $services = $this->serverManager->services($server);
         } catch (Throwable $exception) {
             report($exception);
 
