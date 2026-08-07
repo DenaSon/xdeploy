@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Application\Server\Actions\TestServerConnectionAction;
 use App\Application\Server\Data\TestServerConnectionData;
+use App\Infrastructure\SSH\Exceptions\SSHConnectionTargetNotAllowedException;
 use Mary\Traits\Toast;
 use Throwable;
 
@@ -40,6 +41,16 @@ trait TestsServerConnection
             $this->success(
                 'اتصال موفق',
                 'ارتباط SSH با سرور با موفقیت برقرار شد.',
+            );
+        } catch (SSHConnectionTargetNotAllowedException) {
+            /*
+             * Expected security-policy rejection.
+             *
+             * Do not report this as an application error.
+             */
+            $this->error(
+                'آدرس سرور مجاز نیست',
+                'برای اتصال، IP عمومی یا دامنه عمومی معتبر سرور را وارد کنید.',
             );
         } catch (Throwable $exception) {
             report($exception);

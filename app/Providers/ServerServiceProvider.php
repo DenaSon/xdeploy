@@ -10,7 +10,9 @@ use App\Infrastructure\Linux\Distributions\UbuntuDistribution;
 use App\Infrastructure\Linux\Packages\AptPackageManager;
 use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Contracts\SSHHostResolverInterface;
 use App\Infrastructure\SSH\Services\SSHConnection;
+use App\Infrastructure\SSH\Services\SystemSSHHostResolver;
 use Illuminate\Support\ServiceProvider;
 
 final class ServerServiceProvider extends ServiceProvider
@@ -27,6 +29,10 @@ final class ServerServiceProvider extends ServiceProvider
         $this->app->scoped(
             SSHConnectionInterface::class,
             SSHConnection::class,
+        );
+        $this->app->singleton(
+            SSHHostResolverInterface::class,
+            SystemSSHHostResolver::class,
         );
 
         /*

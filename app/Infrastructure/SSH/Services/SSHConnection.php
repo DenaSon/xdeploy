@@ -10,6 +10,7 @@ use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Infrastructure\SSH\Exceptions\SSHCommandTimeoutException;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionUnavailableException;
+use App\Infrastructure\SSH\Security\SSHConnectionTargetPolicy;
 use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
 use Illuminate\Support\Str;
@@ -29,10 +30,14 @@ final class SSHConnection implements SSHConnectionInterface
     public function __construct(
         private readonly AuthenticationStrategyFactory $authenticationStrategyFactory,
         private readonly SSHConnectionCircuitBreaker $circuitBreaker,
+        private readonly SSHConnectionTargetPolicy $targetPolicy,
     ) {}
 
     public function connect(Server $server): bool
     {
+        $resolvedHost = $this->targetPolicy->resolve(
+            $server->host,
+        );
         $strategy = $this->authenticationStrategyFactory->make(
             $server->authentication_type,
         );
@@ -58,7 +63,7 @@ final class SSHConnection implements SSHConnectionInterface
 
         try {
             $this->ssh = new SSH2(
-                host: $server->host,
+                host: $resolvedHost,
                 port: $server->port,
                 timeout: SSHTimeout::CONNECTION,
             );
