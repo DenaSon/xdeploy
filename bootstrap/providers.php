@@ -8,6 +8,8 @@ use App\Providers\PlatformServiceProvider;
 use App\Providers\ServerServiceProvider;
 use App\Providers\SmsServiceProvider;
 use App\Providers\UserServiceProvider;
+use App\Providers\CloudSnapshotServiceProvider;
+
 
 return [
     AppServiceProvider::class,
@@ -18,4 +20,5 @@ return [
     SmsServiceProvider::class,
     UserServiceProvider::class,
     CredentialSecurityServiceProvider::class,
+    CloudSnapshotServiceProvider::class,
 ];

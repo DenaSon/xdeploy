@@ -17,6 +17,7 @@ use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
 use App\Domain\Cloud\DTOs\CloudServerAddressData;
+use App\Domain\Cloud\DTOs\CloudServerConsoleData;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudServerReportsData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
@@ -134,6 +135,49 @@ final class ArvanCloudResponseMapper
             ),
             regionId: $regionId,
             defaultUsername: $defaultUsername,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapServerVnc(
+        array $payload,
+    ): CloudServerConsoleData {
+        $console = $this->serverVncObject(
+            $payload,
+        );
+
+        $url = $this->requiredString(
+            data: $console,
+            key: 'url',
+            resource: 'server VNC console',
+        );
+
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server VNC console field [url] must be a valid URL.',
+            );
+        }
+
+        $parts = parse_url(
+            $url,
+        );
+
+        if (
+            ! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || ! isset($parts['host'])
+            || ! is_string($parts['host'])
+            || trim($parts['host']) === ''
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server VNC console field [url] must be an absolute HTTPS URL.',
+            );
+        }
+
+        return new CloudServerConsoleData(
+            url: $url,
         );
     }
 
@@ -1277,6 +1321,36 @@ final class ArvanCloudResponseMapper
 
         /** @var list<array<string, mixed>> $data */
         return $data;
+    }
+
+    /**
+     * The verified response uses a data object while the OpenAPI example
+     * exposes the console object directly. Both shapes are supported.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function serverVncObject(
+        array $payload,
+    ): array {
+        $candidate = array_key_exists(
+            'data',
+            $payload,
+        )
+            ? $payload['data']
+            : $payload;
+
+        if (
+            ! is_array($candidate)
+            || array_is_list($candidate)
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server VNC console response has an invalid data envelope.',
+            );
+        }
+
+        /** @var array<string, mixed> $candidate */
+        return $candidate;
     }
 
     /**

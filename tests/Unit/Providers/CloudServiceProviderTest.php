@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Providers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
@@ -140,6 +141,7 @@ final class CloudServiceProviderTest extends TestCase
         );
 
         $contracts = [
+            CloudServerConsoleInterface::class,
             CloudServerCredentialManagerInterface::class,
             CloudServerInventoryInterface::class,
             CloudServerProvisionerInterface::class,
@@ -302,6 +304,10 @@ final class CloudServiceProviderTest extends TestCase
     public static function cloudCapabilityContractProvider(): array
     {
         return [
+            'console' => [
+                'contract' => CloudServerConsoleInterface::class,
+            ],
+
             'credential manager' => [
                 'contract' => CloudServerCredentialManagerInterface::class,
             ],

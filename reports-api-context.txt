@@ -1,0 +1,4821 @@
+
+============================================================
+FILE: app\Domain\Cloud\DTOs\CloudPortData.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Cloud\DTOs;
+
+final readonly class CloudPortData
+{
+    /**
+     * @param  list<string>  $ips
+     * @param  list<string>  $securityGroupIds
+     */
+    public function __construct(
+        public string $id,
+        public string $serverId,
+        public array $ips,
+        public string $macAddress,
+        public string $networkId,
+        public bool $portSecurityEnabled,
+        public array $securityGroupIds,
+        public string $status,
+    ) {}
+
+    public function containsIp(string $ip): bool
+    {
+        return in_array(
+            $ip,
+            $this->ips,
+            true,
+        );
+    }
+}
+
+============================================================
+FILE: app\Domain\Cloud\DTOs\CloudServerData.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Cloud\DTOs;
+
+use App\Domain\Cloud\Enums\CloudServerPowerState;
+use App\Domain\Cloud\Enums\CloudServerStatus;
+use DateTimeImmutable;
+
+final readonly class CloudServerData
+{
+    /**
+     * @param  list<CloudServerAddressData>  $addresses
+     * @param  list<string>  $networkIds
+     * @param  list<string>  $securityGroupIds
+     */
+    public function __construct(
+        public string $id,
+        public string $name,
+        public string $regionId,
+        public CloudServerStatus $status,
+        public ?string $username,
+        public ?string $sizeId,
+        public ?string $imageId,
+        public ?DateTimeImmutable $createdAt,
+        public array $addresses = [],
+        public array $networkIds = [],
+        public array $securityGroupIds = [],
+        public bool $volumeBacked = false,
+        public bool $highAvailability = false,
+
+        /*
+         * Fields added for resize discovery, polling, and verification.
+         *
+         * They are optional and appended to preserve compatibility with
+         * all existing constructor calls.
+         */
+        public ?string $sizeName = null,
+        public ?int $vCpu = null,
+        public ?int $memoryMiB = null,
+        public ?int $diskGiB = null,
+        public ?string $taskState = null,
+        public ?string $providerError = null,
+        public CloudServerPowerState $powerState =
+        CloudServerPowerState::Unknown,
+    ) {}
+
+    /**
+     * @return list<string>
+     */
+    public function publicIpv4s(): array
+    {
+        $addresses = [];
+
+        foreach ($this->addresses as $address) {
+            if (! $address->isPublicIpv4()) {
+                continue;
+            }
+
+            $addresses[] = $address->address;
+        }
+
+        return array_values(
+            array_unique(
+                $addresses,
+            ),
+        );
+    }
+
+    public function firstPublicIpv4(): ?string
+    {
+        return $this->publicIpv4s()[0] ?? null;
+    }
+
+    public function hasPublicIpv4(): bool
+    {
+        return $this->publicIpv4s() !== [];
+    }
+
+    public function isRunning(): bool
+    {
+        return $this->powerState->isRunning();
+    }
+
+    public function isStopped(): bool
+    {
+        return $this->powerState->isStopped();
+    }
+
+    public function isTransitioning(): bool
+    {
+        return $this->powerState->isTransitioning();
+    }
+
+    public function hasProviderError(): bool
+    {
+        return is_string(
+            $this->providerError,
+        ) && trim(
+            $this->providerError,
+        ) !== '';
+    }
+
+    public function hasSizeInformation(): bool
+    {
+        return is_string(
+            $this->sizeId,
+        ) && trim(
+            $this->sizeId,
+        ) !== '';
+    }
+
+    public function hasResourceInformation(): bool
+    {
+        return $this->vCpu !== null
+            && $this->memoryMiB !== null
+            && $this->diskGiB !== null;
+    }
+
+    public function isReadyForSshCheck(): bool
+    {
+        return $this->status->isReady()
+            && $this->powerStateAllowsSshCheck()
+            && ! $this->hasProviderError()
+            && $this->hasPublicIpv4()
+            && is_string(
+                $this->username,
+            )
+            && trim(
+                $this->username,
+            ) !== '';
+    }
+
+    /**
+     * Unknown is temporarily accepted for backward compatibility.
+     *
+     * Once every provider mapper supplies an explicit power state,
+     * active SSH operations will only use Running servers.
+     */
+    private function powerStateAllowsSshCheck(): bool
+    {
+        return in_array(
+            $this->powerState,
+            [
+                CloudServerPowerState::Running,
+                CloudServerPowerState::Unknown,
+            ],
+            true,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'region_id' => $this->regionId,
+            'status' => $this->status->value,
+            'power_state' => $this->powerState->value,
+            'username' => $this->username,
+
+            'size' => [
+                'id' => $this->sizeId,
+                'name' => $this->sizeName,
+                'v_cpu' => $this->vCpu,
+                'memory_mib' => $this->memoryMiB,
+                'disk_gib' => $this->diskGiB,
+            ],
+
+            'image_id' => $this->imageId,
+
+            'created_at' => $this->createdAt?->format(
+                DATE_ATOM,
+            ),
+
+            'addresses' => array_map(
+                static fn (
+                    CloudServerAddressData $address,
+                ): array => $address->toArray(),
+                $this->addresses,
+            ),
+
+            'network_ids' => $this->networkIds,
+            'security_group_ids' => $this->securityGroupIds,
+            'volume_backed' => $this->volumeBacked,
+            'high_availability' => $this->highAvailability,
+            'task_state' => $this->taskState,
+            'provider_error' => $this->providerError,
+        ];
+    }
+}
+
+============================================================
+FILE: app\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Cloud\ArvanCloud;
+
+use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
+use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
+use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
+use App\Domain\Cloud\DTOs\CloudImageData;
+use App\Domain\Cloud\DTOs\CloudNetworkData;
+use App\Domain\Cloud\DTOs\CloudPortData;
+use App\Domain\Cloud\DTOs\CloudQuotaData;
+use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
+use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\DTOs\CloudServerActionData;
+use App\Domain\Cloud\DTOs\CloudServerData;
+use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\DTOs\CloudSshKeyData;
+use App\Domain\Cloud\DTOs\CreateCloudServerData;
+use App\Domain\Cloud\DTOs\CreatedCloudServerData;
+use App\Domain\Cloud\DTOs\ResizeCloudRootDiskData;
+use App\Domain\Cloud\DTOs\ResizeCloudServerData;
+use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
+use App\Domain\Cloud\Exceptions\CloudValidationException;
+use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
+{
+    private const string RESOURCE_REGIONS = 'regions';
+
+    private const string RESOURCE_SIZES = 'sizes';
+
+    private const string RESOURCE_IMAGES = 'images';
+
+    private const string RESOURCE_NETWORKS = 'networks';
+
+    private const string RESOURCE_SECURITIES = 'securities';
+
+    private const string RESOURCE_QUOTA = 'quota';
+
+    private const string RESOURCE_SSH_KEYS = 'ssh-keys';
+
+    private const string RESOURCE_SERVERS = 'servers';
+
+    private const string RESOURCE_PORTS = 'ports';
+
+    private const string ACTION_POWER_ON = 'power-on';
+
+    private const string ACTION_POWER_OFF = 'power-off';
+
+    private const string ACTION_REBOOT = 'reboot';
+
+    private const string ACTIONS = 'actions';
+
+    private const string ACTION_ADD_PUBLIC_IP = 'add-public-ip';
+
+    private const string ACTION_RESIZE = 'resize';
+
+    private const string ACTION_RESIZE_ROOT = 'resizeRoot';
+
+    private const string ACTION_RESET_ROOT_PASSWORD = 'reset-root-password';
+
+    public function __construct(
+        private ArvanCloudClient $client,
+        private ArvanCloudResponseMapper $mapper,
+        private string $createType = 'cinder',
+        private string $defaultUsername = 'ubuntu',
+    ) {}
+
+    /**
+     * @return list<CloudRegionData>
+     */
+    public function listRegions(): array
+    {
+        return $this->mapper->mapRegions(
+            $this->client->get(
+                self::RESOURCE_REGIONS,
+            ),
+        );
+    }
+
+    /**
+     * @return list<CloudSizeData>
+     */
+    public function listSizes(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SIZES,
+            ),
+        );
+
+        return $this->mapper->mapSizes(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudImageData>
+     */
+    public function listImages(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_IMAGES,
+            ),
+            [
+                'type' => 'distributions',
+            ],
+        );
+
+        return $this->mapper->mapImages(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudNetworkData>
+     */
+    public function listNetworks(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_NETWORKS,
+            ),
+        );
+
+        return $this->mapper->mapNetworks(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudSecurityGroupData>
+     */
+    public function listSecurityGroups(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SECURITIES,
+            ),
+        );
+
+        return $this->mapper->mapSecurityGroups(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function getQuota(
+        string $region,
+    ): CloudQuotaData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_QUOTA,
+            ),
+        );
+
+        return $this->mapper->mapQuota(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudSshKeyData>
+     */
+    public function listSshKeys(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SSH_KEYS,
+            ),
+        );
+
+        return $this->mapper->mapSshKeys(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    /**
+     * @return list<CloudSizeData>
+     */
+    public function listServerResizePlans(
+        string $region,
+        string $serverId,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $payload = $this->client->get(
+            $this->serverResizePlansEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+        );
+
+        return $this->mapper->mapServerResizePlans(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function findSize(
+        string $region,
+        string $sizeId,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $payload = $this->client->get(
+            $this->sizeEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+        );
+
+        return $this->mapper->mapSize(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function calculateSize(
+        string $region,
+        string $sizeId,
+        int $diskGiB,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $normalizedDiskGiB = $this->normalizeDiskSize(
+            $diskGiB,
+        );
+
+        $payload = $this->client->post(
+            $this->sizeEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+            [
+                'volume_size' => $normalizedDiskGiB,
+            ],
+        );
+
+        return $this->mapper->mapCalculatedSize(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function calculateDiskPrice(
+        string $region,
+        string $sizeId,
+        int $diskGiB,
+    ): CloudDiskPriceData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $normalizedDiskGiB = $this->normalizeDiskSize(
+            $diskGiB,
+        );
+
+        $payload = $this->client->post(
+            $this->sizeDiskEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+            [
+                'volume_size' => $normalizedDiskGiB,
+            ],
+        );
+
+        return $this->mapper->mapDiskPrice(
+            $payload,
+        );
+    }
+
+    public function createServer(
+        CreateCloudServerData $data,
+    ): CreatedCloudServerData {
+        $regionId = $this->normalizeRegion(
+            $data->regionId,
+        );
+
+        $serverName = $this->normalizeServerName(
+            $data->name,
+        );
+
+        $payload = $this->createServerPayload(
+            data: $data,
+            serverName: $serverName,
+        );
+
+        $response = $this->client->post(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SERVERS,
+            ),
+            $payload,
+        );
+
+        $createdServer = $this->mapper->mapCreatedServer(
+            payload: $response,
+            regionId: $regionId,
+            defaultUsername: $this->normalizedDefaultUsername(),
+            requestedName: $serverName,
+        );
+
+        if (
+            ! $data->usesSshKey()
+            && ! $createdServer->hasGeneratedPassword()
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud create response did not contain a generated password.',
+            );
+        }
+
+        return $createdServer;
+    }
+
+    public function findServer(
+        string $region,
+        string $serverId,
+    ): CloudServerData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerServerId = $this->normalizeResourceId(
+            id: $serverId,
+            resource: 'server',
+        );
+
+        $payload = $this->client->get(
+            $this->serverEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+        );
+
+        return $this->mapper->mapServer(
+            payload: $payload,
+            regionId: $regionId,
+            serverId: $providerServerId,
+            defaultUsername: $this->normalizedDefaultUsername(),
+        );
+    }
+
+    public function powerOn(
+        string $region,
+        string $serverId,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_POWER_ON,
+            ),
+        );
+    }
+
+    public function powerOff(
+        string $region,
+        string $serverId,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_POWER_OFF,
+            ),
+        );
+    }
+
+    public function reboot(
+        string $region,
+        string $serverId,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_REBOOT,
+            ),
+        );
+    }
+
+    public function deleteServer(
+        string $region,
+        string $serverId,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $this->client->delete(
+            $this->serverEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+            ),
+        );
+    }
+
+    /**
+     * @return list<CloudServerActionData>
+     */
+    public function getAvailableActions(
+        string $region,
+        string $serverId,
+    ): array {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $payload = $this->client->get(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTIONS,
+            ),
+        );
+
+        return $this->mapper->mapServerActions(
+            $payload,
+        );
+    }
+
+    /**
+     * @return list<CloudPortData>
+     */
+    public function listServerPorts(
+        string $region,
+        string $serverId,
+    ): array {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_PORTS,
+            ),
+        );
+
+        return $this->mapper->mapPorts(
+            payload: $payload,
+            serverId: $providerServerId,
+        );
+    }
+
+    /**
+     * @param  list<string>  $securityGroupIds
+     */
+    public function addPublicIp(
+        string $region,
+        string $serverId,
+        CloudIpVersion $version = CloudIpVersion::IPv4,
+        array $securityGroupIds = [],
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $normalizedSecurityGroupIds =
+            $this->normalizeOptionalResourceIds(
+                ids: $securityGroupIds,
+                resource: 'security group',
+            );
+
+        $payload = [
+            'type' => $version->value,
+        ];
+
+        if ($normalizedSecurityGroupIds !== []) {
+            $payload['security_groups'] =
+                $normalizedSecurityGroupIds;
+        }
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_ADD_PUBLIC_IP,
+            ),
+            $payload,
+        );
+    }
+
+    public function deletePort(
+        string $region,
+        string $portId,
+    ): void {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerPortId = $this->normalizeResourceId(
+            id: $portId,
+            resource: 'port',
+        );
+
+        $this->client->delete(
+            $this->portEndpoint(
+                regionId: $regionId,
+                portId: $providerPortId,
+            ),
+        );
+    }
+
+    public function resizeServer(
+        ResizeCloudServerData $data,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $data->regionId,
+                serverId: $data->serverId,
+            );
+
+        $targetSizeId = $this->normalizeResourceId(
+            id: $data->targetSizeId,
+            resource: 'size',
+        );
+
+        $targetDiskGiB = $this->normalizeDiskSize(
+            $data->targetDiskGiB,
+        );
+
+        $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_RESIZE,
+            ),
+            [
+                'disk_size' => $targetDiskGiB,
+                'flavor_id' => $targetSizeId,
+            ],
+        );
+    }
+
+    public function resizeRootDisk(
+        ResizeCloudRootDiskData $data,
+    ): void {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $data->regionId,
+                serverId: $data->serverId,
+            );
+
+        $targetDiskGiB = $this->normalizeDiskSize(
+            $data->targetDiskGiB,
+        );
+
+        $this->client->put(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_RESIZE_ROOT,
+            ),
+            [
+                'new_size' => $targetDiskGiB,
+            ],
+        );
+    }
+
+    public function resetRootPassword(
+        string $region,
+        string $serverId,
+    ): CloudRootPasswordResetData {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $payload = $this->client->post(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_RESET_ROOT_PASSWORD,
+            ),
+        );
+
+        return $this->mapper->mapRootPasswordReset(
+            $payload,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function createServerPayload(
+        CreateCloudServerData $data,
+        string $serverName,
+    ): array {
+        $securityGroupIds = $this->normalizeSecurityGroupIds(
+            $data->securityGroupIds,
+        );
+
+        return [
+            'name' => $serverName,
+
+            'network_id' => $this->normalizeResourceId(
+                id: $data->networkId,
+                resource: 'network',
+            ),
+
+            'flavor_id' => $this->normalizeResourceId(
+                id: $data->sizeId,
+                resource: 'size',
+            ),
+
+            'image_id' => $this->normalizeResourceId(
+                id: $data->imageId,
+                resource: 'image',
+            ),
+
+            'security_groups' => array_map(
+                static fn (string $id): array => [
+                    'name' => $id,
+                ],
+                $securityGroupIds,
+            ),
+
+            'ssh_key' => $data->usesSshKey(),
+
+            'key_name' => $data->usesSshKey()
+                ? trim((string) $data->sshKeyName)
+                : null,
+
+            'count' => 1,
+
+            'create_type' => $this->normalizeCreateType(),
+
+            'disk_size' => $this->normalizeDiskSize(
+                $data->diskGiB,
+            ),
+
+            'init_script' => $data->initializationScript,
+
+            'ha_enabled' => $data->highAvailability,
+        ];
+    }
+
+    private function regionEndpoint(
+        string $regionId,
+        string $resource,
+    ): string {
+        return sprintf(
+            'regions/%s/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $resource,
+            ),
+        );
+    }
+
+    private function serverResizePlansEndpoint(
+        string $regionId,
+        string $serverId,
+    ): string {
+        return sprintf(
+            'regions/%s/sizes/by-server/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $serverId,
+            ),
+        );
+    }
+
+    private function sizeEndpoint(
+        string $regionId,
+        string $sizeId,
+    ): string {
+        return sprintf(
+            'regions/%s/sizes/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $sizeId,
+            ),
+        );
+    }
+
+    private function sizeDiskEndpoint(
+        string $regionId,
+        string $sizeId,
+    ): string {
+        return sprintf(
+            '%s/disk',
+            $this->sizeEndpoint(
+                regionId: $regionId,
+                sizeId: $sizeId,
+            ),
+        );
+    }
+
+    private function serverEndpoint(
+        string $regionId,
+        string $serverId,
+    ): string {
+        return sprintf(
+            'regions/%s/servers/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $serverId,
+            ),
+        );
+    }
+
+    private function serverActionEndpoint(
+        string $regionId,
+        string $serverId,
+        string $action,
+    ): string {
+        return sprintf(
+            '%s/%s',
+            $this->serverEndpoint(
+                regionId: $regionId,
+                serverId: $serverId,
+            ),
+            rawurlencode(
+                $action,
+            ),
+        );
+    }
+
+    private function portEndpoint(
+        string $regionId,
+        string $portId,
+    ): string {
+        return sprintf(
+            'regions/%s/ports/%s',
+            rawurlencode(
+                $regionId,
+            ),
+            rawurlencode(
+                $portId,
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function normalizeServerReference(
+        string $region,
+        string $serverId,
+    ): array {
+        return [
+            $this->normalizeRegion(
+                $region,
+            ),
+
+            $this->normalizeResourceId(
+                id: $serverId,
+                resource: 'server',
+            ),
+        ];
+    }
+
+    private function normalizeRegion(
+        string $region,
+    ): string {
+        if (
+            $region === ''
+            || preg_match(
+                '/[\x00-\x1F\x7F]/',
+                $region,
+            ) === 1
+        ) {
+            throw new CloudValidationException(
+                'Cloud region identifier is invalid.',
+            );
+        }
+
+        $region = trim(
+            $region,
+        );
+
+        if ($region === '') {
+            throw new CloudValidationException(
+                'Cloud region identifier cannot be empty.',
+            );
+        }
+
+        if (
+            preg_match(
+                '/\A[a-zA-Z0-9]+(?:[._-][a-zA-Z0-9]+)*\z/',
+                $region,
+            ) !== 1
+        ) {
+            throw new CloudValidationException(
+                'Cloud region identifier is invalid.',
+            );
+        }
+
+        return $region;
+    }
+
+    private function normalizeResourceId(
+        string $id,
+        string $resource,
+    ): string {
+        if (
+            $id === ''
+            || preg_match(
+                '/[\x00-\x1F\x7F]/',
+                $id,
+            ) === 1
+        ) {
+            throw new CloudValidationException(
+                sprintf(
+                    'Cloud %s identifier is invalid.',
+                    $resource,
+                ),
+            );
+        }
+
+        $id = trim(
+            $id,
+        );
+
+        if (
+            $id === ''
+            || preg_match(
+                '/\A[a-zA-Z0-9]+(?:[._-][a-zA-Z0-9]+)*\z/',
+                $id,
+            ) !== 1
+        ) {
+            throw new CloudValidationException(
+                sprintf(
+                    'Cloud %s identifier is invalid.',
+                    $resource,
+                ),
+            );
+        }
+
+        return $id;
+    }
+
+    private function normalizeServerName(
+        string $name,
+    ): string {
+        $name = trim(
+            $name,
+        );
+
+        if (
+            $name === ''
+            || mb_strlen(
+                $name,
+            ) > 255
+            || preg_match(
+                '/[\x00-\x1F\x7F]/',
+                $name,
+            ) === 1
+        ) {
+            throw new CloudValidationException(
+                'Cloud server name is invalid.',
+            );
+        }
+
+        return $name;
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    private function normalizeSecurityGroupIds(
+        array $ids,
+    ): array {
+        $normalized = $this->normalizeOptionalResourceIds(
+            ids: $ids,
+            resource: 'security group',
+        );
+
+        if ($normalized === []) {
+            throw new CloudValidationException(
+                'At least one cloud security group is required.',
+            );
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    private function normalizeOptionalResourceIds(
+        array $ids,
+        string $resource,
+    ): array {
+        $normalized = [];
+
+        foreach ($ids as $id) {
+            if (! is_string($id)) {
+                throw new CloudValidationException(
+                    sprintf(
+                        'Cloud %s identifier must be a string.',
+                        $resource,
+                    ),
+                );
+            }
+
+            $normalized[] = $this->normalizeResourceId(
+                id: $id,
+                resource: $resource,
+            );
+        }
+
+        return array_values(
+            array_unique(
+                $normalized,
+            ),
+        );
+    }
+
+    private function normalizeDiskSize(
+        int $diskGiB,
+    ): int {
+        if ($diskGiB < 1) {
+            throw new CloudValidationException(
+                'Cloud server disk size must be greater than zero.',
+            );
+        }
+
+        return $diskGiB;
+    }
+
+    private function normalizeCreateType(): string
+    {
+        return $this->normalizeResourceId(
+            id: $this->createType,
+            resource: 'create type',
+        );
+    }
+
+    private function normalizedDefaultUsername(): string
+    {
+        $username = trim(
+            $this->defaultUsername,
+        );
+
+        if (
+            $username === ''
+            || preg_match(
+                '/\A[a-z_][a-z0-9_-]*[$]?\z/i',
+                $username,
+            ) !== 1
+        ) {
+            throw new CloudValidationException(
+                'Cloud image default username is invalid.',
+            );
+        }
+
+        return $username;
+    }
+}
+
+============================================================
+FILE: app\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Cloud\ArvanCloud\Mappers;
+
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
+use App\Domain\Cloud\DTOs\CloudImageData;
+use App\Domain\Cloud\DTOs\CloudNetworkData;
+use App\Domain\Cloud\DTOs\CloudPortData;
+use App\Domain\Cloud\DTOs\CloudPriceData;
+use App\Domain\Cloud\DTOs\CloudQuotaData;
+use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
+use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\DTOs\CloudServerActionData;
+use App\Domain\Cloud\DTOs\CloudServerAddressData;
+use App\Domain\Cloud\DTOs\CloudServerData;
+use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\DTOs\CreatedCloudServerData;
+use App\Domain\Cloud\Enums\CloudBillingPeriod;
+use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudServerPowerState;
+use App\Domain\Cloud\Enums\CloudServerStatus;
+use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
+use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
+use DateTimeImmutable;
+use Exception;
+
+final class ArvanCloudResponseMapper
+{
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapCreatedServer(
+        array $payload,
+        string $regionId,
+        string $defaultUsername,
+        string $requestedName,
+    ): CreatedCloudServerData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        $server = $this->createdServerObject(
+            $payload,
+        );
+
+        $requestedName = trim(
+            $requestedName,
+        );
+
+        if ($requestedName === '') {
+            throw new CloudUnexpectedResponseException(
+                'Requested cloud server name cannot be empty.',
+            );
+        }
+
+        $responseName = $server['name'] ?? null;
+
+        $name = is_string($responseName)
+        && trim($responseName) !== ''
+            ? trim($responseName)
+            : $requestedName;
+
+        return new CreatedCloudServerData(
+            id: $this->requiredString(
+                $server,
+                'id',
+                'created server',
+            ),
+
+            name: $name,
+
+            regionId: $regionId,
+
+            /*
+             * A successful POST means the provisioning request was accepted.
+             * The authoritative status is read later through findServer().
+             */
+            status: CloudServerStatus::Provisioning,
+
+            username: $this->serverUsername(
+                $server,
+                $defaultUsername,
+            ),
+
+            /*
+             * The create response does not guarantee a creation timestamp.
+             * The authoritative value is obtained during polling.
+             */
+            createdAt: null,
+
+            generatedPassword: $this->optionalString(
+                $server,
+                'password',
+                'created server',
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapServer(
+        array $payload,
+        string $regionId,
+        string $serverId,
+        string $defaultUsername,
+    ): CloudServerData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        $serverId = trim(
+            $serverId,
+        );
+
+        if ($serverId === '') {
+            throw new CloudUnexpectedResponseException(
+                'Cloud server identifier cannot be empty.',
+            );
+        }
+
+        return $this->mapServerObject(
+            server: $this->serverObject(
+                payload: $payload,
+                serverId: $serverId,
+            ),
+            regionId: $regionId,
+            defaultUsername: $defaultUsername,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudRegionData>
+     */
+    public function mapRegions(array $payload): array
+    {
+        $regions = $this->dataList($payload, 'regions');
+
+        return array_map(
+            function (array $region): CloudRegionData {
+                $country = $this->requiredString(
+                    $region,
+                    'country',
+                    'region',
+                );
+
+                $city = $this->requiredString(
+                    $region,
+                    'city',
+                    'region',
+                );
+
+                $dataCenter = $this->requiredString(
+                    $region,
+                    'dc',
+                    'region',
+                );
+
+                return new CloudRegionData(
+                    id: $this->requiredString(
+                        $region,
+                        'code',
+                        'region',
+                    ),
+                    displayName: implode(
+                        ' / ',
+                        [
+                            $country,
+                            $city,
+                            $dataCenter,
+                        ],
+                    ),
+                    country: $country,
+                    city: $city,
+                    dataCenter: $dataCenter,
+                    canCreateServers: $this->requiredBool(
+                        $region,
+                        'create',
+                        'region',
+                    ),
+                    isVisible: $this->requiredBool(
+                        $region,
+                        'visible',
+                        'region',
+                    ),
+                    supportsVolumeBacked: $this->requiredBool(
+                        $region,
+                        'volume_backed',
+                        'region',
+                    ),
+                );
+            },
+            $regions,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudSizeData>
+     */
+    public function mapSizes(
+        array $payload,
+        string $regionId,
+    ): array {
+        $regionId = $this->normalizeRegionId($regionId);
+        $sizes = $this->dataList($payload, 'sizes');
+
+        return array_map(
+            function (array $size) use ($regionId): CloudSizeData {
+                $availabilityZone = $this->requiredString(
+                    $size,
+                    'availabilityZone',
+                    'size',
+                );
+
+                if ($availabilityZone !== $regionId) {
+                    throw new CloudUnexpectedResponseException(
+                        sprintf(
+                            'ArvanCloud size belongs to unexpected region [%s].',
+                            $availabilityZone,
+                        ),
+                    );
+                }
+
+                return new CloudSizeData(
+                    id: $this->requiredString(
+                        $size,
+                        'id',
+                        'size',
+                    ),
+                    name: $this->requiredString(
+                        $size,
+                        'name',
+                        'size',
+                    ),
+                    regionId: $regionId,
+                    vCpu: $this->requiredNonNegativeInt(
+                        $size,
+                        'cpu_count',
+                        'size',
+                    ),
+                    memoryMiB: $this->bytesToMiB(
+                        $this->requiredNonNegativeInt(
+                            $size,
+                            'memory_in_bytes',
+                            'size',
+                        ),
+                        'size.memory_in_bytes',
+                    ),
+                    diskGiB: $this->bytesToGiB(
+                        $this->requiredNonNegativeInt(
+                            $size,
+                            'disk_in_bytes',
+                            'size',
+                        ),
+                        'size.disk_in_bytes',
+                    ),
+                    category: $this->optionalString(
+                        $size,
+                        'type',
+                        'size',
+                    ),
+                    hourlyPrice: new CloudPriceData(
+                        amount: (string) $this->requiredNonNegativeInt(
+                            $size,
+                            'price_per_hour',
+                            'size',
+                        ),
+                        currencyCode: null,
+                        billingPeriod: CloudBillingPeriod::Hourly,
+                    ),
+                    monthlyPrice: new CloudPriceData(
+                        amount: (string) $this->requiredNonNegativeInt(
+                            $size,
+                            'price_per_month',
+                            'size',
+                        ),
+                        currencyCode: null,
+                        billingPeriod: CloudBillingPeriod::Monthly,
+                    ),
+                );
+            },
+            $sizes,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudSizeData>
+     */
+    public function mapServerResizePlans(
+        array $payload,
+        string $regionId,
+    ): array {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        return array_map(
+            fn (array $size): CloudSizeData => $this->mapResizeSizeObject(
+                size: $size,
+                regionId: $regionId,
+                resource: 'server resize plan',
+            ),
+            $this->resourceItems(
+                payload: $payload,
+                resource: 'server resize plans',
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapSize(
+        array $payload,
+        string $regionId,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        return $this->mapResizeSizeObject(
+            size: $this->resourceObject(
+                payload: $payload,
+                resource: 'size',
+            ),
+            regionId: $regionId,
+            resource: 'size',
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapCalculatedSize(
+        array $payload,
+        string $regionId,
+    ): CloudSizeData {
+        $regionId = $this->normalizeRegionId(
+            $regionId,
+        );
+
+        return $this->mapResizeSizeObject(
+            size: $this->resourceObject(
+                payload: $payload,
+                resource: 'calculated size',
+            ),
+            regionId: $regionId,
+            resource: 'calculated size',
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapDiskPrice(
+        array $payload,
+    ): CloudDiskPriceData {
+        $diskPrice = $this->resourceObject(
+            payload: $payload,
+            resource: 'disk price',
+        );
+
+        return new CloudDiskPriceData(
+            diskGiB: $this->requiredFlexibleNonNegativeInt(
+                data: $diskPrice,
+                key: 'disk',
+                resource: 'disk price',
+            ),
+            hourlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $diskPrice,
+                    key: 'price_per_hour',
+                    resource: 'disk price',
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Hourly,
+            ),
+            monthlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $diskPrice,
+                    key: 'price_per_month',
+                    resource: 'disk price',
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Monthly,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapRootPasswordReset(
+        array $payload,
+    ): CloudRootPasswordResetData {
+        $data = $this->dataObject(
+            payload: $payload,
+            resource: 'root password reset',
+        );
+
+        if (
+            ! array_key_exists('password', $data)
+            || ! is_string($data['password'])
+            || trim($data['password']) === ''
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud root password reset field [password] must be a non-empty string.',
+            );
+        }
+
+        /*
+         * The generated credential is returned exactly as received.
+         * Trimming a password could silently change the credential.
+         */
+        $password = $data['password'];
+
+        return new CloudRootPasswordResetData(
+            password: $password,
+            message: $this->requiredString(
+                data: $payload,
+                key: 'message',
+                resource: 'root password reset',
+            ),
+        );
+    }
+
+    public function mapImages(
+        array $payload,
+        string $regionId,
+    ): array {
+        $regionId = $this->normalizeRegionId($regionId);
+        $groups = $this->dataList($payload, 'image groups');
+
+        $images = [];
+
+        foreach ($groups as $group) {
+            $groupImages = $this->requiredList(
+                $group,
+                'images',
+                'image group',
+            );
+
+            foreach ($groupImages as $image) {
+                $distribution = $this->requiredString(
+                    $image,
+                    'distribution_name',
+                    'image',
+                );
+
+                $distribution = ucfirst(
+                    strtolower($distribution),
+                );
+
+                $version = $this->requiredString(
+                    $image,
+                    'name',
+                    'image',
+                );
+
+                $disk = $this->requiredNonNegativeInt(
+                    $image,
+                    'disk',
+                    'image',
+                );
+
+                $ram = $this->requiredNonNegativeInt(
+                    $image,
+                    'ram',
+                    'image',
+                );
+
+                $images[] = new CloudImageData(
+                    id: $this->requiredString(
+                        $image,
+                        'id',
+                        'image',
+                    ),
+                    name: "{$distribution} {$version}",
+                    regionId: $regionId,
+                    distribution: $distribution,
+                    version: $version,
+                    architecture: null,
+                    minDiskGiB: $disk > 0 ? $disk : null,
+                    minMemoryMiB: $ram > 0 ? $ram : null,
+                    supportsSshKey: $this->requiredBool(
+                        $image,
+                        'ssh_key',
+                        'image',
+                    ),
+                    supportsPassword: $this->requiredBool(
+                        $image,
+                        'ssh_password',
+                        'image',
+                    ),
+                );
+            }
+        }
+
+        return $images;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudNetworkData>
+     */
+    public function mapNetworks(
+        array $payload,
+        string $regionId,
+    ): array {
+        $regionId = $this->normalizeRegionId($regionId);
+        $networks = $this->dataList($payload, 'networks');
+
+        return array_map(
+            function (array $network) use ($regionId): CloudNetworkData {
+                $subnets = $this->requiredList(
+                    $network,
+                    'subnets',
+                    'network',
+                );
+
+                if ($subnets === []) {
+                    throw new CloudUnexpectedResponseException(
+                        'ArvanCloud network does not contain a subnet.',
+                    );
+                }
+
+                $subnet = $subnets[0];
+
+                return new CloudNetworkData(
+                    id: $this->requiredString(
+                        $network,
+                        'id',
+                        'network',
+                    ),
+                    name: $this->requiredString(
+                        $network,
+                        'name',
+                        'network',
+                    ),
+                    regionId: $regionId,
+                    ipVersion: $this->mapIpVersion(
+                        $this->requiredString(
+                            $subnet,
+                            'ip_version',
+                            'network subnet',
+                        ),
+                    ),
+                    cidr: $this->optionalString(
+                        $subnet,
+                        'cidr',
+                        'network subnet',
+                    ),
+                    gateway: $this->optionalString(
+                        $subnet,
+                        'gateway_ip',
+                        'network subnet',
+                    ),
+                    isActive: strtoupper(
+                        $this->requiredString(
+                            $network,
+                            'status',
+                            'network',
+                        ),
+                    ) === 'ACTIVE',
+                    dhcpEnabled: $this->requiredBool(
+                        $subnet,
+                        'enable_dhcp',
+                        'network subnet',
+                    ),
+                );
+            },
+            $networks,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudSecurityGroupData>
+     */
+    public function mapSecurityGroups(
+        array $payload,
+        string $regionId,
+    ): array {
+        $regionId = $this->normalizeRegionId($regionId);
+        $groups = $this->dataList(
+            $payload,
+            'security groups',
+        );
+
+        return array_map(
+            fn (array $group): CloudSecurityGroupData => new CloudSecurityGroupData(
+                id: $this->requiredString(
+                    $group,
+                    'id',
+                    'security group',
+                ),
+                name: $this->requiredString(
+                    $group,
+                    'name',
+                    'security group',
+                ),
+                regionId: $regionId,
+                description: $this->optionalString(
+                    $group,
+                    'description',
+                    'security group',
+                ),
+                isDefault: $this->requiredBool(
+                    $group,
+                    'default',
+                    'security group',
+                ),
+                isReadOnly: $this->requiredBool(
+                    $group,
+                    'readonly',
+                    'security group',
+                ),
+            ),
+            $groups,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function mapQuota(
+        array $payload,
+        string $regionId,
+    ): CloudQuotaData {
+        $regionId = $this->normalizeRegionId($regionId);
+        $data = $this->dataObject($payload, 'quota');
+
+        return new CloudQuotaData(
+            regionId: $regionId,
+            instancesLimit: $this->quotaLimit(
+                $data,
+                'max_total_instances',
+            ),
+            instancesUsed: $this->requiredNonNegativeInt(
+                $data,
+                'total_instances_used',
+                'quota',
+            ),
+            vCpuLimit: $this->quotaLimit(
+                $data,
+                'max_total_cores',
+            ),
+            vCpuUsed: $this->requiredNonNegativeInt(
+                $data,
+                'total_cores_used',
+                'quota',
+            ),
+            memoryMiBLimit: $this->quotaLimit(
+                $data,
+                'max_total_ram_size',
+            ),
+            memoryMiBUsed: $this->requiredNonNegativeInt(
+                $data,
+                'total_ram_used',
+                'quota',
+            ),
+            sshKeysLimit: $this->quotaLimit(
+                $data,
+                'max_total_keypairs',
+            ),
+            sshKeysUsed: null,
+        );
+    }
+
+    /**
+     * Schema موفق این Endpoint هنوز با API Key فعلی تأیید نشده است.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return list<never>
+     */
+    public function mapSshKeys(
+        array $payload,
+        string $regionId,
+    ): array {
+        throw new CloudUnexpectedResponseException(
+            'ArvanCloud SSH key response schema has not been verified.',
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudServerActionData>
+     */
+    public function mapServerActions(
+        array $payload,
+    ): array {
+        $actions = $this->serverActionItems(
+            $payload,
+        );
+
+        return array_map(
+            fn (array $action): CloudServerActionData => new CloudServerActionData(
+                action: $this->requiredString(
+                    $action,
+                    'action',
+                    'server action',
+                ),
+                message: $this->optionalString(
+                    $action,
+                    'message',
+                    'server action',
+                ),
+                startedAt: $this->optionalString(
+                    $action,
+                    'start_time',
+                    'server action',
+                ),
+            ),
+            $actions,
+        );
+    }
+
+    /**
+     * مستندات آروان پاسخ را به‌صورت یک Object نمایش می‌دهد،
+     * اما خروجی Domain همیشه یک List استاندارد است.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function serverActionItems(
+        array $payload,
+    ): array {
+        $data = $payload;
+
+        if (array_key_exists('data', $payload)) {
+            if (! is_array($payload['data'])) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server actions response has an invalid data envelope.',
+                );
+            }
+
+            $data = $payload['data'];
+        }
+
+        if ($data === []) {
+            return [];
+        }
+
+        if (! array_is_list($data)) {
+            /** @var array<string, mixed> $data */
+            return [
+                $data,
+            ];
+        }
+
+        foreach ($data as $action) {
+            if (
+                ! is_array($action)
+                || array_is_list($action)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server actions response contains an invalid item.',
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $data */
+        return $data;
+    }
+
+    /**
+     * GetServerDetails normally returns one server object directly.
+     *
+     * This parser also accepts the previous list response and an optional
+     * data envelope so existing tests and discovery responses remain valid.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function serverObject(
+        array $payload,
+        string $serverId,
+    ): array {
+        $candidate = array_key_exists(
+            'data',
+            $payload,
+        )
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server response has an invalid data envelope.',
+            );
+        }
+
+        if ($candidate === []) {
+            throw new CloudResourceNotFoundException(
+                sprintf(
+                    'Cloud server [%s] was not found.',
+                    $serverId,
+                ),
+            );
+        }
+
+        if (! array_is_list($candidate)) {
+            if (! array_key_exists('id', $candidate)) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server response has an invalid data envelope.',
+                );
+            }
+
+            /** @var array<string, mixed> $candidate */
+            $server = $candidate;
+
+            $this->assertExpectedServerId(
+                server: $server,
+                serverId: $serverId,
+            );
+
+            return $server;
+        }
+
+        foreach ($candidate as $item) {
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud servers response contains an invalid item.',
+                );
+            }
+
+            /** @var array<string, mixed> $item */
+            $currentId = $this->requiredString(
+                $item,
+                'id',
+                'server',
+            );
+
+            if ($currentId === $serverId) {
+                return $item;
+            }
+        }
+
+        throw new CloudResourceNotFoundException(
+            sprintf(
+                'Cloud server [%s] was not found.',
+                $serverId,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     */
+    private function assertExpectedServerId(
+        array $server,
+        string $serverId,
+    ): void {
+        $responseServerId = $this->requiredString(
+            $server,
+            'id',
+            'server',
+        );
+
+        if ($responseServerId === $serverId) {
+            return;
+        }
+
+        throw new CloudResourceNotFoundException(
+            sprintf(
+                'Cloud server [%s] was not found.',
+                $serverId,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     */
+    private function mapServerObject(
+        array $server,
+        string $regionId,
+        string $defaultUsername,
+    ): CloudServerData {
+        $providerStatus = $this->requiredString(
+            $server,
+            'status',
+            'server',
+        );
+
+        $status = $this->mapServerStatus(
+            $providerStatus,
+        );
+
+        return new CloudServerData(
+            id: $this->requiredString(
+                $server,
+                'id',
+                'server',
+            ),
+
+            name: $this->requiredString(
+                $server,
+                'name',
+                'server',
+            ),
+
+            regionId: $regionId,
+
+            status: $status,
+
+            username: $this->serverUsername(
+                $server,
+                $defaultUsername,
+            ),
+
+            sizeId: $this->nestedReferenceId(
+                $server,
+                'flavor',
+                [
+                    'id',
+                    'name',
+                ],
+            ),
+
+            imageId: $this->nestedReferenceId(
+                $server,
+                'image',
+                [
+                    'id',
+                ],
+            ),
+
+            createdAt: $this->serverCreatedAt(
+                $server,
+                'server',
+            ),
+
+            addresses: $this->serverAddresses(
+                server: $server,
+                status: $status,
+            ),
+
+            networkIds: $this->serverReferenceIds(
+                server: $server,
+                key: 'networks',
+                resource: 'server networks',
+                idKeys: [
+                    'id',
+                    'network_id',
+                    'uuid',
+                ],
+                status: $status,
+            ),
+
+            securityGroupIds: $this->serverReferenceIds(
+                server: $server,
+                key: 'security_groups',
+                resource: 'server security groups',
+                idKeys: [
+                    'id',
+                    'uuid',
+                ],
+                status: $status,
+            ),
+
+            volumeBacked: $this->optionalBoolean(
+                $server,
+                'volume_backed',
+                false,
+            ),
+
+            highAvailability: $this->optionalBoolean(
+                $server,
+                'ha_enabled',
+                false,
+            ),
+
+            sizeName: $this->nestedOptionalString(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'name',
+                resource: 'server flavor',
+            ),
+
+            vCpu: $this->nestedOptionalNonNegativeInt(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'vcpus',
+                resource: 'server flavor',
+            ),
+
+            memoryMiB: $this->nestedOptionalNonNegativeInt(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'ram',
+                resource: 'server flavor',
+            ),
+
+            diskGiB: $this->nestedOptionalNonNegativeInt(
+                data: $server,
+                objectKey: 'flavor',
+                valueKey: 'disk',
+                resource: 'server flavor',
+            ),
+
+            taskState: $this->optionalString(
+                $server,
+                'task_state',
+                'server',
+            ),
+
+            providerError: $this->optionalString(
+                $server,
+                'error',
+                'server',
+            ),
+
+            powerState: $this->mapServerPowerState(
+                $providerStatus,
+            ),
+        );
+    }
+
+    /**
+     * ArvanCloud may return incomplete address information while
+     * the server is still being provisioned.
+     *
+     * @param  array<string, mixed>  $server
+     * @return list<CloudServerAddressData>
+     */
+    private function serverAddresses(
+        array $server,
+        CloudServerStatus $status,
+    ): array {
+        try {
+            return $this->mapServerAddresses($server);
+        } catch (CloudUnexpectedResponseException $exception) {
+            if ($status === CloudServerStatus::Provisioning) {
+                return [];
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * ArvanCloud may temporarily return null, an object, or another
+     * incomplete shape for provider references during provisioning.
+     *
+     * Active servers must still satisfy the strict provider contract.
+     *
+     * @param  array<string, mixed>  $server
+     * @param  list<string>  $idKeys
+     * @return list<string>
+     */
+    private function serverReferenceIds(
+        array $server,
+        string $key,
+        string $resource,
+        array $idKeys,
+        CloudServerStatus $status,
+    ): array {
+        try {
+            return $this->uniqueReferenceIds(
+                data: $server,
+                key: $key,
+                resource: $resource,
+                idKeys: $idKeys,
+            );
+        } catch (CloudUnexpectedResponseException $exception) {
+            if ($status === CloudServerStatus::Provisioning) {
+                return [];
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * پاسخ Create در Discovery ممکن است Object اصلی یا data باشد.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function createdServerObject(
+        array $payload,
+    ): array {
+        if (
+            ! array_is_list($payload)
+            && isset($payload['id'])
+        ) {
+            /** @var array<string, mixed> $payload */
+            return $payload;
+        }
+
+        $data = $payload['data'] ?? null;
+
+        if (
+            is_array($data)
+            && ! array_is_list($data)
+            && isset($data['id'])
+        ) {
+            /** @var array<string, mixed> $data */
+            return $data;
+        }
+
+        if (
+            is_array($data)
+            && array_is_list($data)
+            && count($data) === 1
+            && is_array($data[0])
+            && ! array_is_list($data[0])
+            && isset($data[0]['id'])
+        ) {
+            /** @var array<string, mixed> $server */
+            $server = $data[0];
+
+            return $server;
+        }
+
+        throw new CloudUnexpectedResponseException(
+            'ArvanCloud create server response has an invalid envelope.',
+        );
+    }
+
+    private function mapServerStatus(
+        string $status,
+    ): CloudServerStatus {
+        return match ($this->normalizeProviderStatus($status)) {
+            'ACTIVE',
+            'SHUTOFF',
+            'STOPPED',
+            'PAUSED',
+            'SUSPENDED',
+            'POWERING_ON',
+            'POWERING_OFF',
+            'STARTING',
+            'STOPPING',
+            'REBUILD',
+            'REBOOT',
+            'HARD_REBOOT',
+            'RESIZE',
+            'VERIFY_RESIZE',
+            'REVERT_RESIZE',
+            'PASSWORD' => CloudServerStatus::Active,
+
+            'BUILD',
+            'BUILDING',
+            'CREATING',
+            'PROVISIONING',
+            'QUEUED' => CloudServerStatus::Provisioning,
+
+            'ERROR',
+            'FAILED',
+            'DELETED',
+            'TERMINATED' => CloudServerStatus::Failed,
+
+            default => CloudServerStatus::Unknown,
+        };
+    }
+
+    private function mapServerPowerState(
+        string $status,
+    ): CloudServerPowerState {
+        return match ($this->normalizeProviderStatus($status)) {
+            'ACTIVE' => CloudServerPowerState::Running,
+
+            'SHUTOFF',
+            'STOPPED',
+            'PAUSED',
+            'SUSPENDED' => CloudServerPowerState::Stopped,
+
+            'BUILD',
+            'BUILDING',
+            'CREATING',
+            'PROVISIONING',
+            'QUEUED',
+            'POWERING_ON',
+            'POWERING_OFF',
+            'STARTING',
+            'STOPPING',
+            'REBUILD',
+            'REBOOT',
+            'HARD_REBOOT',
+            'RESIZE',
+            'VERIFY_RESIZE',
+            'REVERT_RESIZE',
+            'PASSWORD' => CloudServerPowerState::Transitioning,
+
+            'ERROR',
+            'FAILED',
+            'DELETED',
+            'TERMINATED' => CloudServerPowerState::Error,
+
+            default => CloudServerPowerState::Unknown,
+        };
+    }
+
+    private function normalizeProviderStatus(
+        string $status,
+    ): string {
+        return strtoupper(
+            trim(
+                $status,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     * @return list<CloudServerAddressData>
+     */
+    private function mapServerAddresses(
+        array $server,
+    ): array {
+        if (
+            ! array_key_exists('addresses', $server)
+            || ! is_array($server['addresses'])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud server field [addresses] must be an array.',
+            );
+        }
+
+        $groups = $server['addresses'];
+        $addressItems = [];
+
+        if (array_is_list($groups)) {
+            $addressItems = $groups;
+        } else {
+            foreach ($groups as $group) {
+                if (
+                    ! is_array($group)
+                    || ! array_is_list($group)
+                ) {
+                    throw new CloudUnexpectedResponseException(
+                        'ArvanCloud server address group must be a list.',
+                    );
+                }
+
+                foreach ($group as $address) {
+                    $addressItems[] = $address;
+                }
+            }
+        }
+
+        $addresses = [];
+
+        foreach ($addressItems as $address) {
+            if (
+                ! is_array($address)
+                || array_is_list($address)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server address item is invalid.',
+                );
+            }
+
+            $version = $address['version'] ?? null;
+
+            $ipVersion = match ((string) $version) {
+                '4' => CloudIpVersion::IPv4,
+                '6' => CloudIpVersion::IPv6,
+
+                default => throw new CloudUnexpectedResponseException(
+                    'ArvanCloud server address has an unsupported IP version.',
+                ),
+            };
+
+            $addresses[] = new CloudServerAddressData(
+                address: $this->requiredString(
+                    $address,
+                    'addr',
+                    'server address',
+                ),
+
+                version: $ipVersion,
+
+                isPublic: $this->requiredBool(
+                    $address,
+                    'is_public',
+                    'server address',
+                ),
+
+                isVpc: $this->requiredBool(
+                    $address,
+                    'is_vpc',
+                    'server address',
+                ),
+
+                type: $this->optionalString(
+                    $address,
+                    'type',
+                    'server address',
+                ),
+            );
+        }
+
+        return $addresses;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $idKeys
+     * @return list<string>
+     */
+    private function uniqueReferenceIds(
+        array $data,
+        string $key,
+        string $resource,
+        array $idKeys,
+    ): array {
+        if (! array_key_exists($key, $data)) {
+            return [];
+        }
+
+        $items = $data[$key];
+
+        if (
+            ! is_array($items)
+            || ! array_is_list($items)
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s must be a list.',
+                    $resource,
+                ),
+            );
+        }
+
+        $ids = [];
+
+        foreach ($items as $item) {
+            /*
+             * ArvanCloud networks are returned as a list of UUID strings.
+             *
+             * Example:
+             * networks: ["626ad7fd-..."]
+             */
+            if (is_string($item)) {
+                $id = trim($item);
+
+                if ($id === '') {
+                    throw new CloudUnexpectedResponseException(
+                        sprintf(
+                            'ArvanCloud %s contains an empty identifier.',
+                            $resource,
+                        ),
+                    );
+                }
+
+                $ids[] = $id;
+
+                continue;
+            }
+
+            /*
+             * Security groups and some provider references are returned
+             * as objects containing an ID field.
+             *
+             * Example:
+             * security_groups: [["id" => "8449a4f5-..."]]
+             */
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s contains an invalid item.',
+                        $resource,
+                    ),
+                );
+            }
+
+            $id = $this->referenceIdFromObject(
+                item: $item,
+                idKeys: $idKeys,
+                resource: $resource,
+            );
+
+            $ids[] = $id;
+        }
+
+        return array_values(
+            array_unique($ids),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  list<string>  $idKeys
+     */
+    private function referenceIdFromObject(
+        array $item,
+        array $idKeys,
+        string $resource,
+    ): string {
+        foreach ($idKeys as $idKey) {
+            if (! array_key_exists($idKey, $item)) {
+                continue;
+            }
+
+            $value = $item[$idKey];
+
+            if (! is_string($value)) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] must be a string.',
+                        $resource,
+                        $idKey,
+                    ),
+                );
+            }
+
+            $value = trim($value);
+
+            if ($value === '') {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] cannot be empty.',
+                        $resource,
+                        $idKey,
+                    ),
+                );
+            }
+
+            return $value;
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s does not contain a valid identifier.',
+                $resource,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $idKeys
+     */
+    private function nestedReferenceId(
+        array $data,
+        string $key,
+        array $idKeys,
+    ): ?string {
+        if (! array_key_exists($key, $data)) {
+            return null;
+        }
+
+        $value = $data[$key];
+
+        if (is_string($value)) {
+            $value = trim($value);
+
+            return $value !== ''
+                ? $value
+                : null;
+        }
+
+        if (
+            ! is_array($value)
+            || array_is_list($value)
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud server field [%s] has an invalid reference.',
+                    $key,
+                ),
+            );
+        }
+
+        foreach ($idKeys as $idKey) {
+            if (
+                isset($value[$idKey])
+                && is_string($value[$idKey])
+                && trim($value[$idKey]) !== ''
+            ) {
+                return trim($value[$idKey]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function nestedOptionalString(
+        array $data,
+        string $objectKey,
+        string $valueKey,
+        string $resource,
+    ): ?string {
+        $object = $this->optionalNestedObject(
+            data: $data,
+            key: $objectKey,
+            resource: $resource,
+        );
+
+        if ($object === null) {
+            return null;
+        }
+
+        return $this->optionalString(
+            $object,
+            $valueKey,
+            $resource,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function nestedOptionalNonNegativeInt(
+        array $data,
+        string $objectKey,
+        string $valueKey,
+        string $resource,
+    ): ?int {
+        $object = $this->optionalNestedObject(
+            data: $data,
+            key: $objectKey,
+            resource: $resource,
+        );
+
+        if ($object === null) {
+            return null;
+        }
+
+        return $this->optionalNonNegativeInt(
+            data: $object,
+            key: $valueKey,
+            resource: $resource,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $size
+     */
+    private function mapResizeSizeObject(
+        array $size,
+        string $regionId,
+        string $resource,
+    ): CloudSizeData {
+        $availabilityZone = $this->optionalString(
+            data: $size,
+            key: 'availabilityZone',
+            resource: $resource,
+        );
+
+        if (
+            $availabilityZone !== null
+            && $availabilityZone !== $regionId
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s belongs to unexpected region [%s].',
+                    $resource,
+                    $availabilityZone,
+                ),
+            );
+        }
+
+        $category = $this->optionalString(
+            data: $size,
+            key: 'type',
+            resource: $resource,
+        );
+
+        $category ??= $this->optionalString(
+            data: $size,
+            key: 'category',
+            resource: $resource,
+        );
+
+        return new CloudSizeData(
+            id: $this->requiredString(
+                data: $size,
+                key: 'id',
+                resource: $resource,
+            ),
+            name: $this->requiredString(
+                data: $size,
+                key: 'name',
+                resource: $resource,
+            ),
+            regionId: $regionId,
+            vCpu: $this->requiredFlexibleNonNegativeInt(
+                data: $size,
+                key: 'cpu_count',
+                resource: $resource,
+            ),
+            memoryMiB: $this->sizeMemoryMiB(
+                size: $size,
+                resource: $resource,
+            ),
+            diskGiB: $this->sizeDiskGiB(
+                size: $size,
+                resource: $resource,
+            ),
+            category: $category,
+            hourlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $size,
+                    key: 'price_per_hour',
+                    resource: $resource,
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Hourly,
+            ),
+            monthlyPrice: new CloudPriceData(
+                amount: $this->requiredNonNegativeDecimalString(
+                    data: $size,
+                    key: 'price_per_month',
+                    resource: $resource,
+                ),
+                currencyCode: null,
+                billingPeriod: CloudBillingPeriod::Monthly,
+            ),
+        );
+    }
+
+    /**
+     * Resize-plan responses expose byte fields while single-plan responses
+     * expose memory directly in MiB.
+     *
+     * @param  array<string, mixed>  $size
+     */
+    private function sizeMemoryMiB(
+        array $size,
+        string $resource,
+    ): int {
+        if (
+            array_key_exists('memory_in_bytes', $size)
+            && $size['memory_in_bytes'] !== null
+            && $size['memory_in_bytes'] !== ''
+        ) {
+            return $this->bytesToMiB(
+                $this->requiredFlexibleNonNegativeInt(
+                    data: $size,
+                    key: 'memory_in_bytes',
+                    resource: $resource,
+                ),
+                "{$resource}.memory_in_bytes",
+            );
+        }
+
+        return $this->requiredFlexibleNonNegativeInt(
+            data: $size,
+            key: 'memory',
+            resource: $resource,
+        );
+    }
+
+    /**
+     * Resize-plan responses expose byte fields while single-plan responses
+     * expose disk directly in GiB.
+     *
+     * @param  array<string, mixed>  $size
+     */
+    private function sizeDiskGiB(
+        array $size,
+        string $resource,
+    ): int {
+        if (
+            array_key_exists('disk_in_bytes', $size)
+            && $size['disk_in_bytes'] !== null
+            && $size['disk_in_bytes'] !== ''
+        ) {
+            return $this->bytesToGiB(
+                $this->requiredFlexibleNonNegativeInt(
+                    data: $size,
+                    key: 'disk_in_bytes',
+                    resource: $resource,
+                ),
+                "{$resource}.disk_in_bytes",
+            );
+        }
+
+        return $this->requiredFlexibleNonNegativeInt(
+            data: $size,
+            key: 'disk',
+            resource: $resource,
+        );
+    }
+
+    /**
+     * String references are valid for fields such as flavor and image,
+     * but they do not contain nested metadata.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|null
+     */
+    private function optionalNestedObject(
+        array $data,
+        string $key,
+        string $resource,
+    ): ?array {
+        if (
+            ! array_key_exists($key, $data)
+            || $data[$key] === null
+            || is_string($data[$key])
+        ) {
+            return null;
+        }
+
+        if (
+            ! is_array($data[$key])
+            || array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s must be an object, string, or null.',
+                    $resource,
+                ),
+            );
+        }
+
+        /** @var array<string, mixed> $object */
+        $object = $data[$key];
+
+        return $object;
+    }
+
+    /**
+     * OpenAPI describes some server flavor values as numbers rather than
+     * strict integers, while xDeploy requires whole resource units.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function optionalNonNegativeInt(
+        array $data,
+        string $key,
+        string $resource,
+    ): ?int {
+        if (
+            ! array_key_exists($key, $data)
+            || $data[$key] === null
+            || $data[$key] === ''
+        ) {
+            return null;
+        }
+
+        $value = $data[$key];
+
+        if (is_int($value)) {
+            if ($value < 0) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] must be a non-negative integer.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+
+            return $value;
+        }
+
+        if (
+            is_float($value)
+            && is_finite($value)
+            && $value >= 0
+            && floor($value) === $value
+            && $value <= PHP_INT_MAX
+        ) {
+            return (int) $value;
+        }
+
+        if (is_string($value)) {
+            $value = trim(
+                $value,
+            );
+
+            $normalized = filter_var(
+                $value,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 0,
+                    ],
+                ],
+            );
+
+            if ($normalized !== false) {
+                return $normalized;
+            }
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s field [%s] must be a non-negative integer.',
+                $resource,
+                $key,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $server
+     */
+    private function serverUsername(
+        array $server,
+        string $defaultUsername,
+    ): string {
+        $username = $this->optionalString(
+            $server,
+            'username',
+            'server',
+        );
+
+        $username ??= $this->nestedOptionalString(
+            data: $server,
+            objectKey: 'image',
+            valueKey: 'username',
+            resource: 'server image',
+        );
+
+        if ($username !== null) {
+            return $username;
+        }
+
+        $defaultUsername = trim(
+            $defaultUsername,
+        );
+
+        if ($defaultUsername === '') {
+            throw new CloudUnexpectedResponseException(
+                'Cloud image default username is missing.',
+            );
+        }
+
+        return $defaultUsername;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function serverCreatedAt(
+        array $data,
+        string $resource,
+    ): ?DateTimeImmutable {
+        $value = $this->optionalString(
+            $data,
+            'created',
+            $resource,
+        );
+
+        $value ??= $this->optionalString(
+            $data,
+            'created_at',
+            $resource,
+        );
+
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return new DateTimeImmutable($value);
+        } catch (Exception $exception) {
+            throw new CloudUnexpectedResponseException(
+                message: sprintf(
+                    'ArvanCloud %s creation date is invalid.',
+                    $resource,
+                ),
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function optionalBoolean(
+        array $data,
+        string $key,
+        bool $default,
+    ): bool {
+        if (! array_key_exists($key, $data)) {
+            return $default;
+        }
+
+        if (! is_bool($data[$key])) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud server field [%s] must be boolean.',
+                    $key,
+                ),
+            );
+        }
+
+        return $data[$key];
+    }
+
+    /**
+     * Accept direct objects, direct lists, and optional data envelopes.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function resourceItems(
+        array $payload,
+        string $resource,
+    ): array {
+        $candidate = array_key_exists('data', $payload)
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s response has an invalid data envelope.',
+                    $resource,
+                ),
+            );
+        }
+
+        if ($candidate === []) {
+            return [];
+        }
+
+        if (! array_is_list($candidate)) {
+            /** @var array<string, mixed> $candidate */
+            return [
+                $candidate,
+            ];
+        }
+
+        foreach ($candidate as $item) {
+            if (
+                ! is_array($item)
+                || array_is_list($item)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s response contains an invalid item.',
+                        $resource,
+                    ),
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $candidate */
+        return $candidate;
+    }
+
+    /**
+     * Accept direct objects, one-item lists, and optional data envelopes.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function resourceObject(
+        array $payload,
+        string $resource,
+    ): array {
+        $candidate = array_key_exists('data', $payload)
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s response has an invalid data envelope.',
+                    $resource,
+                ),
+            );
+        }
+
+        if (! array_is_list($candidate)) {
+            /** @var array<string, mixed> $candidate */
+            return $candidate;
+        }
+
+        if (
+            count($candidate) === 1
+            && is_array($candidate[0])
+            && ! array_is_list($candidate[0])
+        ) {
+            /** @var array<string, mixed> $object */
+            $object = $candidate[0];
+
+            return $object;
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s response has an invalid data envelope.',
+                $resource,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function dataList(
+        array $payload,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists('data', $payload)
+            || ! is_array($payload['data'])
+            || ! array_is_list($payload['data'])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s response has an invalid data envelope.',
+                    $resource,
+                ),
+            );
+        }
+
+        foreach ($payload['data'] as $item) {
+            if (! is_array($item) || array_is_list($item)) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s response contains an invalid item.',
+                        $resource,
+                    ),
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $data */
+        $data = $payload['data'];
+
+        return $data;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function dataObject(
+        array $payload,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists('data', $payload)
+            || ! is_array($payload['data'])
+            || array_is_list($payload['data'])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s response has an invalid data envelope.',
+                    $resource,
+                ),
+            );
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = $payload['data'];
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<array<string, mixed>>
+     */
+    private function requiredList(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        foreach ($data[$key] as $item) {
+            if (! is_array($item) || array_is_list($item)) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] contains an invalid item.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $items */
+        $items = $data[$key];
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredString(
+        array $data,
+        string $key,
+        string $resource,
+    ): string {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_string($data[$key])
+            || trim($data[$key]) === ''
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a non-empty string.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        return trim($data[$key]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function optionalString(
+        array $data,
+        string $key,
+        string $resource,
+    ): ?string {
+        if (
+            ! array_key_exists($key, $data)
+            || $data[$key] === null
+            || $data[$key] === ''
+        ) {
+            return null;
+        }
+
+        if (! is_string($data[$key])) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a string or null.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $value = trim($data[$key]);
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredBool(
+        array $data,
+        string $key,
+        string $resource,
+    ): bool {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_bool($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be boolean.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        return $data[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredFlexibleNonNegativeInt(
+        array $data,
+        string $key,
+        string $resource,
+    ): int {
+        $value = $this->optionalNonNegativeInt(
+            data: $data,
+            key: $key,
+            resource: $resource,
+        );
+
+        if ($value === null) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a non-negative integer.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Prices are preserved as decimal strings to avoid float arithmetic.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredNonNegativeDecimalString(
+        array $data,
+        string $key,
+        string $resource,
+    ): string {
+        if (! array_key_exists($key, $data)) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a non-negative number.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $value = $data[$key];
+
+        if (is_int($value) && $value >= 0) {
+            return (string) $value;
+        }
+
+        if (
+            is_float($value)
+            && is_finite($value)
+            && $value >= 0
+        ) {
+            $normalized = rtrim(
+                rtrim(
+                    sprintf('%.14F', $value),
+                    '0',
+                ),
+                '.',
+            );
+
+            return $normalized === '-0'
+                ? '0'
+                : $normalized;
+        }
+
+        if (is_string($value)) {
+            $value = trim(
+                $value,
+            );
+
+            if (
+                preg_match(
+                    '/\A\d+(?:\.\d+)?\z/',
+                    $value,
+                ) === 1
+            ) {
+                return $value;
+            }
+        }
+
+        throw new CloudUnexpectedResponseException(
+            sprintf(
+                'ArvanCloud %s field [%s] must be a non-negative number.',
+                $resource,
+                $key,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function requiredNonNegativeInt(
+        array $data,
+        string $key,
+        string $resource,
+    ): int {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_int($data[$key])
+            || $data[$key] < 0
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a non-negative integer.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        return $data[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function quotaLimit(
+        array $data,
+        string $key,
+    ): ?int {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud quota field [%s] must be an object.',
+                    $key,
+                ),
+            );
+        }
+
+        /** @var array<string, mixed> $limit */
+        $limit = $data[$key];
+
+        $unlimited = $this->requiredBool(
+            $limit,
+            'unlimited',
+            "quota.{$key}",
+        );
+
+        if ($unlimited) {
+            return null;
+        }
+
+        if (
+            ! array_key_exists('value', $limit)
+            || ! is_int($limit['value'])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud quota field [%s.value] must be integer.',
+                    $key,
+                ),
+            );
+        }
+
+        return $limit['value'] >= 0
+            ? $limit['value']
+            : null;
+    }
+
+    private function mapIpVersion(
+        string $version,
+    ): CloudIpVersion {
+        return match ($version) {
+            '4' => CloudIpVersion::IPv4,
+            '6' => CloudIpVersion::IPv6,
+
+            default => throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud returned unsupported IP version [%s].',
+                    $version,
+                ),
+            ),
+        };
+    }
+
+    private function bytesToMiB(
+        int $bytes,
+        string $field,
+    ): int {
+        if ($bytes % 1_048_576 !== 0) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud field [%s] is not an exact MiB value.',
+                    $field,
+                ),
+            );
+        }
+
+        return intdiv($bytes, 1_048_576);
+    }
+
+    private function bytesToGiB(
+        int $bytes,
+        string $field,
+    ): int {
+        if ($bytes % 1_073_741_824 !== 0) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud field [%s] is not an exact GiB value.',
+                    $field,
+                ),
+            );
+        }
+
+        return intdiv($bytes, 1_073_741_824);
+    }
+
+    private function normalizeRegionId(
+        string $regionId,
+    ): string {
+        $regionId = trim($regionId);
+
+        if ($regionId === '') {
+            throw new CloudUnexpectedResponseException(
+                'Cloud region identifier cannot be empty.',
+            );
+        }
+
+        return $regionId;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     * @return list<CloudPortData>
+     */
+    public function mapPorts(
+        array $payload,
+        string $serverId,
+    ): array {
+        $ports = $this->portItems(
+            $payload,
+        );
+
+        $mappedPorts = [];
+
+        foreach ($ports as $port) {
+            $portServerId = $this->requiredString(
+                data: $port,
+                key: 'instance_id',
+                resource: 'port',
+            );
+
+            if ($portServerId !== $serverId) {
+                continue;
+            }
+
+            $mappedPorts[] = new CloudPortData(
+                id: $this->requiredString(
+                    data: $port,
+                    key: 'id',
+                    resource: 'port',
+                ),
+
+                serverId: $portServerId,
+
+                ips: $this->requiredStringList(
+                    data: $port,
+                    key: 'ips',
+                    resource: 'port',
+                ),
+
+                macAddress: $this->requiredString(
+                    data: $port,
+                    key: 'mac_address',
+                    resource: 'port',
+                ),
+
+                networkId: $this->requiredString(
+                    data: $port,
+                    key: 'network_id',
+                    resource: 'port',
+                ),
+
+                portSecurityEnabled: $this->requiredBool(
+                    data: $port,
+                    key: 'port_security_enabled',
+                    resource: 'port',
+                ),
+
+                securityGroupIds: $this->requiredStringList(
+                    data: $port,
+                    key: 'security_group_ids',
+                    resource: 'port',
+                ),
+
+                status: $this->requiredString(
+                    data: $port,
+                    key: 'status',
+                    resource: 'port',
+                ),
+            );
+        }
+
+        return $mappedPorts;
+    }
+
+    /**
+     * API Documentation پاسخ Ports را گاهی به‌صورت Object نمایش
+     * می‌دهد، درحالی‌که Endpoint به‌عنوان List معرفی شده است.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function portItems(
+        array $payload,
+    ): array {
+        $candidate = array_key_exists(
+            'data',
+            $payload,
+        )
+            ? $payload['data']
+            : $payload;
+
+        if (! is_array($candidate)) {
+            throw new CloudUnexpectedResponseException(
+                'ArvanCloud ports response has an invalid data envelope.',
+            );
+        }
+
+        if ($candidate === []) {
+            return [];
+        }
+
+        if (! array_is_list($candidate)) {
+            if (! array_key_exists('id', $candidate)) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud ports response has an invalid data envelope.',
+                );
+            }
+
+            /** @var array<string, mixed> $candidate */
+            return [
+                $candidate,
+            ];
+        }
+
+        foreach ($candidate as $port) {
+            if (
+                ! is_array($port)
+                || array_is_list($port)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'ArvanCloud ports response contains an invalid item.',
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $candidate */
+        return $candidate;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private function requiredStringList(
+        array $data,
+        string $key,
+        string $resource,
+    ): array {
+        if (
+            ! array_key_exists($key, $data)
+            || ! is_array($data[$key])
+            || ! array_is_list($data[$key])
+        ) {
+            throw new CloudUnexpectedResponseException(
+                sprintf(
+                    'ArvanCloud %s field [%s] must be a list of strings.',
+                    $resource,
+                    $key,
+                ),
+            );
+        }
+
+        $values = [];
+
+        foreach ($data[$key] as $value) {
+            if (
+                ! is_string($value)
+                || trim($value) === ''
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    sprintf(
+                        'ArvanCloud %s field [%s] contains an invalid value.',
+                        $resource,
+                        $key,
+                    ),
+                );
+            }
+
+            $values[] = trim(
+                $value,
+            );
+        }
+
+        return $values;
+    }
+}
+
+============================================================
+FILE: app\Providers\CloudServiceProvider.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace App\Providers;
+
+use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
+use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
+use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
+use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\ServiceProvider;
+
+final class CloudServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->registerArvanCloudClient();
+        $this->registerArvanCloudMapper();
+        $this->registerArvanCloudProvider();
+
+        $this->registerCloudProviderContract();
+        $this->registerCloudCapabilityContracts();
+    }
+
+    private function registerArvanCloudClient(): void
+    {
+        $this->app->singleton(
+            ArvanCloudClient::class,
+            static function (): ArvanCloudClient {
+                $baseUrl = config(
+                    'cloud.providers.arvan.base_url',
+                );
+
+                $apiKey = config(
+                    'cloud.providers.arvan.api_key',
+                );
+
+                $connectTimeout = config(
+                    'cloud.providers.arvan.timeouts.connect',
+                    10,
+                );
+
+                $requestTimeout = config(
+                    'cloud.providers.arvan.timeouts.request',
+                    90,
+                );
+
+                if (
+                    ! is_string($baseUrl)
+                    || trim($baseUrl) === ''
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud base URL is not configured.',
+                    );
+                }
+
+                if (
+                    ! is_string($apiKey)
+                    || trim($apiKey) === ''
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud API key is not configured.',
+                    );
+                }
+
+                if (
+                    ! is_int($connectTimeout)
+                    && ! is_numeric($connectTimeout)
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud connect timeout must be an integer.',
+                    );
+                }
+
+                if (
+                    ! is_int($requestTimeout)
+                    && ! is_numeric($requestTimeout)
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud request timeout must be an integer.',
+                    );
+                }
+
+                return new ArvanCloudClient(
+                    baseUrl: trim($baseUrl),
+                    apiKey: trim($apiKey),
+                    connectTimeout: (int) $connectTimeout,
+                    requestTimeout: (int) $requestTimeout,
+                );
+            },
+        );
+    }
+
+    private function registerArvanCloudMapper(): void
+    {
+        $this->app->singleton(
+            ArvanCloudResponseMapper::class,
+        );
+    }
+
+    private function registerArvanCloudProvider(): void
+    {
+        $this->app->singleton(
+            ArvanCloudProvider::class,
+            static function (
+                Application $app,
+            ): ArvanCloudProvider {
+                $createType = config(
+                    'cloud.providers.arvan.defaults.create_type',
+                    'cinder',
+                );
+
+                if (
+                    ! is_string($createType)
+                    || trim($createType) === ''
+                ) {
+                    throw new CloudConfigurationException(
+                        'ArvanCloud default create type is not configured.',
+                    );
+                }
+
+                return new ArvanCloudProvider(
+                    client: $app->make(
+                        ArvanCloudClient::class,
+                    ),
+
+                    mapper: $app->make(
+                        ArvanCloudResponseMapper::class,
+                    ),
+
+                    createType: trim($createType),
+
+                    defaultUsername: 'ubuntu',
+                );
+            },
+        );
+    }
+
+    private function registerCloudProviderContract(): void
+    {
+        $this->app->singleton(
+            CloudProviderInterface::class,
+            function (
+                Application $app,
+            ): CloudProviderInterface {
+                return $this->resolveDefaultCloudProvider(
+                    $app,
+                );
+            },
+        );
+    }
+
+    private function registerCloudCapabilityContracts(): void
+    {
+        $contracts = [
+            CloudServerCredentialManagerInterface::class,
+            CloudServerProvisionerInterface::class,
+            CloudServerLifecycleInterface::class,
+            CloudServerNetworkingInterface::class,
+            CloudServerResizeCatalogInterface::class,
+            CloudServerResizerInterface::class,
+        ];
+
+        foreach ($contracts as $contract) {
+            $this->app->singleton(
+                $contract,
+                static function (
+                    Application $app,
+                ) use (
+                    $contract,
+                ): object {
+                    $provider = $app->make(
+                        CloudProviderInterface::class,
+                    );
+
+                    if (! $provider instanceof $contract) {
+                        throw new CloudConfigurationException(
+                            sprintf(
+                                'The default cloud provider does not support contract [%s].',
+                                $contract,
+                            ),
+                        );
+                    }
+
+                    return $provider;
+                },
+            );
+        }
+    }
+
+    private function resolveDefaultCloudProvider(
+        Application $app,
+    ): CloudProviderInterface {
+        $provider = $this->defaultCloudProvider();
+
+        return match ($provider) {
+            'arvan' => $app->make(
+                ArvanCloudProvider::class,
+            ),
+
+            default => throw new CloudConfigurationException(
+                sprintf(
+                    'The cloud provider [%s] is not supported.',
+                    $provider,
+                ),
+            ),
+        };
+    }
+
+    private function defaultCloudProvider(): string
+    {
+        $provider = config(
+            'cloud.default',
+        );
+
+        if (
+            ! is_string($provider)
+            || trim($provider) === ''
+        ) {
+            throw new CloudConfigurationException(
+                'The default cloud provider is not configured.',
+            );
+        }
+
+        return strtolower(
+            trim($provider),
+        );
+    }
+}
+
+============================================================
+FILE: tests\Unit\Infrastructure\Cloud\ArvanCloud\ArvanCloudProviderRootPasswordResetTest.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\Infrastructure\Cloud\ArvanCloud;
+
+use App\Domain\Cloud\Exceptions\CloudValidationException;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
+use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
+
+final class ArvanCloudProviderRootPasswordResetTest extends TestCase
+{
+    private const string BASE_URL = 'https://napi.arvancloud.ir/ecc/v1';
+
+    public function test_it_resets_the_root_password_without_a_request_body(): void
+    {
+        Http::preventStrayRequests();
+
+        Http::fake([
+            self::BASE_URL
+            .'/regions/eu-west1-a/servers/server-123/reset-root-password' => Http::response(
+                [
+                    'data' => [
+                        'password' => 'generated-password',
+                    ],
+                    'message' => 'Server Root password changed',
+                ],
+                202,
+                [
+                    'Content-Type' => 'application/json',
+                ],
+            ),
+        ]);
+
+        $result = $this->provider()->resetRootPassword(
+            region: 'eu-west1-a',
+            serverId: 'server-123',
+        );
+
+        $this->assertSame(
+            'generated-password',
+            $result->password,
+        );
+
+        $this->assertSame(
+            'Server Root password changed',
+            $result->message,
+        );
+
+        Http::assertSent(
+            static fn (Request $request): bool => $request->method() === 'POST'
+                && $request->url() === self::BASE_URL
+                .'/regions/eu-west1-a/servers/server-123/reset-root-password'
+                && $request->body() === '',
+        );
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_it_normalizes_the_region_and_server_identifier(): void
+    {
+        Http::preventStrayRequests();
+
+        Http::fake([
+            self::BASE_URL
+            .'/regions/eu-west1-a/servers/server-123/reset-root-password' => Http::response(
+                [
+                    'data' => [
+                        'password' => 'generated-password',
+                    ],
+                    'message' => 'Server Root password changed',
+                ],
+                202,
+            ),
+        ]);
+
+        $result = $this->provider()->resetRootPassword(
+            region: ' eu-west1-a ',
+            serverId: ' server-123 ',
+        );
+
+        $this->assertSame(
+            'generated-password',
+            $result->password,
+        );
+
+        Http::assertSent(
+            static fn (Request $request): bool => $request->url()
+                === self::BASE_URL
+                .'/regions/eu-west1-a/servers/server-123/reset-root-password',
+        );
+    }
+
+    #[DataProvider('invalidServerReferenceProvider')]
+    public function test_it_rejects_invalid_server_references_before_sending_a_request(
+        string $region,
+        string $serverId,
+    ): void {
+        Http::preventStrayRequests();
+        Http::fake();
+
+        $this->expectException(
+            CloudValidationException::class,
+        );
+
+        try {
+            $this->provider()->resetRootPassword(
+                region: $region,
+                serverId: $serverId,
+            );
+        } finally {
+            Http::assertNothingSent();
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function invalidServerReferenceProvider(): iterable
+    {
+        yield 'empty region' => [
+            '',
+            'server-123',
+        ];
+
+        yield 'whitespace region' => [
+            '   ',
+            'server-123',
+        ];
+
+        yield 'invalid region' => [
+            'eu/west',
+            'server-123',
+        ];
+
+        yield 'empty server identifier' => [
+            'eu-west1-a',
+            '',
+        ];
+
+        yield 'whitespace server identifier' => [
+            'eu-west1-a',
+            '   ',
+        ];
+
+        yield 'invalid server identifier' => [
+            'eu-west1-a',
+            'server/123',
+        ];
+    }
+
+    private function provider(): ArvanCloudProvider
+    {
+        return new ArvanCloudProvider(
+            client: new ArvanCloudClient(
+                baseUrl: self::BASE_URL,
+                apiKey: 'test-api-key',
+            ),
+            mapper: new ArvanCloudResponseMapper,
+        );
+    }
+}
+
+============================================================
+FILE: tests\Unit\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapperRootPasswordResetTest.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\Infrastructure\Cloud\ArvanCloud\Mappers;
+
+use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
+use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
+
+final class ArvanCloudResponseMapperRootPasswordResetTest extends TestCase
+{
+    public function test_it_maps_the_verified_root_password_reset_response(): void
+    {
+        $mapper = new ArvanCloudResponseMapper;
+
+        $result = $mapper->mapRootPasswordReset([
+            'data' => [
+                'password' => 'generated-password',
+            ],
+            'message' => 'Server Root password changed',
+        ]);
+
+        $this->assertSame(
+            'generated-password',
+            $result->password,
+        );
+
+        $this->assertSame(
+            'Server Root password changed',
+            $result->message,
+        );
+    }
+
+    public function test_it_preserves_the_generated_password_exactly_as_received(): void
+    {
+        $mapper = new ArvanCloudResponseMapper;
+
+        $result = $mapper->mapRootPasswordReset([
+            'data' => [
+                'password' => ' generated-password ',
+            ],
+            'message' => 'Server Root password changed',
+        ]);
+
+        $this->assertSame(
+            ' generated-password ',
+            $result->password,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $payload
+     */
+    #[DataProvider('invalidPayloadProvider')]
+    public function test_it_rejects_invalid_root_password_reset_payloads(
+        array $payload,
+    ): void {
+        $mapper = new ArvanCloudResponseMapper;
+
+        $this->expectException(
+            CloudUnexpectedResponseException::class,
+        );
+
+        $mapper->mapRootPasswordReset(
+            $payload,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<array-key, mixed>}>
+     */
+    public static function invalidPayloadProvider(): iterable
+    {
+        yield 'missing data envelope' => [
+            [
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'data is not an object' => [
+            [
+                'data' => 'invalid',
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'data is a list' => [
+            [
+                'data' => [
+                    [
+                        'password' => 'generated-password',
+                    ],
+                ],
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'missing password' => [
+            [
+                'data' => [],
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'password is not a string' => [
+            [
+                'data' => [
+                    'password' => 123456,
+                ],
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'password is empty' => [
+            [
+                'data' => [
+                    'password' => '',
+                ],
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'password contains only whitespace' => [
+            [
+                'data' => [
+                    'password' => '   ',
+                ],
+                'message' => 'Server Root password changed',
+            ],
+        ];
+
+        yield 'missing message' => [
+            [
+                'data' => [
+                    'password' => 'generated-password',
+                ],
+            ],
+        ];
+
+        yield 'message is not a string' => [
+            [
+                'data' => [
+                    'password' => 'generated-password',
+                ],
+                'message' => [
+                    'invalid',
+                ],
+            ],
+        ];
+
+        yield 'message is empty' => [
+            [
+                'data' => [
+                    'password' => 'generated-password',
+                ],
+                'message' => '',
+            ],
+        ];
+    }
+}
+
+============================================================
+FILE: tests\Unit\Providers\CloudServiceProviderTest.php
+============================================================
+
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\Providers;
+
+use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
+use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
+use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
+use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
+
+final class CloudServiceProviderTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set(
+            'cloud.default',
+            'arvan',
+        );
+
+        config()->set(
+            'cloud.providers.arvan.base_url',
+            'https://api.example.test/ecc/v1',
+        );
+
+        config()->set(
+            'cloud.providers.arvan.api_key',
+            'test-api-key',
+        );
+
+        config()->set(
+            'cloud.providers.arvan.timeouts.connect',
+            5,
+        );
+
+        config()->set(
+            'cloud.providers.arvan.timeouts.request',
+            15,
+        );
+
+        config()->set(
+            'cloud.providers.arvan.defaults.create_type',
+            'cinder',
+        );
+    }
+
+    public function test_it_resolves_default_cloud_provider(): void
+    {
+        $provider = $this->app->make(
+            CloudProviderInterface::class,
+        );
+
+        $this->assertInstanceOf(
+            ArvanCloudProvider::class,
+            $provider,
+        );
+    }
+
+    public function test_it_resolves_concrete_provider_as_singleton(): void
+    {
+        $first = $this->app->make(
+            ArvanCloudProvider::class,
+        );
+
+        $second = $this->app->make(
+            ArvanCloudProvider::class,
+        );
+
+        $this->assertSame(
+            $first,
+            $second,
+        );
+    }
+
+    public function test_default_provider_and_concrete_provider_are_the_same_instance(): void
+    {
+        $defaultProvider = $this->app->make(
+            CloudProviderInterface::class,
+        );
+
+        $concreteProvider = $this->app->make(
+            ArvanCloudProvider::class,
+        );
+
+        $this->assertSame(
+            $concreteProvider,
+            $defaultProvider,
+        );
+    }
+
+    #[DataProvider('cloudCapabilityContractProvider')]
+    public function test_each_cloud_capability_contract_resolves_to_arvan_provider(
+        string $contract,
+    ): void {
+        $resolved = $this->app->make(
+            $contract,
+        );
+
+        $this->assertInstanceOf(
+            ArvanCloudProvider::class,
+            $resolved,
+        );
+    }
+
+    #[DataProvider('cloudCapabilityContractProvider')]
+    public function test_each_cloud_capability_contract_uses_the_default_provider_instance(
+        string $contract,
+    ): void {
+        $defaultProvider = $this->app->make(
+            CloudProviderInterface::class,
+        );
+
+        $capability = $this->app->make(
+            $contract,
+        );
+
+        $this->assertSame(
+            $defaultProvider,
+            $capability,
+        );
+    }
+
+    public function test_all_cloud_contracts_share_one_provider_instance(): void
+    {
+        $provider = $this->app->make(
+            CloudProviderInterface::class,
+        );
+
+        $contracts = [
+            CloudServerCredentialManagerInterface::class,
+            CloudServerProvisionerInterface::class,
+            CloudServerLifecycleInterface::class,
+            CloudServerNetworkingInterface::class,
+            CloudServerResizeCatalogInterface::class,
+            CloudServerResizerInterface::class,
+        ];
+
+        foreach ($contracts as $contract) {
+            $this->assertSame(
+                $provider,
+                $this->app->make(
+                    $contract,
+                ),
+                sprintf(
+                    'Contract [%s] did not resolve to the default provider instance.',
+                    $contract,
+                ),
+            );
+        }
+    }
+
+    public function test_arvan_cloud_client_is_registered_as_singleton(): void
+    {
+        $first = $this->app->make(
+            ArvanCloudClient::class,
+        );
+
+        $second = $this->app->make(
+            ArvanCloudClient::class,
+        );
+
+        $this->assertSame(
+            $first,
+            $second,
+        );
+    }
+
+    public function test_arvan_cloud_mapper_is_registered_as_singleton(): void
+    {
+        $first = $this->app->make(
+            ArvanCloudResponseMapper::class,
+        );
+
+        $second = $this->app->make(
+            ArvanCloudResponseMapper::class,
+        );
+
+        $this->assertSame(
+            $first,
+            $second,
+        );
+    }
+
+    public function test_it_rejects_unsupported_default_provider(): void
+    {
+        config()->set(
+            'cloud.default',
+            'unsupported-provider',
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'The cloud provider [unsupported-provider] is not supported.',
+        );
+
+        $this->app->make(
+            CloudProviderInterface::class,
+        );
+    }
+
+    public function test_it_rejects_missing_default_provider(): void
+    {
+        config()->set(
+            'cloud.default',
+            null,
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'The default cloud provider is not configured.',
+        );
+
+        $this->app->make(
+            CloudProviderInterface::class,
+        );
+    }
+
+    public function test_it_rejects_missing_arvan_api_key(): void
+    {
+        config()->set(
+            'cloud.providers.arvan.api_key',
+            null,
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'ArvanCloud API key is not configured.',
+        );
+
+        $this->app->make(
+            ArvanCloudProvider::class,
+        );
+    }
+
+    public function test_it_rejects_missing_arvan_base_url(): void
+    {
+        config()->set(
+            'cloud.providers.arvan.base_url',
+            null,
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'ArvanCloud base URL is not configured.',
+        );
+
+        $this->app->make(
+            ArvanCloudProvider::class,
+        );
+    }
+
+    public function test_it_rejects_invalid_create_type_configuration(): void
+    {
+        config()->set(
+            'cloud.providers.arvan.defaults.create_type',
+            '   ',
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'ArvanCloud default create type is not configured.',
+        );
+
+        $this->app->make(
+            ArvanCloudProvider::class,
+        );
+    }
+
+    /**
+     * @return array<string, array{contract: class-string}>
+     */
+    public static function cloudCapabilityContractProvider(): array
+    {
+        return [
+            'credential manager' => [
+                'contract' => CloudServerCredentialManagerInterface::class,
+            ],
+
+            'provisioner' => [
+                'contract' => CloudServerProvisionerInterface::class,
+            ],
+
+            'lifecycle' => [
+                'contract' => CloudServerLifecycleInterface::class,
+            ],
+
+            'networking' => [
+                'contract' => CloudServerNetworkingInterface::class,
+            ],
+
+            'resize catalog' => [
+                'contract' => CloudServerResizeCatalogInterface::class,
+            ],
+
+            'resizer' => [
+                'contract' => CloudServerResizerInterface::class,
+            ],
+        ];
+    }
+}

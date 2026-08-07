@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Cloud\ArvanCloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
@@ -22,6 +23,7 @@ use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudRootPasswordResetData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
+use App\Domain\Cloud\DTOs\CloudServerConsoleData;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudServerReportsData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
@@ -36,7 +38,7 @@ use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
-final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerConsoleInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
 
@@ -73,6 +75,8 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
     private const string ACTION_RESIZE_ROOT = 'resizeRoot';
 
     private const string ACTION_RESET_ROOT_PASSWORD = 'reset-root-password';
+
+    private const string ACTION_VNC = 'vnc';
 
     public function __construct(
         private ArvanCloudClient $client,
@@ -445,6 +449,29 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             regionId: $regionId,
             serverId: $providerServerId,
             defaultUsername: $this->normalizedDefaultUsername(),
+        );
+    }
+
+    public function getVncConsole(
+        string $region,
+        string $serverId,
+    ): CloudServerConsoleData {
+        [$regionId, $providerServerId] =
+            $this->normalizeServerReference(
+                region: $region,
+                serverId: $serverId,
+            );
+
+        $payload = $this->client->get(
+            $this->serverActionEndpoint(
+                regionId: $regionId,
+                serverId: $providerServerId,
+                action: self::ACTION_VNC,
+            ),
+        );
+
+        return $this->mapper->mapServerVnc(
+            $payload,
         );
     }
 
