@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Application\Server\ServerManager;
 use App\Domain\Server\DTOs\ServiceStatusData;
+use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Models\Server;
 use Illuminate\Console\Command;
 use Throwable;
@@ -40,6 +41,10 @@ final class CheckServerServicesCommand extends Command
 
         try {
             $services = $this->serverManager->services($server);
+        } catch (SSHConnectionException) {
+            $this->error('Unable to connect to the server over SSH.');
+
+            return self::FAILURE;
         } catch (Throwable $exception) {
             report($exception);
 
