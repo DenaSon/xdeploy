@@ -15,14 +15,17 @@ use Illuminate\Support\ServiceProvider;
 
 final class PlatformServiceProvider extends ServiceProvider
 {
-    /**
-     * Register platform services.
-     */
     public function register(): void
     {
-        $this->app->singleton(
+        /*
+         * Registered platforms capture SSHConnectionInterface.
+         *
+         * The registry therefore belongs to the current
+         * request/job lifecycle.
+         */
+        $this->app->scoped(
             PlatformRegistryInterface::class,
-            fn (Application $app) => new PlatformRegistry(
+            fn (Application $app): PlatformRegistry => new PlatformRegistry(
                 $this->platforms($app),
             ),
         );
@@ -33,11 +36,17 @@ final class PlatformServiceProvider extends ServiceProvider
      *
      * @throws BindingResolutionException
      */
-    private function platforms(Application $app): array
-    {
+    private function platforms(
+        Application $app,
+    ): array {
         return [
-            $app->make(DockerPlatform::class),
-            $app->make(DockerComposePlatform::class),
+            $app->make(
+                DockerPlatform::class,
+            ),
+
+            $app->make(
+                DockerComposePlatform::class,
+            ),
         ];
     }
 }

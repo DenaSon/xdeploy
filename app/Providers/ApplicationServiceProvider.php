@@ -30,7 +30,13 @@ final class ApplicationServiceProvider extends ServiceProvider
             SshMarzbanHttpsGateway::class,
         );
 
-        $this->app->singleton(
+        /*
+         * Applications contain lifecycle-scoped SSH dependencies.
+         *
+         * The registry therefore must not survive beyond
+         * the request/job lifecycle that created them.
+         */
+        $this->app->scoped(
             ApplicationRegistryInterface::class,
             fn (Application $app): ApplicationRegistry => new ApplicationRegistry(
                 $this->applications($app),
@@ -43,10 +49,13 @@ final class ApplicationServiceProvider extends ServiceProvider
      *
      * @throws BindingResolutionException
      */
-    private function applications(Application $app): array
-    {
+    private function applications(
+        Application $app,
+    ): array {
         return [
-            $app->make(MarzbanApplication::class),
+            $app->make(
+                MarzbanApplication::class,
+            ),
         ];
     }
 }

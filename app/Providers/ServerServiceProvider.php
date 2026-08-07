@@ -17,21 +17,40 @@ final class ServerServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(
+        /*
+         * SSHConnection is stateful:
+         * it stores the current SSH transport and target server.
+         *
+         * It must be shared within one request/job lifecycle,
+         * but never across different lifecycles.
+         */
+        $this->app->scoped(
             SSHConnectionInterface::class,
             SSHConnection::class,
         );
 
+        /*
+         * AptPackageManager captures SSHConnectionInterface
+         * in its constructor, so it must use the same lifecycle.
+         */
+        $this->app->scoped(
+            SystemPackageManager::class,
+            AptPackageManager::class,
+        );
+
+        /*
+         * UbuntuDistribution only contains command definitions
+         * and has no server/request state.
+         */
         $this->app->singleton(
             LinuxDistribution::class,
             UbuntuDistribution::class,
         );
 
-        $this->app->singleton(
-            SystemPackageManager::class,
-            AptPackageManager::class,
-        );
-
+        /*
+         * AuthenticationStrategyFactory does not represent
+         * a server connection/session and may remain singleton.
+         */
         $this->app->singleton(
             AuthenticationStrategyFactory::class,
         );

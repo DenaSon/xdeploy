@@ -272,7 +272,14 @@ final class SSHConnection implements SSHConnectionInterface
     {
         $ssh = $this->ssh;
 
+        /*
+         * Clear all connection-scoped state first.
+         *
+         * Even if closing the underlying transport fails,
+         * this object must no longer represent a server session.
+         */
         $this->ssh = null;
+        $this->server = null;
 
         if ($ssh === null) {
             return;
@@ -282,7 +289,8 @@ final class SSHConnection implements SSHConnectionInterface
             $ssh->disconnect();
         } catch (Throwable) {
             /*
-             * Connection cleanup must never hide the original exception.
+             * Connection cleanup must never hide
+             * the original exception.
              */
         }
     }
