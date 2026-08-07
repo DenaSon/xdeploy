@@ -8,6 +8,7 @@ use App\Application\Authentication\Actions\VerifyOtpAction;
 use App\Domain\Authentication\DTOs\VerifyOtpData;
 use App\Domain\Authentication\Exceptions\InvalidOtpException;
 use App\Domain\Authentication\Exceptions\OtpExpiredException;
+use App\Domain\Authentication\Exceptions\TooManyOtpAttemptsException;
 use App\Domain\User\ValueObjects\PhoneNumber;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
@@ -21,9 +22,12 @@ final class VerifyOtpPage extends Component
     #[Validate('required|digits:4')]
     public string $code = '';
 
-    public function mount(string $phone): void
-    {
-        $this->phone = (string) PhoneNumber::from($phone);
+    public function mount(
+        string $phone,
+    ): void {
+        $this->phone = (string) PhoneNumber::from(
+            $phone,
+        );
     }
 
     public function verify(
@@ -43,7 +47,25 @@ final class VerifyOtpPage extends Component
                 name: 'panel.servers.index',
                 navigate: true,
             );
-        } catch (InvalidOtpException|OtpExpiredException $exception) {
+        } catch (
+            TooManyOtpAttemptsException $exception
+        ) {
+            $seconds = max(
+                1,
+                $exception->retryAfterSeconds,
+            );
+
+            $this->addError(
+                'code',
+                sprintf(
+                    'تعداد تلاش‌ها بیش از حد مجاز است. %d ثانیه دیگر دوباره تلاش کنید.',
+                    $seconds,
+                ),
+            );
+        } catch (
+            InvalidOtpException
+            |OtpExpiredException $exception
+        ) {
             $this->addError(
                 'code',
                 $exception->getMessage(),
@@ -58,7 +80,10 @@ final class VerifyOtpPage extends Component
 
     public function render()
     {
-        return view('livewire.auth.verify-otp-page')
-            ->title('تأیید شماره موبایل');
+        return view(
+            'livewire.auth.verify-otp-page',
+        )->title(
+            'تأیید شماره موبایل',
+        );
     }
 }

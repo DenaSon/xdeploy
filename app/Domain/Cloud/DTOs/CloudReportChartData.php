@@ -46,8 +46,8 @@ final readonly class CloudReportChartData
         CloudReportMetric $metric,
     ): bool {
         return $this->seriesFor(
-                $metric,
-            ) !== null;
+            $metric,
+        ) !== null;
     }
 
     public function latestTimestamp(): ?DateTimeImmutable

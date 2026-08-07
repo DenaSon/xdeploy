@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Concerns;
 
 use App\Models\Server;
@@ -16,42 +18,95 @@ trait HasServerForm
 
     public string $credential = '';
 
-    protected function rules(): array
-    {
+    /**
+     * @return array<string, array<int, string>>
+     */
+    protected function serverRules(
+        bool $requireCredential = true,
+    ): array {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
-            'host' => ['required', 'string'],
+            'host' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
-            'port' => ['required', 'integer', 'between:1,65535'],
+            'port' => [
+                'required',
+                'integer',
+                'between:1,65535',
+            ],
 
-            'username' => ['required', 'string'],
+            'username' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
-            'credential' => ['required', 'string'],
+            'credential' => [
+                $requireCredential
+                    ? 'required'
+                    : 'nullable',
+                'string',
+            ],
         ];
     }
 
-    protected function serverAlreadyExists(?Server $ignore = null): bool
-    {
+    protected function serverAlreadyExists(
+        ?Server $ignore = null,
+    ): bool {
         return Server::query()
-            ->where('user_id', auth()->id())
-            ->where('host', $this->host)
-            ->where('port', $this->port)
+            ->where(
+                'user_id',
+                auth()->id(),
+            )
+            ->where(
+                'host',
+                $this->host,
+            )
+            ->where(
+                'port',
+                $this->port,
+            )
             ->when(
-                $ignore,
-                fn ($query) => $query->whereKeyNot($ignore)
+                $ignore !== null,
+                static fn ($query) => $query->whereKeyNot(
+                    $ignore->getKey(),
+                ),
             )
             ->exists();
     }
 
-    protected function fillServerForm(array $data): void
-    {
+    /**
+     * Fill only non-sensitive server fields.
+     *
+     * @param array{
+     *     name: string,
+     *     host: string,
+     *     port: int,
+     *     username: string
+     * } $data
+     */
+    protected function fillServerForm(
+        array $data,
+    ): void {
         $this->fill([
             'name' => $data['name'],
             'host' => $data['host'],
             'port' => $data['port'],
             'username' => $data['username'],
-            'credential' => $data['credential'],
         ]);
+
+        /*
+         * Never expose the existing decrypted credential
+         * through Livewire public state.
+         */
+        $this->credential = '';
     }
 }

@@ -7,6 +7,7 @@ namespace App\Domain\Authentication\Services;
 use App\Domain\Authentication\Contracts\OtpRepositoryInterface;
 use App\Domain\Authentication\Exceptions\InvalidOtpException;
 use App\Domain\Authentication\Exceptions\OtpExpiredException;
+use App\Domain\Authentication\Exceptions\TooManyOtpAttemptsException;
 use App\Domain\Authentication\Exceptions\TooManyOtpRequestsException;
 use App\Domain\Authentication\ValueObjects\OtpCode;
 use App\Domain\User\ValueObjects\PhoneNumber;
@@ -15,6 +16,14 @@ use Illuminate\Support\Facades\RateLimiter;
 
 final readonly class OtpService
 {
+    private const int REQUEST_MAX_ATTEMPTS = 2;
+
+    private const int REQUEST_DECAY_SECONDS = 60;
+
+    private const int VERIFY_MAX_ATTEMPTS = 5;
+
+    private const int VERIFY_DECAY_SECONDS = 120;
+
     public function __construct(
         private OtpRepositoryInterface $repository,
     ) {}
@@ -22,21 +31,31 @@ final readonly class OtpService
     public function generate(
         PhoneNumber $phone,
     ): OtpCode {
+        $key = $this->requestRateLimitKey(
+            $phone,
+        );
 
-        $key = 'otp:'.$phone;
-
-        if (RateLimiter::tooManyAttempts($key, 2)) {
+        if (
+            RateLimiter::tooManyAttempts(
+                $key,
+                self::REQUEST_MAX_ATTEMPTS,
+            )
+        ) {
             throw new TooManyOtpRequestsException;
         }
 
-        RateLimiter::hit($key, 60);
+        RateLimiter::hit(
+            $key,
+            self::REQUEST_DECAY_SECONDS,
+        );
 
         $code = OtpCode::generate();
 
         $this->repository->store(
             phone: $phone,
             code: $code,
-            expiresAt: CarbonImmutable::now()->addMinutes(2),
+            expiresAt: CarbonImmutable::now()
+                ->addMinutes(2),
         );
 
         return $code;
@@ -46,33 +65,127 @@ final readonly class OtpService
         PhoneNumber $phone,
         OtpCode $code,
     ): void {
-        $otp = $this->repository->findByPhone($phone);
+        $rateLimitKey =
+            $this->verifyRateLimitKey(
+                $phone,
+            );
 
-        if (! $otp) {
+        $this->guardVerificationRateLimit(
+            $rateLimitKey,
+        );
+
+        $otp = $this->repository
+            ->findByPhone(
+                $phone,
+            );
+
+        if ($otp === null) {
+            $this->recordFailedVerification(
+                $rateLimitKey,
+            );
+
             throw new InvalidOtpException;
         }
 
         if ($otp->expires_at->isPast()) {
-            $this->repository->delete($phone);
+            $this->repository->delete(
+                $phone,
+            );
 
             throw new OtpExpiredException;
         }
 
-        if ((string) $code !== $otp->code) {
+        if (
+            ! hash_equals(
+                (string) $otp->code,
+                (string) $code,
+            )
+        ) {
+            $this->recordFailedVerification(
+                $rateLimitKey,
+            );
+
             throw new InvalidOtpException;
         }
 
-        $this->repository->delete($phone);
+        /*
+         * Successful verification removes both the OTP
+         * and its failed-attempt counter.
+         */
+        RateLimiter::clear(
+            $rateLimitKey,
+        );
+
+        $this->repository->delete(
+            $phone,
+        );
     }
 
     public function delete(
         PhoneNumber $phone,
     ): void {
-        $this->repository->delete($phone);
+        $this->repository->delete(
+            $phone,
+        );
     }
 
     public function clearExpired(): int
     {
-        return $this->repository->deleteExpired();
+        return $this->repository
+            ->deleteExpired();
+    }
+
+    private function guardVerificationRateLimit(
+        string $key,
+    ): void {
+        if (
+            ! RateLimiter::tooManyAttempts(
+                $key,
+                self::VERIFY_MAX_ATTEMPTS,
+            )
+        ) {
+            return;
+        }
+
+        throw new TooManyOtpAttemptsException(
+            retryAfterSeconds: RateLimiter::availableIn(
+                $key,
+            ),
+        );
+    }
+
+    private function recordFailedVerification(
+        string $key,
+    ): void {
+        RateLimiter::hit(
+            $key,
+            self::VERIFY_DECAY_SECONDS,
+        );
+
+        /*
+         * Lock immediately on the fifth failed attempt,
+         * not on the sixth request.
+         */
+        $this->guardVerificationRateLimit(
+            $key,
+        );
+    }
+
+    private function requestRateLimitKey(
+        PhoneNumber $phone,
+    ): string {
+        return sprintf(
+            'otp:request:%s',
+            (string) $phone,
+        );
+    }
+
+    private function verifyRateLimitKey(
+        PhoneNumber $phone,
+    ): string {
+        return sprintf(
+            'otp:verify:%s',
+            (string) $phone,
+        );
     }
 }

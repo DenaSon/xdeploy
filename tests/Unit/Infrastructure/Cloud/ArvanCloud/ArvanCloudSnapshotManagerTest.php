@@ -149,7 +149,7 @@ final class ArvanCloudSnapshotManagerTest extends TestCase
                 connectTimeout: 5,
                 requestTimeout: 15,
             ),
-            mapper: new ArvanCloudSnapshotResponseMapper(),
+            mapper: new ArvanCloudSnapshotResponseMapper,
         );
     }
 }

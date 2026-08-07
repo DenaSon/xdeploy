@@ -3,13 +3,12 @@
 use App\Providers\ApplicationServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\CloudServiceProvider;
+use App\Providers\CloudSnapshotServiceProvider;
 use App\Providers\CredentialSecurityServiceProvider;
 use App\Providers\PlatformServiceProvider;
 use App\Providers\ServerServiceProvider;
 use App\Providers\SmsServiceProvider;
 use App\Providers\UserServiceProvider;
-use App\Providers\CloudSnapshotServiceProvider;
-
 
 return [
     AppServiceProvider::class,

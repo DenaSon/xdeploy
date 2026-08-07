@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Concerns;
 
 use App\Application\Server\Actions\TestServerConnectionAction;
@@ -11,19 +13,25 @@ trait TestsServerConnection
 {
     use Toast;
 
-    public function testConnection(TestServerConnectionAction $action): void
-    {
-        $data = TestServerConnectionData::from(
-            $this->validate()
-        );
+    public function testConnection(
+        TestServerConnectionAction $action,
+    ): void {
+        $data = $this->validate();
+
+        $data['credential'] =
+            $this->credentialForConnectionTest();
 
         try {
-
-            if (! $action->execute($data)) {
-
+            if (
+                ! $action->execute(
+                    TestServerConnectionData::from(
+                        $data,
+                    ),
+                )
+            ) {
                 $this->error(
                     'اتصال ناموفق',
-                    'امکان برقراری ارتباط با سرور وجود ندارد. اطلاعات اتصال را بررسی کنید.'
+                    'امکان برقراری ارتباط با سرور وجود ندارد. اطلاعات اتصال را بررسی کنید.',
                 );
 
                 return;
@@ -31,18 +39,25 @@ trait TestsServerConnection
 
             $this->success(
                 'اتصال موفق',
-                'ارتباط SSH با سرور با موفقیت برقرار شد.'
+                'ارتباط SSH با سرور با موفقیت برقرار شد.',
             );
-
         } catch (Throwable $exception) {
-
             report($exception);
 
             $this->error(
                 'خطا',
-                'خطایی هنگام برقراری ارتباط با سرور رخ داد.'
+                'خطایی هنگام برقراری ارتباط با سرور رخ داد.',
             );
-
         }
+    }
+
+    /**
+     * Create uses the credential entered by the user.
+     * Edit may override this without exposing the stored
+     * credential through Livewire state.
+     */
+    protected function credentialForConnectionTest(): string
+    {
+        return $this->credential;
     }
 }

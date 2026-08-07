@@ -139,6 +139,6 @@ final class ArvanCloudSnapshotResponseMapperTest extends TestCase
 
     private function mapper(): ArvanCloudSnapshotResponseMapper
     {
-        return new ArvanCloudSnapshotResponseMapper();
+        return new ArvanCloudSnapshotResponseMapper;
     }
 }

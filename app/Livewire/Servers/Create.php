@@ -27,20 +27,32 @@ final class Create extends Component
         $this->username = 'root';
     }
 
-    public function save(CreateServerAction $action): mixed
+    /**
+     * @return array<string, array<int, string>>
+     */
+    protected function rules(): array
     {
+        return $this->serverRules(
+            requireCredential: true,
+        );
+    }
+
+    public function save(
+        CreateServerAction $action,
+    ): mixed {
         $data = $this->validate();
 
         if ($this->serverAlreadyExists()) {
             $this->addError(
                 'host',
-                'سروری با این آدرس و پورت قبلاً ثبت شده است.'
+                'سروری با این آدرس و پورت قبلاً ثبت شده است.',
             );
 
             return null;
         }
 
-        $data['authentication_type'] = AuthenticationType::Password->value;
+        $data['authentication_type'] =
+            AuthenticationType::Password->value;
 
         $action->handle(
             Auth::user(),
@@ -48,7 +60,7 @@ final class Create extends Component
         );
 
         $this->success(
-            'سرور با موفقیت ایجاد شد.'
+            'سرور با موفقیت ایجاد شد.',
         );
 
         return $this->redirectRoute(
@@ -59,6 +71,8 @@ final class Create extends Component
 
     public function render(): View
     {
-        return view('livewire.servers.create');
+        return view(
+            'livewire.servers.create',
+        );
     }
 }
