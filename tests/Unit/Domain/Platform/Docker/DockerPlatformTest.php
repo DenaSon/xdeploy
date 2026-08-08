@@ -9,6 +9,8 @@ use App\Domain\Platform\Enums\PlatformState;
 use App\Domain\Platform\Exceptions\PlatformInstallationException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
+use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Support\SSH\SSHTimeout;
@@ -48,7 +50,9 @@ final class DockerPlatformTest extends TestCase
             SSHConnectionInterface::class,
         );
 
-        $this->expectRunningInspection($ssh);
+        $this->expectRunningInspection(
+            $ssh,
+        );
 
         $info = $this->platform($ssh)->inspect();
 
@@ -68,56 +72,110 @@ final class DockerPlatformTest extends TestCase
         );
     }
 
-    public function test_it_installs_docker_using_privileged_executor(): void
+    public function test_it_installs_docker_using_installer_source_and_privileged_executor(): void
     {
         $ssh = Mockery::mock(
             SSHConnectionInterface::class,
         );
 
-        $this->expectRootPreflight($ssh);
+        $installerSource = Mockery::mock(
+            InstallerSourceInterface::class,
+        );
+
+        $installerCommand = 'xdeploy-docker-installer-command';
+
+        $this->expectUbuntuOperatingSystem(
+            $ssh,
+        );
+
+        $installerSource
+            ->shouldReceive('buildExecutionCommand')
+            ->once()
+            ->with(
+                'docker/ubuntu.sh',
+                (string) config(
+                    'xdeploy.installers.docker.ubuntu.sha256',
+                ),
+            )
+            ->andReturn(
+                $installerCommand,
+            );
+
+        $this->expectRootPreflight(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
             ->once()
             ->ordered()
             ->with(
-                Mockery::on(
-                    static fn (string $command): bool => trim($command)
-                        === 'curl -fsSL https://get.docker.com | sh',
-                ),
+                $installerCommand,
                 SSHTimeout::DOCKER_INSTALL,
-                false,
+                true,
             )
             ->andReturn(
-                new SSHResult('Docker installed.', 0),
+                new SSHResult(
+                    'Docker installed.',
+                    0,
+                ),
             );
 
-        $this->expectRunningInspection($ssh);
+        $this->expectRunningInspection(
+            $ssh,
+        );
 
-        $this->platform($ssh)->install();
+        $this
+            ->platform(
+                ssh: $ssh,
+                installerSource: $installerSource,
+            )
+            ->install();
 
         $this->addToAssertionCount(1);
     }
 
-    public function test_it_throws_when_docker_installation_command_fails(): void
+    public function test_it_throws_when_docker_installer_command_fails(): void
     {
         $ssh = Mockery::mock(
             SSHConnectionInterface::class,
         );
 
-        $this->expectRootPreflight($ssh);
+        $installerSource = Mockery::mock(
+            InstallerSourceInterface::class,
+        );
+
+        $installerCommand = 'xdeploy-docker-installer-command';
+
+        $this->expectUbuntuOperatingSystem(
+            $ssh,
+        );
+
+        $installerSource
+            ->shouldReceive('buildExecutionCommand')
+            ->once()
+            ->with(
+                'docker/ubuntu.sh',
+                (string) config(
+                    'xdeploy.installers.docker.ubuntu.sha256',
+                ),
+            )
+            ->andReturn(
+                $installerCommand,
+            );
+
+        $this->expectRootPreflight(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
             ->once()
             ->ordered()
             ->with(
-                Mockery::on(
-                    static fn (string $command): bool => trim($command)
-                        === 'curl -fsSL https://get.docker.com | sh',
-                ),
+                $installerCommand,
                 SSHTimeout::DOCKER_INSTALL,
-                false,
+                true,
             )
             ->andReturn(
                 new SSHResult(
@@ -131,10 +189,15 @@ final class DockerPlatformTest extends TestCase
         );
 
         $this->expectExceptionMessage(
-            'Docker installation failed.',
+            'Docker installation using the xDeploy installer failed.',
         );
 
-        $this->platform($ssh)->install();
+        $this
+            ->platform(
+                ssh: $ssh,
+                installerSource: $installerSource,
+            )
+            ->install();
     }
 
     public function test_it_starts_docker_using_privileged_executor(): void
@@ -143,7 +206,9 @@ final class DockerPlatformTest extends TestCase
             SSHConnectionInterface::class,
         );
 
-        $this->expectRootPreflight($ssh);
+        $this->expectRootPreflight(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
@@ -158,7 +223,9 @@ final class DockerPlatformTest extends TestCase
                 new SSHResult('', 0),
             );
 
-        $this->expectRunningInspection($ssh);
+        $this->expectRunningInspection(
+            $ssh,
+        );
 
         $this->platform($ssh)->start();
 
@@ -171,7 +238,9 @@ final class DockerPlatformTest extends TestCase
             SSHConnectionInterface::class,
         );
 
-        $this->expectRootPreflight($ssh);
+        $this->expectRootPreflight(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
@@ -186,7 +255,9 @@ final class DockerPlatformTest extends TestCase
                 new SSHResult('', 0),
             );
 
-        $this->expectStoppedInspection($ssh);
+        $this->expectStoppedInspection(
+            $ssh,
+        );
 
         $this->platform($ssh)->stop();
 
@@ -199,7 +270,9 @@ final class DockerPlatformTest extends TestCase
             SSHConnectionInterface::class,
         );
 
-        $this->expectRootPreflight($ssh);
+        $this->expectRootPreflight(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
@@ -214,11 +287,40 @@ final class DockerPlatformTest extends TestCase
                 new SSHResult('', 0),
             );
 
-        $this->expectRunningInspection($ssh);
+        $this->expectRunningInspection(
+            $ssh,
+        );
 
         $this->platform($ssh)->restart();
 
         $this->addToAssertionCount(1);
+    }
+
+    private function expectUbuntuOperatingSystem(
+        SSHConnectionInterface $ssh,
+    ): void {
+        $ssh
+            ->shouldReceive('executeWithResult')
+            ->once()
+            ->ordered()
+            ->with(
+                'if [ -r /etc/os-release ]; then cat /etc/os-release; '
+                .'elif [ -r /usr/lib/os-release ]; then cat /usr/lib/os-release; '
+                .'else exit 1; fi',
+                20,
+            )
+            ->andReturn(
+                new SSHResult(
+                    <<<'OS_RELEASE'
+ID=ubuntu
+NAME="Ubuntu"
+VERSION_ID="24.04"
+PRETTY_NAME="Ubuntu 24.04 LTS"
+ID_LIKE=debian
+OS_RELEASE,
+                    0,
+                ),
+            );
     }
 
     private function expectRootPreflight(
@@ -240,8 +342,13 @@ final class DockerPlatformTest extends TestCase
     private function expectRunningInspection(
         SSHConnectionInterface $ssh,
     ): void {
-        $this->expectDockerBinary($ssh);
-        $this->expectDockerVersion($ssh);
+        $this->expectDockerBinary(
+            $ssh,
+        );
+
+        $this->expectDockerVersion(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
@@ -252,15 +359,23 @@ final class DockerPlatformTest extends TestCase
                 SSHTimeout::QUICK,
             )
             ->andReturn(
-                new SSHResult('active', 0),
+                new SSHResult(
+                    'active',
+                    0,
+                ),
             );
     }
 
     private function expectStoppedInspection(
         SSHConnectionInterface $ssh,
     ): void {
-        $this->expectDockerBinary($ssh);
-        $this->expectDockerVersion($ssh);
+        $this->expectDockerBinary(
+            $ssh,
+        );
+
+        $this->expectDockerVersion(
+            $ssh,
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
@@ -271,7 +386,10 @@ final class DockerPlatformTest extends TestCase
                 SSHTimeout::QUICK,
             )
             ->andReturn(
-                new SSHResult('inactive', 3),
+                new SSHResult(
+                    'inactive',
+                    3,
+                ),
             );
     }
 
@@ -287,7 +405,10 @@ final class DockerPlatformTest extends TestCase
                 SSHTimeout::QUICK,
             )
             ->andReturn(
-                new SSHResult('/usr/bin/docker', 0),
+                new SSHResult(
+                    '/usr/bin/docker',
+                    0,
+                ),
             );
     }
 
@@ -312,15 +433,28 @@ final class DockerPlatformTest extends TestCase
 
     private function platform(
         SSHConnectionInterface $ssh,
+        ?InstallerSourceInterface $installerSource = null,
     ): DockerPlatform {
+        $installerSource ??= Mockery::mock(
+            InstallerSourceInterface::class,
+        );
+
         return new DockerPlatform(
             ssh: $ssh,
+
             privileged: new PrivilegedCommandExecutor(
                 ssh: $ssh,
+
                 preflight: new PrivilegedExecutionPreflight(
                     $ssh,
                 ),
             ),
+
+            operatingSystem: new OperatingSystemInspector(
+                $ssh,
+            ),
+
+            installerSource: $installerSource,
         );
     }
 }
