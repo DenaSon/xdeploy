@@ -15,7 +15,20 @@ use Throwable;
 final readonly class SshMarzbanAdminGateway implements MarzbanAdminGateway
 {
     private const string INSPECT_COMMAND = <<<'BASH'
-output="$(NO_COLOR=1 TERM=dumb marzban cli admin list{{ username_option }} 2>&1)"
+if ! docker compose version >/dev/null 2>&1; then
+    exit 127
+fi
+
+output="$(
+    docker compose \
+        -f /opt/marzban/docker-compose.yml \
+        -p marzban \
+        exec -T \
+        -e CLI_PROG_NAME='marzban cli' \
+        marzban \
+        marzban-cli admin list{{ username_option }} \
+        2>&1
+)"
 status=$?
 
 if [ "$status" -ne 0 ]; then
@@ -61,7 +74,9 @@ BASH;
     ): MarzbanSetupState {
         try {
             $result = $this->privileged->executeWithResult(
-                command: $this->inspectionCommand($username),
+                command: $this->inspectionCommand(
+                    $username,
+                ),
                 timeout: SSHTimeout::QUICK,
             );
         } catch (Throwable) {
@@ -73,7 +88,9 @@ BASH;
         }
 
         return MarzbanSetupState::tryFrom(
-            trim($result->output),
+            trim(
+                $result->output,
+            ),
         ) ?? throw MarzbanSetupInspectionException::failed();
     }
 
@@ -91,10 +108,6 @@ BASH;
                 sensitive: true,
             );
         } catch (Throwable) {
-            /*
-             * Do not attach the original exception because it may contain
-             * information about the sensitive remote command.
-             */
             throw MarzbanAdminProvisioningException::commandFailed();
         }
 
@@ -108,7 +121,10 @@ BASH;
     ): string {
         $usernameOption = $username === null
             ? ''
-            : ' --username '.$this->shellArgument($username);
+            : ' --username '
+                .$this->shellArgument(
+                    $username,
+                );
 
         return strtr(
             self::INSPECT_COMMAND,
@@ -135,14 +151,9 @@ BASH;
         );
     }
 
-    /**
-     * Quote a value for the remote POSIX shell.
-     *
-     * escapeshellarg() is deliberately not used because xDeploy may run
-     * on Windows while the destination command is always executed by Bash.
-     */
-    private function shellArgument(string $value): string
-    {
+    private function shellArgument(
+        string $value,
+    ): string {
         return "'".str_replace(
             "'",
             "'\"'\"'",

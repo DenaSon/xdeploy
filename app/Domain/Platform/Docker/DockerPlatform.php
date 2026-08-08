@@ -14,14 +14,19 @@ use App\Domain\Platform\Exceptions\PlatformRestartException;
 use App\Domain\Platform\Exceptions\PlatformStartException;
 use App\Domain\Platform\Exceptions\PlatformStopException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
+use RuntimeException;
 
 final readonly class DockerPlatform implements PlatformInterface, StartablePlatformInterface
 {
     public function __construct(
         private SSHConnectionInterface $ssh,
         private PrivilegedCommandExecutor $privileged,
+        private OperatingSystemInspector $operatingSystem,
+        private InstallerSourceInterface $installerSource,
     ) {}
 
     public function type(): PlatformType
@@ -59,7 +64,9 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
             timeout: SSHTimeout::QUICK,
         );
 
-        $serviceState = trim($serviceResult->output);
+        $serviceState = trim(
+            $serviceResult->output,
+        );
 
         $state = match ($serviceState) {
             'active' => PlatformState::Running,
@@ -84,16 +91,57 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
 
     public function install(): void
     {
+        $os = $this->operatingSystem->inspect();
+
+        if ($os->id !== 'ubuntu') {
+            throw new PlatformInstallationException(
+                sprintf(
+                    'The xDeploy Docker installer currently supports Ubuntu only; detected [%s].',
+                    $os->displayName(),
+                ),
+            );
+        }
+
+        if (
+            ! in_array(
+                $os->versionId,
+                ['22.04', '24.04'],
+                true,
+            )
+        ) {
+            throw new PlatformInstallationException(
+                sprintf(
+                    'The xDeploy Docker installer does not support Ubuntu version [%s].',
+                    $os->versionId ?? 'unknown',
+                ),
+            );
+        }
+
+        try {
+            $command = $this->installerSource->buildExecutionCommand(
+                relativePath: (string) config(
+                    'xdeploy.installers.docker.ubuntu.path',
+                ),
+                expectedSha256: (string) config(
+                    'xdeploy.installers.docker.ubuntu.sha256',
+                ),
+            );
+        } catch (RuntimeException $exception) {
+            throw new PlatformInstallationException(
+                message: 'Docker installer could not be prepared.',
+                previous: $exception,
+            );
+        }
+
         $result = $this->privileged->executeWithResult(
-            command: <<<'BASH'
-curl -fsSL https://get.docker.com | sh
-BASH,
+            command: $command,
             timeout: SSHTimeout::DOCKER_INSTALL,
+            sensitive: true,
         );
 
         if (! $result->successful()) {
             throw new PlatformInstallationException(
-                'Docker installation failed.',
+                'Docker installation using the xDeploy installer failed.',
             );
         }
 

@@ -9,16 +9,20 @@ use App\Domain\Platform\DTOs\PlatformInfo;
 use App\Domain\Platform\Enums\PlatformState;
 use App\Domain\Platform\Enums\PlatformType;
 use App\Domain\Platform\Exceptions\PlatformInstallationException;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 use RuntimeException;
 
 final readonly class DockerComposePlatform implements PlatformInterface
 {
-    private const COMMAND_TIMEOUT_SECONDS = 5;
+    private const int COMMAND_TIMEOUT_SECONDS = 5;
 
     public function __construct(
         private SSHConnectionInterface $ssh,
+        private PrivilegedCommandExecutor $privileged,
+        private OperatingSystemInspector $operatingSystem,
     ) {}
 
     public function type(): PlatformType
@@ -74,14 +78,54 @@ final readonly class DockerComposePlatform implements PlatformInterface
 
     public function install(): void
     {
-        throw new PlatformInstallationException(
-            'Docker Compose is unavailable after installing the docker-compose-plugin system package.',
+        $os = $this->operatingSystem->inspect();
+
+        if (
+            $os->id !== 'ubuntu'
+            || ! in_array($os->versionId, ['22.04', '24.04'], true)
+        ) {
+            throw new PlatformInstallationException(
+                sprintf(
+                    'Automatic Docker Compose installation currently supports Ubuntu 22.04 and 24.04 only; detected [%s].',
+                    $os->displayName(),
+                ),
+            );
+        }
+
+        $result = $this->privileged->executeWithResult(
+            command: <<<'BASH'
+set -Eeuo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+
+if ! apt-cache show docker-compose-v2 >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends software-properties-common
+    add-apt-repository -y universe
+    apt-get update
+fi
+
+apt-get install -y --no-install-recommends docker-compose-v2
+
+docker compose version
+BASH,
+            timeout: SSHTimeout::SYSTEM_PACKAGE_INSTALL,
         );
+
+        if (! $result->successful()) {
+            throw new PlatformInstallationException(
+                'Docker Compose V2 installation failed.',
+            );
+        }
+
+        if (! $this->inspect()->isInstalled()) {
+            throw new PlatformInstallationException(
+                'Docker Compose V2 installation verification failed.',
+            );
+        }
     }
 
-    /**
-     * @return list<PlatformType>
-     */
     public function dependencies(): array
     {
         return [
@@ -89,23 +133,14 @@ final readonly class DockerComposePlatform implements PlatformInterface
         ];
     }
 
-    /**
-     * @return list<string>
-     */
     public function systemPackages(): array
     {
-        return [
-            'docker-compose-plugin',
-        ];
+        return [];
     }
 
     private function commandTimedOut(int $exitCode): bool
     {
-        return in_array(
-            $exitCode,
-            [124, 137],
-            true,
-        );
+        return in_array($exitCode, [124, 137], true);
     }
 
     private function extractVersion(string $output): ?string

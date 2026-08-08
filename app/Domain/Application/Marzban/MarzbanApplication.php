@@ -9,12 +9,16 @@ use App\Domain\Application\Shared\Abstracts\CommandApplication;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Application\Shared\Enums\SoftwareType;
+use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
 use App\Domain\Application\Shared\Exceptions\ApplicationRestartException;
 use App\Domain\Application\Shared\Exceptions\ApplicationStartException;
 use App\Domain\Application\Shared\Exceptions\ApplicationStopException;
 use App\Domain\Application\Shared\ValueObjects\ApplicationRequirements;
 use App\Domain\Application\Shared\ValueObjects\ProvidedSoftware;
 use App\Domain\Platform\Enums\PlatformType;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 use RuntimeException;
 use Throwable;
@@ -28,6 +32,17 @@ final readonly class MarzbanApplication extends CommandApplication implements St
     private const int CONTAINER_INSPECTION_ATTEMPTS = 3;
 
     private const int CONTAINER_INSPECTION_DELAY_MICROSECONDS = 500_000;
+
+    public function __construct(
+        SSHConnectionInterface $ssh,
+        PrivilegedCommandExecutor $privileged,
+        private InstallerSourceInterface $installerSource,
+    ) {
+        parent::__construct(
+            ssh: $ssh,
+            privileged: $privileged,
+        );
+    }
 
     public function type(): ApplicationType
     {
@@ -103,60 +118,64 @@ final readonly class MarzbanApplication extends CommandApplication implements St
 
     protected function inspectCommand(): string
     {
-        return 'test -d /opt/marzban';
+        return <<<'BASH'
+if [ -f /opt/marzban/.xdeploy-install-complete ]; then
+    exit 0
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+    exit 1
+fi
+
+container_id="$(
+    docker ps -a \
+        --filter "label=com.docker.compose.project=marzban" \
+        --filter "label=com.docker.compose.service=marzban" \
+        --format "{{.ID}}" \
+        2>/dev/null \
+        | head -n 1
+)"
+
+test -n "$container_id"
+BASH;
     }
 
     protected function resolveState(): ApplicationState
     {
-        $installedResult = $this->ssh->executeWithResult(
-            command: $this->inspectCommand(),
-            timeout: SSHTimeout::QUICK,
-        );
-
-        if (! $installedResult->successful()) {
-            return ApplicationState::NotInstalled;
-        }
-
         return $this->resolveContainerState();
     }
 
     /**
      * @return array<string, mixed>
      */
-    protected function metadataFromOutput(string $output): array
-    {
+    protected function metadataFromOutput(
+        string $output,
+    ): array {
         return [];
     }
 
     protected function installCommand(): string
     {
-        return <<<'BASH'
-set -euo pipefail
+        try {
+            return $this->installerSource->buildExecutionCommand(
+                relativePath: (string) config(
+                    'xdeploy.installers.marzban.ubuntu.path',
+                ),
+                expectedSha256: (string) config(
+                    'xdeploy.installers.marzban.ubuntu.sha256',
+                ),
+            );
+        } catch (RuntimeException $exception) {
+            throw new ApplicationInstallationException(
+                message: 'Marzban installer could not be prepared.',
+                previous: $exception,
+            );
+        }
+    }
 
-INSTALLER="$(mktemp /tmp/xdeploy-marzban-installer.XXXXXX)"
-
-cleanup() {
-    rm -f "$INSTALLER"
-}
-
-trap cleanup EXIT
-
-curl -fsSL \
-    https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh \
-    -o "$INSTALLER"
-
-if ! grep -q '^follow_marzban_logs() {' "$INSTALLER"; then
-    echo "Unexpected Marzban installer format." >&2
-    exit 90
-fi
-
-sed -i \
-    '/^follow_marzban_logs() {/a\    return 0' \
-    "$INSTALLER"
-
-timeout --signal=TERM 600 \
-    bash "$INSTALLER" install </dev/null
-BASH;
+    protected function installSensitive(): bool
+    {
+        return true;
     }
 
     protected function uninstallCommand(): string
@@ -167,8 +186,7 @@ BASH;
                 'down --remove-orphans',
             ),
             <<<'BASH'
-timeout --signal=TERM 180 \
-    sh -c 'yes y | marzban uninstall'
+rm -f /opt/marzban/.xdeploy-install-complete
 BASH,
         );
     }
@@ -194,12 +212,16 @@ BASH,
         string $stateFailureMessage,
     ): void {
         $result = $this->privileged->executeWithResult(
-            command: $this->composeCommand($operation),
+            command: $this->composeCommand(
+                $operation,
+            ),
             timeout: SSHTimeout::DEFAULT,
         );
 
         if (! $result->successful()) {
-            throw new $exception($commandFailureMessage);
+            throw new $exception(
+                $commandFailureMessage,
+            );
         }
 
         $this->waitForState(
@@ -222,20 +244,31 @@ BASH,
             $attempt <= self::STATE_CHECK_ATTEMPTS;
             $attempt++
         ) {
-            if ($this->resolveState() === $expectedState) {
+            if (
+                $this->resolveState()
+                === $expectedState
+            ) {
                 return;
             }
 
-            if ($attempt < self::STATE_CHECK_ATTEMPTS) {
-                usleep(self::STATE_CHECK_DELAY_MICROSECONDS);
+            if (
+                $attempt
+                < self::STATE_CHECK_ATTEMPTS
+            ) {
+                usleep(
+                    self::STATE_CHECK_DELAY_MICROSECONDS,
+                );
             }
         }
 
-        throw new $exception($message);
+        throw new $exception(
+            $message,
+        );
     }
 
-    private function composeCommand(string $operation): string
-    {
+    private function composeCommand(
+        string $operation,
+    ): string {
         return sprintf(
             <<<'BASH'
 set -euo pipefail
@@ -253,6 +286,7 @@ fi
 docker compose \
     --env-file /opt/marzban/.env \
     "${compose_files[@]}" \
+    -p marzban \
     %s
 BASH,
             $operation,
@@ -279,8 +313,12 @@ BASH,
                     timeout: SSHTimeout::QUICK,
                 );
 
-                if ($result->successful()) {
-                    return trim($result->output) !== ''
+                if (
+                    $result->successful()
+                ) {
+                    return trim(
+                        $result->output,
+                    ) !== ''
                         ? ApplicationState::Running
                         : ApplicationState::Installed;
                 }
@@ -288,8 +326,13 @@ BASH,
                 // Retry transient Docker or SSH inspection failures.
             }
 
-            if ($attempt < self::CONTAINER_INSPECTION_ATTEMPTS) {
-                usleep(self::CONTAINER_INSPECTION_DELAY_MICROSECONDS);
+            if (
+                $attempt
+                < self::CONTAINER_INSPECTION_ATTEMPTS
+            ) {
+                usleep(
+                    self::CONTAINER_INSPECTION_DELAY_MICROSECONDS,
+                );
             }
         }
 

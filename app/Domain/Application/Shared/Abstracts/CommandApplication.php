@@ -49,6 +49,7 @@ abstract readonly class CommandApplication extends AbstractApplication
         $result = $this->privileged->executeWithResult(
             command: $this->installCommand(),
             timeout: $this->installTimeout(),
+            sensitive: $this->installSensitive(),
         );
 
         if (! $result->successful()) {
@@ -134,5 +135,10 @@ abstract readonly class CommandApplication extends AbstractApplication
     protected function uninstallTimeout(): int
     {
         return SSHTimeout::DEFAULT;
+    }
+
+    protected function installSensitive(): bool
+    {
+        return false;
     }
 }
