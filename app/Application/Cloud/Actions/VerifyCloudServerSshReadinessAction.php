@@ -13,11 +13,11 @@ use App\Domain\Server\Exceptions\RootPrivilegesRequiredException;
 use App\Domain\Server\Exceptions\UnsupportedOperatingSystemException;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Contracts\SSHPortReadinessProbeInterface;
 use App\Infrastructure\SSH\Enums\SSHCommandReadinessStatus;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Infrastructure\SSH\Services\SSHCommandReadinessInspector;
 use App\Infrastructure\SSH\Services\SSHPasswordRotationService;
-use App\Infrastructure\SSH\Services\SSHPortReadinessProbe;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Throwable;
@@ -29,7 +29,7 @@ final readonly class VerifyCloudServerSshReadinessAction
         private PrivilegedExecutionPreflight $preflight,
         private SSHCommandReadinessInspector $commandReadiness,
         private SSHPasswordRotationService $passwordRotation,
-        private SSHPortReadinessProbe $portReadinessProbe,
+        private SSHPortReadinessProbeInterface $portReadinessProbe,
         private EnsureSupportedOperatingSystemAction $ensureSupportedOperatingSystem,
     ) {}
 
@@ -55,11 +55,6 @@ final readonly class VerifyCloudServerSshReadinessAction
                 $server,
             );
 
-            /*
-             * OS compatibility is checked only after command execution
-             * is confirmed. This guarantees /etc/os-release can be read
-             * without confusing password/bootstrap failures with OS support.
-             */
             $this->ensureSupportedOperatingSystem
                 ->handle();
 

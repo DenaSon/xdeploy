@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\SSH\Services;
 
+use App\Infrastructure\SSH\Contracts\SSHPortReadinessProbeInterface;
 use App\Infrastructure\SSH\Security\SSHConnectionTargetPolicy;
 use App\Models\Server;
 use InvalidArgumentException;
 
-final readonly class SSHPortReadinessProbe
+final readonly class SSHPortReadinessProbe implements SSHPortReadinessProbeInterface
 {
     private const int MAX_WAIT_SECONDS = 90;
 
