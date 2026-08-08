@@ -9,22 +9,43 @@ use App\Domain\Server\DTOs\OperatingSystemInfo;
 final readonly class SupportedOperatingSystemPolicy
 {
     /**
-     * Only operating systems explicitly verified by xDeploy
-     * are supported. ID_LIKE must not implicitly grant support.
-     *
-     * @var list<string>
+     * @param  array<string, list<string>>  $matrix
      */
-    private const array SUPPORTED_IDS = [
-        'ubuntu',
-        'debian',
-    ];
+    public function __construct(
+        private array $matrix,
+    ) {}
 
     public function supports(
         OperatingSystemInfo $operatingSystem,
     ): bool {
+        return $this->supportsIdVersion(
+            id: $operatingSystem->id,
+            versionId: $operatingSystem->versionId,
+        );
+    }
+
+    public function supportsIdVersion(
+        string $id,
+        ?string $versionId,
+    ): bool {
+        $id = strtolower(
+            trim($id),
+        );
+
+        $versionId = trim(
+            (string) $versionId,
+        );
+
+        if (
+            $id === ''
+            || $versionId === ''
+        ) {
+            return false;
+        }
+
         return in_array(
-            strtolower($operatingSystem->id),
-            self::SUPPORTED_IDS,
+            $versionId,
+            $this->matrix[$id] ?? [],
             true,
         );
     }
@@ -34,6 +55,21 @@ final readonly class SupportedOperatingSystemPolicy
      */
     public function supportedIds(): array
     {
-        return self::SUPPORTED_IDS;
+        return array_keys(
+            $this->matrix,
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function supportedVersions(
+        string $id,
+    ): array {
+        $id = strtolower(
+            trim($id),
+        );
+
+        return $this->matrix[$id] ?? [];
     }
 }

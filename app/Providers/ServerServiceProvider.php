@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domain\Server\Contracts\SystemPackageManager;
+use App\Domain\Server\Services\SupportedOperatingSystemPolicy;
 use App\Infrastructure\Linux\Contracts\LinuxDistribution;
 use App\Infrastructure\Linux\Distributions\DebianFamilyDistribution;
 use App\Infrastructure\Linux\Packages\AptPackageManager;
@@ -48,6 +49,16 @@ final class ServerServiceProvider extends ServiceProvider
 
         $this->app->singleton(
             AuthenticationStrategyFactory::class,
+        );
+
+        $this->app->singleton(
+            SupportedOperatingSystemPolicy::class,
+            static fn (): SupportedOperatingSystemPolicy => new SupportedOperatingSystemPolicy(
+                matrix: (array) config(
+                    'supported_os.matrix',
+                    [],
+                ),
+            ),
         );
     }
 }

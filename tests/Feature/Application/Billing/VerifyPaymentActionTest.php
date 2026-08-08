@@ -132,17 +132,11 @@ final class VerifyPaymentActionTest extends TestCase
             PaymentGatewayInterface::class,
         );
 
-        /*
-         * execute() still resolves the gateway name on both calls.
-         */
         $gateway
             ->shouldReceive('name')
             ->twice()
             ->andReturn('fake');
 
-        /*
-         * Actual gateway verification must happen only once.
-         */
         $gateway
             ->shouldReceive('verify')
             ->once()
@@ -366,6 +360,11 @@ final class VerifyPaymentActionTest extends TestCase
 
             'region_id' => 'eu-west1-a',
             'size_id' => 'eco-2-2-0',
+
+            'image_id' => 'ubuntu-24-04-image',
+            'image_name' => 'Ubuntu 24.04 LTS',
+            'image_distribution' => 'ubuntu',
+            'image_version' => '24.04',
 
             'default_disk_gib' => 30,
             'selected_disk_gib' => 30,

@@ -16,17 +16,28 @@ final class Order extends Model
 
     protected $fillable = [
         'user_id',
+
         'region_id',
         'size_id',
+
+        'image_id',
+        'image_name',
+        'image_distribution',
+        'image_version',
+
         'default_disk_gib',
         'selected_disk_gib',
+
         'period',
         'duration_hours',
+
         'provider_cost',
         'markup_percent',
         'final_amount',
         'currency',
+
         'status',
+
         'quote_expires_at',
         'paid_at',
     ];
@@ -39,11 +50,15 @@ final class Order extends Model
         return [
             'default_disk_gib' => 'integer',
             'selected_disk_gib' => 'integer',
+
             'duration_hours' => 'integer',
+
             'provider_cost' => 'integer',
             'markup_percent' => 'integer',
             'final_amount' => 'integer',
+
             'status' => OrderStatus::class,
+
             'quote_expires_at' => 'immutable_datetime',
             'paid_at' => 'immutable_datetime',
         ];
@@ -54,7 +69,9 @@ final class Order extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(
+            User::class,
+        );
     }
 
     /**
@@ -62,6 +79,8 @@ final class Order extends Model
      */
     public function payments(): HasMany
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(
+            Payment::class,
+        );
     }
 }
