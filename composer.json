@@ -19,7 +19,8 @@
         "livewire/livewire": "*",
         "mallardduck/blade-lucide-icons": "^1.26",
         "phpseclib/phpseclib": "^3.0",
-        "robsontenorio/mary": "^2.8"
+        "robsontenorio/mary": "^2.8",
+        "zarinpal/zarinpal-php-sdk": "*"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
