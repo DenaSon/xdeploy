@@ -35,7 +35,9 @@ final readonly class DebianFamilyDistribution implements LinuxDistribution
 
     public function privateIp(): string
     {
-        return "hostname -I | awk '{print \$1}'";
+        return <<<'BASH'
+hostname -I | awk '{print $1}'
+BASH;
     }
 
     public function cpu(): string
@@ -58,30 +60,15 @@ final readonly class DebianFamilyDistribution implements LinuxDistribution
         return 'cat /proc/loadavg';
     }
 
-    public function serviceStatus(
-        string $service,
-    ): string {
-        return <<<BASH
-if systemctl show "{$service}" >/dev/null 2>&1; then
-    systemctl is-active "{$service}"
-else
-    echo "not-installed"
-fi
-BASH;
-    }
-
-    public function dockerContainerStatus(
-        string $container,
-    ): string {
-        return <<<BASH
-if docker ps \
-    --filter "name={$container}" \
-    --filter "status=running" \
-    --format "{{.Names}}" | grep -q .; then
-    echo "active"
-else
-    echo "inactive"
-fi
+    public function services(): string
+    {
+        return <<<'BASH'
+systemctl list-units \
+    --type=service \
+    --all \
+    --no-pager \
+    --no-legend \
+    --plain
 BASH;
     }
 }

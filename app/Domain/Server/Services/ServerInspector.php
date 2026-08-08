@@ -6,17 +6,21 @@ namespace App\Domain\Server\Services;
 
 use App\Domain\Server\DTOs\CpuInfoData;
 use App\Domain\Server\DTOs\DiskInfoData;
+use App\Domain\Server\DTOs\DockerRuntimeData;
 use App\Domain\Server\DTOs\LoadAverageData;
 use App\Domain\Server\DTOs\MemoryInfoData;
+use App\Domain\Server\DTOs\SystemServiceData;
 use App\Domain\Server\Parsers\Contracts\Parser;
 use App\Domain\Server\Parsers\CpuParser;
 use App\Domain\Server\Parsers\DiskParser;
 use App\Domain\Server\Parsers\LoadAverageParser;
 use App\Domain\Server\Parsers\MemoryParser;
+use App\Domain\Server\Parsers\SystemServiceParser;
+use App\Infrastructure\Docker\Services\DockerInspector;
 use App\Infrastructure\Linux\Contracts\LinuxDistribution;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 
-readonly class ServerInspector
+final readonly class ServerInspector
 {
     public function __construct(
         private SSHConnectionInterface $ssh,
@@ -25,127 +29,82 @@ readonly class ServerInspector
         private CpuParser $cpuParser,
         private DiskParser $diskParser,
         private LoadAverageParser $loadAverageParser,
+        private SystemServiceParser $systemServiceParser,
+        private DockerInspector $dockerInspector,
     ) {}
 
-    /**
-     * Execute an SSH command.
-     */
-    private function run(string $command): string
-    {
-
-        return trim(
-            $this->ssh->execute($command)
-        );
-    }
-
-    /**
-     * Execute an SSH command and parse its output.
-     */
-    private function parse(string $command, Parser $parser): mixed
-    {
-        return $parser->parse(
-            $this->run($command)
-        );
-    }
-
-    /**
-     * Get server hostname.
-     */
     public function hostname(): string
     {
         return $this->run(
-            $this->distribution->hostname()
+            $this->distribution->hostname(),
         );
     }
 
-    /**
-     * Get operating system.
-     */
     public function operatingSystem(): string
     {
         return $this->run(
-            $this->distribution->operatingSystem()
+            $this->distribution->operatingSystem(),
         );
     }
 
-    /**
-     * Get Linux kernel version.
-     */
     public function kernel(): string
     {
         return $this->run(
-            $this->distribution->kernel()
+            $this->distribution->kernel(),
         );
     }
 
-    /**
-     * Get current SSH user.
-     */
     public function whoami(): string
     {
         return $this->run(
-            $this->distribution->whoami()
+            $this->distribution->whoami(),
         );
     }
 
-    /**
-     * Get server uptime.
-     */
     public function uptime(): string
     {
         return $this->run(
-            $this->distribution->uptime()
+            $this->distribution->uptime(),
         );
     }
 
-    /**
-     * Get primary private IP address.
-     */
     public function privateIp(): string
     {
         return $this->run(
-            $this->distribution->privateIp()
+            $this->distribution->privateIp(),
         );
     }
 
-    /**
-     * Get CPU information.
-     */
     public function cpu(): CpuInfoData
     {
+        /** @var CpuInfoData */
         return $this->parse(
             $this->distribution->cpu(),
             $this->cpuParser,
         );
     }
 
-    /**
-     * Get memory information.
-     */
     public function memory(): MemoryInfoData
     {
+        /** @var MemoryInfoData */
         return $this->parse(
             $this->distribution->memory(),
             $this->memoryParser,
         );
     }
 
-    /**
-     * Get disk usage information.
-     */
     public function disk(): DiskInfoData
     {
+        /** @var DiskInfoData */
         return $this->parse(
             $this->distribution->disk(),
             $this->diskParser,
         );
     }
 
-    /**
-     * Get system load average.
-     */
     public function loadAverage(): LoadAverageData
     {
+        /** @var LoadAverageData */
         return $this->parse(
             $this->distribution->loadAverage(),
             $this->loadAverageParser,
@@ -153,15 +112,42 @@ readonly class ServerInspector
     }
 
     /**
-     * Get service status.
+     * @return list<SystemServiceData>
      */
-    public function serviceStatus(string $service): string
+    public function services(): array
     {
-        $command = match ($service) {
-            'marzban' => $this->distribution->dockerContainerStatus('marzban'),
-            default => $this->distribution->serviceStatus($service),
-        };
+        return $this->systemServiceParser
+            ->parse(
+                $this->run(
+                    $this->distribution->services(),
+                ),
+            );
+    }
 
-        return $this->run($command);
+    public function docker(): DockerRuntimeData
+    {
+        return $this->dockerInspector
+            ->inspect();
+    }
+
+    private function run(
+        string $command,
+    ): string {
+        return trim(
+            $this->ssh->execute(
+                $command,
+            ),
+        );
+    }
+
+    private function parse(
+        string $command,
+        Parser $parser,
+    ): mixed {
+        return $parser->parse(
+            $this->run(
+                $command,
+            ),
+        );
     }
 }

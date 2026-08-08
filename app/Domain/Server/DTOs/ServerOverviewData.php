@@ -1,14 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Server\DTOs;
 
-readonly class ServerOverviewData
+final readonly class ServerOverviewData
 {
     /**
-     * @param  ServiceStatusData[]  $services
-     */
-    /**
-     * @param  ServiceStatusData[]  $services
+     * @param  list<SystemServiceData>  $services
      */
     public function __construct(
         public string $hostname,
@@ -22,11 +21,9 @@ readonly class ServerOverviewData
         public DiskInfoData $disk,
         public LoadAverageData $loadAverage,
         public array $services = [],
+        public ?DockerRuntimeData $docker = null,
     ) {}
 
-    /**
-     * Convert the DTO to an array.
-     */
     public function toArray(): array
     {
         return [
@@ -43,9 +40,20 @@ readonly class ServerOverviewData
             'loadAverage' => $this->loadAverage->toArray(),
 
             'services' => array_map(
-                fn (ServiceStatusData $service) => $service->toArray(),
+                static fn (
+                    SystemServiceData $service,
+                ): array => $service->toArray(),
                 $this->services,
             ),
+
+            'docker' => $this->docker?->toArray()
+                ?? [
+                    'installed' => false,
+                    'accessible' => false,
+                    'running_count' => 0,
+                    'total_count' => 0,
+                    'containers' => [],
+                ],
         ];
     }
 }
