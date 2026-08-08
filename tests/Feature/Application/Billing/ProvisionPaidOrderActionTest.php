@@ -148,6 +148,63 @@ final class ProvisionPaidOrderActionTest extends TestCase
         }
     }
 
+    public function test_failed_order_with_delivered_inactive_server_is_recovered_as_fulfilled_without_reprovisioning(): void
+    {
+        $order = $this->order(
+            OrderStatus::Failed,
+        );
+
+        $server = $this->server(
+            user: $order->user,
+            name: "xdeploy-order-{$order->id}",
+            status: ServerStatus::Inactive,
+        );
+
+        $server->forceFill([
+            'host' => '203.0.113.77',
+        ])->save();
+
+        $order->forceFill([
+            'server_id' => $server->id,
+        ])->save();
+
+        $result = $this->action()->execute(
+            $order->id,
+        );
+
+        $this->assertSame(
+            $server->id,
+            $result->id,
+        );
+
+        $freshOrder = $order->fresh();
+
+        $this->assertSame(
+            OrderStatus::Fulfilled,
+            $freshOrder->status,
+        );
+
+        $this->assertSame(
+            $server->id,
+            $freshOrder->server_id,
+        );
+
+        $this->assertSame(
+            ServerStatus::Inactive,
+            $server->fresh()->status,
+        );
+
+        $this->assertSame(
+            '203.0.113.77',
+            $server->fresh()->host,
+        );
+
+        $this->assertDatabaseCount(
+            'servers',
+            1,
+        );
+    }
+
     public function test_fulfilled_order_without_server_is_never_reprovisioned(): void
     {
         $order = $this->order(
@@ -212,11 +269,9 @@ final class ProvisionPaidOrderActionTest extends TestCase
 
             'status' => $status,
 
-            'quote_expires_at' =>
-                now()->addMinutes(15),
+            'quote_expires_at' => now()->addMinutes(15),
 
-            'paid_at' =>
-                $status === OrderStatus::PendingPayment
+            'paid_at' => $status === OrderStatus::PendingPayment
                     ? null
                     : now(),
         ]);
@@ -239,17 +294,14 @@ final class ProvisionPaidOrderActionTest extends TestCase
             'port' => 22,
             'username' => 'ubuntu',
 
-            'authentication_type' =>
-                AuthenticationType::Password,
+            'authentication_type' => AuthenticationType::Password,
 
-            'credential' =>
-                'temporary-test-password',
+            'credential' => 'temporary-test-password',
 
             'status' => $status,
 
             'cloud_provider' => 'arvan',
-            'cloud_server_id' =>
-                'provider-'.$name,
+            'cloud_server_id' => 'provider-'.$name,
 
             'cloud_region' => 'eu-west1-a',
 

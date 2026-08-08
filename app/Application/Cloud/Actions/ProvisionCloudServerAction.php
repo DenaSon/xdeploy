@@ -59,7 +59,39 @@ final readonly class ProvisionCloudServerAction
         }
     }
 
+    /**
+     * Full server workflow retained for existing callers that require an
+     * xDeploy-ready SSH connection before the Server becomes Active.
+     */
     public function handle(
+        User $user,
+        CreateCloudServerData $data,
+    ): ProvisionCloudServerResult {
+        $result = $this->provisionProviderResource(
+            user: $user,
+            data: $data,
+        );
+
+        $this->verifySshReadiness->handle(
+            $result->server,
+        );
+
+        return new ProvisionCloudServerResult(
+            server: $result->server->refresh(),
+            cloudServer: $result->cloudServer,
+            pollAttempts: $result->pollAttempts,
+        );
+    }
+
+    /**
+     * Provider-delivery boundary.
+     *
+     * This method stops once the provider resource is ready and its public
+     * connection information is persisted. SSH reachability is intentionally
+     * NOT part of this boundary because an otherwise valid public IP may be
+     * unreachable from the xDeploy host/network.
+     */
+    public function provisionProviderResource(
         User $user,
         CreateCloudServerData $data,
     ): ProvisionCloudServerResult {
@@ -93,20 +125,10 @@ final readonly class ProvisionCloudServerAction
             );
         }
 
-        $result = $this->pollUntilReady(
+        return $this->pollUntilReady(
             server: $server,
             regionId: $data->regionId,
             providerServerId: $createdServer->id,
-        );
-
-        $this->verifySshReadiness->handle(
-            $result->server,
-        );
-
-        return new ProvisionCloudServerResult(
-            server: $result->server->refresh(),
-            cloudServer: $result->cloudServer,
-            pollAttempts: $result->pollAttempts,
         );
     }
 

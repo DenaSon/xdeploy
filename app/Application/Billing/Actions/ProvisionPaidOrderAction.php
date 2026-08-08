@@ -66,7 +66,7 @@ final readonly class ProvisionPaidOrderAction
             }
 
             $result = $this->provisionCloudServer
-                ->handle(
+                ->provisionProviderResource(
                     user: $user,
                     data: $data,
                 );
@@ -88,19 +88,40 @@ final readonly class ProvisionPaidOrderAction
                     serverName: $serverName,
                 );
 
-            if (
-                $recoveredServer instanceof Server
-                && $recoveredServer->isActive()
-            ) {
-                return $this->markFulfilled(
+            if ($recoveredServer instanceof Server) {
+                if (
+                    $recoveredServer->isActive()
+                    || $this->hasProviderDeliveryEvidence(
+                        $recoveredServer,
+                    )
+                ) {
+                    return $this->markFulfilled(
+                        orderId: $order->getKey(),
+                        server: $recoveredServer,
+                    );
+                }
+
+                /*
+                 * A provider resource already exists, so this is no longer
+                 * a safe state for automatic create/retry. Preserve the
+                 * correlation and keep the Order in Provisioning for
+                 * reconciliation instead of declaring a commercial failure.
+                 */
+                $this->attachServerWithoutChangingStatus(
                     orderId: $order->getKey(),
                     server: $recoveredServer,
                 );
+
+                throw $exception;
             }
 
+            /*
+             * Only failures without a recoverable provider resource may
+             * transition the commercial Order to Failed.
+             */
             $this->markFailed(
                 orderId: $order->getKey(),
-                server: $recoveredServer,
+                server: null,
             );
 
             throw $exception;
@@ -151,6 +172,22 @@ final readonly class ProvisionPaidOrderAction
                 if (
                     $order->status
                     === OrderStatus::Provisioning
+                ) {
+                    return [
+                        $order,
+                        false,
+                    ];
+                }
+
+                /*
+                 * Failed Orders are recovery-only. They may never start a
+                 * fresh provider create request. This allows historical
+                 * Orders that were incorrectly failed only because SSH was
+                 * unreachable to be repaired safely.
+                 */
+                if (
+                    $order->status
+                    === OrderStatus::Failed
                 ) {
                     return [
                         $order,
@@ -218,7 +255,12 @@ final readonly class ProvisionPaidOrderAction
         }
 
         if ($server instanceof Server) {
-            if ($server->isActive()) {
+            if (
+                $server->isActive()
+                || $this->hasProviderDeliveryEvidence(
+                    $server,
+                )
+            ) {
                 return $this->markFulfilled(
                     orderId: $order->getKey(),
                     server: $server,
@@ -226,13 +268,20 @@ final readonly class ProvisionPaidOrderAction
             }
 
             /*
-             * Persist the correlation if a recoverable local Server was
-             * discovered, but keep the Order in Provisioning state.
-             * A second provider create request is intentionally forbidden.
+             * Persist the correlation if a provider resource exists but is
+             * not yet delivered with a usable public host. Automatic provider
+             * creation remains forbidden.
              */
             $this->attachServerWithoutChangingStatus(
                 orderId: $order->getKey(),
                 server: $server,
+            );
+        }
+
+        if ($order->status === OrderStatus::Failed) {
+            throw OrderNotProvisionableException::forStatus(
+                orderId: $order->getKey(),
+                status: $order->status,
             );
         }
 
@@ -265,6 +314,22 @@ final readonly class ProvisionPaidOrderAction
             )
             ->latest('id')
             ->first();
+    }
+
+    private function hasProviderDeliveryEvidence(
+        Server $server,
+    ): bool {
+        $provider = trim(
+            (string) $server->cloud_provider,
+        );
+
+        $providerServerId = trim(
+            (string) $server->cloud_server_id,
+        );
+
+        return $provider !== ''
+            && $providerServerId !== ''
+            && $server->hasConnectionHost();
     }
 
     private function markFulfilled(
