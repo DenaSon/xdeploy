@@ -166,7 +166,7 @@ Route::match(
 
             imageId: $data['image_id'],
 
-            selectedDiskGiB: $data['disk_gib'],
+            selectedDiskGiB: (int) $data['disk_gib'],
 
             period: $data['period'],
         );

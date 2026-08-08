@@ -16,6 +16,7 @@ final class Order extends Model
 
     protected $fillable = [
         'user_id',
+        'server_id',
 
         'region_id',
         'size_id',
@@ -48,6 +49,8 @@ final class Order extends Model
     protected function casts(): array
     {
         return [
+            'server_id' => 'integer',
+
             'default_disk_gib' => 'integer',
             'selected_disk_gib' => 'integer',
 
@@ -71,6 +74,16 @@ final class Order extends Model
     {
         return $this->belongsTo(
             User::class,
+        );
+    }
+
+    /**
+     * @return BelongsTo<Server, $this>
+     */
+    public function server(): BelongsTo
+    {
+        return $this->belongsTo(
+            Server::class,
         );
     }
 

@@ -19,6 +19,22 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             /*
+             * A fulfilled Order may point to its provisioned xDeploy Server.
+             *
+             * The relation is nullable because the Server does not exist while
+             * the Order is awaiting payment/provisioning. nullOnDelete keeps the
+             * existing Server deletion workflow intact while the Order purchase
+             * snapshot remains available for billing/audit history.
+             *
+             * unique() guarantees that one Server cannot fulfill two Orders.
+             */
+            $table->foreignId('server_id')
+                ->nullable()
+                ->unique()
+                ->constrained('servers')
+                ->nullOnDelete();
+
+            /*
              * Snapshot of the selected cloud infrastructure.
              */
             $table->string('region_id', 100);

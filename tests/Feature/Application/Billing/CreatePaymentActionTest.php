@@ -12,6 +12,7 @@ use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Domain\Billing\Exceptions\OrderNotPayableException;
 use App\Domain\Billing\Exceptions\OrderQuoteExpiredException;
+use App\Domain\Billing\Exceptions\PaymentInitiationInProgressException;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\User;
@@ -32,9 +33,11 @@ final class CreatePaymentActionTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_creates_pending_payment_from_order_snapshot(): void
+    public function test_it_reserves_initiating_payment_before_calling_gateway_and_finishes_as_pending(): void
     {
-        Carbon::setTestNow('2026-08-08 20:00:00');
+        Carbon::setTestNow(
+            '2026-08-08 20:00:00',
+        );
 
         $user = User::factory()->create();
 
@@ -55,28 +58,58 @@ final class CreatePaymentActionTest extends TestCase
         $gateway
             ->shouldReceive('initiate')
             ->once()
-            ->with(Mockery::on(
-                static function (
-                    PaymentInitiationRequestData $request,
-                ) use ($order): bool {
-                    return $request->orderId === $order->id
-                        && $request->amount === 2_165_760
-                        && $request->currency === 'IRR'
-                        && $request->callbackUrl === 'https://xdeploy.test/payment/callback';
-                },
-            ))
-            ->andReturn(
-                new PaymentInitiationData(
-                    reference: 'REF-123',
-                    redirectUrl: 'https://gateway.test/pay/REF-123',
+            ->with(
+                Mockery::on(
+                    static function (
+                        PaymentInitiationRequestData $request,
+                    ) use ($order): bool {
+                        return $request->orderId
+                                === $order->id
+                            && $request->amount
+                                === 2_165_760
+                            && $request->currency
+                                === 'IRR'
+                            && $request->callbackUrl
+                                === 'https://xdeploy.test/payment/callback';
+                    },
                 ),
+            )
+            ->andReturnUsing(
+                function () use (
+                    $order,
+                ): PaymentInitiationData {
+                    /*
+                     * The reservation must already be visible before the
+                     * external gateway call starts.
+                     */
+                    $reserved =
+                        Payment::query()
+                            ->where(
+                                'order_id',
+                                $order->id,
+                            )
+                            ->sole();
+
+                    $this->assertSame(
+                        PaymentStatus::Initiating,
+                        $reserved->status,
+                    );
+
+                    $this->assertNull(
+                        $reserved->gateway_reference,
+                    );
+
+                    return new PaymentInitiationData(
+                        reference: 'REF-123',
+
+                        redirectUrl: 'https://gateway.test/pay/REF-123',
+                    );
+                },
             );
 
-        $action = new CreatePaymentAction(
-            gateway: $gateway,
-        );
-
-        $result = $action->execute(
+        $result = $this->action(
+            $gateway,
+        )->execute(
             user: $user,
             orderId: $order->id,
             callbackUrl: 'https://xdeploy.test/payment/callback',
@@ -112,17 +145,15 @@ final class CreatePaymentActionTest extends TestCase
             $result->redirectUrl,
         );
 
-        $payment = Payment::query()
-            ->findOrFail($result->paymentId);
+        $payment =
+            Payment::query()
+                ->findOrFail(
+                    $result->paymentId,
+                );
 
         $this->assertSame(
             PaymentStatus::Pending,
             $payment->status,
-        );
-
-        $this->assertSame(
-            2_165_760,
-            $payment->amount,
         );
 
         $this->assertSame(
@@ -143,103 +174,87 @@ final class CreatePaymentActionTest extends TestCase
             $order->fresh()->status,
         );
 
-        $this->assertDatabaseHas('payments', [
-            'id' => $result->paymentId,
-            'order_id' => $order->id,
-            'gateway' => 'fake',
-            'amount' => 2_165_760,
-            'currency' => 'IRR',
-            'status' => 'pending',
-            'gateway_reference' => 'REF-123',
-        ]);
+        $this->assertDatabaseCount(
+            'payments',
+            1,
+        );
     }
 
-    public function test_it_rejects_an_expired_order_quote(): void
+    public function test_it_reuses_existing_pending_payment_instead_of_creating_another_gateway_authority(): void
     {
-        Carbon::setTestNow('2026-08-08 20:00:00');
-
-        $user = User::factory()->create();
+        $user =
+            User::factory()->create();
 
         $order = $this->createOrder(
             user: $user,
-            quoteExpiresAt: Carbon::parse(
-                '2026-08-08 19:59:00',
-            ),
         );
+
+        $existing =
+            $this->createPayment(
+                order: $order,
+
+                status: PaymentStatus::Pending,
+
+                reference: 'REF-EXISTING',
+
+                redirectUrl: 'https://gateway.test/pay/REF-EXISTING',
+            );
 
         $gateway = Mockery::mock(
             PaymentGatewayInterface::class,
         );
 
-        $gateway->shouldNotReceive('name');
-        $gateway->shouldNotReceive('initiate');
+        $gateway
+            ->shouldReceive('name')
+            ->once()
+            ->andReturn('fake');
 
-        $action = new CreatePaymentAction(
-            gateway: $gateway,
+        $gateway
+            ->shouldNotReceive(
+                'initiate',
+            );
+
+        $result = $this->action(
+            $gateway,
+        )->execute(
+            user: $user,
+            orderId: $order->id,
+            callbackUrl: 'https://xdeploy.test/payment/callback',
         );
 
-        $this->expectException(
-            OrderQuoteExpiredException::class,
+        $this->assertSame(
+            $existing->id,
+            $result->paymentId,
         );
 
-        try {
-            $action->execute(
-                user: $user,
-                orderId: $order->id,
-                callbackUrl: 'https://xdeploy.test/payment/callback',
-            );
-        } finally {
-            $this->assertDatabaseCount(
-                'payments',
-                0,
-            );
-        }
+        $this->assertSame(
+            'REF-EXISTING',
+            $result->reference,
+        );
+
+        $this->assertSame(
+            'https://gateway.test/pay/REF-EXISTING',
+            $result->redirectUrl,
+        );
+
+        $this->assertDatabaseCount(
+            'payments',
+            1,
+        );
     }
 
-    public function test_it_rejects_order_that_is_not_pending_payment(): void
+    public function test_it_blocks_second_payment_attempt_while_an_initiation_is_already_in_progress(): void
     {
-        $user = User::factory()->create();
+        $user =
+            User::factory()->create();
 
         $order = $this->createOrder(
             user: $user,
-            status: OrderStatus::Paid,
         );
 
-        $gateway = Mockery::mock(
-            PaymentGatewayInterface::class,
-        );
-
-        $gateway->shouldNotReceive('name');
-        $gateway->shouldNotReceive('initiate');
-
-        $action = new CreatePaymentAction(
-            gateway: $gateway,
-        );
-
-        $this->expectException(
-            OrderNotPayableException::class,
-        );
-
-        try {
-            $action->execute(
-                user: $user,
-                orderId: $order->id,
-                callbackUrl: 'https://xdeploy.test/payment/callback',
-            );
-        } finally {
-            $this->assertDatabaseCount(
-                'payments',
-                0,
-            );
-        }
-    }
-
-    public function test_it_marks_payment_failed_when_gateway_initiation_fails(): void
-    {
-        $user = User::factory()->create();
-
-        $order = $this->createOrder(
-            user: $user,
+        $this->createPayment(
+            order: $order,
+            status: PaymentStatus::Initiating,
         );
 
         $gateway = Mockery::mock(
@@ -252,14 +267,241 @@ final class CreatePaymentActionTest extends TestCase
             ->andReturn('fake');
 
         $gateway
-            ->shouldReceive('initiate')
-            ->once()
-            ->andThrow(
-                new RuntimeException('Gateway unavailable.'),
+            ->shouldNotReceive(
+                'initiate',
             );
 
-        $action = new CreatePaymentAction(
-            gateway: $gateway,
+        $this->expectException(
+            PaymentInitiationInProgressException::class,
+        );
+
+        try {
+            $this->action(
+                $gateway,
+            )->execute(
+                user: $user,
+                orderId: $order->id,
+                callbackUrl: 'https://xdeploy.test/payment/callback',
+            );
+        } finally {
+            $this->assertDatabaseCount(
+                'payments',
+                1,
+            );
+        }
+    }
+
+    public function test_it_persists_expired_order_status_before_throwing_quote_expired_exception(): void
+    {
+        Carbon::setTestNow(
+            '2026-08-08 20:00:00',
+        );
+
+        $user =
+            User::factory()->create();
+
+        $order = $this->createOrder(
+            user: $user,
+
+            quoteExpiresAt: Carbon::parse(
+                '2026-08-08 19:59:00',
+            ),
+        );
+
+        $gateway = Mockery::mock(
+            PaymentGatewayInterface::class,
+        );
+
+        $gateway
+            ->shouldReceive('name')
+            ->once()
+            ->andReturn('fake');
+
+        $gateway
+            ->shouldNotReceive(
+                'initiate',
+            );
+
+        $this->expectException(
+            OrderQuoteExpiredException::class,
+        );
+
+        try {
+            $this->action(
+                $gateway,
+            )->execute(
+                user: $user,
+                orderId: $order->id,
+                callbackUrl: 'https://xdeploy.test/payment/callback',
+            );
+        } finally {
+            $this->assertSame(
+                OrderStatus::Expired,
+                $order->fresh()->status,
+            );
+
+            $this->assertDatabaseCount(
+                'payments',
+                0,
+            );
+        }
+    }
+
+    public function test_expired_quote_does_not_invalidate_payment_already_initiated_while_order_was_payable(): void
+    {
+        Carbon::setTestNow(
+            '2026-08-08 20:00:00',
+        );
+
+        $user =
+            User::factory()->create();
+
+        $order = $this->createOrder(
+            user: $user,
+
+            quoteExpiresAt: Carbon::parse(
+                '2026-08-08 19:59:00',
+            ),
+        );
+
+        $existing =
+            $this->createPayment(
+                order: $order,
+
+                status: PaymentStatus::Pending,
+
+                reference: 'REF-BEFORE-EXPIRY',
+
+                redirectUrl: 'https://gateway.test/pay/REF-BEFORE-EXPIRY',
+            );
+
+        $gateway = Mockery::mock(
+            PaymentGatewayInterface::class,
+        );
+
+        $gateway
+            ->shouldReceive('name')
+            ->once()
+            ->andReturn('fake');
+
+        $gateway
+            ->shouldNotReceive(
+                'initiate',
+            );
+
+        $result = $this->action(
+            $gateway,
+        )->execute(
+            user: $user,
+            orderId: $order->id,
+            callbackUrl: 'https://xdeploy.test/payment/callback',
+        );
+
+        $this->assertSame(
+            $existing->id,
+            $result->paymentId,
+        );
+
+        $this->assertSame(
+            OrderStatus::PendingPayment,
+            $order->fresh()->status,
+        );
+
+        $this->assertDatabaseCount(
+            'payments',
+            1,
+        );
+    }
+
+    public function test_it_rejects_order_that_is_not_pending_payment(): void
+    {
+        $user =
+            User::factory()->create();
+
+        $order = $this->createOrder(
+            user: $user,
+            status: OrderStatus::Paid,
+        );
+
+        $gateway = Mockery::mock(
+            PaymentGatewayInterface::class,
+        );
+
+        $gateway
+            ->shouldNotReceive(
+                'name',
+            );
+
+        $gateway
+            ->shouldNotReceive(
+                'initiate',
+            );
+
+        $this->expectException(
+            OrderNotPayableException::class,
+        );
+
+        try {
+            $this->action(
+                $gateway,
+            )->execute(
+                user: $user,
+                orderId: $order->id,
+                callbackUrl: 'https://xdeploy.test/payment/callback',
+            );
+        } finally {
+            $this->assertDatabaseCount(
+                'payments',
+                0,
+            );
+        }
+    }
+
+    public function test_gateway_failure_marks_reserved_payment_failed_and_allows_a_new_attempt(): void
+    {
+        $user =
+            User::factory()->create();
+
+        $order = $this->createOrder(
+            user: $user,
+        );
+
+        $gateway = Mockery::mock(
+            PaymentGatewayInterface::class,
+        );
+
+        $gateway
+            ->shouldReceive('name')
+            ->twice()
+            ->andReturn('fake');
+
+        $attempt = 0;
+
+        $gateway
+            ->shouldReceive('initiate')
+            ->twice()
+            ->andReturnUsing(
+                static function () use (
+                    &$attempt,
+                ): PaymentInitiationData {
+                    $attempt++;
+
+                    if ($attempt === 1) {
+                        throw new RuntimeException(
+                            'Gateway unavailable.',
+                        );
+                    }
+
+                    return new PaymentInitiationData(
+                        reference: 'REF-RETRY',
+
+                        redirectUrl: 'https://gateway.test/pay/REF-RETRY',
+                    );
+                },
+            );
+
+        $action = $this->action(
+            $gateway,
         );
 
         try {
@@ -279,32 +521,67 @@ final class CreatePaymentActionTest extends TestCase
             );
         }
 
-        $payment = Payment::query()->sole();
+        $failed =
+            Payment::query()
+                ->orderBy('id')
+                ->firstOrFail();
 
         $this->assertSame(
             PaymentStatus::Failed,
-            $payment->status,
+            $failed->status,
         );
 
         $this->assertSame(
             'initiation_failed',
-            $payment->failure_code,
+            $failed->failure_code,
         );
 
-        $this->assertNull(
-            $payment->gateway_reference,
+        $result = $action->execute(
+            user: $user,
+            orderId: $order->id,
+            callbackUrl: 'https://xdeploy.test/payment/callback',
+        );
+
+        $pending =
+            Payment::query()
+                ->findOrFail(
+                    $result->paymentId,
+                );
+
+        $this->assertNotSame(
+            $failed->id,
+            $pending->id,
         );
 
         $this->assertSame(
-            OrderStatus::PendingPayment,
-            $order->fresh()->status,
+            PaymentStatus::Pending,
+            $pending->status,
+        );
+
+        $this->assertSame(
+            'REF-RETRY',
+            $pending->gateway_reference,
+        );
+
+        $this->assertDatabaseCount(
+            'payments',
+            2,
+        );
+    }
+
+    private function action(
+        PaymentGatewayInterface $gateway,
+    ): CreatePaymentAction {
+        return new CreatePaymentAction(
+            gateway: $gateway,
         );
     }
 
     private function createOrder(
         User $user,
         int $finalAmount = 1_781_760,
-        OrderStatus $status = OrderStatus::PendingPayment,
+        OrderStatus $status =
+            OrderStatus::PendingPayment,
         ?Carbon $quoteExpiresAt = null,
     ): Order {
         return Order::query()->create([
@@ -314,8 +591,11 @@ final class CreatePaymentActionTest extends TestCase
             'size_id' => 'eco-2-2-0',
 
             'image_id' => 'ubuntu-24-04-image',
+
             'image_name' => 'Ubuntu 24.04 LTS',
+
             'image_distribution' => 'ubuntu',
+
             'image_version' => '24.04',
 
             'default_disk_gib' => 30,
@@ -325,7 +605,9 @@ final class CreatePaymentActionTest extends TestCase
             'duration_hours' => 48,
 
             'provider_cost' => 1_113_600,
+
             'markup_percent' => 60,
+
             'final_amount' => $finalAmount,
 
             'currency' => 'IRR',
@@ -335,6 +617,35 @@ final class CreatePaymentActionTest extends TestCase
                 ?? now()->addMinutes(15),
 
             'paid_at' => null,
+        ]);
+    }
+
+    private function createPayment(
+        Order $order,
+        PaymentStatus $status,
+        ?string $reference = null,
+        ?string $redirectUrl = null,
+    ): Payment {
+        return Payment::query()->create([
+            'order_id' => $order->id,
+
+            'gateway' => 'fake',
+
+            'amount' => $order->final_amount,
+
+            'currency' => $order->currency,
+
+            'status' => $status,
+
+            'gateway_reference' => $reference,
+
+            'gateway_transaction_id' => null,
+
+            'redirect_url' => $redirectUrl,
+
+            'failure_code' => null,
+
+            'verified_at' => null,
         ]);
     }
 }
