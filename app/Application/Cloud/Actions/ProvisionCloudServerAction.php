@@ -248,7 +248,7 @@ final readonly class ProvisionCloudServerAction
                     'provisioned_at' => $createdServer->createdAt ?? now(),
                 ],
 
-                explicitStatus: ServerStatus::Inactive,
+                status: ServerStatus::Inactive,
             );
         } catch (Throwable $exception) {
             /*

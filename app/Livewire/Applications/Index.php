@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Throwable;
@@ -21,6 +22,9 @@ use Throwable;
 final class Index extends Component
 {
     use HandlesSshAvailability;
+
+    #[Locked]
+    public int $serverId;
 
     /**
      * @var array<int, array{
@@ -35,21 +39,18 @@ final class Index extends Component
      */
     public array $applications = [];
 
-    public bool $serverMissing = false;
-
     public ?string $errorMessage = null;
 
     public function mount(
+        Server $server,
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
     ): void {
-        $server = $this->activeServer();
+        $server = $this->resolveOwnedServer(
+            $server,
+        );
 
-        if ($server === null) {
-            $this->handleMissingServer();
-
-            return;
-        }
+        $this->serverId = (int) $server->getKey();
 
         $this->loadApplications(
             applicationManager: $applicationManager,
@@ -62,15 +63,8 @@ final class Index extends Component
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
     ): void {
-        $server = $this->activeServer();
+        $server = $this->server();
 
-        if ($server === null) {
-            $this->handleMissingServer();
-
-            return;
-        }
-
-        $this->serverMissing = false;
         $this->errorMessage = null;
 
         $this->loadApplications(
@@ -85,24 +79,13 @@ final class Index extends Component
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
     ): void {
-        $server = $this->activeServer();
+        $server = $this->server();
 
-        if ($server === null) {
-            $this->handleMissingServer();
-
-            return;
-        }
-
-        /*
-         * فقط Circuit ریست می‌شود.
-         * Alert تا زمان موفقیت واقعی اتصال باقی می‌ماند.
-         */
         $this->resetSshCircuit(
             circuitBreaker: $circuitBreaker,
             server: $server,
         );
 
-        $this->serverMissing = false;
         $this->errorMessage = null;
 
         $loaded = $this->loadApplications(
@@ -142,7 +125,9 @@ final class Index extends Component
 
     public function render(): View
     {
-        return view('livewire.applications.index');
+        return view(
+            'livewire.applications.index',
+        );
     }
 
     private function loadApplications(
@@ -171,10 +156,6 @@ final class Index extends Component
                 $overview,
             );
 
-            /*
-             * بعضی Inspectorها خطای زیرساخت را به وضعیت Unknown
-             * تبدیل می‌کنند؛ در این حالت Circuit سیگنال قطعی را می‌دهد.
-             */
             if (
                 $this->allApplicationsUnknown($applications)
                 && $this->hasSshFailureSignal(
@@ -197,7 +178,6 @@ final class Index extends Component
             }
 
             $this->applications = $applications;
-            $this->serverMissing = false;
             $this->errorMessage = null;
 
             if ($clearSshStateOnSuccess) {
@@ -257,22 +237,25 @@ final class Index extends Component
         $this->errorMessage = null;
     }
 
-    private function handleMissingServer(): void
-    {
-        $this->serverMissing = true;
-        $this->applications = [];
-        $this->errorMessage = null;
-
-        $this->clearSshUnavailable();
+    private function resolveOwnedServer(
+        Server $server,
+    ): Server {
+        return $this->authenticatedUser()
+            ->servers()
+            ->whereKey(
+                $server->getKey(),
+            )
+            ->firstOrFail();
     }
 
-    private function activeServer(): ?Server
+    private function server(): Server
     {
-        return Server::query()
-            ->activeFor(
-                $this->authenticatedUser(),
+        return $this->authenticatedUser()
+            ->servers()
+            ->whereKey(
+                $this->serverId,
             )
-            ->first();
+            ->firstOrFail();
     }
 
     private function authenticatedUser(): User

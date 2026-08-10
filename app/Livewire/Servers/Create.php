@@ -6,8 +6,10 @@ namespace App\Livewire\Servers;
 
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Server\Enums\AuthenticationType;
+use App\Domain\Server\Enums\ServerStatus;
 use App\Livewire\Concerns\HasServerForm;
 use App\Livewire\Concerns\TestsServerConnection;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -42,6 +44,15 @@ final class Create extends Component
     ): mixed {
         $data = $this->validate();
 
+        if (! $this->connectionIsVerified()) {
+            $this->error(
+                'بررسی اتصال لازم است',
+                'قبل از افزودن سرور، اتصال را با اطلاعات فعلی بررسی کنید.',
+            );
+
+            return null;
+        }
+
         if ($this->serverAlreadyExists()) {
             $this->addError(
                 'host',
@@ -51,20 +62,29 @@ final class Create extends Component
             return null;
         }
 
+        $user = $this->authenticatedUser();
+
         $data['authentication_type'] =
             AuthenticationType::Password->value;
 
-        $action->handle(
-            Auth::user(),
-            $data,
+        $server = $action->handle(
+            user: $user,
+            attributes: $data,
+            status: ServerStatus::Active,
         );
 
+        $this->credential = '';
+
         $this->success(
-            'سرور با موفقیت ایجاد شد.',
+            'سرور اضافه شد',
+            'سرور با موفقیت به xDeploy متصل شد.',
         );
 
         return $this->redirectRoute(
-            'panel.servers.index',
+            'panel.servers.dashboard',
+            [
+                'server' => $server,
+            ],
             navigate: true,
         );
     }
@@ -74,5 +94,17 @@ final class Create extends Component
         return view(
             'livewire.servers.create',
         );
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }

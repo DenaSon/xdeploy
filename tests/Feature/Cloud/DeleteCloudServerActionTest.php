@@ -197,7 +197,7 @@ final class DeleteCloudServerActionTest extends TestCase
         );
     }
 
-    public function test_deleting_active_cloud_server_promotes_latest_remaining_server(): void
+    public function test_deleting_active_cloud_server_does_not_change_remaining_server_statuses(): void
     {
         $user = $this->createUser(
             phone: '09170000006',
@@ -248,12 +248,12 @@ final class DeleteCloudServerActionTest extends TestCase
         );
 
         $this->assertSame(
-            ServerStatus::Active,
+            ServerStatus::Inactive,
             $latestInactiveServer->refresh()->status,
         );
 
         $this->assertSame(
-            1,
+            0,
             $user->servers()->active()->count(),
         );
     }

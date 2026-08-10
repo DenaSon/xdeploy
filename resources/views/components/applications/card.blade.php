@@ -1,7 +1,7 @@
 @props([
     'application',
+    'serverId',
 ])
-
 @php
     $state = $application['state'] ?? 'unknown';
 
@@ -28,8 +28,10 @@
 @endphp
 
 <a
-    href="{{ route('panel.applications.show', ['application' => $application['type']]) }}"
-    class="group block"
+    href="{{ route('panel.servers.applications.show', [
+    'server' => $serverId,
+    'application' => $application['type'],
+]) }}"
 >
     <x-card
         class="border border-base-300 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"

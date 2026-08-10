@@ -335,7 +335,7 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
                 'provisioned_at' => now(),
             ],
 
-            explicitStatus: ServerStatus::Inactive,
+            status: ServerStatus::Inactive,
         );
     }
 }

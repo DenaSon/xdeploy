@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
-use App\Application\Server\Actions\ActivateServerAction;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -21,7 +20,6 @@ final class Dashboard extends Component
 
     public function mount(
         Server $server,
-        ActivateServerAction $activateServer,
     ): void {
         $user = Auth::user();
 
@@ -30,20 +28,12 @@ final class Dashboard extends Component
             401,
         );
 
-        /*
-         * Keep the parent page intentionally lightweight.
-         *
-         * No SSH connection, readiness inspection, server overview query,
-         * service discovery, Docker inspection, or resource collection is
-         * allowed in the initial Dashboard request.
-         *
-         * Independent child widgets own those reads after the shell has
-         * already rendered.
-         */
-        $this->server = $activateServer->handle(
-            $user,
-            $server,
-        );
+        $this->server = $user
+            ->servers()
+            ->whereKey(
+                $server->getKey(),
+            )
+            ->firstOrFail();
     }
 
     public function render(): View

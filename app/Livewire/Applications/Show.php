@@ -32,7 +32,7 @@ final class Show extends Component
     public string $managementPanel = '';
 
     #[Locked]
-    public ?int $serverId = null;
+    public int $serverId;
 
     public int $managementPanelRevision = 0;
 
@@ -55,8 +55,6 @@ final class Show extends Component
         'is_unknown' => true,
     ];
 
-    public bool $serverMissing = false;
-
     public bool $processing = false;
 
     public ?string $successMessage = null;
@@ -64,11 +62,16 @@ final class Show extends Component
     public ?string $errorMessage = null;
 
     public function mount(
+        Server $server,
         string $application,
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
         ApplicationManagementPanelResolver $managementPanelResolver,
     ): void {
+        $server = $this->resolveOwnedServer(
+            $server,
+        );
+
         $type = ApplicationType::tryFrom(
             $application,
         );
@@ -79,7 +82,10 @@ final class Show extends Component
             'Application not found.',
         );
 
+        $this->serverId = (int) $server->getKey();
+
         $this->application = $type->value;
+
         $this->name = ucfirst(
             $type->value,
         );
@@ -92,6 +98,7 @@ final class Show extends Component
         $this->loadApplication(
             applicationManager: $applicationManager,
             circuitBreaker: $circuitBreaker,
+            server: $server,
         );
     }
 
@@ -104,6 +111,7 @@ final class Show extends Component
         $this->loadApplication(
             applicationManager: $applicationManager,
             circuitBreaker: $circuitBreaker,
+            server: $this->server(),
             notifyOnSshFailure: true,
         );
     }
@@ -112,13 +120,7 @@ final class Show extends Component
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
     ): void {
-        $server = $this->activeServer();
-
-        if ($server === null) {
-            $this->handleMissingServer();
-
-            return;
-        }
+        $server = $this->server();
 
         /*
          * The persistent SSH alert remains visible until the following
@@ -129,7 +131,6 @@ final class Show extends Component
             server: $server,
         );
 
-        $this->serverMissing = false;
         $this->resetMessages();
 
         $loaded = $this->loadApplication(
@@ -346,23 +347,18 @@ final class Show extends Component
             return;
         }
 
+        /*
+         * Resolve ownership before entering the operation try/catch.
+         * A missing or foreign server must remain a 404 rather than
+         * being converted into an application operation error.
+         */
+        $server = $this->server();
+        $user = $this->authenticatedUser();
+
         $this->processing = true;
         $this->resetMessages();
 
-        $server = null;
-        $user = $this->authenticatedUser();
-
         try {
-            $server = $this->activeServer();
-
-            if ($server === null) {
-                $this->handleMissingServer();
-
-                return;
-            }
-
-            $this->serverMissing = false;
-
             $operation(
                 $applicationManager,
                 $user,
@@ -424,23 +420,11 @@ final class Show extends Component
     private function loadApplication(
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
-        ?Server $server = null,
+        Server $server,
         bool $notifyOnSshFailure = false,
         bool $clearSshStateOnSuccess = true,
     ): bool {
-        $server ??= $this->activeServer();
-
-        if ($server === null) {
-            $this->handleMissingServer();
-
-            return false;
-        }
-
-        $this->serverId = (int) $server->getKey();
-
         try {
-            $this->serverMissing = false;
-
             $info = $applicationManager->inspect(
                 user: $this->authenticatedUser(),
                 server: $server,
@@ -523,22 +507,6 @@ final class Show extends Component
         $this->errorMessage = null;
     }
 
-    private function handleMissingServer(): void
-    {
-        $this->serverId = null;
-        $this->serverMissing = true;
-
-        $this->info =
-            $this->unknownApplicationInfo();
-
-        $this->successMessage = null;
-
-        $this->errorMessage =
-            'هیچ سرور فعالی وجود ندارد.';
-
-        $this->clearSshUnavailable();
-    }
-
     private function setApplicationInfo(
         ApplicationInfo $info,
     ): void {
@@ -559,13 +527,25 @@ final class Show extends Component
         );
     }
 
-    private function activeServer(): ?Server
-    {
-        return Server::query()
-            ->activeFor(
-                $this->authenticatedUser(),
+    private function resolveOwnedServer(
+        Server $server,
+    ): Server {
+        return $this->authenticatedUser()
+            ->servers()
+            ->whereKey(
+                $server->getKey(),
             )
-            ->first();
+            ->firstOrFail();
+    }
+
+    private function server(): Server
+    {
+        return $this->authenticatedUser()
+            ->servers()
+            ->whereKey(
+                $this->serverId,
+            )
+            ->firstOrFail();
     }
 
     private function authenticatedUser(): User
@@ -588,15 +568,7 @@ final class Show extends Component
 
     /**
      * @return array{
-     * );
-
-    return $user;
-    }
-
-    private function resetMessages(): void
-    {
-    $this->successMessage = null;
-    $this->error     state: string,
+     *     state: string,
      *     version: null,
      *     is_installed: false,
      *     is_running: false,

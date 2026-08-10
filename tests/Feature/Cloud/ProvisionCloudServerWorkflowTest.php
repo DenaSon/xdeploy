@@ -416,33 +416,29 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
         SSHConnectionInterface $ssh,
     ): ProvisionCloudServerAction {
         /*
-         * Resolve the real SSH-readiness action graph through Laravel.
-         * This keeps this workflow test aligned with the current production
-         * constructor without duplicating every collaborator manually.
+         * Resolve production dependencies through Laravel's container
+         * so this workflow test stays aligned with their constructors.
          */
         $this->app->instance(
             SSHConnectionInterface::class,
             $ssh,
         );
 
-        $verifySshReadiness =
-            $this->app->make(
-                VerifyCloudServerSshReadinessAction::class,
-            );
+        $createServer = $this->app->make(
+            CreateServerAction::class,
+        );
+
+        $verifySshReadiness = $this->app->make(
+            VerifyCloudServerSshReadinessAction::class,
+        );
 
         return new ProvisionCloudServerAction(
             catalog: $catalog,
-
             provisioner: $provisioner,
-
-            createServer: new CreateServerAction,
-
+            createServer: $createServer,
             verifySshReadiness: $verifySshReadiness,
-
             providerName: 'arvan',
-
             maxAttempts: $maxAttempts,
-
             pollDelaySeconds: 0,
         );
     }

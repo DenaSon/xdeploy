@@ -13,11 +13,10 @@ final readonly class CreateServerAction
 {
     public function __construct(
         private ServerNameGenerator $nameGenerator,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     public function handle(
         User $user,

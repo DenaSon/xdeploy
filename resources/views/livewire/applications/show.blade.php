@@ -29,11 +29,12 @@
         class="flex flex-col gap-4
                sm:flex-row sm:items-center sm:justify-between"
     >
-
         <div class="flex items-center gap-3">
 
             <a
-                href="{{ route('panel.applications.index') }}"
+                href="{{ route('panel.servers.applications.index', [
+                    'server' => $serverId,
+                ]) }}"
                 wire:navigate
                 class="flex size-9 items-center justify-center rounded-xl
                        border border-base-300 bg-base-100
@@ -58,10 +59,7 @@
 
         </div>
 
-        @if (
-            ! $serverMissing
-            && ! $sshUnavailable
-        )
+        @if (! $sshUnavailable)
 
             <x-button
                 label="بروزرسانی وضعیت"
@@ -74,7 +72,6 @@
             />
 
         @endif
-
     </div>
 
     {{-- Persistent SSH state --}}
@@ -126,52 +123,13 @@
 
     @endif
 
-    @if ($serverMissing)
+    @if ($sshUnavailable)
 
-        <x-card
-            class="mt-6 border border-warning/20 bg-warning/5
-                   py-12 text-center"
-        >
-
-            <div
-                class="mx-auto flex size-14 items-center justify-center
-                       rounded-2xl bg-warning/10"
-            >
-                <x-icon
-                    name="o-server"
-                    class="size-7 text-warning"
-                />
-            </div>
-
-            <h2 class="mt-4 text-lg font-semibold text-base-content">
-                سرور فعالی وجود ندارد
-            </h2>
-
-            <p
-                class="mx-auto mt-2 max-w-md text-sm leading-7
-                       text-base-content/60"
-            >
-                برای مدیریت برنامه‌ها، ابتدا باید یک سرور فعال در xDeploy
-                تعریف کنید.
-            </p>
-
-            <a
-                href="{{ route('panel.servers.index') }}"
-                wire:navigate
-                class="btn btn-primary mt-6"
-            >
-                مشاهده سرورها
-            </a>
-
-        </x-card>
-
-    @elseif ($sshUnavailable)
-
+        {{-- Application unavailable while SSH is down --}}
         <x-card
             class="mt-6 border border-base-300 bg-base-100/70
                    py-12 text-center shadow-sm"
         >
-
             <div
                 class="mx-auto flex size-14 items-center justify-center
                        rounded-2xl bg-base-200"
@@ -193,7 +151,6 @@
                 برای جلوگیری از اجرای عملیات با وضعیت نامشخص، کنترل‌های
                 برنامه تا برقراری دوباره ارتباط SSH غیرفعال شده‌اند.
             </p>
-
         </x-card>
 
     @else
@@ -205,12 +162,10 @@
                 class="border border-base-300 bg-base-100
                        shadow-sm xl:col-span-2"
             >
-
                 <div
                     class="flex flex-col gap-6
                            sm:flex-row sm:items-start"
                 >
-
                     <div
                         class="flex size-16 shrink-0 items-center
                                justify-center rounded-2xl bg-primary/10"
@@ -254,19 +209,16 @@
                         </p>
 
                     </div>
-
                 </div>
 
                 <div
                     class="mt-8 grid grid-cols-1 gap-4
                            sm:grid-cols-2"
                 >
-
                     <div
                         class="rounded-2xl border border-base-300
                                bg-base-200/30 p-4"
                     >
-
                         <p class="text-xs text-base-content/50">
                             شناسه برنامه
                         </p>
@@ -278,14 +230,12 @@
                         >
                             {{ $application }}
                         </p>
-
                     </div>
 
                     <div
                         class="rounded-2xl border border-base-300
                                bg-base-200/30 p-4"
                     >
-
                         <p class="text-xs text-base-content/50">
                             نسخه
                         </p>
@@ -297,18 +247,14 @@
                         >
                             {{ $info['version'] ?? 'نامشخص' }}
                         </p>
-
                     </div>
-
                 </div>
-
             </x-card>
 
             {{-- Current status --}}
             <x-card
                 class="border border-base-300 bg-base-100 shadow-sm"
             >
-
                 <h3 class="font-semibold text-base-content">
                     وضعیت فعلی
                 </h3>
@@ -420,7 +366,6 @@
                     </div>
 
                 </div>
-
             </x-card>
 
         </div>
@@ -429,12 +374,10 @@
         <x-card
             class="mt-6 border border-base-300 bg-base-100 shadow-sm"
         >
-
             <div
                 class="flex flex-col gap-2
                        sm:flex-row sm:items-center sm:justify-between"
             >
-
                 <div>
                     <h3 class="font-semibold text-base-content">
                         عملیات برنامه
@@ -457,7 +400,6 @@
 
                     در حال انجام عملیات...
                 </div>
-
             </div>
 
             <div class="mt-6 flex flex-wrap gap-3">
@@ -545,14 +487,10 @@
                 @endif
 
             </div>
-
         </x-card>
 
         {{-- Application-specific management panel --}}
-        @if (
-            $info['is_running']
-            && $serverId !== null
-        )
+        @if ($info['is_running'])
 
             <div class="mt-6">
                 <livewire:is

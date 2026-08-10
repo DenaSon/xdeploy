@@ -48,7 +48,7 @@ final class CloudServerPersistenceTest extends TestCase
                 'provisioned_at' => now(),
             ],
 
-            explicitStatus: ServerStatus::Inactive,
+            status: ServerStatus::Inactive,
         );
 
         $this->assertSame(
@@ -114,7 +114,7 @@ final class CloudServerPersistenceTest extends TestCase
                 'provisioned_at' => now(),
             ],
 
-            explicitStatus: ServerStatus::Inactive,
+            status: ServerStatus::Inactive,
         );
 
         $rawCredential = DB::table(
@@ -169,7 +169,7 @@ final class CloudServerPersistenceTest extends TestCase
         )->handle(
             user: $user,
             attributes: $attributes,
-            explicitStatus: ServerStatus::Inactive,
+            status: ServerStatus::Inactive,
         );
 
         $this->expectException(
@@ -181,44 +181,7 @@ final class CloudServerPersistenceTest extends TestCase
         )->handle(
             user: $user,
             attributes: $attributes,
-            explicitStatus: ServerStatus::Inactive,
-        );
-    }
-
-    public function test_existing_manual_server_activation_behavior_is_preserved(): void
-    {
-        $user = $this->createUser();
-
-        $first = app(
-            CreateServerAction::class,
-        )->handle(
-            user: $user,
-
-            attributes: $this->manualServerAttributes(
-                'first-server',
-                '192.0.2.10',
-            ),
-        );
-
-        $second = app(
-            CreateServerAction::class,
-        )->handle(
-            user: $user,
-
-            attributes: $this->manualServerAttributes(
-                'second-server',
-                '192.0.2.11',
-            ),
-        );
-
-        $this->assertSame(
-            ServerStatus::Active,
-            $first->status,
-        );
-
-        $this->assertSame(
-            ServerStatus::Inactive,
-            $second->status,
+            status: ServerStatus::Inactive,
         );
     }
 
@@ -229,24 +192,5 @@ final class CloudServerPersistenceTest extends TestCase
 
             'phone' => '+4915112345678',
         ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function manualServerAttributes(
-        string $name,
-        string $host,
-    ): array {
-        return [
-            'name' => $name,
-            'host' => $host,
-            'port' => 22,
-            'username' => 'root',
-
-            'authentication_type' => AuthenticationType::Password,
-
-            'credential' => 'manual-server-password',
-        ];
     }
 }
