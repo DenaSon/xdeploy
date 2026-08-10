@@ -50,7 +50,6 @@ final class Edit extends Component
          */
         $this->fillServerForm(
             $this->server->only([
-                'name',
                 'host',
                 'port',
                 'username',

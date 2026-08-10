@@ -23,7 +23,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             // Server Information
-            $table->string('name');
+            $table->string('name')->nullable();
             $table->string('host');
 
             $table->unsignedSmallInteger('port')

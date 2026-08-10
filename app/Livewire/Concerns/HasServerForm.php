@@ -8,8 +8,6 @@ use App\Models\Server;
 
 trait HasServerForm
 {
-    public string $name = '';
-
     public string $host = '';
 
     public int $port = 22;
@@ -25,12 +23,6 @@ trait HasServerForm
         bool $requireCredential = true,
     ): array {
         return [
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
             'host' => [
                 'required',
                 'string',
@@ -84,10 +76,9 @@ trait HasServerForm
     }
 
     /**
-     * Fill only non-sensitive server fields.
+     * Fill only non-sensitive server connection fields.
      *
      * @param array{
-     *     name: string,
      *     host: string,
      *     port: int,
      *     username: string
@@ -97,7 +88,6 @@ trait HasServerForm
         array $data,
     ): void {
         $this->fill([
-            'name' => $data['name'],
             'host' => $data['host'],
             'port' => $data['port'],
             'username' => $data['username'],

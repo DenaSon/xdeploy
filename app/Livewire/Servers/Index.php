@@ -11,9 +11,11 @@ use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
+#[Title('سرورها')]
 final class Index extends Component
 {
     use Toast;
@@ -51,6 +53,6 @@ final class Index extends Component
 
     public function render(): View
     {
-        return view('livewire.servers.index');
+        return view('livewire.servers.index')->layout('layouts.panel');
     }
 }

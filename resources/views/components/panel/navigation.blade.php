@@ -2,49 +2,40 @@
     use App\Application\Navigation\PanelNavigation;
 @endphp
 
-<nav class="flex-1 py-4">
+<nav class="flex-1 px-2 py-4">
 
-    <x-menu class="space-y-1">
+    <x-menu>
 
-        @foreach (PanelNavigation::items() as $item)
+        <x-menu-item
+            title="سرورها"
+            icon="lucide.server"
+            :link="route('panel.servers.index')"
+            :active="request()->routeIs('panel.servers.*')"
+            wire:navigate
 
-            @php
-                $isActive = request()->routeIs($item['name']);
-            @endphp
+            class="
+                rounded-xl
 
-            <x-menu-item
-                :title="$item['title']"
-                :icon="$item['icon']"
-                :link="$item['route']"
-                :active="$isActive"
-                :icon-classes="$isActive
-                    ? '!size-4 text-primary stroke-[1.8]'
-                    : '!size-4 text-primary/65 stroke-[1.6]'"
-                wire:navigate
-                @class([
-                    '
-                        rounded-xl
-                        border border-transparent
+                text-sm
+                text-base-content/65
 
-                        text-sm
-                        text-base-content/60
+                transition-colors duration-200
 
-                        transition-all duration-200
+                hover:bg-base-200
+                hover:text-base-content
+            "
 
-                        hover:bg-primary/5
-                        hover:text-base-content
-                    ',
+            active-bg-color="
+                !bg-primary/10
+                !text-primary
+                !font-medium
+            "
 
-                    '
-                        !border-primary/10
-                        !bg-primary/10
-                        !font-medium
-                        !text-primary
-                    ' => $isActive,
-                ])
-            />
-
-        @endforeach
+            icon-classes="
+                !size-[18px]
+                stroke-[1.7]
+            "
+        />
 
     </x-menu>
 

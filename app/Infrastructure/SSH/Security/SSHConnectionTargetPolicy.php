@@ -6,9 +6,34 @@ namespace App\Infrastructure\SSH\Security;
 
 use App\Infrastructure\SSH\Contracts\SSHHostResolverInterface;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionTargetNotAllowedException;
+use Symfony\Component\HttpFoundation\IpUtils;
 
 final readonly class SSHConnectionTargetPolicy
 {
+    /**
+     * Private ranges allowed only for local development/testing.
+     *
+     * Link-local, multicast, documentation and other reserved
+     * ranges are intentionally not included.
+     *
+     * @var list<string>
+     */
+    private const array DEVELOPMENT_NETWORKS = [
+        // IPv4 loopback
+        '127.0.0.0/8',
+
+        // RFC1918
+        '10.0.0.0/8',
+        '172.16.0.0/12',
+        '192.168.0.0/16',
+
+        // IPv6 loopback
+        '::1/128',
+
+        // IPv6 unique-local
+        'fc00::/7',
+    ];
+
     public function __construct(
         private SSHHostResolverInterface $resolver,
     ) {}
@@ -29,7 +54,7 @@ final readonly class SSHConnectionTargetPolicy
                 FILTER_VALIDATE_IP,
             ) !== false
         ) {
-            $this->ensureGloballyRoutable(
+            $this->ensureAllowedAddress(
                 $host,
             );
 
@@ -37,11 +62,7 @@ final readonly class SSHConnectionTargetPolicy
         }
 
         /*
-         * Public SSH targets must use either a public IP
-         * address or a fully-qualified hostname.
-         *
-         * Reject single-label names such as:
-         * localhost, database, redis, metadata, etc.
+         * Public SSH targets must use a fully-qualified hostname.
          */
         if (
             ! str_contains(
@@ -70,23 +91,16 @@ final readonly class SSHConnectionTargetPolicy
         }
 
         /*
-         * Every resolved address must be safe.
-         *
-         * If even one DNS result points to a private,
-         * loopback or otherwise non-public address,
-         * reject the hostname completely.
+         * Every resolved address must be allowed.
          */
         foreach ($addresses as $address) {
-            $this->ensureGloballyRoutable(
+            $this->ensureAllowedAddress(
                 $address,
             );
         }
 
         /*
-         * Return the validated IP instead of the hostname.
-         *
-         * SSHConnection connects directly to this address,
-         * avoiding another DNS lookup and reducing
+         * Connect directly to the validated address to reduce
          * DNS-rebinding / TOCTOU risk.
          */
         return $addresses[0];
@@ -115,9 +129,12 @@ final readonly class SSHConnectionTargetPolicy
         return $host;
     }
 
-    private function ensureGloballyRoutable(
+    private function ensureAllowedAddress(
         string $address,
     ): void {
+        /*
+         * Production-safe path.
+         */
         if (
             filter_var(
                 $address,
@@ -128,8 +145,32 @@ final readonly class SSHConnectionTargetPolicy
             return;
         }
 
+        /*
+         * Explicit development-only exception.
+         */
+        if (
+            $this->privateTargetsAreAllowed()
+            && IpUtils::checkIp(
+                $address,
+                self::DEVELOPMENT_NETWORKS,
+            )
+        ) {
+            return;
+        }
+
         throw new SSHConnectionTargetNotAllowedException(
-            'SSH connections to non-public network addresses are not allowed.',
+            'SSH connections to this network address are not allowed.',
+        );
+    }
+
+    private function privateTargetsAreAllowed(): bool
+    {
+        return app()->environment([
+            'local',
+            'testing',
+        ]) && (bool) config(
+            'xdeploy.ssh.allow_private_targets',
+            false,
         );
     }
 }

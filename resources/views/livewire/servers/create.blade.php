@@ -1,96 +1,183 @@
-<div
-    dir="rtl"
-    class="relative flex min-h-screen items-center justify-center overflow-hidden bg-base-200/50 px-4 py-10 sm:px-6"
->
-    {{-- Background decoration --}}
-    <div
-        class="pointer-events-none absolute -right-40 -top-40 size-[28rem] rounded-full bg-primary/8 blur-3xl"
-    ></div>
+<div>
+    {{-- Header --}}
+    <header class="mb-6">
 
-    <div
-        class="pointer-events-none absolute -bottom-40 -left-40 size-[28rem] rounded-full bg-secondary/8 blur-3xl"
-    ></div>
+        <div class="flex items-start gap-3">
 
-    <div class="relative z-10 w-full max-w-2xl">
+            <div
+                class="
+                flex size-10 shrink-0
+                items-center justify-center
 
-        <div
-            class="overflow-hidden rounded-3xl border border-base-300/70 bg-base-100/90 shadow-2xl shadow-base-300/30 backdrop-blur-xl"
-        >
-            {{-- Top accent --}}
-            <div class="h-1 bg-gradient-to-l from-primary via-secondary to-primary"></div>
-
-            <div class="p-6 sm:p-8 lg:p-10">
-
-                {{-- Header --}}
-                <div class="flex items-start gap-4">
-
-                    <div
-                        class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/10"
-                    >
-                        <x-icon
-                            name="o-server-stack"
-                            class="size-6"
-                        />
-                    </div>
-
-                    <div>
-                        <h1 class="text-2xl font-bold tracking-tight text-base-content sm:text-3xl">
-                            افزودن سرور
-                        </h1>
-
-                        <p class="mt-2 text-sm leading-6 text-base-content/55">
-                            سرور VPS خود را به xDeploy متصل کنید.
-                        </p>
-                    </div>
-
-                </div>
-
-                {{-- Information --}}
-                <div
-                    role="alert"
-                    class="alert alert-info alert-soft mt-7 items-start rounded-2xl border border-info/15"
-                >
-                    <x-icon
-                        name="o-information-circle"
-                        class="mt-0.5 size-5 shrink-0"
-                    />
-
-                    <div class="text-sm">
-                        <p class="font-semibold">
-                            اطلاعات اتصال SSH
-                        </p>
-
-                        <p class="mt-1 leading-7 opacity-75">
-                            اطلاعات دسترسی به سرور را وارد کنید. پیش از ثبت نهایی،
-                            می‌توانید اتصال SSH را بررسی کنید.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="divider my-7 opacity-60"></div>
-
-                {{-- Form --}}
-                <x-servers.form
-                    submit="save"
-                    button="افزودن سرور"
+                rounded-xl
+                bg-primary/10
+                text-primary
+            "
+            >
+                <x-icon
+                    name="lucide.server-plus"
+                    class="!size-5 stroke-[1.8]"
                 />
+            </div>
+
+            <div class="min-w-0">
+
+                <h1
+                    class="
+                    text-2xl font-semibold
+                    tracking-tight
+                    text-base-content
+                "
+                >
+                    اتصال VPS
+                </h1>
+
+                <p
+                    class="
+                    mt-1.5
+                    text-sm leading-7
+                    text-base-content/50
+                "
+                >
+                    اطلاعات SSH سرور را وارد کن و پس از تأیید اتصال،
+                    آن را به xDeploy اضافه کن.
+                </p>
 
             </div>
+
         </div>
 
-        {{-- Security note --}}
-        <div class="mt-5 flex items-center justify-center gap-2 text-xs text-base-content/35">
+    </header>
 
+
+    {{-- Form surface --}}
+    <section
+        class="
+        rounded-2xl
+        border border-base-300
+        bg-base-100
+
+        p-5
+        sm:p-6
+    "
+    >
+
+        {{-- Connection requirement --}}
+        <div
+            class="
+            mb-6
+
+            flex items-start gap-3
+
+            rounded-xl
+            bg-base-200/60
+
+            p-4
+        "
+        >
+        <span
+            class="
+                flex size-8 shrink-0
+                items-center justify-center
+
+                rounded-lg
+                bg-base-100
+                text-base-content/45
+            "
+        >
             <x-icon
-                name="o-lock-closed"
-                class="size-4"
+                name="lucide.shield-check"
+                class="!size-4 stroke-[1.7]"
             />
+        </span>
 
-            <span>
-                اطلاعات اتصال شما به‌صورت امن نگهداری می‌شود.
-            </span>
+            <div class="min-w-0">
+
+                <div
+                    class="
+                    text-xs font-medium
+                    text-base-content/65
+                "
+                >
+                    تأیید اتصال الزامی است
+                </div>
+
+                <p
+                    class="
+                    mt-1
+                    text-xs leading-6
+                    text-base-content/45
+                "
+                >
+                    پیش از افزودن سرور، xDeploy اتصال SSH، سیستم‌عامل
+                    و سطح دسترسی موردنیاز را بررسی می‌کند.
+                </p>
+
+            </div>
 
         </div>
 
+
+        {{-- Shared form --}}
+        <x-servers.form
+            submit="save"
+            button="افزودن سرور"
+            :require-verified-connection="true"
+            :connection-verified="$this->connectionIsVerified()"
+
+        />
+
+    </section>
+
+
+    {{-- Security note --}}
+    <div
+        class="
+        mt-4
+
+        flex items-center
+        justify-center gap-1.5
+
+        text-xs
+        text-base-content/35
+    "
+    >
+        <x-icon
+            name="lucide.lock-keyhole"
+            class="!size-3.5 stroke-[1.6]"
+        />
+
+        <span>
+        اطلاعات اتصال به‌صورت امن نگهداری می‌شود.
+    </span>
     </div>
+
+
+    {{-- Alternative path --}}
+    <div
+        class="
+        my-7
+
+        flex items-center gap-3
+
+        text-xs
+        text-base-content/35
+    "
+        aria-hidden="true"
+    >
+        <span class="h-px flex-1 bg-base-300"></span>
+
+        <span>
+        VPS نداری؟
+    </span>
+
+        <span class="h-px flex-1 bg-base-300"></span>
+    </div>
+
+
+    {{-- Buy VPS CTA --}}
+    <x-servers.buy-vps-cta
+        :link="route('home')"
+    />
+
 </div>

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
+
 <html
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
     dir="rtl"
-    data-theme="{{ config('app.theme', 'light') }}"
 >
 <head>
     <meta charset="utf-8">
@@ -12,8 +12,13 @@
         content="width=device-width, initial-scale=1"
     >
 
+    <meta
+        name="color-scheme"
+        content="light dark"
+    >
+
     <title>
-        {{ $title ?? __('Dashboard') }} | xDeploy
+        {{ $title ? $title . ' | ' : '' }}xDeploy
     </title>
 
     @vite([
@@ -27,27 +32,40 @@
         min-h-screen
         bg-base-200
         font-sans
+        text-base-content
+        antialiased
     "
 >
 
 <x-main full-width>
 
+    {{-- Sidebar --}}
     <x-slot:sidebar
         drawer="panel-drawer"
         collapsible
         collapse-text=""
-        class="bg-base-300"
+
+        class="
+            border-s border-base-300
+            bg-base-100
+        "
     >
 
         <x-panel.brand />
 
         <x-panel.navigation />
 
+        <div class="mt-auto">
+            <x-panel.footer />
+        </div>
+
     </x-slot:sidebar>
 
+
+    {{-- Main content --}}
     <x-slot:content>
 
-        <x-panel.header/>
+        <x-panel.header />
 
         <x-panel.page-container>
             {{ $slot }}
@@ -55,16 +73,15 @@
 
     </x-slot:content>
 
-    <x-slot:footer>
-
-        <x-panel.footer />
-
-    </x-slot:footer>
-
 </x-main>
+
+
+{{-- Global UI --}}
 <x-components.panel.offline-indicator />
-{{-- Global Toast --}}
-<x-toast position="toast-top toast-center" />
+
+<x-toast
+    position="toast-top toast-center"
+/>
 
 </body>
 </html>

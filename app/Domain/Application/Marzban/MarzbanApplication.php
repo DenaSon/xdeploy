@@ -97,7 +97,7 @@ final readonly class MarzbanApplication extends CommandApplication implements St
     public function stop(): void
     {
         $this->executeLifecycleOperation(
-            operation: 'down --remove-orphans',
+            operation: 'stop',
             expectedState: ApplicationState::Installed,
             exception: ApplicationStopException::class,
             commandFailureMessage: 'Failed to stop Marzban.',

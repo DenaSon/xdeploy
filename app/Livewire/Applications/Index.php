@@ -12,10 +12,12 @@ use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 use Throwable;
 
 #[Layout('layouts.panel')]
+#[Title('Applications')]
 final class Index extends Component
 {
     use HandlesSshAvailability;

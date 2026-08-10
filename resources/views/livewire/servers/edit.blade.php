@@ -1,97 +1,161 @@
-<div
-    dir="rtl"
-    class="relative flex min-h-screen items-center justify-center overflow-hidden bg-base-200/50 px-4 py-10 sm:px-6"
->
-    {{-- Background decoration --}}
-    <div
-        class="pointer-events-none absolute -right-40 -top-40 size-[28rem] rounded-full bg-primary/8 blur-3xl"
-    ></div>
+<div class="mx-auto w-full max-w-2xl">
 
-    <div
-        class="pointer-events-none absolute -bottom-40 -left-40 size-[28rem] rounded-full bg-secondary/8 blur-3xl"
-    ></div>
+    {{-- Header --}}
+    <header class="mb-6">
 
-    <div class="relative z-10 w-full max-w-2xl">
+        <div class="flex items-start gap-3">
 
-        {{-- Edit card --}}
-        <div
-            class="overflow-hidden rounded-3xl border border-base-300/70 bg-base-100/90 shadow-2xl shadow-base-300/30 backdrop-blur-xl"
-        >
-            {{-- Top accent --}}
-            <div class="h-1 bg-gradient-to-l from-primary via-secondary to-primary"></div>
+            <div
+                class="
+                    flex size-10 shrink-0
+                    items-center justify-center
 
-            <div class="p-6 sm:p-8 lg:p-10">
-
-                {{-- Header --}}
-                <div class="flex items-start gap-4">
-
-                    <div
-                        class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-warning/10 text-warning ring-1 ring-warning/15"
-                    >
-                        <x-icon
-                            name="o-pencil-square"
-                            class="size-6"
-                        />
-                    </div>
-
-                    <div>
-                        <h1 class="text-2xl font-bold tracking-tight text-base-content sm:text-3xl">
-                            ویرایش سرور
-                        </h1>
-
-                        <p class="mt-2 text-sm leading-6 text-base-content/55">
-                            اطلاعات اتصال سرور را مشاهده و ویرایش کنید.
-                        </p>
-                    </div>
-
-                </div>
-
-                {{-- Information --}}
-                <div
-                    role="alert"
-                    class="alert alert-warning alert-soft mt-7 items-start rounded-2xl border border-warning/15"
-                >
-                    <x-icon
-                        name="o-pencil-square"
-                        class="mt-0.5 size-5 shrink-0"
-                    />
-
-                    <div class="text-sm">
-                        <p class="font-semibold">
-                            ویرایش اطلاعات اتصال
-                        </p>
-
-                        <p class="mt-1 leading-7 opacity-75">
-                            تغییرات اطلاعات SSH برای تمام عملیات آینده xDeploy
-                            روی این سرور استفاده خواهند شد.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="divider my-7 opacity-60"></div>
-
-                {{-- Form --}}
-                <x-servers.form
-                    submit="update"
-                    button="ذخیره تغییرات"
+                    rounded-xl
+                    bg-primary/10
+                    text-primary
+                "
+            >
+                <x-icon
+                    name="lucide.pencil"
+                    class="!size-5 stroke-[1.8]"
                 />
+            </div>
+
+            <div class="min-w-0">
+
+                <h1
+                    class="
+                        text-2xl font-semibold
+                        tracking-tight
+                        text-base-content
+                    "
+                >
+                    ویرایش اتصال سرور
+                </h1>
+
+                <p
+                    class="
+                        mt-1.5
+                        text-sm leading-7
+                        text-base-content/50
+                    "
+                >
+                    اطلاعات SSH مورد استفاده xDeploy برای اتصال
+                    به این سرور را ویرایش کن.
+                </p>
 
             </div>
+
         </div>
 
-        {{-- Security note --}}
-        <div class="mt-5 flex items-center justify-center gap-2 text-xs text-base-content/35">
+    </header>
 
-            <x-icon
-                name="o-lock-closed"
-                class="size-4"
-            />
 
-            <span>
-                اطلاعات اتصال شما به‌صورت امن نگهداری می‌شود.
+    {{-- Form surface --}}
+    <section
+        class="
+            rounded-2xl
+
+            border border-base-300
+            bg-base-100
+
+            p-5
+
+            sm:p-6
+        "
+    >
+
+        {{-- Current server --}}
+        <div
+            class="
+                mb-6
+
+                flex items-center gap-3
+
+                rounded-xl
+                bg-base-200/60
+
+                p-4
+            "
+        >
+            <span
+                class="
+                    flex size-9 shrink-0
+                    items-center justify-center
+
+                    rounded-lg
+                    bg-base-100
+
+                    text-base-content/50
+                "
+            >
+                <x-icon
+                    name="lucide.server"
+                    class="!size-4 stroke-[1.7]"
+                />
             </span>
 
+
+            <div class="min-w-0">
+
+                <div
+                    class="
+                        text-[11px]
+                        text-base-content/40
+                    "
+                >
+                    اتصال فعلی
+                </div>
+
+                <div
+                    dir="ltr"
+                    class="
+                        technical-value
+
+                        mt-1 truncate
+
+                        text-sm font-medium
+                        text-base-content/70
+                    "
+                >
+                    {{ $server->host }}:{{ $server->port }}
+                </div>
+
+            </div>
+
         </div>
 
+
+        {{-- Shared form --}}
+        <x-servers.form
+            submit="update"
+            button="ذخیره تغییرات"
+            :editing="true"
+        />
+
+    </section>
+
+
+    {{-- Security note --}}
+    <div
+        class="
+            mt-4
+
+            flex items-center
+            justify-center gap-1.5
+
+            text-xs
+            text-base-content/35
+        "
+    >
+        <x-icon
+            name="lucide.lock-keyhole"
+            class="!size-3.5 stroke-[1.6]"
+        />
+
+        <span>
+            اطلاعات اتصال به‌صورت امن نگهداری می‌شود.
+        </span>
     </div>
+
 </div>

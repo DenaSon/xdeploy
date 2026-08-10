@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 return [
 
+    'ssh' => [
+        'allow_private_targets' => env(
+            'XDEPLOY_SSH_ALLOW_PRIVATE_TARGETS',
+            false,
+        ),
+    ],
+
     'installers' => [
 
         'source' => env(

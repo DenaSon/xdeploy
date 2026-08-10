@@ -9,6 +9,7 @@ use App\Application\Server\Data\TestServerConnectionData;
 use App\Application\Server\Data\TestServerConnectionResult;
 use App\Application\Server\Enums\ServerConnectionTestStatus;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionTargetNotAllowedException;
+use Livewire\Attributes\Locked;
 use Mary\Traits\Toast;
 use Throwable;
 
@@ -16,9 +17,19 @@ trait TestsServerConnection
 {
     use Toast;
 
+    #[Locked]
+    public ?string $verifiedConnectionFingerprint = null;
+
     public function testConnection(
         TestServerConnectionAction $action,
     ): void {
+        /*
+         * هر تست جدید، نتیجه تست قبلی را باطل می‌کند.
+         *
+         * فقط نتیجه Ready می‌تواند دوباره فرم را verified کند.
+         */
+        $this->verifiedConnectionFingerprint = null;
+
         $data = $this->validate();
 
         $data['credential'] =
@@ -31,15 +42,17 @@ trait TestsServerConnection
                 ),
             );
 
+            if (
+                $result->status
+                === ServerConnectionTestStatus::Ready
+            ) {
+                $this->markConnectionAsVerified();
+            }
+
             $this->showConnectionTestResult(
                 $result,
             );
         } catch (SSHConnectionTargetNotAllowedException) {
-            /*
-             * Expected security-policy rejection.
-             *
-             * Do not report this as an application error.
-             */
             $this->error(
                 'آدرس سرور مجاز نیست',
                 'برای اتصال، IP عمومی یا دامنه عمومی معتبر سرور را وارد کنید.',
@@ -54,6 +67,53 @@ trait TestsServerConnection
         }
     }
 
+    public function connectionIsVerified(): bool
+    {
+        if (
+            $this->verifiedConnectionFingerprint === null
+        ) {
+            return false;
+        }
+
+        return hash_equals(
+            $this->verifiedConnectionFingerprint,
+            $this->connectionFingerprint(),
+        );
+    }
+
+    private function markConnectionAsVerified(): void
+    {
+        $this->verifiedConnectionFingerprint =
+            $this->connectionFingerprint();
+    }
+
+    private function connectionFingerprint(): string
+    {
+        $payload = json_encode(
+            [
+                'host' => trim($this->host),
+                'port' => $this->port,
+                'username' => trim($this->username),
+
+                /*
+                 * اینجا مقدار فرم را fingerprint می‌کنیم،
+                 * نه credential واقعی ذخیره‌شده در DB.
+                 *
+                 * در Edit مقدار خالی یعنی:
+                 * "از credential فعلی استفاده کن".
+                 */
+                'credential' => $this->credential,
+            ],
+            JSON_THROW_ON_ERROR,
+        );
+
+        return hash_hmac(
+            'sha256',
+            $payload,
+            (string) config('app.key'),
+        );
+    }
+
     private function showConnectionTestResult(
         TestServerConnectionResult $result,
     ): void {
@@ -61,6 +121,7 @@ trait TestsServerConnection
             ServerConnectionTestStatus::Ready => $this->showReadyConnection(
                 $result,
             ),
+
             ServerConnectionTestStatus::InsufficientPrivileges => $this->error(
                 'دسترسی مدیریتی کافی نیست',
                 'اتصال SSH و سیستم‌عامل سرور تأیید شدند، اما حساب کاربری باید root باشد یا امکان اجرای sudo بدون درخواست رمز عبور را داشته باشد.',
