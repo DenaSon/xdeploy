@@ -168,8 +168,8 @@ final class ApplicationCatalogIndexTest extends TestCase
         User $user,
     ): Server {
         $server = new Server([
-            'name' => 'catalog-test-server-' . $user->getKey(),
-            'host' => '192.0.2.' . (10 + (int) $user->getKey()),
+            'name' => 'catalog-test-server-'.$user->getKey(),
+            'host' => '192.0.2.'.(10 + (int) $user->getKey()),
             'port' => 22,
             'username' => 'root',
         ]);

@@ -1,498 +1,780 @@
-<div>
-    @php
-        $state = $info['state'] ?? 'unknown';
+@php
+    $state = $info['state'] ?? 'unknown';
 
-        $statusLabel = match ($state) {
-            'running' => 'در حال اجرا',
-            'installed' => 'نصب‌شده',
-            'not_installed' => 'نصب نشده',
-            default => 'وضعیت نامشخص',
-        };
+    $status = match ($state) {
+        'running' => [
+            'label' => 'در حال اجرا',
+            'icon' => 'lucide.circle-play',
+            'classes' => 'border-success/20 bg-success/10 text-success',
+            'dot' => 'bg-success',
+        ],
 
-        $statusClasses = match ($state) {
-            'running' => 'border-success/20 bg-success/10 text-success',
-            'installed' => 'border-info/20 bg-info/10 text-info',
-            'not_installed' => 'border-base-300 bg-base-200 text-base-content/60',
-            default => 'border-warning/20 bg-warning/10 text-warning',
-        };
+        'installed' => [
+            'label' => 'نصب‌شده',
+            'icon' => 'lucide.circle-check',
+            'classes' => 'border-info/20 bg-info/10 text-info',
+            'dot' => 'bg-info',
+        ],
 
-        $statusIcon = match ($state) {
-            'running' => 'o-play',
-            'installed' => 'o-check-circle',
-            'not_installed' => 'o-arrow-down-tray',
-            default => 'o-exclamation-triangle',
-        };
-    @endphp
+        'not_installed' => [
+            'label' => 'نصب نشده',
+            'icon' => 'lucide.package-plus',
+            'classes' => 'border-base-300 bg-base-200/70 text-base-content/55',
+            'dot' => 'bg-base-content/30',
+        ],
 
-    {{-- Header --}}
-    <div
-        class="flex flex-col gap-4
-               sm:flex-row sm:items-center sm:justify-between"
-    >
-        <div class="flex items-center gap-3">
+        default => [
+            'label' => 'وضعیت نامشخص',
+            'icon' => 'lucide.circle-help',
+            'classes' => 'border-warning/20 bg-warning/10 text-warning',
+            'dot' => 'bg-warning',
+        ],
+    };
 
-            <a
-                href="{{ route('panel.servers.applications.index', [
-                    'server' => $serverId,
-                ]) }}"
-                wire:navigate
-                class="flex size-9 items-center justify-center rounded-xl
-                       border border-base-300 bg-base-100
-                       text-base-content/60 transition
-                       hover:border-primary/30 hover:text-primary"
+    $version = $info['version'] ?? null;
+
+    $version = is_string($version)
+        && trim($version) !== ''
+            ? trim($version)
+            : null;
+
+    $applicationIcon = is_string($icon)
+        && trim($icon) !== ''
+            ? trim($icon)
+            : null;
+
+    $usesLucideIcon = $applicationIcon !== null
+        && str_starts_with(
+            $applicationIcon,
+            'lucide.',
+        );
+@endphp
+
+<x-servers.workspace :server="$server">
+
+    <div class="space-y-5">
+
+        {{-- Application context --}}
+        <section
+            x-data="{
+                descriptionExpanded: false,
+            }"
+            class="overflow-hidden rounded-2xl
+                   border border-base-300
+                   bg-base-100"
+        >
+            {{-- Main application header --}}
+            <div
+                class="flex flex-col gap-4
+                       px-5 py-5
+                       sm:flex-row
+                       sm:items-center
+                       sm:justify-between
+                       sm:px-6"
             >
-                <x-icon
-                    name="o-arrow-right"
-                    class="size-5"
-                />
-            </a>
+                {{-- Identity --}}
+                <div
+                    class="flex min-w-0
+                           items-center gap-3.5"
+                >
+                    {{-- Back --}}
+                    <a
+                        href="{{ route('panel.servers.applications.index', [
+                            'server' => $serverId,
+                        ]) }}"
+                        wire:navigate
+                        aria-label="بازگشت به برنامه‌ها"
+                        class="flex size-9 shrink-0
+                               items-center justify-center
+                               rounded-xl
+                               border border-base-300
+                               bg-base-100
+                               text-base-content/45
+                               transition-colors duration-150
+                               hover:border-primary/20
+                               hover:bg-primary/5
+                               hover:text-primary"
+                    >
+                        <x-icon
+                            name="lucide.arrow-right"
+                            class="size-4"
+                        />
+                    </a>
 
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight text-base-content">
-                    {{ $name }}
-                </h1>
+                    {{-- Application icon --}}
+                    <div
+                        class="flex size-12 shrink-0
+                               items-center justify-center
+                               overflow-hidden rounded-xl
+                               border border-primary/15
+                               bg-primary/[0.06]"
+                    >
+                        @if ($usesLucideIcon)
 
-                <p class="mt-1 text-sm text-base-content/60">
-                    مدیریت نصب و وضعیت اجرای برنامه
-                </p>
+                            <x-icon
+                                :name="$applicationIcon"
+                                class="size-5.5 text-primary"
+                            />
+
+                        @elseif ($applicationIcon !== null)
+
+                            <img
+                                src="{{ asset($applicationIcon) }}"
+                                alt="{{ $name }}"
+                                class="size-8 object-contain"
+                            />
+
+                        @else
+
+                            <x-icon
+                                name="lucide.package"
+                                class="size-5.5 text-primary"
+                            />
+
+                        @endif
+                    </div>
+
+                    {{-- Application title --}}
+                    <div class="min-w-0">
+
+                        <div
+                            class="flex flex-wrap
+                                   items-center gap-2"
+                        >
+                            <h1
+                                class="truncate text-lg
+                                       font-semibold
+                                       text-base-content"
+                            >
+                                {{ $name }}
+                            </h1>
+
+                            <span
+                                class="inline-flex items-center
+                                       gap-1.5 rounded-full
+                                       border px-2.5 py-1
+                                       text-xs font-medium
+                                       {{ $status['classes'] }}"
+                            >
+                                <span
+                                    class="size-1.5 rounded-full
+                                           {{ $status['dot'] }}"
+                                ></span>
+
+                                {{ $status['label'] }}
+                            </span>
+                        </div>
+
+                        @if ($shortDescription !== '')
+
+                            <p
+                                class="mt-1 max-w-2xl
+                                       text-sm leading-6
+                                       text-base-content/50"
+                            >
+                                {{ $shortDescription }}
+                            </p>
+
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Header actions --}}
+                <div
+                    class="flex shrink-0
+                           items-center gap-1"
+                >
+                    {{-- Description --}}
+                    @if ($description !== null)
+
+                        <div
+                            class="tooltip tooltip-bottom
+                                   before:z-50
+                                   before:whitespace-nowrap
+                                   before:text-xs
+                                   after:z-50"
+                            data-tip="درباره برنامه"
+                        >
+                            <button
+                                type="button"
+                                @click="
+                                    descriptionExpanded =
+                                        ! descriptionExpanded
+                                "
+                                x-bind:aria-expanded="
+                                    descriptionExpanded.toString()
+                                "
+                                x-bind:class="{
+                                    'border-primary/20 bg-primary/10 text-primary':
+                                        descriptionExpanded,
+                                }"
+                                aria-label="اطلاعات بیشتر درباره {{ $name }}"
+                                class="flex size-9
+                                       items-center justify-center
+                                       rounded-xl
+                                       border border-transparent
+                                       text-base-content/45
+                                       transition-colors duration-150
+                                       hover:border-base-300
+                                       hover:bg-base-200/60
+                                       hover:text-primary"
+                            >
+                                <x-icon
+                                    name="lucide.info"
+                                    class="size-4"
+                                />
+                            </button>
+                        </div>
+
+                    @endif
+
+                    {{-- Refresh runtime --}}
+                    @if (! $sshUnavailable)
+
+                        <div
+                            class="tooltip tooltip-bottom
+                                   before:z-50
+                                   before:whitespace-nowrap
+                                   before:text-xs
+                                   after:z-50"
+                            data-tip="بروزرسانی وضعیت"
+                        >
+                            <button
+                                type="button"
+                                wire:click="refreshApplication"
+                                wire:loading.attr="disabled"
+                                wire:target="refreshApplication"
+                                aria-label="بروزرسانی وضعیت برنامه"
+                                class="flex size-9
+                                       items-center justify-center
+                                       rounded-xl
+                                       border border-transparent
+                                       text-base-content/45
+                                       transition-colors duration-150
+                                       hover:border-base-300
+                                       hover:bg-base-200/60
+                                       hover:text-primary
+                                       disabled:pointer-events-none
+                                       disabled:opacity-50"
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="refreshApplication"
+                                >
+                                    <x-icon
+                                        name="lucide.refresh-cw"
+                                        class="size-4"
+                                    />
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="refreshApplication"
+                                    class="loading loading-spinner
+                                           loading-xs"
+                                ></span>
+                            </button>
+                        </div>
+
+                    @endif
+                </div>
             </div>
 
-        </div>
+            {{-- Full description --}}
+            @if ($description !== null)
 
-        @if (! $sshUnavailable)
+                <div
+                    x-cloak
+                    x-show="descriptionExpanded"
+                    x-collapse
+                    class="border-t border-base-300"
+                >
+                    <div
+                        class="flex items-start gap-3
+                               bg-base-200/25
+                               px-5 py-4
+                               sm:px-6"
+                    >
+                        <div
+                            class="flex size-8 shrink-0
+                                   items-center justify-center
+                                   rounded-lg
+                                   bg-primary/8
+                                   text-primary"
+                        >
+                            <x-icon
+                                name="lucide.info"
+                                class="size-4"
+                            />
+                        </div>
 
-            <x-button
-                label="بروزرسانی وضعیت"
-                icon="o-arrow-path"
-                wire:click="refreshApplication"
-                wire:loading.attr="disabled"
-                wire:target="refreshApplication"
-                spinner="refreshApplication"
-                class="btn-ghost"
-            />
+                        <div class="min-w-0">
+                            <p
+                                class="text-xs font-medium
+                                       text-base-content/55"
+                            >
+                                درباره {{ $name }}
+                            </p>
 
-        @endif
-    </div>
+                            <p
+                                class="mt-1.5 max-w-4xl
+                                       text-sm leading-7
+                                       text-base-content/60"
+                            >
+                                {{ $description }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-    {{-- Persistent SSH state --}}
-    @if ($sshUnavailable)
+            @endif
 
-        <div class="mt-6">
+            {{-- Runtime facts --}}
+            @if (! $sshUnavailable)
+
+                <div
+                    class="grid grid-cols-1
+                           border-t border-base-300
+                           sm:grid-cols-3"
+                >
+                    {{-- Runtime status --}}
+                    <div
+                        class="flex items-center gap-3
+                               border-b border-base-300
+                               px-5 py-3.5
+                               sm:border-b-0
+                               sm:border-l
+                               sm:px-6"
+                    >
+                        <div
+                            class="flex size-8 shrink-0
+                                   items-center justify-center
+                                   rounded-lg
+                                   bg-base-200/60"
+                        >
+                            <x-icon
+                                :name="$status['icon']"
+                                class="size-4
+                                       text-base-content/45"
+                            />
+                        </div>
+
+                        <div class="min-w-0">
+                            <p
+                                class="text-[11px]
+                                       text-base-content/40"
+                            >
+                                وضعیت
+                            </p>
+
+                            <p
+                                class="mt-0.5 truncate
+                                       text-sm font-medium
+                                       text-base-content"
+                            >
+                                {{ $status['label'] }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- Application identifier --}}
+                    <div
+                        class="flex items-center gap-3
+                               border-b border-base-300
+                               px-5 py-3.5
+                               sm:border-b-0
+                               sm:border-l
+                               sm:px-6"
+                    >
+                        <div
+                            class="flex size-8 shrink-0
+                                   items-center justify-center
+                                   rounded-lg
+                                   bg-base-200/60"
+                        >
+                            <x-icon
+                                name="lucide.fingerprint"
+                                class="size-4
+                                       text-base-content/45"
+                            />
+                        </div>
+
+                        <div class="min-w-0">
+                            <p
+                                class="text-[11px]
+                                       text-base-content/40"
+                            >
+                                شناسه برنامه
+                            </p>
+
+                            <p
+                                dir="ltr"
+                                class="technical-value
+                                       mt-0.5 truncate text-left
+                                       text-sm font-medium
+                                       text-base-content"
+                            >
+                                {{ $application }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- Version --}}
+                    <div
+                        class="flex items-center gap-3
+                               px-5 py-3.5
+                               sm:px-6"
+                    >
+                        <div
+                            class="flex size-8 shrink-0
+                                   items-center justify-center
+                                   rounded-lg
+                                   bg-base-200/60"
+                        >
+                            <x-icon
+                                name="lucide.tag"
+                                class="size-4
+                                       text-base-content/45"
+                            />
+                        </div>
+
+                        <div class="min-w-0">
+                            <p
+                                class="text-[11px]
+                                       text-base-content/40"
+                            >
+                                نسخه
+                            </p>
+
+                            <p
+                                dir="ltr"
+                                class="technical-value
+                                       mt-0.5 truncate text-left
+                                       text-sm font-medium
+                                       text-base-content"
+                            >
+                                {{ $version ?? '—' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            @endif
+        </section>
+
+        {{-- Persistent SSH state --}}
+        @if ($sshUnavailable)
+
             <x-ssh.unavailable-alert
                 :message="$sshErrorMessage"
                 :retry-after="$sshRetryAfter"
                 retry-action="retryConnection"
             />
-        </div>
 
-    @endif
+        @endif
 
-    {{-- Operation messages --}}
-    @if (
-        $successMessage !== null
-        || $errorMessage !== null
-    )
+        {{-- Operation feedback --}}
+        @if (
+            $successMessage !== null
+            || $errorMessage !== null
+        )
 
-        <div class="mt-6 space-y-4">
+            <div class="space-y-3">
 
-            @if ($successMessage !== null)
+                @if ($successMessage !== null)
 
-                <x-alert
-                    icon="o-check-circle"
-                    class="border border-success/20
-                           bg-success/10 text-success"
-                >
-                    {{ $successMessage }}
-                </x-alert>
-
-            @endif
-
-            @if ($errorMessage !== null)
-
-                <x-alert
-                    icon="o-exclamation-triangle"
-                    class="border border-error/20
-                           bg-error/10 text-error"
-                >
-                    {{ $errorMessage }}
-                </x-alert>
-
-            @endif
-
-        </div>
-
-    @endif
-
-    @if ($sshUnavailable)
-
-        {{-- Application unavailable while SSH is down --}}
-        <x-card
-            class="mt-6 border border-base-300 bg-base-100/70
-                   py-12 text-center shadow-sm"
-        >
-            <div
-                class="mx-auto flex size-14 items-center justify-center
-                       rounded-2xl bg-base-200"
-            >
-                <x-icon
-                    name="o-signal-slash"
-                    class="size-7 text-base-content/30"
-                />
-            </div>
-
-            <h2 class="mt-4 text-lg font-semibold text-base-content">
-                وضعیت برنامه در دسترس نیست
-            </h2>
-
-            <p
-                class="mx-auto mt-2 max-w-lg text-sm leading-7
-                       text-base-content/60"
-            >
-                برای جلوگیری از اجرای عملیات با وضعیت نامشخص، کنترل‌های
-                برنامه تا برقراری دوباره ارتباط SSH غیرفعال شده‌اند.
-            </p>
-        </x-card>
-
-    @else
-
-        {{-- Application summary --}}
-        <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
-
-            <x-card
-                class="border border-base-300 bg-base-100
-                       shadow-sm xl:col-span-2"
-            >
-                <div
-                    class="flex flex-col gap-6
-                           sm:flex-row sm:items-start"
-                >
-                    <div
-                        class="flex size-16 shrink-0 items-center
-                               justify-center rounded-2xl bg-primary/10"
+                    <x-alert
+                        icon="lucide.circle-check"
+                        class="border border-success/20
+                               bg-success/10
+                               text-success"
                     >
-                        <x-icon
-                            name="o-cube"
-                            class="size-8 text-primary"
-                        />
-                    </div>
+                        {{ $successMessage }}
+                    </x-alert>
 
-                    <div class="min-w-0 flex-1">
+                @endif
 
-                        <div class="flex flex-wrap items-center gap-3">
+                @if ($errorMessage !== null)
 
-                            <h2 class="text-xl font-bold text-base-content">
-                                {{ $name }}
-                            </h2>
-
-                            <span
-                                class="inline-flex items-center gap-1.5
-                                       rounded-full border px-3 py-1
-                                       text-xs font-medium
-                                       {{ $statusClasses }}"
-                            >
-                                <x-icon
-                                    :name="$statusIcon"
-                                    class="size-4"
-                                />
-
-                                {{ $statusLabel }}
-                            </span>
-
-                        </div>
-
-                        <p
-                            class="mt-2 text-sm leading-7
-                                   text-base-content/60"
-                        >
-                            مدیریت چرخه عمر {{ $name }} شامل نصب، اجرا،
-                            توقف، راه‌اندازی مجدد و حذف برنامه.
-                        </p>
-
-                    </div>
-                </div>
-
-                <div
-                    class="mt-8 grid grid-cols-1 gap-4
-                           sm:grid-cols-2"
-                >
-                    <div
-                        class="rounded-2xl border border-base-300
-                               bg-base-200/30 p-4"
+                    <x-alert
+                        icon="lucide.triangle-alert"
+                        class="border border-error/20
+                               bg-error/10
+                               text-error"
                     >
-                        <p class="text-xs text-base-content/50">
-                            شناسه برنامه
-                        </p>
-
-                        <p
-                            class="mt-2 font-mono text-sm font-medium
-                                   text-base-content"
-                            dir="ltr"
-                        >
-                            {{ $application }}
-                        </p>
-                    </div>
-
-                    <div
-                        class="rounded-2xl border border-base-300
-                               bg-base-200/30 p-4"
-                    >
-                        <p class="text-xs text-base-content/50">
-                            نسخه
-                        </p>
-
-                        <p
-                            class="mt-2 font-mono text-sm font-medium
-                                   text-base-content"
-                            dir="ltr"
-                        >
-                            {{ $info['version'] ?? 'نامشخص' }}
-                        </p>
-                    </div>
-                </div>
-            </x-card>
-
-            {{-- Current status --}}
-            <x-card
-                class="border border-base-300 bg-base-100 shadow-sm"
-            >
-                <h3 class="font-semibold text-base-content">
-                    وضعیت فعلی
-                </h3>
-
-                <div class="mt-5 space-y-4">
-
-                    <div class="flex items-center justify-between gap-4">
-
-                        <span class="text-sm text-base-content/60">
-                            نصب
-                        </span>
-
-                        @if ($info['is_installed'])
-
-                            <span
-                                class="inline-flex items-center gap-1
-                                       text-sm font-medium text-success"
-                            >
-                                <x-icon
-                                    name="o-check-circle"
-                                    class="size-4"
-                                />
-
-                                نصب‌شده
-                            </span>
-
-                        @elseif ($info['is_unknown'])
-
-                            <span
-                                class="inline-flex items-center gap-1
-                                       text-sm font-medium text-warning"
-                            >
-                                <x-icon
-                                    name="o-question-mark-circle"
-                                    class="size-4"
-                                />
-
-                                نامشخص
-                            </span>
-
-                        @else
-
-                            <span
-                                class="inline-flex items-center gap-1
-                                       text-sm text-base-content/50"
-                            >
-                                <x-icon
-                                    name="o-x-circle"
-                                    class="size-4"
-                                />
-
-                                نصب نشده
-                            </span>
-
-                        @endif
-
-                    </div>
-
-                    <div class="h-px bg-base-300"></div>
-
-                    <div class="flex items-center justify-between gap-4">
-
-                        <span class="text-sm text-base-content/60">
-                            اجرا
-                        </span>
-
-                        @if ($info['is_running'])
-
-                            <span
-                                class="inline-flex items-center gap-1
-                                       text-sm font-medium text-success"
-                            >
-                                <span
-                                    class="size-2 rounded-full bg-success"
-                                ></span>
-
-                                فعال
-                            </span>
-
-                        @elseif ($info['is_installed'])
-
-                            <span
-                                class="inline-flex items-center gap-1
-                                       text-sm font-medium text-warning"
-                            >
-                                <span
-                                    class="size-2 rounded-full bg-warning"
-                                ></span>
-
-                                متوقف
-                            </span>
-
-                        @else
-
-                            <span
-                                class="inline-flex items-center gap-1
-                                       text-sm text-base-content/50"
-                            >
-                                <span
-                                    class="size-2 rounded-full
-                                           bg-base-content/30"
-                                ></span>
-
-                                غیرفعال
-                            </span>
-
-                        @endif
-
-                    </div>
-
-                </div>
-            </x-card>
-
-        </div>
-
-        {{-- Application actions --}}
-        <x-card
-            class="mt-6 border border-base-300 bg-base-100 shadow-sm"
-        >
-            <div
-                class="flex flex-col gap-2
-                       sm:flex-row sm:items-center sm:justify-between"
-            >
-                <div>
-                    <h3 class="font-semibold text-base-content">
-                        عملیات برنامه
-                    </h3>
-
-                    <p class="mt-1 text-sm text-base-content/60">
-                        عملیات قابل اجرا بر اساس وضعیت فعلی نمایش داده
-                        می‌شوند.
-                    </p>
-                </div>
-
-                <div
-                    wire:loading
-                    wire:target="install,uninstall,start,stop,restart"
-                    class="text-sm text-base-content/60"
-                >
-                    <span
-                        class="loading loading-spinner loading-sm"
-                    ></span>
-
-                    در حال انجام عملیات...
-                </div>
-            </div>
-
-            <div class="mt-6 flex flex-wrap gap-3">
-
-                @if ($info['is_unknown'])
-
-                    <x-button
-                        label="بروزرسانی وضعیت"
-                        icon="o-arrow-path"
-                        wire:click="refreshApplication"
-                        wire:loading.attr="disabled"
-                        wire:target="refreshApplication"
-                        spinner="refreshApplication"
-                        class="btn-primary"
-                    />
-
-                @elseif ($info['is_not_installed'])
-
-                    <x-button
-                        label="نصب و اجرا"
-                        icon="o-arrow-down-tray"
-                        wire:click="install"
-                        wire:loading.attr="disabled"
-                        wire:target="install"
-                        spinner="install"
-                        class="btn-primary"
-                    />
-
-                @elseif ($info['is_running'])
-
-                    <x-button
-                        label="راه‌اندازی مجدد"
-                        icon="o-arrow-path"
-                        wire:click="restart"
-                        wire:loading.attr="disabled"
-                        wire:target="restart"
-                        spinner="restart"
-                        class="btn-primary"
-                    />
-
-                    <x-button
-                        label="توقف"
-                        icon="o-stop"
-                        wire:click="stop"
-                        wire:loading.attr="disabled"
-                        wire:target="stop"
-                        spinner="stop"
-                        class="btn-warning btn-outline"
-                    />
-
-                    <x-button
-                        label="حذف"
-                        icon="o-trash"
-                        wire:click="uninstall"
-                        wire:confirm="آیا از حذف کامل {{ $name }} مطمئن هستید؟ این عملیات قابل بازگشت نیست."
-                        wire:loading.attr="disabled"
-                        wire:target="uninstall"
-                        spinner="uninstall"
-                        class="btn-error btn-outline"
-                    />
-
-                @elseif ($info['is_installed'])
-
-                    <x-button
-                        label="اجرا"
-                        icon="o-play"
-                        wire:click="start"
-                        wire:loading.attr="disabled"
-                        wire:target="start"
-                        spinner="start"
-                        class="btn-primary"
-                    />
-
-                    <x-button
-                        label="حذف"
-                        icon="o-trash"
-                        wire:click="uninstall"
-                        wire:confirm="آیا از حذف کامل {{ $name }} مطمئن هستید؟ این عملیات قابل بازگشت نیست."
-                        wire:loading.attr="disabled"
-                        wire:target="uninstall"
-                        spinner="uninstall"
-                        class="btn-error btn-outline"
-                    />
+                        {{ $errorMessage }}
+                    </x-alert>
 
                 @endif
 
             </div>
-        </x-card>
 
-        {{-- Application-specific management panel --}}
-        @if ($info['is_running'])
+        @endif
 
-            <div class="mt-6">
+        @if ($sshUnavailable)
+
+            {{-- Runtime unavailable --}}
+            <section
+                class="rounded-2xl
+                       border border-base-300
+                       bg-base-100
+                       px-6 py-10
+                       text-center"
+            >
+                <div
+                    class="mx-auto flex size-11
+                           items-center justify-center
+                           rounded-xl
+                           bg-base-200/60"
+                >
+                    <x-icon
+                        name="lucide.unplug"
+                        class="size-5
+                               text-base-content/35"
+                    />
+                </div>
+
+                <h2
+                    class="mt-3 text-base
+                           font-semibold
+                           text-base-content"
+                >
+                    وضعیت برنامه در دسترس نیست
+                </h2>
+
+                <p
+                    class="mx-auto mt-1.5
+                           max-w-lg
+                           text-sm leading-7
+                           text-base-content/50"
+                >
+                    تا برقراری دوباره ارتباط SSH،
+                    عملیات برنامه برای جلوگیری از اجرای
+                    دستور با وضعیت نامشخص غیرفعال است.
+                </p>
+            </section>
+
+        @else
+
+            {{-- Lifecycle operations --}}
+            <section
+                class="overflow-hidden
+                       rounded-2xl
+                       border border-base-300
+                       bg-base-100"
+            >
+                <header
+                    class="flex flex-col gap-3
+                           border-b border-base-300
+                           px-5 py-4
+                           sm:flex-row
+                           sm:items-center
+                           sm:justify-between
+                           sm:px-6"
+                >
+                    <div
+                        class="flex items-start gap-3"
+                    >
+                        <div
+                            class="flex size-9 shrink-0
+                                   items-center justify-center
+                                   rounded-xl
+                                   bg-base-200/70"
+                        >
+                            <x-icon
+                                name="lucide.power"
+                                class="size-4
+                                       text-base-content/60"
+                            />
+                        </div>
+
+                        <div>
+                            <h2
+                                class="text-base font-semibold
+                                       text-base-content"
+                            >
+                                عملیات برنامه
+                            </h2>
+
+                            <p
+                                class="mt-0.5 text-sm
+                                       text-base-content/50"
+                            >
+                                عملیات در دسترس بر اساس وضعیت فعلی برنامه
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        wire:loading
+                        wire:target="install,uninstall,start,stop,restart"
+                        class="flex items-center gap-2
+                               text-xs
+                               text-base-content/45"
+                    >
+                        <span
+                            class="loading loading-spinner
+                                   loading-xs"
+                        ></span>
+
+                        <span>
+                            در حال انجام عملیات
+                        </span>
+                    </div>
+                </header>
+
+                <div
+                    class="px-5 py-4
+                           sm:px-6"
+                >
+                    {{-- Unknown --}}
+                    @if ($info['is_unknown'])
+
+                        <div
+                            class="flex flex-col gap-3
+                                   sm:flex-row
+                                   sm:items-center
+                                   sm:justify-between"
+                        >
+                            <p
+                                class="text-sm
+                                       text-base-content/55"
+                            >
+                                وضعیت برنامه مشخص نیست.
+                                ابتدا اطلاعات را دوباره دریافت کنید.
+                            </p>
+
+                            <x-button
+                                label="بروزرسانی وضعیت"
+                                icon="lucide.refresh-cw"
+                                wire:click="refreshApplication"
+                                wire:loading.attr="disabled"
+                                wire:target="refreshApplication"
+                                spinner="refreshApplication"
+                                class="btn-primary btn-sm
+                                       rounded-xl"
+                            />
+                        </div>
+
+                        {{-- Not installed --}}
+                    @elseif ($info['is_not_installed'])
+
+                        <div
+                            class="flex flex-col gap-4
+                                   sm:flex-row
+                                   sm:items-center
+                                   sm:justify-between"
+                        >
+                            <div>
+                                <h3
+                                    class="text-sm font-medium
+                                           text-base-content"
+                                >
+                                    {{ $name }} هنوز روی این سرور نصب نشده است
+                                </h3>
+
+                                <p
+                                    class="mt-1 text-sm
+                                           leading-6
+                                           text-base-content/50"
+                                >
+                                    xDeploy مراحل نصب و راه‌اندازی اولیه
+                                    برنامه را روی سرور انجام می‌دهد.
+                                </p>
+                            </div>
+
+                            <x-button
+                                label="نصب برنامه"
+                                icon="lucide.download"
+                                wire:click="install"
+                                wire:loading.attr="disabled"
+                                wire:target="install"
+                                spinner="install"
+                                class="btn-primary btn-sm
+                                       shrink-0 rounded-xl"
+                            />
+                        </div>
+
+                        {{-- Running --}}
+                    @elseif ($info['is_running'])
+
+                        <div
+                            class="flex flex-wrap
+                                   items-center gap-2"
+                        >
+                            <x-button
+                                label="راه‌اندازی مجدد"
+                                icon="lucide.rotate-cw"
+                                wire:click="restart"
+                                wire:loading.attr="disabled"
+                                wire:target="restart"
+                                spinner="restart"
+                                class="btn-primary btn-sm
+                                       rounded-xl"
+                            />
+
+                            <x-button
+                                label="توقف"
+                                icon="lucide.square"
+                                wire:click="stop"
+                                wire:loading.attr="disabled"
+                                wire:target="stop"
+                                spinner="stop"
+                                class="btn-outline btn-sm
+                                       rounded-xl"
+                            />
+
+                            <x-button
+                                label="حذف برنامه"
+                                icon="lucide.trash-2"
+                                wire:click="uninstall"
+                                wire:confirm="آیا از حذف کامل {{ $name }} مطمئن هستید؟ این عملیات قابل بازگشت نیست."
+                                wire:loading.attr="disabled"
+                                wire:target="uninstall"
+                                spinner="uninstall"
+                                class="btn-error btn-outline
+                                       btn-sm rounded-xl"
+                            />
+                        </div>
+
+                        {{-- Installed / stopped --}}
+                    @elseif ($info['is_installed'])
+
+                        <div
+                            class="flex flex-wrap
+                                   items-center gap-2"
+                        >
+                            <x-button
+                                label="اجرای برنامه"
+                                icon="lucide.play"
+                                wire:click="start"
+                                wire:loading.attr="disabled"
+                                wire:target="start"
+                                spinner="start"
+                                class="btn-primary btn-sm
+                                       rounded-xl"
+                            />
+
+                            <x-button
+                                label="حذف برنامه"
+                                icon="lucide.trash-2"
+                                wire:click="uninstall"
+                                wire:confirm="آیا از حذف کامل {{ $name }} مطمئن هستید؟ این عملیات قابل بازگشت نیست."
+                                wire:loading.attr="disabled"
+                                wire:target="uninstall"
+                                spinner="uninstall"
+                                class="btn-error btn-outline
+                                       btn-sm rounded-xl"
+                            />
+                        </div>
+
+                    @endif
+                </div>
+            </section>
+
+            {{-- Application-specific management --}}
+            @if ($info['is_running'])
+
                 <livewire:is
                     :component="$managementPanel"
                     :server-id="$serverId"
@@ -501,9 +783,11 @@
                         .$serverId.'-'
                         .$managementPanelRevision"
                 />
-            </div>
+
+            @endif
 
         @endif
 
-    @endif
-</div>
+    </div>
+
+</x-servers.workspace>

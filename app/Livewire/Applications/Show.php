@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Applications;
 
+use App\Application\Applications\Actions\GetApplicationCatalogItemAction;
 use App\Application\Applications\Manager\ApplicationManager;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationType;
@@ -25,10 +26,22 @@ final class Show extends Component
 {
     use HandlesSshAvailability;
 
+    #[Locked]
     public string $application = '';
 
+    #[Locked]
     public string $name = '';
 
+    #[Locked]
+    public string $shortDescription = '';
+
+    #[Locked]
+    public ?string $description = null;
+
+    #[Locked]
+    public ?string $icon = null;
+
+    #[Locked]
     public string $managementPanel = '';
 
     #[Locked]
@@ -67,6 +80,7 @@ final class Show extends Component
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
         ApplicationManagementPanelResolver $managementPanelResolver,
+        GetApplicationCatalogItemAction $getApplicationCatalogItem,
     ): void {
         $server = $this->resolveOwnedServer(
             $server,
@@ -82,13 +96,36 @@ final class Show extends Component
             'Application not found.',
         );
 
+        $catalogItem = $getApplicationCatalogItem->execute(
+            $type,
+        );
+
         $this->serverId = (int) $server->getKey();
 
         $this->application = $type->value;
 
-        $this->name = ucfirst(
-            $type->value,
+        $this->name = (string) $catalogItem['name'];
+
+        $this->shortDescription = (string) (
+            $catalogItem['short_description']
+            ?? ''
         );
+
+        $description = $catalogItem['description']
+            ?? null;
+
+        $this->description = is_string($description)
+        && trim($description) !== ''
+            ? trim($description)
+            : null;
+
+        $icon = $catalogItem['icon']
+            ?? null;
+
+        $this->icon = is_string($icon)
+        && trim($icon) !== ''
+            ? trim($icon)
+            : null;
 
         $this->managementPanel =
             $managementPanelResolver->resolve(
@@ -320,6 +357,9 @@ final class Show extends Component
     {
         return view(
             'livewire.applications.show',
+            [
+                'server' => $this->server(),
+            ],
         )->title(
             $this->name,
         );
