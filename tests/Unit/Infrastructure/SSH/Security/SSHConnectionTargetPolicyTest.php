@@ -423,7 +423,7 @@ final class SSHConnectionTargetPolicyTest extends TestCase
     }
 
     /**
-     * @param list<string> $addresses
+     * @param  list<string>  $addresses
      */
     private function policy(
         array $addresses = [],
@@ -431,7 +431,7 @@ final class SSHConnectionTargetPolicyTest extends TestCase
         $resolver = new class($addresses) implements SSHHostResolverInterface
         {
             /**
-             * @param list<string> $addresses
+             * @param  list<string>  $addresses
              */
             public function __construct(
                 private readonly array $addresses,

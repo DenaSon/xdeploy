@@ -150,8 +150,7 @@ final class BuildCloudServerDataFromOrderActionTest extends TestCase
 
             'status' => OrderStatus::Paid,
 
-            'quote_expires_at' =>
-                now()->addMinutes(15),
+            'quote_expires_at' => now()->addMinutes(15),
 
             'paid_at' => now(),
         ]);

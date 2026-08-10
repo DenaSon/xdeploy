@@ -114,8 +114,7 @@ final readonly class ResolveCloudImageForOrderAction
         foreach (
             $this->cloud->listSizes(
                 $region,
-            )
-            as $size
+            ) as $size
         ) {
             if ($size->id === $sizeId) {
                 return $size;
@@ -138,8 +137,7 @@ final readonly class ResolveCloudImageForOrderAction
         foreach (
             $this->supportedImages->execute(
                 $region,
-            )
-            as $image
+            ) as $image
         ) {
             if ($image->id === $imageId) {
                 return $image;

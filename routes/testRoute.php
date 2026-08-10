@@ -199,11 +199,9 @@ Route::match(
 
             'status' => $order->status->value,
 
-            'quote_expires_at' =>
-                $order->quote_expires_at?->toIso8601String(),
+            'quote_expires_at' => $order->quote_expires_at?->toIso8601String(),
 
-            'paid_at' =>
-                $order->paid_at?->toIso8601String(),
+            'paid_at' => $order->paid_at?->toIso8601String(),
         ]);
     },
 );

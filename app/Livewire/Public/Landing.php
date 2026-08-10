@@ -7,6 +7,7 @@ namespace App\Livewire\Public;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+
 #[Layout('layouts.public')]
 final class Landing extends Component
 {

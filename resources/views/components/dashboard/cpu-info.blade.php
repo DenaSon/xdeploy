@@ -22,180 +22,176 @@
         return (string) $value;
     };
 
-    $model = $displayValue($cpu['model']);
-    $architecture = $displayValue($cpu['architecture']);
-    $cores = $displayValue($cpu['cores']);
-    $threads = $displayValue($cpu['threads']);
+    $model = $displayValue(
+        $cpu['model'],
+    );
+
+    $architecture = $displayValue(
+        $cpu['architecture'],
+    );
+
+    $cores = $displayValue(
+        $cpu['cores'],
+    );
+
+    $threads = $displayValue(
+        $cpu['threads'],
+    );
+
+    $specifications = [
+        [
+            'label' => 'معماری',
+            'value' => $architecture,
+            'icon' => 'lucide.binary',
+            'technical' => true,
+        ],
+        [
+            'label' => 'هسته',
+            'value' => $cores,
+            'icon' => 'lucide.boxes',
+            'technical' => true,
+        ],
+        [
+            'label' => 'رشته',
+            'value' => $threads,
+            'icon' => 'lucide.workflow',
+            'technical' => true,
+        ],
+    ];
 @endphp
 
-<x-dashboard.card
-    title="پردازنده"
-    subtitle="CPU Information"
-    icon="o-cpu-chip"
+<section
+    class="overflow-hidden rounded-2xl
+           border border-base-300 bg-base-100"
 >
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
+    {{-- Header --}}
+    <header
+        class="flex items-start gap-3
+               border-b border-base-300
+               px-5 py-4 sm:px-6"
+    >
+        <div
+            class="flex size-9 shrink-0 items-center
+                   justify-center rounded-xl
+                   bg-base-200/70"
+        >
+            <x-icon
+                name="lucide.cpu"
+                class="size-4.5 text-base-content/65"
+            />
+        </div>
 
+        <div>
+            <h2 class="font-semibold text-base-content">
+                پردازنده
+            </h2>
+
+            <p
+                class="mt-0.5 text-sm
+                       text-base-content/50"
+            >
+                مشخصات پردازنده و معماری سیستم
+            </p>
+        </div>
+    </header>
+
+    <div
+        class="grid grid-cols-1
+               lg:grid-cols-12"
+    >
         {{-- Processor model --}}
         <div
-            class="relative overflow-hidden rounded-2xl
-                   border border-base-content/5
-                   bg-base-200/30
-                   p-5
-                   lg:col-span-7"
+            class="min-w-0 border-b border-base-300
+                   px-5 py-5
+                   sm:px-6
+                   lg:col-span-7
+                   lg:border-b-0
+                   lg:border-l"
         >
-            {{-- Decorative glow --}}
             <div
-                class="pointer-events-none absolute -top-12 -left-12
-                       size-32 rounded-full bg-primary/10 blur-3xl"
-            ></div>
-
-            <div class="relative">
-
-                <div class="flex items-center gap-3">
-
-                    <div
-                        class="flex size-10 shrink-0 items-center justify-center
-                               rounded-xl border border-primary/10
-                               bg-primary/10"
-                    >
-                        <x-icon
-                            name="o-cpu-chip"
-                            class="size-5 text-primary"
-                        />
-                    </div>
-
-                    <div>
-                        <p
-                            class="text-xs font-medium
-                                   text-base-content/45"
-                        >
-                            مدل پردازنده
-                        </p>
-
-                        <p
-                            class="mt-0.5 text-[11px]
-                                   text-base-content/30"
-                        >
-                            Processor Model
-                        </p>
-                    </div>
-
-                </div>
-
+                class="flex items-start gap-3"
+            >
                 <div
-                    class="mt-5 break-words text-left
-                           text-base font-semibold leading-7
-                           tracking-tight text-base-content
-                           sm:text-lg"
-                    dir="ltr"
+                    class="flex size-9 shrink-0 items-center
+                           justify-center rounded-lg
+                           bg-base-200/60"
                 >
-                    {{ $model }}
+                    <x-icon
+                        name="lucide.microchip"
+                        class="size-4 text-base-content/45"
+                    />
                 </div>
 
+                <div class="min-w-0 flex-1">
+
+                    <p
+                        class="text-xs font-medium
+                               text-base-content/45"
+                    >
+                        مدل پردازنده
+                    </p>
+
+                    <p
+                        dir="ltr"
+                        class="technical-value mt-2
+                               break-words text-left
+                               text-sm font-medium
+                               leading-6 text-base-content
+                               sm:text-base"
+                    >
+                        {{ $model }}
+                    </p>
+
+                </div>
             </div>
         </div>
 
         {{-- Processor specifications --}}
         <div
-            class="grid grid-cols-3 gap-3
+            class="grid grid-cols-3
+                   divide-x divide-x-reverse
+                   divide-base-300
                    lg:col-span-5"
         >
-
-            <div
-                class="flex min-w-0 flex-col items-center justify-center
-                       rounded-2xl border border-base-content/5
-                       bg-base-200/25
-                       px-3 py-5 text-center
-                       transition duration-300
-                       hover:border-primary/15
-                       hover:bg-base-200/40"
-            >
-                <div
-                    class="flex size-9 items-center justify-center
-                           rounded-xl bg-base-200"
-                >
-                    <x-icon
-                        name="o-command-line"
-                        class="size-4 text-base-content/50"
-                    />
-                </div>
+            @foreach ($specifications as $item)
 
                 <div
-                    class="mt-3 truncate font-mono text-sm font-semibold
-                           text-base-content sm:text-base"
-                    dir="ltr"
+                    class="flex min-w-0 flex-col
+                           items-center justify-center
+                           px-3 py-5 text-center"
                 >
-                    {{ $architecture }}
+                    <div
+                        class="flex size-8 items-center
+                               justify-center rounded-lg
+                               bg-base-200/60"
+                    >
+                        <x-icon
+                            :name="$item['icon']"
+                            class="size-4 text-base-content/45"
+                        />
+                    </div>
+
+                    <p
+                        @class([
+                            'mt-3 truncate text-sm font-semibold text-base-content sm:text-base',
+                            'technical-value' => $item['technical'],
+                        ])
+                        @if ($item['technical'])
+                            dir="ltr"
+                        @endif
+                    >
+                        {{ $item['value'] }}
+                    </p>
+
+                    <p
+                        class="mt-1 text-xs
+                               text-base-content/45"
+                    >
+                        {{ $item['label'] }}
+                    </p>
                 </div>
 
-                <div class="mt-1 text-[11px] text-base-content/45">
-                    معماری
-                </div>
-            </div>
-
-            <div
-                class="flex min-w-0 flex-col items-center justify-center
-                       rounded-2xl border border-base-content/5
-                       bg-base-200/25
-                       px-3 py-5 text-center
-                       transition duration-300
-                       hover:border-primary/15
-                       hover:bg-base-200/40"
-            >
-                <div
-                    class="flex size-9 items-center justify-center
-                           rounded-xl bg-base-200"
-                >
-                    <x-icon
-                        name="o-squares-2x2"
-                        class="size-4 text-base-content/50"
-                    />
-                </div>
-
-                <div
-                    class="mt-3 text-base font-semibold
-                           text-base-content sm:text-lg"
-                >
-                    {{ $cores }}
-                </div>
-
-                <div class="mt-1 text-[11px] text-base-content/45">
-                    هسته
-                </div>
-            </div>
-
-            <div
-                class="flex min-w-0 flex-col items-center justify-center
-                       rounded-2xl border border-base-content/5
-                       bg-base-200/25
-                       px-3 py-5 text-center
-                       transition duration-300
-                       hover:border-primary/15
-                       hover:bg-base-200/40"
-            >
-                <div
-                    class="flex size-9 items-center justify-center
-                           rounded-xl bg-base-200"
-                >
-                    <x-icon
-                        name="o-arrows-right-left"
-                        class="size-4 text-base-content/50"
-                    />
-                </div>
-
-                <div
-                    class="mt-3 text-base font-semibold
-                           text-base-content sm:text-lg"
-                >
-                    {{ $threads }}
-                </div>
-
-                <div class="mt-1 text-[11px] text-base-content/45">
-                    رشته
-                </div>
-            </div>
-
+            @endforeach
         </div>
-
     </div>
-</x-dashboard.card>
+</section>
