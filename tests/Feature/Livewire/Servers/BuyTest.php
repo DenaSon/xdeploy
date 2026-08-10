@@ -35,7 +35,40 @@ final class BuyTest extends TestCase
         );
     }
 
-    public function test_authenticated_user_can_open_cloud_purchase_page_with_a_live_quote(): void
+    public function test_cloud_catalog_is_deferred_until_livewire_init_request(): void
+    {
+        $user = User::factory()->create();
+
+        $cloud = Mockery::mock(
+            CloudProviderInterface::class,
+        );
+
+        $cloud->shouldNotReceive(
+            'listRegions',
+        );
+
+        $this->app->instance(
+            CloudProviderInterface::class,
+            $cloud,
+        );
+
+        $this->actingAs(
+            $user,
+        );
+
+        Livewire::test(
+            Buy::class,
+        )
+            ->assertSet(
+                'catalogLoaded',
+                false,
+            )
+            ->assertSee(
+                'خرید VPS',
+            );
+    }
+
+    public function test_authenticated_user_can_load_cloud_purchase_catalog_and_live_quote(): void
     {
         $user = User::factory()->create();
 
@@ -59,9 +92,6 @@ final class BuyTest extends TestCase
                 ),
             ]);
 
-        /*
-         * Once for the catalog and once for authoritative quote calculation.
-         */
         $cloud
             ->shouldReceive('listSizes')
             ->twice()
@@ -94,11 +124,6 @@ final class BuyTest extends TestCase
             $cloud,
         );
 
-        /*
-         * The default disk equals the selected disk in this test, so the
-         * calculator must not need a disk-price lookup. Binding the contract
-         * still keeps action construction fully isolated from the real provider.
-         */
         $resizeCatalog = Mockery::mock(
             CloudServerResizeCatalogInterface::class,
         );
@@ -119,6 +144,17 @@ final class BuyTest extends TestCase
         Livewire::test(
             Buy::class,
         )
+            ->call(
+                'loadCatalog',
+            )
+            ->assertSet(
+                'catalogLoaded',
+                true,
+            )
+            ->assertSet(
+                'regionGroup',
+                'iran',
+            )
             ->assertSet(
                 'regionId',
                 'ir-thr-ba1',
@@ -140,7 +176,16 @@ final class BuyTest extends TestCase
                 '1_month',
             )
             ->assertSee(
-                'خرید سرور جدید',
+                'موقعیت',
+            )
+            ->assertSee(
+                'پیکربندی موردنظر را انتخاب کنید',
+            )
+            ->assertSee(
+                'مدت استفاده',
+            )
+            ->assertSee(
+                'پلن',
             )
             ->assertSee(
                 'Ubuntu',

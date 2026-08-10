@@ -403,25 +403,25 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     class="group/action
-                           flex items-center
-                           justify-between gap-4
-                           border-t border-base-300
-                           bg-base-200/25
-                           px-5 py-3.5
-                           transition-colors duration-150
-                           hover:bg-primary/[0.05]
-                           sm:px-6"
+       flex items-center
+       justify-between gap-4
+       border-t border-success/15
+       bg-success/8
+       px-5 py-3.5
+       transition-colors duration-150
+       hover:bg-success/10
+       sm:px-6"
                 >
                     <div
                         class="flex min-w-0
-                               items-center gap-2.5"
+                   items-center gap-2.5"
                     >
                         <div
                             class="flex size-8 shrink-0
-                                   items-center justify-center
-                                   rounded-lg
-                                   bg-primary/8
-                                   text-primary"
+                       items-center justify-center
+                       rounded-lg
+                       bg-primary/8
+                       text-primary"
                         >
                             <x-icon
                                 name="lucide.panel-top"
@@ -432,16 +432,16 @@
                         <div class="min-w-0">
                             <p
                                 class="text-sm font-semibold
-                                       text-base-content/80
-                                       transition-colors
-                                       group-hover/action:text-primary"
+                           text-base-content/80
+                           transition-colors
+                           group-hover/action:text-primary"
                             >
                                 ورود به پنل Marzban
                             </p>
 
                             <p
                                 class="mt-0.5 text-[11px]
-                                       text-base-content/40"
+                           text-base-content/40"
                             >
                                 داشبورد مدیریت در صفحه جدید باز می‌شود
                             </p>
@@ -450,15 +450,15 @@
 
                     <div
                         class="flex size-8 shrink-0
-                               items-center justify-center
-                               rounded-lg
-                               border border-base-300
-                               bg-base-100
-                               text-base-content/40
-                               transition-all duration-150
-                               group-hover/action:border-primary/20
-                               group-hover/action:bg-primary
-                               group-hover/action:text-primary-content"
+                   items-center justify-center
+                   rounded-lg
+                   border border-base-300
+                   bg-base-100
+                   text-base-content/40
+                   transition-all duration-150
+                   group-hover/action:border-primary/20
+                   group-hover/action:bg-primary
+                   group-hover/action:text-primary-content"
                     >
                         <x-icon
                             name="lucide.external-link"

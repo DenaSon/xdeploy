@@ -517,7 +517,7 @@
                     'title' => 'سرور برای HTTPS آماده است',
                     'description' =>
                         'ساختار نصب Marzban تأیید شد و پورت‌های موردنیاز در دسترس هستند.',
-                    'icon' => 'lucide.server-check',
+                    'icon' => 'lucide.server-plus',
                     'iconBackground' => 'bg-success/10',
                     'iconColor' => 'text-success',
                     'statusClasses' =>

@@ -91,7 +91,7 @@ final class Show extends Component
         } catch (PaymentInitiationInProgressException) {
             $this->info(
                 'پرداخت در حال آماده‌سازی است',
-                'چند لحظه صبر کنید و دوباره تلاش کنید.',
+                'لطفاً چند لحظه صبر کنید و سپس دوباره تلاش کنید.',
             );
 
             return null;
@@ -109,7 +109,7 @@ final class Show extends Component
 
             $this->error(
                 'شروع پرداخت ناموفق بود',
-                'سفارش حفظ شده است. چند لحظه دیگر دوباره تلاش کنید.',
+                'سفارش شما حفظ شده است. لطفاً چند لحظه دیگر دوباره تلاش کنید.',
             );
 
             return null;
@@ -206,7 +206,7 @@ final class Show extends Component
             ) {
                 return [
                     'label' => 'آماده استفاده',
-                    'description' => 'سرور ساخته شده و اتصال xDeploy نیز آماده است.',
+                    'description' => 'سرور با موفقیت ساخته شده و اتصال xDeploy نیز آماده استفاده است.',
                     'icon' => 'lucide.circle-check',
                     'badge' => 'badge-success',
                 ];
@@ -214,7 +214,7 @@ final class Show extends Component
 
             return [
                 'label' => 'VPS ساخته شد',
-                'description' => 'ساخت سرور در Cloud کامل شده و بررسی اتصال xDeploy در حال انجام است.',
+                'description' => 'ساخت VPS با موفقیت تکمیل شده است. در حال بررسی آمادگی اتصال xDeploy هستیم.',
                 'icon' => 'lucide.server',
                 'badge' => 'badge-info',
             ];
@@ -223,42 +223,42 @@ final class Show extends Component
         return match ($order->status) {
             OrderStatus::PendingPayment => [
                 'label' => 'در انتظار پرداخت',
-                'description' => 'سفارش ثبت شده و برای ادامه باید پرداخت انجام شود.',
+                'description' => 'سفارش ثبت شده است. برای ادامه فرایند، لطفاً پرداخت را تکمیل کنید.',
                 'icon' => 'lucide.credit-card',
                 'badge' => 'badge-warning',
             ],
 
             OrderStatus::Paid => [
                 'label' => 'پرداخت تأیید شد',
-                'description' => 'پرداخت تأیید شده و سفارش در صف ساخت سرور قرار گرفته است.',
+                'description' => 'پرداخت با موفقیت تأیید شده است و سفارش برای ساخت VPS در صف قرار دارد.',
                 'icon' => 'lucide.badge-check',
                 'badge' => 'badge-success',
             ],
 
             OrderStatus::Provisioning => [
                 'label' => 'در حال ساخت VPS',
-                'description' => 'درخواست ساخت به Cloud Provider ارسال شده است.',
+                'description' => 'درخواست ساخت VPS به ارائه‌دهنده زیرساخت ارسال شده است.',
                 'icon' => 'lucide.loader-circle',
                 'badge' => 'badge-info',
             ],
 
             OrderStatus::Failed => [
                 'label' => 'ساخت سرور ناموفق بود',
-                'description' => 'ساخت خودکار متوقف شده است. برای جلوگیری از ایجاد سرور تکراری، تلاش مجدد خودکار انجام نمی‌شود.',
+                'description' => 'فرایند ساخت متوقف شده است. برای جلوگیری از ایجاد VPS تکراری، تلاش مجدد به‌صورت خودکار انجام نمی‌شود.',
                 'icon' => 'lucide.triangle-alert',
                 'badge' => 'badge-error',
             ],
 
             OrderStatus::Cancelled => [
                 'label' => 'سفارش لغو شد',
-                'description' => 'این سفارش دیگر وارد فرایند ساخت سرور نمی‌شود.',
+                'description' => 'این سفارش لغو شده است و وارد فرایند ساخت VPS نخواهد شد.',
                 'icon' => 'lucide.circle-x',
                 'badge' => 'badge-neutral',
             ],
 
             OrderStatus::Expired => [
                 'label' => 'پیش‌فاکتور منقضی شد',
-                'description' => 'اعتبار قیمت این سفارش تمام شده است. یک سفارش جدید ایجاد کنید.',
+                'description' => 'اعتبار قیمت این سفارش به پایان رسیده است. لطفاً یک سفارش جدید ایجاد کنید.',
                 'icon' => 'lucide.clock-alert',
                 'badge' => 'badge-warning',
             ],
@@ -294,22 +294,22 @@ final class Show extends Component
         return match ($payment->status) {
             PaymentStatus::Cancelled => [
                 'type' => 'warning',
-                'message' => 'پرداخت قبلی لغو شد. اگر پیش‌فاکتور هنوز معتبر باشد می‌توانید دوباره پرداخت را شروع کنید.',
+                'message' => 'پرداخت قبلی لغو شده است. در صورت معتبر بودن پیش‌فاکتور، می‌توانید پرداخت را دوباره آغاز کنید.',
             ],
 
             PaymentStatus::Failed => [
                 'type' => 'error',
-                'message' => 'شروع پرداخت قبلی ناموفق بود. سفارش شما حفظ شده و می‌توانید دوباره تلاش کنید.',
+                'message' => 'شروع پرداخت قبلی انجام نشد. سفارش شما حفظ شده است و می‌توانید دوباره تلاش کنید.',
             ],
 
             PaymentStatus::Initiating => [
                 'type' => 'info',
-                'message' => 'درخواست پرداخت در حال آماده‌سازی است. از ایجاد چند پرداخت هم‌زمان جلوگیری می‌شود.',
+                'message' => 'درخواست پرداخت در حال آماده‌سازی است. لطفاً صبر کنید؛ از ایجاد پرداخت‌های هم‌زمان جلوگیری می‌شود.',
             ],
 
             PaymentStatus::Pending => [
                 'type' => 'info',
-                'message' => 'یک پرداخت فعال برای این سفارش وجود دارد. دکمه پرداخت شما را به همان درخواست برمی‌گرداند.',
+                'message' => 'یک پرداخت فعال برای این سفارش وجود دارد. با انتخاب ادامه پرداخت، همان درخواست پرداخت ادامه خواهد یافت.',
             ],
 
             PaymentStatus::Paid => null,

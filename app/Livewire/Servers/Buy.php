@@ -27,6 +27,21 @@ final class Buy extends Component
 {
     use Toast;
 
+    private const string REGION_GROUP_IRAN = 'iran';
+
+    private const int MAX_VISIBLE_PLANS = 10;
+
+    private const string REGION_GROUP_INTERNATIONAL = 'international';
+
+    private const array REGION_DISPLAY_NAMES = [
+        'ir-thr-ba1' => 'تهران (مرکز ۱)',
+        'ir-thr-fr1' => 'تهران (مرکز ۲)',
+        'ir-thr-si1' => 'تهران (مرکز ۳)',
+        'ir-tbz-sh1' => 'تبریز (مرکز ۱)',
+        'ir-southwest1-a' => 'اهواز (مرکز ۱)',
+        'eu-west1-a' => 'آلمان (مرکز اروپا)',
+    ];
+
     /**
      * @var list<array{
      *     id: string,
@@ -64,7 +79,12 @@ final class Buy extends Component
     public array $images = [];
 
     /**
-     * @var list<array{id: string, label: string}>
+     * @var list<array{
+     *     id: string,
+     *     label: string,
+     *     hint: string,
+     *     recommended: bool
+     * }>
      */
     public array $periods = [];
 
@@ -77,6 +97,10 @@ final class Buy extends Component
      * }|array{}
      */
     public array $quote = [];
+
+    public bool $catalogLoaded = false;
+
+    public string $regionGroup = self::REGION_GROUP_IRAN;
 
     public string $regionId = '';
 
@@ -96,31 +120,114 @@ final class Buy extends Component
 
     public function mount(): void
     {
+        /*
+         * Do not block the initial page render on the Cloud Provider.
+         * The catalog is fetched after first paint through wire:init.
+         */
         $this->loadPeriods();
+    }
 
-        $this->loadRegions();
+    public function regionDisplayName(
+        array $region,
+    ): string {
+        $regionId = $region['id'] ?? null;
+
+        if (
+            $regionId !== null
+            && isset(self::REGION_DISPLAY_NAMES[$regionId])
+        ) {
+            return self::REGION_DISPLAY_NAMES[$regionId];
+        }
+
+        return $region['city']
+            ?? $region['country']
+            ?? $region['name']
+            ?? $regionId
+            ?? '—';
+    }
+
+    public function loadCatalog(): void
+    {
+        if ($this->catalogLoaded) {
+            return;
+        }
+
+        $this->fetchCatalog();
     }
 
     public function reloadCatalog(): void
     {
+        $this->catalogLoaded = false;
         $this->catalogError = null;
         $this->quoteError = null;
         $this->pendingOrderId = null;
 
-        $this->loadRegions();
+        $this->fetchCatalog();
     }
 
-    public function selectRegion(
-        string $regionId,
-    ): void {
+    public function selectRegionGroup(string $group): void
+    {
+        if (! in_array(
+            $group,
+            [
+                self::REGION_GROUP_IRAN,
+                self::REGION_GROUP_INTERNATIONAL,
+            ],
+            true,
+        )) {
+            return;
+        }
+
+        $groupRegions = $this->regionsForGroup(
+            $group,
+        );
+
+        if ($groupRegions === []) {
+            return;
+        }
+
+        $this->regionGroup = $group;
+
+        $selectedRegion = $this->findById(
+            $this->regions,
+            $this->regionId,
+        );
+
         if (
-            $this->findById(
-                $this->regions,
-                $regionId,
-            ) === null
+            $selectedRegion !== null
+            && $this->regionGroupFor(
+                $selectedRegion,
+            ) === $group
         ) {
             return;
         }
+
+        $this->pendingOrderId = null;
+
+        $this->loadRegionCatalog(
+            $groupRegions[0]['id'],
+        );
+    }
+
+    public function selectRegion(string $regionId): void
+    {
+        $region = $this->findById(
+            $this->regions,
+            $regionId,
+        );
+
+        if ($region === null) {
+            return;
+        }
+
+        if ($this->regionId === $regionId) {
+            return;
+        }
+
+        $this->regionGroup =
+            $this->regionGroupFor(
+                $region,
+            );
 
         $this->pendingOrderId = null;
 
@@ -129,9 +236,8 @@ final class Buy extends Component
         );
     }
 
-    public function selectSize(
-        string $sizeId,
-    ): void {
+    public function selectSize(string $sizeId): void
+    {
         $size = $this->findById(
             $this->sizes,
             $sizeId,
@@ -141,7 +247,12 @@ final class Buy extends Component
             return;
         }
 
+        if ($this->sizeId === $sizeId) {
+            return;
+        }
+
         $this->sizeId = $sizeId;
+
         $this->selectedDiskGiB =
             $this->minimumDiskGiB();
 
@@ -150,9 +261,8 @@ final class Buy extends Component
         $this->recalculateQuote();
     }
 
-    public function selectImage(
-        string $imageId,
-    ): void {
+    public function selectImage(string $imageId): void
+    {
         if (
             $this->findById(
                 $this->images,
@@ -162,7 +272,12 @@ final class Buy extends Component
             return;
         }
 
+        if ($this->imageId === $imageId) {
+            return;
+        }
+
         $this->imageId = $imageId;
+
         $this->selectedDiskGiB = max(
             $this->selectedDiskGiB,
             $this->minimumDiskGiB(),
@@ -173,15 +288,43 @@ final class Buy extends Component
         $this->recalculateQuote();
     }
 
-    public function selectPeriod(
-        string $period,
-    ): void {
+    public function updatedImageId(string $imageId): void
+    {
+        /*
+         * Mary UI x-group updates imageId through wire:model.live.
+         * Recalculate the quote after Livewire has applied the new value.
+         */
+        if (
+            $this->findById(
+                $this->images,
+                $imageId,
+            ) === null
+        ) {
+            return;
+        }
+
+        $this->selectedDiskGiB = max(
+            $this->selectedDiskGiB,
+            $this->minimumDiskGiB(),
+        );
+
+        $this->pendingOrderId = null;
+
+        $this->recalculateQuote();
+    }
+
+    public function selectPeriod(string $period): void
+    {
         if (
             $this->findById(
                 $this->periods,
                 $period,
             ) === null
         ) {
+            return;
+        }
+
+        if ($this->period === $period) {
             return;
         }
 
@@ -209,11 +352,16 @@ final class Buy extends Component
             return;
         }
 
-        $this->selectedDiskGiB = max(
+        $nextValue = max(
             $this->minimumDiskGiB(),
             $this->selectedDiskGiB - 10,
         );
 
+        if ($nextValue === $this->selectedDiskGiB) {
+            return;
+        }
+
+        $this->selectedDiskGiB = $nextValue;
         $this->pendingOrderId = null;
 
         $this->recalculateQuote();
@@ -226,7 +374,7 @@ final class Buy extends Component
         if (! $this->selectionIsValid()) {
             $this->error(
                 'اطلاعات خرید کامل نیست',
-                'منطقه، پلن، سیستم‌عامل و دوره پرداخت را انتخاب کنید.',
+                'لطفاً منطقه، پلن، سیستم‌عامل و دوره پرداخت را انتخاب کنید.',
             );
 
             return null;
@@ -238,7 +386,7 @@ final class Buy extends Component
             if ($this->quote === []) {
                 $this->error(
                     'قیمت در دسترس نیست',
-                    'در حال حاضر امکان دریافت قیمت این پیکربندی وجود ندارد.',
+                    'در حال حاضر امکان دریافت قیمت این پیکربندی وجود ندارد. لطفاً دوباره تلاش کنید.',
                 );
 
                 return null;
@@ -248,10 +396,6 @@ final class Buy extends Component
         $user = $this->authenticatedUser();
 
         try {
-            /*
-             * Keep the same pending Order when gateway initiation fails.
-             * A retry should not create duplicate commercial Orders.
-             */
             if ($this->pendingOrderId === null) {
                 $order = $createOrder->execute(
                     user: $user,
@@ -283,7 +427,7 @@ final class Buy extends Component
 
             $this->warning(
                 'پیش‌فاکتور منقضی شد',
-                'قیمت به‌روزرسانی شد. دوباره پرداخت را شروع کنید.',
+                'قیمت سفارش به‌روزرسانی شد. لطفاً پرداخت را دوباره آغاز کنید.',
             );
 
             return null;
@@ -294,7 +438,7 @@ final class Buy extends Component
 
             $this->error(
                 'شروع پرداخت ناموفق بود',
-                'سفارش حفظ شد. چند لحظه دیگر دوباره تلاش کنید.',
+                'سفارش شما حفظ شده است. لطفاً چند لحظه دیگر دوباره تلاش کنید.',
             );
 
             return null;
@@ -306,6 +450,24 @@ final class Buy extends Component
         return view(
             'livewire.servers.buy',
             [
+                'visibleRegions' => $this->regionsForGroup(
+                    $this->regionGroup,
+                ),
+
+                'regionGroupCounts' => [
+                    self::REGION_GROUP_IRAN => count(
+                        $this->regionsForGroup(
+                            self::REGION_GROUP_IRAN,
+                        ),
+                    ),
+
+                    self::REGION_GROUP_INTERNATIONAL => count(
+                        $this->regionsForGroup(
+                            self::REGION_GROUP_INTERNATIONAL,
+                        ),
+                    ),
+                ],
+
                 'selectedRegion' => $this->findById(
                     $this->regions,
                     $this->regionId,
@@ -327,55 +489,27 @@ final class Buy extends Component
                 ),
 
                 'minimumDiskGiB' => $this->minimumDiskGiB(),
+
+                'providerLabel' => $this->providerLabel(),
+
+                'quoteTtlMinutes' => max(
+                    1,
+                    (int) config(
+                        'money.quote_ttl_minutes',
+                        15,
+                    ),
+                ),
             ],
         )->layout(
             'layouts.panel',
         );
     }
 
-    private function loadPeriods(): void
+    private function fetchCatalog(): void
     {
-        $configuredPeriods = (array) config(
-            'money.periods',
-            [],
-        );
+        $this->catalogError = null;
+        $this->quoteError = null;
 
-        $this->periods = [];
-
-        foreach (
-            $configuredPeriods as $id => $config
-        ) {
-            if (
-                ! is_string($id)
-                || ! is_array($config)
-            ) {
-                continue;
-            }
-
-            $label = $config['label'] ?? null;
-
-            if (! is_string($label)) {
-                continue;
-            }
-
-            $this->periods[] = [
-                'id' => $id,
-                'label' => $label,
-            ];
-        }
-
-        $preferred = $this->findById(
-            $this->periods,
-            '1_month',
-        );
-
-        $this->period =
-            $preferred['id']
-            ?? ($this->periods[0]['id'] ?? '');
-    }
-
-    private function loadRegions(): void
-    {
         try {
             $cloud = app(
                 CloudProviderInterface::class,
@@ -406,15 +540,31 @@ final class Buy extends Component
             );
 
             if ($this->regions === []) {
+                $this->catalogLoaded = true;
                 $this->catalogError =
                     'در حال حاضر هیچ منطقه‌ای برای ساخت سرور در دسترس نیست.';
 
                 return;
             }
 
-            $this->loadRegionCatalog(
-                $this->regions[0]['id'],
+            $iranRegions = $this->regionsForGroup(
+                self::REGION_GROUP_IRAN,
             );
+
+            $preferredRegion =
+                $iranRegions[0]
+                ?? $this->regions[0];
+
+            $this->regionGroup =
+                $this->regionGroupFor(
+                    $preferredRegion,
+                );
+
+            $this->loadRegionCatalog(
+                $preferredRegion['id'],
+            );
+
+            $this->catalogLoaded = true;
         } catch (Throwable $exception) {
             report(
                 $exception,
@@ -424,10 +574,56 @@ final class Buy extends Component
             $this->sizes = [];
             $this->images = [];
             $this->quote = [];
+            $this->catalogLoaded = true;
 
             $this->catalogError =
                 'دریافت اطلاعات سرورهای ابری ناموفق بود. دوباره تلاش کنید.';
         }
+    }
+
+    private function loadPeriods(): void
+    {
+        $configuredPeriods = (array) config(
+            'money.periods',
+            [],
+        );
+
+        $this->periods = [];
+
+        foreach (
+            $configuredPeriods as $id => $config
+        ) {
+            if (
+                ! is_string($id)
+                || ! is_array($config)
+            ) {
+                continue;
+            }
+
+            $label = $config['label'] ?? null;
+
+            if (! is_string($label)) {
+                continue;
+            }
+
+            $this->periods[] = [
+                'id' => $id,
+                'label' => $label,
+                'hint' => $this->periodHint(
+                    $id,
+                ),
+                'recommended' => $id === '1_month',
+            ];
+        }
+
+        $preferred = $this->findById(
+            $this->periods,
+            '1_month',
+        );
+
+        $this->period =
+            $preferred['id']
+            ?? ($this->periods[0]['id'] ?? '');
     }
 
     private function loadRegionCatalog(
@@ -449,10 +645,6 @@ final class Buy extends Component
                 CloudProviderInterface::class,
             );
 
-            /*
-             * CloudSizeData prices are nullable at the Domain boundary.
-             * Never expose an unpriced size to the commercial UI.
-             */
             $purchasableSizes = array_values(
                 array_filter(
                     $cloud->listSizes(
@@ -473,6 +665,12 @@ final class Buy extends Component
                 ): int => (int) $left->monthlyPrice->amount
                     <=>
                     (int) $right->monthlyPrice->amount,
+            );
+
+            $purchasableSizes = array_slice(
+                $purchasableSizes,
+                0,
+                self::MAX_VISIBLE_PLANS,
             );
 
             $this->sizes = array_map(
@@ -546,8 +744,16 @@ final class Buy extends Component
             $this->quote = [];
 
             $this->catalogError =
-                'دریافت پلن‌های این منطقه ناموفق بود. منطقه دیگری انتخاب کنید یا دوباره تلاش کنید.';
+                'دریافت پلن‌های این منطقه ناموفق بود. لطفاً منطقه دیگری را انتخاب کنید یا دوباره تلاش کنید.';
         }
+    }
+
+    public function formatToman(
+        int $rialAmount,
+    ): string {
+        return number_format(
+            intdiv($rialAmount, 10),
+        );
     }
 
     private function recalculateQuote(): void
@@ -664,6 +870,102 @@ final class Buy extends Component
         }
 
         return null;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function regionsForGroup(
+        string $group,
+    ): array {
+        return array_values(
+            array_filter(
+                $this->regions,
+                fn (array $region): bool => $this->regionGroupFor(
+                    $region,
+                ) === $group,
+            ),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $region
+     */
+    private function regionGroupFor(
+        array $region,
+    ): string {
+        $country = mb_strtolower(
+            trim(
+                (string) ($region['country'] ?? ''),
+            ),
+        );
+
+        $name = mb_strtolower(
+            trim(
+                (string) ($region['name'] ?? ''),
+            ),
+        );
+
+        $id = mb_strtolower(
+            trim(
+                (string) ($region['id'] ?? ''),
+            ),
+        );
+
+        if (
+            str_starts_with(
+                $id,
+                'ir-',
+            )
+            || str_contains(
+                $country,
+                'iran',
+            )
+            || str_contains(
+                $country,
+                'ایران',
+            )
+            || str_contains(
+                $name,
+                'iran',
+            )
+            || str_contains(
+                $name,
+                'ایران',
+            )
+        ) {
+            return self::REGION_GROUP_IRAN;
+        }
+
+        return self::REGION_GROUP_INTERNATIONAL;
+    }
+
+    private function periodHint(
+        string $period,
+    ): string {
+        return match ($period) {
+            '2_days' => 'مناسب آزمایش کوتاه',
+
+            '14_days' => 'مناسب استفاده کوتاه',
+
+            '1_month' => 'مناسب استفاده ماهانه',
+
+            default => 'دوره استفاده',
+        };
+    }
+
+    private function providerLabel(): string
+    {
+        return match (
+            (string) config(
+                'cloud.default',
+                '',
+            )
+        ) {
+            'arvan' => 'ابر آروان',
+
+            default => 'Cloud Provider',
+        };
     }
 
     private function memoryLabel(

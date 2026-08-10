@@ -60,7 +60,7 @@
                             text-base-content/50
                         "
                     >
-                        وضعیت پرداخت و آماده‌سازی VPS را از این صفحه دنبال کن.
+                        وضعیت پرداخت و آماده‌سازی VPS را از این صفحه دنبال کنید.
                     </p>
                 </div>
             </div>
@@ -160,7 +160,7 @@
                     "
                 >
                     <span class="loading loading-spinner loading-xs"></span>
-                    به‌روزرسانی خودکار
+                    لطفاً صبر کنید
                 </div>
             @endif
         </div>
@@ -168,21 +168,33 @@
 
     @if($paymentNotice)
         <div
+            role="alert"
             @class([
                 '
-                    rounded-xl border
-                    px-4 py-3
+                    alert alert-soft
+                    rounded-xl
                     text-sm leading-7
                 ',
-                'border-warning/20 bg-warning/5 text-base-content/70' =>
+                'alert-warning' =>
                     $paymentNotice['type'] === 'warning',
-                'border-error/20 bg-error/5 text-error' =>
+                'alert-error' =>
                     $paymentNotice['type'] === 'error',
-                'border-info/20 bg-info/5 text-base-content/70' =>
+                'alert-info' =>
                     $paymentNotice['type'] === 'info',
             ])
         >
-            {{ $paymentNotice['message'] }}
+            <x-icon
+                :name="match ($paymentNotice['type']) {
+                    'error' => 'lucide.circle-alert',
+                    'warning' => 'lucide.triangle-alert',
+                    default => 'lucide.info',
+                }"
+                class="!size-4.5 shrink-0"
+            />
+
+            <span>
+                {{ $paymentNotice['message'] }}
+            </span>
         </div>
     @endif
 
@@ -627,3 +639,4 @@
         </aside>
     </div>
 </div>
+
