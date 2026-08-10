@@ -11,113 +11,170 @@
 
     $statusClasses = $isActive
         ? 'border-success/20 bg-success/10 text-success'
-        : 'border-base-300 bg-base-200 text-base-content/60';
+        : 'border-base-300 bg-base-200 text-base-content/55';
 
     $connectionAddress = $server->host
         ? $server->host . ':' . $server->port
         : '—';
+
+    $navigationItems = [
+        [
+            'label' => 'نمای کلی',
+            'icon' => 'lucide.layout-dashboard',
+            'route' => route(
+                'panel.servers.dashboard',
+                ['server' => $server],
+            ),
+            'active' => request()->routeIs(
+                'panel.servers.dashboard',
+            ),
+        ],
+
+        [
+            'label' => 'برنامه‌ها',
+            'icon' => 'lucide.package',
+            'route' => route(
+                'panel.servers.applications.index',
+                ['server' => $server],
+            ),
+            'active' => request()->routeIs(
+                'panel.servers.applications.*',
+            ),
+        ],
+    ];
 @endphp
 
 <header
-    class="flex flex-col gap-5
-           px-5 py-5
-           sm:px-6
-           lg:flex-row lg:items-center lg:justify-between"
+    class="px-4 py-3.5
+           sm:px-5"
 >
-    <div class="flex min-w-0 items-start gap-4">
-
-        <div
-            class="flex size-11 shrink-0 items-center justify-center
-                   rounded-xl border border-base-300 bg-base-200/50"
+    <div
+        class="flex flex-col gap-3
+               lg:flex-row
+               lg:items-center
+               lg:justify-between"
+    >
+        {{-- Server navigation --}}
+        <nav
+            class="min-w-0"
+            aria-label="ناوبری سرور"
         >
-            <x-icon
-                name="lucide.server"
-                class="size-5 text-base-content/70"
-            />
-        </div>
+            <div
+                class="flex items-center gap-1
+                       overflow-x-auto"
+            >
+                @foreach ($navigationItems as $item)
 
-        <div class="min-w-0">
-
-            <div class="flex flex-wrap items-center gap-2.5">
-
-                <h1
-                    class="truncate text-xl font-semibold
-                           tracking-tight text-base-content"
-                >
-                    {{ $server->name }}
-                </h1>
-
-                <span
-                    class="inline-flex items-center gap-1.5
-                           rounded-full border px-2.5 py-1
-                           text-xs font-medium
-                           {{ $statusClasses }}"
-                >
-                    <span
+                    <a
+                        href="{{ $item['route'] }}"
+                        wire:navigate
+                        @if ($item['active'])
+                            aria-current="page"
+                        @endif
                         @class([
-                            'size-1.5 rounded-full',
-                            'bg-success' => $isActive,
-                            'bg-base-content/30' => ! $isActive,
+                            'flex shrink-0 items-center gap-1.5',
+                            'rounded-xl px-3 py-2',
+                            'text-sm font-medium',
+                            'transition-colors duration-150',
+
+                            'bg-primary/8 text-primary'
+                                => $item['active'],
+
+                            'text-base-content/50 hover:bg-base-200/60 hover:text-base-content/75'
+                                => ! $item['active'],
                         ])
-                    ></span>
+                    >
+                        <x-icon
+                            :name="$item['icon']"
+                            class="size-4"
+                        />
 
-                    {{ $statusLabel }}
-                </span>
+                        <span>
+                            {{ $item['label'] }}
+                        </span>
+                    </a>
 
+                @endforeach
+            </div>
+        </nav>
+
+        {{-- Server context --}}
+        <div
+            class="flex min-w-0
+                   items-center gap-3
+                   lg:max-w-[50%]"
+        >
+            {{-- Server icon --}}
+            <div
+                class="flex size-10 shrink-0
+                       items-center justify-center
+                       rounded-xl
+                       border border-base-300
+                       bg-base-200/50"
+            >
+                <x-icon
+                    name="lucide.server"
+                    class="size-4.5
+                           text-base-content/60"
+                />
             </div>
 
-            <div
-                class="mt-2 flex flex-wrap items-center
-                       gap-x-4 gap-y-2
-                       text-sm text-base-content/55"
-            >
-                <span class="inline-flex items-center gap-1.5">
+            {{-- Server identity --}}
+            <div class="min-w-0">
 
+                <div
+                    class="flex flex-wrap
+                           items-center gap-2"
+                >
+                    <h1
+                        dir="ltr"
+                        class="technical-value truncate
+                               text-base font-semibold
+                               tracking-tight
+                               text-base-content"
+                    >
+                        {{ $server->name }}
+                    </h1>
+
+                    <span
+                        class="inline-flex items-center
+                               gap-1.5 rounded-full
+                               border px-2 py-0.5
+                               text-[11px] font-medium
+                               {{ $statusClasses }}"
+                    >
+                        <span
+                            @class([
+                                'size-1.5 rounded-full',
+                                'bg-success' => $isActive,
+                                'bg-base-content/30' => ! $isActive,
+                            ])
+                        ></span>
+
+                        {{ $statusLabel }}
+                    </span>
+                </div>
+
+                <div
+                    class="mt-1 flex items-center
+                           gap-1.5
+                           text-xs
+                           text-base-content/45"
+                >
                     <x-icon
                         name="lucide.network"
-                        class="size-4"
+                        class="size-3.5 shrink-0"
                     />
 
                     <span
                         dir="ltr"
-                        class="technical-value"
+                        class="technical-value truncate"
                     >
                         {{ $connectionAddress }}
                     </span>
+                </div>
 
-                </span>
-
-                <span class="inline-flex items-center gap-1.5">
-
-                    <x-icon
-                        name="lucide.user"
-                        class="size-4"
-                    />
-
-                    <span
-                        dir="ltr"
-                        class="technical-value"
-                    >
-                        {{ $server->username }}
-                    </span>
-
-                </span>
             </div>
-
         </div>
-    </div>
-
-    <div class="flex shrink-0 items-center gap-2">
-
-        <x-button
-            label="ویرایش اتصال"
-            icon="lucide.pencil"
-            :link="route('panel.servers.edit', [
-                'server' => $server,
-            ])"
-            wire:navigate
-            class="btn-ghost btn-sm rounded-xl"
-        />
-
     </div>
 </header>
