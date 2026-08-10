@@ -4,42 +4,40 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Application\Marzban;
 
+use App\Domain\Application\Marzban\Admin\DTOs\MarzbanAdminOverview;
 use App\Domain\Application\Marzban\Admin\MarzbanAdminGateway;
+use App\Domain\Application\Marzban\Admin\MarzbanAdminReader;
 use App\Domain\Application\Marzban\Exceptions\MarzbanAdminProvisioningException;
 use App\Domain\Application\Marzban\Exceptions\MarzbanSetupInspectionException;
 use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Application\Marzban\Parsers\MarzbanAdminListParser;
 use App\Support\SSH\SSHTimeout;
 use Throwable;
 
-final readonly class SshMarzbanAdminGateway implements MarzbanAdminGateway
+final readonly class SshMarzbanAdminGateway implements
+    MarzbanAdminGateway,
+    MarzbanAdminReader
 {
     private const string INSPECT_COMMAND = <<<'BASH'
-if ! docker compose version >/dev/null 2>&1; then
+if docker compose version >/dev/null 2>&1; then
+    compose='docker compose'
+elif docker-compose version >/dev/null 2>&1; then
+    compose='docker-compose'
+else
     exit 127
 fi
 
-output="$(
-    docker compose \
-        -f /opt/marzban/docker-compose.yml \
-        -p marzban \
-        exec -T \
-        -e CLI_PROG_NAME='marzban cli' \
-        marzban \
-        marzban-cli admin list{{ username_option }} \
-        2>&1
-)"
-status=$?
-
-if [ "$status" -ne 0 ]; then
-    exit "$status"
-fi
-
-if printf '%s' "$output" | grep -q '✔'; then
-    printf 'complete'
-else
-    printf 'pending'
-fi
+$compose \
+    -f /opt/marzban/docker-compose.yml \
+    -p marzban \
+    exec -T \
+    -e CLI_PROG_NAME='marzban cli' \
+    -e COLUMNS=320 \
+    marzban \
+    marzban-cli admin list \
+    --limit 1000{{ username_option }} \
+    2>&1
 BASH;
 
     private const string CREATE_COMMAND = <<<'BASH'
@@ -69,29 +67,17 @@ BASH;
         private PrivilegedCommandExecutor $privileged,
     ) {}
 
+    public function overview(): MarzbanAdminOverview
+    {
+        return $this->inspectAdmins();
+    }
+
     public function inspect(
         ?string $username = null,
     ): MarzbanSetupState {
-        try {
-            $result = $this->privileged->executeWithResult(
-                command: $this->inspectionCommand(
-                    $username,
-                ),
-                timeout: SSHTimeout::QUICK,
-            );
-        } catch (Throwable) {
-            throw MarzbanSetupInspectionException::failed();
-        }
-
-        if (! $result->successful()) {
-            throw MarzbanSetupInspectionException::failed();
-        }
-
-        return MarzbanSetupState::tryFrom(
-            trim(
-                $result->output,
-            ),
-        ) ?? throw MarzbanSetupInspectionException::failed();
+        return $this->inspectAdmins(
+            $username,
+        )->state;
     }
 
     public function create(
@@ -116,6 +102,30 @@ BASH;
         }
     }
 
+    private function inspectAdmins(
+        ?string $username = null,
+    ): MarzbanAdminOverview {
+        try {
+            $result = $this->privileged->executeWithResult(
+                command: $this->inspectionCommand(
+                    $username,
+                ),
+                timeout: SSHTimeout::QUICK,
+            );
+        } catch (Throwable) {
+            throw MarzbanSetupInspectionException::failed();
+        }
+
+        if (! $result->successful()) {
+            throw MarzbanSetupInspectionException::failed();
+        }
+
+        return (new MarzbanAdminListParser())
+            ->parse(
+                $result->output,
+            );
+    }
+
     private function inspectionCommand(
         ?string $username,
     ): string {
@@ -129,7 +139,8 @@ BASH;
         return strtr(
             self::INSPECT_COMMAND,
             [
-                '{{ username_option }}' => $usernameOption,
+                '{{ username_option }}' =>
+                    $usernameOption,
             ],
         );
     }
@@ -141,12 +152,15 @@ BASH;
         return strtr(
             self::CREATE_COMMAND,
             [
-                '{{ username }}' => $this->shellArgument(
-                    $username,
-                ),
-                '{{ password }}' => $this->shellArgument(
-                    $password,
-                ),
+                '{{ username }}' =>
+                    $this->shellArgument(
+                        $username,
+                    ),
+
+                '{{ password }}' =>
+                    $this->shellArgument(
+                        $password,
+                    ),
             ],
         );
     }

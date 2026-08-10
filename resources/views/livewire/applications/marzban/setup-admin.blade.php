@@ -1,4 +1,6 @@
 @php
+    $adminCount = count($admins);
+
     $setupPresentation = match ($setupState) {
         'pending' => [
             'label' => 'نیازمند راه‌اندازی',
@@ -11,8 +13,8 @@
         ],
 
         'complete' => [
-            'label' => 'تکمیل‌شده',
-            'icon' => 'lucide.user-round-check',
+            'label' => $adminCount . ' مدیر',
+            'icon' => 'lucide.users-round',
             'iconBackground' => 'bg-success/10',
             'iconColor' => 'text-success',
             'statusClasses' =>
@@ -32,7 +34,7 @@
 
         default => [
             'label' => null,
-            'icon' => 'lucide.user-round',
+            'icon' => 'lucide.users-round',
             'iconBackground' => 'bg-base-200/70',
             'iconColor' => 'text-base-content/45',
             'statusClasses' => null,
@@ -59,7 +61,6 @@
             class="flex min-w-0
                    items-start gap-3.5"
         >
-            {{-- Icon --}}
             <div
                 @class([
                     'flex size-10 shrink-0',
@@ -75,7 +76,6 @@
                 />
             </div>
 
-            {{-- Identity --}}
             <div class="min-w-0">
                 <div
                     class="flex flex-wrap
@@ -85,7 +85,7 @@
                         class="text-sm font-semibold
                                text-base-content"
                     >
-                        مدیر اصلی Marzban
+                        مدیران Marzban
                     </h3>
 
                     @if ($setupPresentation['label'] !== null)
@@ -113,7 +113,7 @@
                            text-sm leading-7
                            text-base-content/55"
                 >
-                    حساب مدیرکل برای ورود و مدیریت پنل Marzban.
+                    حساب‌های مدیریتی دارای دسترسی به پنل Marzban.
                 </p>
             </div>
         </div>
@@ -127,7 +127,6 @@
                    px-5 py-5
                    sm:px-6"
         >
-            {{-- Security note --}}
             <div
                 class="flex items-start gap-3
                        rounded-xl
@@ -152,13 +151,13 @@
                     class="text-sm leading-7
                            text-base-content/65"
                 >
-                    این حساب با دسترسی مدیرکل ساخته می‌شود.
-                    رمز عبور فقط هنگام اجرای عملیات به سرور ارسال
-                    شده و در xDeploy ذخیره نمی‌شود.
+                    هنوز حساب مدیریتی روی Marzban شناسایی نشده است.
+                    این حساب با دسترسی مدیرکل ساخته می‌شود و رمز عبور
+                    فقط هنگام اجرای عملیات به سرور ارسال شده و در
+                    xDeploy ذخیره نمی‌شود.
                 </p>
             </div>
 
-            {{-- Admin form --}}
             <x-form
                 wire:submit="createAdmin"
                 class="mt-5"
@@ -220,48 +219,99 @@
             </x-form>
         </div>
 
-        {{-- Setup complete --}}
+    {{-- Detected administrators --}}
     @elseif ($setupState === 'complete')
 
-        <div
-            class="flex items-start gap-3
-                   border-t border-base-300
-                   bg-success/[0.035]
-                   px-5 py-4
-                   sm:px-6"
-        >
+        <div class="border-t border-base-300">
             <div
-                class="flex size-8 shrink-0
-                       items-center justify-center
-                       rounded-lg
-                       bg-success/10
-                       text-success"
+                class="flex items-center
+                       gap-2
+                       bg-success/[0.025]
+                       px-5 py-3
+                       text-xs
+                       text-base-content/50
+                       sm:px-6"
             >
                 <x-icon
-                    name="lucide.circle-check"
-                    class="size-4"
+                    name="lucide.users"
+                    class="size-3.5"
                 />
+
+                حساب‌های مدیریتی شناسایی‌شده روی این سرور
             </div>
 
-            <div>
-                <p
-                    class="text-sm font-medium
-                           text-base-content"
-                >
-                    مدیر Marzban آماده استفاده است
-                </p>
+            <div class="divide-y divide-base-300">
 
-                <p
-                    class="mt-1 text-sm leading-6
-                           text-base-content/50"
-                >
-                    حساب مدیرکل ساخته و با موفقیت روی سرور
-                    تأیید شده است.
-                </p>
+                @forelse ($admins as $admin)
+
+                    <div
+                        class="flex items-center gap-3
+                               px-5 py-3.5
+                               sm:px-6"
+                    >
+                        <div
+                            class="flex size-8 shrink-0
+                                   items-center justify-center
+                                   rounded-lg
+                                   bg-base-200/70
+                                   text-base-content/45"
+                        >
+                            <x-icon
+                                name="lucide.user-round"
+                                class="size-4"
+                            />
+                        </div>
+
+                        <div class="min-w-0">
+                            <p
+                                class="text-[11px]
+                                       text-base-content/40"
+                            >
+                                نام کاربری مدیر
+                            </p>
+
+                            <p
+                                dir="ltr"
+                                class="technical-value
+                                       mt-0.5 truncate
+                                       text-left text-sm
+                                       font-medium
+                                       text-base-content"
+                            >
+                                {{ $admin['username'] }}
+                            </p>
+                        </div>
+                    </div>
+
+                @empty
+
+                    <div
+                        class="flex items-start gap-3
+                               px-5 py-4
+                               sm:px-6"
+                    >
+                        <x-icon
+                            name="lucide.circle-help"
+                            class="mt-0.5 size-4
+                                   shrink-0
+                                   text-warning"
+                        />
+
+                        <p
+                            class="text-sm leading-6
+                                   text-base-content/55"
+                        >
+                            وضعیت مدیران تکمیل‌شده گزارش شده،
+                            اما جزئیات حساب‌ها در دسترس نیست.
+                            وضعیت مدیریت را دوباره بروزرسانی کنید.
+                        </p>
+                    </div>
+
+                @endforelse
             </div>
         </div>
 
-        {{-- Unknown --}}
+    {{-- Unknown --}}
     @elseif ($setupState === 'unknown')
 
         <div
@@ -289,7 +339,7 @@
                     class="text-sm font-medium
                            text-base-content"
                 >
-                    وضعیت مدیر قابل تشخیص نیست
+                    وضعیت مدیران قابل تشخیص نیست
                 </p>
 
                 <p
@@ -297,13 +347,13 @@
                            text-base-content/55"
                 >
                     برای جلوگیری از ساخت حساب تکراری،
-                    امکان ایجاد مدیر تا مشخص‌شدن وضعیت
-                    غیرفعال است.
+                    امکان ایجاد مدیر تا دریافت وضعیت معتبر
+                    از Marzban غیرفعال است.
                 </p>
             </div>
         </div>
 
-        {{-- Not available yet --}}
+    {{-- Not available yet --}}
     @else
 
         <div
@@ -330,8 +380,8 @@
                 class="text-sm leading-7
                        text-base-content/55"
             >
-                ساخت مدیر پس از نصب و اجرای Marzban
-                فعال می‌شود.
+                مدیریت حساب‌های Marzban پس از نصب و اجرای
+                برنامه فعال می‌شود.
             </p>
         </div>
 

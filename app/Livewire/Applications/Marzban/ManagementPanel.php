@@ -48,7 +48,7 @@ final class ManagementPanel extends Component
     }
 
     /**
-     * @param  array<string, mixed>  $management
+     * @param array<string, mixed> $management
      */
     #[On('marzban-management-updated.{serverId}')]
     public function updateManagement(
@@ -59,6 +59,11 @@ final class ManagementPanel extends Component
             'setup.state',
         );
 
+        $admins = data_get(
+            $management,
+            'setup.admins',
+        );
+
         $httpsState = data_get(
             $management,
             'https.state',
@@ -67,10 +72,22 @@ final class ManagementPanel extends Component
         if (
             ! is_string($setupState)
             || MarzbanSetupState::tryFrom($setupState) === null
+            || ! is_array($admins)
             || ! is_string($httpsState)
             || MarzbanHttpsState::tryFrom($httpsState) === null
         ) {
             return;
+        }
+
+        foreach ($admins as $admin) {
+            if (
+                ! is_array($admin)
+                || ! isset($admin['username'])
+                || ! is_string($admin['username'])
+                || trim($admin['username']) === ''
+            ) {
+                return;
+            }
         }
 
         $this->management = $management;
@@ -78,12 +95,18 @@ final class ManagementPanel extends Component
     }
 
     #[On('marzban-setup-completed.{serverId}')]
-    public function markSetupCompleted(): void
-    {
-        $this->management['setup']['state'] =
-            MarzbanSetupState::Complete->value;
-
-        $this->managementUnavailable = false;
+    public function markSetupCompleted(
+        MarzbanManager $manager,
+    ): void {
+        /*
+         * Do not synthesize a local "complete" state.
+         *
+         * Reload the real server snapshot so the UI also receives the
+         * detected administrator list and remains consistent with Marzban.
+         */
+        $this->loadManagement(
+            $manager,
+        );
     }
 
     public function render(): View

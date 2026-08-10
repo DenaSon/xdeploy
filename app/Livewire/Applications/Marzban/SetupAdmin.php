@@ -30,18 +30,33 @@ final class SetupAdmin extends Component
     #[Reactive]
     public string $setupState;
 
+    /**
+     * @var list<array{
+     *     username: string
+     * }>
+     */
+    #[Reactive]
+    public array $admins = [];
+
     public string $username = '';
 
     public string $password = '';
 
     public string $passwordConfirmation = '';
 
+    /**
+     * @param list<array{
+     *     username: string
+     * }> $admins
+     */
     public function mount(
         int $serverId,
         string $setupState,
+        array $admins = [],
     ): void {
         $this->serverId = $serverId;
         $this->setupState = $setupState;
+        $this->admins = $admins;
     }
 
     public function createAdmin(
@@ -71,8 +86,8 @@ final class SetupAdmin extends Component
 
             /*
              * Parent updates its management state.
-             * setupState will then flow back to this component
-             * through the reactive property.
+             * setupState and admins then flow back into this component
+             * through the reactive properties.
              */
             $this->dispatch(
                 "marzban-management-updated.{$this->serverId}",
@@ -89,8 +104,8 @@ final class SetupAdmin extends Component
             $this->resetValidation();
 
             /*
-             * Parent marks the setup as complete.
-             * Do not mutate the reactive property here.
+             * The parent performs a fresh inspection instead of synthesizing
+             * a local state, so the real administrator list is returned too.
              */
             $this->dispatch(
                 "marzban-setup-completed.{$this->serverId}",
@@ -139,6 +154,7 @@ final class SetupAdmin extends Component
                 'max:32',
                 'regex:/\A[a-z0-9_]+\z/',
             ],
+
             'password' => [
                 'required',
                 'string',
@@ -147,6 +163,7 @@ final class SetupAdmin extends Component
                 'not_regex:/[\x00-\x1F\x7F]/',
                 'same:passwordConfirmation',
             ],
+
             'passwordConfirmation' => [
                 'required',
                 'string',
@@ -160,9 +177,14 @@ final class SetupAdmin extends Component
     protected function messages(): array
     {
         return [
-            'username.regex' => 'نام کاربری فقط می‌تواند شامل حروف انگلیسی کوچک، عدد و زیرخط باشد.',
-            'password.same' => 'رمز عبور و تکرار آن یکسان نیستند.',
-            'password.not_regex' => 'رمز عبور شامل نویسه غیرمجاز است.',
+            'username.regex' =>
+                'نام کاربری فقط می‌تواند شامل حروف انگلیسی کوچک، عدد و زیرخط باشد.',
+
+            'password.same' =>
+                'رمز عبور و تکرار آن یکسان نیستند.',
+
+            'password.not_regex' =>
+                'رمز عبور شامل نویسه غیرمجاز است.',
         ];
     }
 

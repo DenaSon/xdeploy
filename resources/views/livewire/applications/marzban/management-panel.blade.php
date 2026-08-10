@@ -158,10 +158,11 @@
 
     @else
 
-        {{-- Admin setup --}}
+        {{-- Admin setup / detected admins --}}
         <livewire:applications.marzban.setup-admin
             :server-id="$serverId"
             :setup-state="$management['setup']['state']"
+            :admins="$management['setup']['admins'] ?? []"
             :key="'marzban-setup-admin-'.$serverId"
         />
 
@@ -300,7 +301,6 @@
                    border border-base-300
                    bg-base-100"
         >
-            {{-- Capability --}}
             <div
                 class="flex flex-col gap-4
                        px-5 py-5
@@ -313,7 +313,6 @@
                     class="flex min-w-0
                            items-start gap-3.5"
                 >
-                    {{-- Icon --}}
                     <div
                         @class([
                             'flex size-10 shrink-0',
@@ -331,7 +330,6 @@
                         />
                     </div>
 
-                    {{-- Information --}}
                     <div class="min-w-0">
                         <div
                             class="flex flex-wrap
@@ -398,7 +396,6 @@
                 </div>
             </div>
 
-            {{-- Dashboard action --}}
             @if ($dashboardUrl !== null)
 
                 <a
@@ -473,7 +470,6 @@
             @endif
         </section>
 
-        {{-- HTTPS setup --}}
         @if ($httpsState === 'disabled')
 
             <livewire:applications.marzban.setup-https

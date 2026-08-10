@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Application\Applications\Marzban\DTOs;
 
+use App\Domain\Application\Marzban\Admin\DTOs\MarzbanAdminOverview;
 use App\Domain\Application\Marzban\Https\DTOs\MarzbanHttpsInfo;
-use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 
 final readonly class MarzbanManagementData
 {
     public function __construct(
         public ApplicationInfo $application,
-        public MarzbanSetupState $setup,
+        public MarzbanAdminOverview $setup,
         public MarzbanHttpsInfo $https,
     ) {}
 
@@ -27,7 +27,10 @@ final readonly class MarzbanManagementData
      *         is_unknown: bool
      *     },
      *     setup: array{
-     *         state: string
+     *         state: string,
+     *         admins: list<array{
+     *             username: string
+     *         }>
      *     },
      *     https: array{
      *         state: string,
@@ -46,12 +49,16 @@ final readonly class MarzbanManagementData
                 'is_not_installed' => $this->application->isNotInstalled(),
                 'is_unknown' => $this->application->isUnknown(),
             ],
-            'setup' => [
-                'state' => $this->setup->value,
-            ],
+
+            'setup' =>
+                $this->setup->toArray(),
+
             'https' => [
-                'state' => $this->https->state->value,
-                'domain' => $this->https->domain,
+                'state' =>
+                    $this->https->state->value,
+
+                'domain' =>
+                    $this->https->domain,
             ],
         ];
     }

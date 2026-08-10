@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Domain\Application\Contracts\ApplicationInterface;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Marzban\Admin\MarzbanAdminGateway;
+use App\Domain\Application\Marzban\Admin\MarzbanAdminReader;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
 use App\Domain\Application\Marzban\MarzbanApplication;
 use App\Domain\Application\Registry\ApplicationRegistry;
@@ -22,6 +23,11 @@ final class ApplicationServiceProvider extends ServiceProvider
     {
         $this->app->bind(
             MarzbanAdminGateway::class,
+            SshMarzbanAdminGateway::class,
+        );
+
+        $this->app->bind(
+            MarzbanAdminReader::class,
             SshMarzbanAdminGateway::class,
         );
 
