@@ -79,19 +79,22 @@ final class ZarinPalCallbackControllerTest extends TestCase
             .'&Status=OK',
         );
 
-        $response
-            ->assertOk()
-            ->assertJson([
-                'success' => true,
-                'payment_id' => $payment->id,
-                'order_id' => $order->id,
-                'status' => 'paid',
-                'transaction_id' => 'TX-QUEUE-987',
-            ]);
+        $response->assertRedirect(
+            route(
+                'panel.orders.show',
+                $order,
+            ),
+        );
 
         $this->assertSame(
             PaymentStatus::Paid,
             $payment->fresh()->status,
+        );
+
+        $this->assertSame(
+            'TX-QUEUE-987',
+            $payment->fresh()
+                ->gateway_transaction_id,
         );
 
         $this->assertSame(
@@ -161,15 +164,22 @@ final class ZarinPalCallbackControllerTest extends TestCase
             .'&Status=OK',
         );
 
-        $response
-            ->assertOk()
-            ->assertJson([
-                'success' => true,
-                'payment_id' => $payment->id,
-                'order_id' => $order->id,
-                'status' => 'paid',
-                'transaction_id' => 'TX-FULFILLED',
-            ]);
+        $response->assertRedirect(
+            route(
+                'panel.orders.show',
+                $order,
+            ),
+        );
+
+        $this->assertSame(
+            PaymentStatus::Paid,
+            $payment->fresh()->status,
+        );
+
+        $this->assertSame(
+            OrderStatus::Fulfilled,
+            $order->fresh()->status,
+        );
 
         Queue::assertNothingPushed();
     }
@@ -200,18 +210,25 @@ final class ZarinPalCallbackControllerTest extends TestCase
             .'&Status=NOK',
         );
 
-        $response
-            ->assertOk()
-            ->assertJson([
-                'success' => false,
-                'payment_id' => $payment->id,
-                'order_id' => $order->id,
-                'status' => 'cancelled',
-            ]);
+        $response->assertRedirect(
+            route(
+                'panel.orders.show',
+                $order,
+            ),
+        );
 
         $this->assertSame(
             PaymentStatus::Cancelled,
             $payment->fresh()->status,
+        );
+
+        /*
+         * Cancelling a gateway attempt does not cancel the commercial Order.
+         * The customer may start payment again while the quote remains valid.
+         */
+        $this->assertSame(
+            OrderStatus::PendingPayment,
+            $order->fresh()->status,
         );
 
         Queue::assertNothingPushed();

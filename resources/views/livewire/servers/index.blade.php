@@ -88,20 +88,34 @@
 
         </div>
 
+        <div class="flex flex-wrap items-center gap-2">
+            <x-button
+                label="اتصال VPS"
+                icon="lucide.link-2"
+                :link="route('panel.servers.create')"
+                wire:navigate
+                class="
+                    btn-ghost
+                    rounded-xl
+                    border border-base-300
+                    px-4
+                    font-medium
+                "
+            />
 
-        <x-button
-            label="افزودن سرور"
-            icon="lucide.plus"
-            :link="route('panel.servers.create')"
-            wire:navigate
-            class="
-                btn-primary
-                rounded-xl
-
-                px-4
-                font-medium
-            "
-        />
+            <x-button
+                label="خرید VPS"
+                icon="lucide.cloud"
+                :link="route('panel.servers.buy')"
+                wire:navigate
+                class="
+                    btn-primary
+                    rounded-xl
+                    px-4
+                    font-medium
+                "
+            />
+        </div>
 
     </header>
 
@@ -400,22 +414,41 @@
                 تا مدیریت سرور و برنامه‌ها را شروع کنی.
             </p>
 
-
-            <x-button
-                label="افزودن اولین سرور"
-                icon="lucide.plus"
-                :link="route('panel.servers.create')"
-                wire:navigate
+            <div
                 class="
-                    btn-primary
-
                     mt-6
-                    rounded-xl
-
-                    px-5
-                    font-medium
+                    flex flex-wrap
+                    items-center justify-center
+                    gap-2
                 "
-            />
+            >
+                <x-button
+                    label="اتصال VPS شخصی"
+                    icon="lucide.link-2"
+                    :link="route('panel.servers.create')"
+                    wire:navigate
+                    class="
+                        btn-ghost
+                        rounded-xl
+                        border border-base-300
+                        px-5
+                        font-medium
+                    "
+                />
+
+                <x-button
+                    label="خرید VPS"
+                    icon="lucide.cloud"
+                    :link="route('panel.servers.buy')"
+                    wire:navigate
+                    class="
+                        btn-primary
+                        rounded-xl
+                        px-5
+                        font-medium
+                    "
+                />
+            </div>
 
         </section>
 

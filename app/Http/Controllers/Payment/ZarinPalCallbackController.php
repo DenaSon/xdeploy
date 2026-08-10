@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Payment;
 
 use App\Application\Billing\Actions\CancelPendingPaymentAction;
 use App\Application\Billing\Actions\VerifyPaymentAndQueueProvisioningAction;
-use App\Domain\Billing\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 final class ZarinPalCallbackController extends Controller
@@ -17,7 +17,7 @@ final class ZarinPalCallbackController extends Controller
         Request $request,
         VerifyPaymentAndQueueProvisioningAction $verifyAndQueue,
         CancelPendingPaymentAction $cancel,
-    ): JsonResponse {
+    ): JsonResponse|RedirectResponse {
         $authority = trim(
             (string) $request->query(
                 'Authority',
@@ -34,6 +34,11 @@ final class ZarinPalCallbackController extends Controller
             ),
         );
 
+        /*
+         * Without an Authority there is no safe way to correlate the callback
+         * with an Order. Keep the explicit validation response instead of
+         * guessing a customer destination.
+         */
         if ($authority === '') {
             return response()->json([
                 'success' => false,
@@ -51,17 +56,12 @@ final class ZarinPalCallbackController extends Controller
                 reference: $authority,
             );
 
-            return response()->json([
-                'success' => false,
-
-                'payment_id' => $payment->getKey(),
-
-                'order_id' => $payment->order_id,
-
-                'status' => $payment->status->value,
-
-                'message' => 'Payment was cancelled or not completed.',
-            ]);
+            return redirect()->route(
+                'panel.orders.show',
+                [
+                    'order' => $payment->order_id,
+                ],
+            );
         }
 
         /*
@@ -72,19 +72,11 @@ final class ZarinPalCallbackController extends Controller
             gatewayReference: $authority,
         );
 
-        return response()->json([
-            'success' => true,
-
-            'payment_id' => $payment->getKey(),
-
-            'order_id' => $payment->order_id,
-
-            'status' => PaymentStatus::Paid->value,
-
-            'transaction_id' => $payment->gateway_transaction_id,
-
-            'verified_at' => $payment->verified_at
-                ?->toIso8601String(),
-        ]);
+        return redirect()->route(
+            'panel.orders.show',
+            [
+                'order' => $payment->order_id,
+            ],
+        );
     }
 }
