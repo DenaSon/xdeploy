@@ -17,29 +17,42 @@ use Tests\TestCase;
 
 final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
 {
-    public function test_it_resolves_network_and_default_security_group_from_the_selected_region(): void
+    public function test_it_selects_the_default_network_when_region_contains_multiple_public_ipv4_networks(): void
     {
         $cloud = $this->cloud();
 
         $cloud
             ->shouldReceive('listNetworks')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->network(
-                    id: 'network-iran',
-                    regionId: 'ir-thr1',
+                    id: 'public-210',
+                    name: 'public210',
+                    regionId: 'ir-thr-ba1',
+                ),
+
+                $this->network(
+                    id: 'default-network',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
+                ),
+
+                $this->network(
+                    id: 'public-211',
+                    name: 'public211',
+                    regionId: 'ir-thr-ba1',
                 ),
             ]);
 
         $cloud
             ->shouldReceive('listSecurityGroups')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->securityGroup(
                     id: 'sg-iran',
-                    regionId: 'ir-thr1',
+                    regionId: 'ir-thr-ba1',
                     isDefault: true,
                 ),
             ]);
@@ -47,11 +60,11 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $result = $this->action(
             $cloud,
         )->execute(
-            'ir-thr1',
+            'ir-thr-ba1',
         );
 
         $this->assertSame(
-            'network-iran',
+            'default-network',
             $result->networkId,
         );
 
@@ -60,6 +73,46 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
                 'sg-iran',
             ],
             $result->securityGroupIds,
+        );
+    }
+
+    public function test_it_falls_back_to_the_only_eligible_network_when_no_default_label_exists(): void
+    {
+        $cloud = $this->cloud();
+
+        $cloud
+            ->shouldReceive('listNetworks')
+            ->once()
+            ->with('ir-southwest1-a')
+            ->andReturn([
+                $this->network(
+                    id: 'only-network',
+                    name: 'public1',
+                    regionId: 'ir-southwest1-a',
+                ),
+            ]);
+
+        $cloud
+            ->shouldReceive('listSecurityGroups')
+            ->once()
+            ->with('ir-southwest1-a')
+            ->andReturn([
+                $this->securityGroup(
+                    id: 'sg-ahwaz',
+                    regionId: 'ir-southwest1-a',
+                    isDefault: true,
+                ),
+            ]);
+
+        $result = $this->action(
+            $cloud,
+        )->execute(
+            'ir-southwest1-a',
+        );
+
+        $this->assertSame(
+            'only-network',
+            $result->networkId,
         );
     }
 
@@ -70,23 +123,25 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $cloud
             ->shouldReceive('listNetworks')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->network(
-                    id: 'network-germany',
+                    id: 'germany-default',
+                    name: 'Default network',
                     regionId: 'eu-west1-a',
                 ),
 
                 $this->network(
-                    id: 'network-iran',
-                    regionId: 'ir-thr1',
+                    id: 'iran-default',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
                 ),
             ]);
 
         $cloud
             ->shouldReceive('listSecurityGroups')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->securityGroup(
                     id: 'sg-germany',
@@ -96,7 +151,7 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
 
                 $this->securityGroup(
                     id: 'sg-iran',
-                    regionId: 'ir-thr1',
+                    regionId: 'ir-thr-ba1',
                     isDefault: true,
                 ),
             ]);
@@ -104,11 +159,11 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $result = $this->action(
             $cloud,
         )->execute(
-            'ir-thr1',
+            'ir-thr-ba1',
         );
 
         $this->assertSame(
-            'network-iran',
+            'iran-default',
             $result->networkId,
         );
 
@@ -120,23 +175,25 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         );
     }
 
-    public function test_it_fails_closed_when_multiple_networks_are_equally_eligible(): void
+    public function test_it_fails_closed_when_multiple_eligible_networks_have_no_unique_default(): void
     {
         $cloud = $this->cloud();
 
         $cloud
             ->shouldReceive('listNetworks')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->network(
                     id: 'network-a',
-                    regionId: 'ir-thr1',
+                    name: 'public210',
+                    regionId: 'ir-thr-ba1',
                 ),
 
                 $this->network(
                     id: 'network-b',
-                    regionId: 'ir-thr1',
+                    name: 'public211',
+                    regionId: 'ir-thr-ba1',
                 ),
             ]);
 
@@ -151,7 +208,44 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $this->action(
             $cloud,
         )->execute(
-            'ir-thr1',
+            'ir-thr-ba1',
+        );
+    }
+
+    public function test_it_fails_closed_when_multiple_default_networks_are_returned(): void
+    {
+        $cloud = $this->cloud();
+
+        $cloud
+            ->shouldReceive('listNetworks')
+            ->once()
+            ->with('ir-thr-ba1')
+            ->andReturn([
+                $this->network(
+                    id: 'default-a',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
+                ),
+
+                $this->network(
+                    id: 'default-b',
+                    name: ' default NETWORK ',
+                    regionId: 'ir-thr-ba1',
+                ),
+            ]);
+
+        $cloud->shouldNotReceive(
+            'listSecurityGroups',
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->action(
+            $cloud,
+        )->execute(
+            'ir-thr-ba1',
         );
     }
 
@@ -162,23 +256,26 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $cloud
             ->shouldReceive('listNetworks')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->network(
                     id: 'inactive-network',
-                    regionId: 'ir-thr1',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
                     isActive: false,
                 ),
 
                 $this->network(
                     id: 'ipv6-network',
-                    regionId: 'ir-thr1',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
                     ipVersion: CloudIpVersion::IPv6,
                 ),
 
                 $this->network(
                     id: 'no-dhcp-network',
-                    regionId: 'ir-thr1',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
                     dhcpEnabled: false,
                 ),
             ]);
@@ -194,7 +291,7 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $this->action(
             $cloud,
         )->execute(
-            'ir-thr1',
+            'ir-thr-ba1',
         );
     }
 
@@ -205,22 +302,23 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $cloud
             ->shouldReceive('listNetworks')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->network(
                     id: 'network-iran',
-                    regionId: 'ir-thr1',
+                    name: 'Default network',
+                    regionId: 'ir-thr-ba1',
                 ),
             ]);
 
         $cloud
             ->shouldReceive('listSecurityGroups')
             ->once()
-            ->with('ir-thr1')
+            ->with('ir-thr-ba1')
             ->andReturn([
                 $this->securityGroup(
                     id: 'custom-sg',
-                    regionId: 'ir-thr1',
+                    regionId: 'ir-thr-ba1',
                     isDefault: false,
                 ),
             ]);
@@ -232,7 +330,7 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
         $this->action(
             $cloud,
         )->execute(
-            'ir-thr1',
+            'ir-thr-ba1',
         );
     }
 
@@ -279,6 +377,7 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
 
     private function network(
         string $id,
+        string $name,
         string $regionId,
         bool $isActive = true,
         bool $dhcpEnabled = true,
@@ -286,7 +385,7 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
     ): CloudNetworkData {
         return new CloudNetworkData(
             id: $id,
-            name: $id,
+            name: $name,
             regionId: $regionId,
             ipVersion: $ipVersion,
             cidr: null,

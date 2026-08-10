@@ -14,6 +14,8 @@ use InvalidArgumentException;
 
 final readonly class ResolveCloudProvisioningInfrastructureAction
 {
+    private const string DEFAULT_NETWORK_NAME = 'default network';
+
     public function __construct(
         private CloudProviderInterface $cloud,
     ) {}
@@ -50,7 +52,7 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
     private function resolveNetwork(
         string $regionId,
     ): CloudNetworkData {
-        $networks = array_values(
+        $eligibleNetworks = array_values(
             array_filter(
                 $this->cloud->listNetworks(
                     $regionId,
@@ -64,7 +66,7 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
             ),
         );
 
-        if ($networks === []) {
+        if ($eligibleNetworks === []) {
             throw new CloudConfigurationException(
                 sprintf(
                     'Cloud region [%s] has no active DHCP-enabled IPv4 network available for provisioning.',
@@ -74,28 +76,51 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
         }
 
         /*
-         * Never select an arbitrary network.
+         * ArvanCloud exposes several public IPv4 pools in most regions, while
+         * exactly one provider-managed network is returned as "Default network".
          *
-         * A region can legitimately contain multiple IPv4 networks,
-         * including user/private networks. CloudNetworkData currently
-         * exposes no provider-neutral "default provisioning network"
-         * semantic, so silently picking the first result would be unsafe.
-         *
-         * For the current MVP, automatic selection is allowed only when
-         * there is exactly one eligible network. If a provider/region
-         * exposes more than one, we fail closed until an explicit provider
-         * policy can identify the correct provisioning network.
+         * xDeploy must not choose an arbitrary public pool merely because it
+         * happens to appear first in the API response. Prefer the provider's
+         * explicit default network semantic.
          */
-        if (count($networks) !== 1) {
+        $defaultNetworks = array_values(
+            array_filter(
+                $eligibleNetworks,
+                fn (
+                    CloudNetworkData $network,
+                ): bool => $this->isDefaultNetwork(
+                    $network,
+                ),
+            ),
+        );
+
+        if (count($defaultNetworks) === 1) {
+            return $defaultNetworks[0];
+        }
+
+        if (count($defaultNetworks) > 1) {
             throw new CloudConfigurationException(
                 sprintf(
-                    'Cloud region [%s] has multiple eligible IPv4 networks; xDeploy cannot safely choose one automatically.',
+                    'Cloud region [%s] exposes multiple default networks; xDeploy cannot safely choose one.',
                     $regionId,
                 ),
             );
         }
 
-        return $networks[0];
+        /*
+         * Keep a conservative provider-neutral fallback for regions/providers
+         * that expose only one eligible network but do not label it.
+         */
+        if (count($eligibleNetworks) === 1) {
+            return $eligibleNetworks[0];
+        }
+
+        throw new CloudConfigurationException(
+            sprintf(
+                'Cloud region [%s] has multiple eligible IPv4 networks but no unique default network.',
+                $regionId,
+            ),
+        );
     }
 
     private function resolveSecurityGroup(
@@ -132,5 +157,15 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
         }
 
         return $defaults[0];
+    }
+
+    private function isDefaultNetwork(
+        CloudNetworkData $network,
+    ): bool {
+        return mb_strtolower(
+            trim(
+                $network->name,
+            ),
+        ) === self::DEFAULT_NETWORK_NAME;
     }
 }
