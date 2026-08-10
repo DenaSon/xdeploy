@@ -97,10 +97,6 @@ final class SetupHttps extends Component
         $this->activationError = null;
 
         try {
-            $server = Server::query()->findOrFail(
-                $this->serverId,
-            );
-
             $user = $this->authenticatedUser();
 
             $server = Server::query()
@@ -114,21 +110,30 @@ final class SetupHttps extends Component
                 server: $server,
                 domain: $this->domain,
             );
+
             $this->domain = $result->dns->domain;
-            $this->dnsPreflight = $result->dns->toArray();
-            $this->serverPreflight = $result->server?->toArray();
+
+            $this->dnsPreflight =
+                $result->dns->toArray();
+
+            $this->serverPreflight =
+                $result->server?->toArray();
         } catch (InvalidMarzbanDomainException) {
             $this->addError(
                 'domain',
                 'فقط دامنه یا ساب‌دامنه معتبر وارد کنید؛ بدون پروتکل، مسیر، پورت یا Wildcard.',
             );
         } catch (MarzbanHttpsPreflightException $exception) {
-            report($exception);
+            report(
+                $exception,
+            );
 
             $this->preflightError =
                 'بررسی DNS کامل نشد. اتصال سرور و دسترسی عمومی DNS را بررسی کنید.';
         } catch (Throwable $exception) {
-            report($exception);
+            report(
+                $exception,
+            );
 
             $this->preflightError =
                 'بررسی دامنه با خطا مواجه شد. پس از بررسی اتصال دوباره تلاش کنید.';
@@ -150,9 +155,6 @@ final class SetupHttps extends Component
         }
 
         try {
-            $server = Server::query()->findOrFail(
-                $this->serverId,
-            );
             $user = $this->authenticatedUser();
 
             $server = Server::query()
@@ -177,20 +179,28 @@ final class SetupHttps extends Component
                 'فقط دامنه یا ساب‌دامنه معتبر وارد کنید؛ بدون پروتکل، مسیر، پورت یا Wildcard.',
             );
         } catch (MarzbanHttpsPreflightException $exception) {
-            report($exception);
+            report(
+                $exception,
+            );
 
             $this->dnsPreflight = null;
             $this->serverPreflight = null;
+
             $this->activationError =
                 'آمادگی دامنه یا سرور تغییر کرده است. بررسی آمادگی را دوباره اجرا کنید.';
         } catch (MarzbanHttpsApplyException $exception) {
-            report($exception);
-
-            $this->activationError = $this->applyErrorMessage(
+            report(
                 $exception,
             );
+
+            $this->activationError =
+                $this->applyErrorMessage(
+                    $exception,
+                );
         } catch (Throwable $exception) {
-            report($exception);
+            report(
+                $exception,
+            );
 
             $this->activationError =
                 'فعال‌سازی HTTPS با خطای پیش‌بینی‌نشده متوقف شد. وضعیت Marzban را بروزرسانی و دوباره بررسی کنید.';
