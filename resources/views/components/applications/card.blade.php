@@ -2,95 +2,161 @@
     'application',
     'serverId',
 ])
+
 @php
-    $state = $application['state'] ?? 'unknown';
+    $slug = (string) (
+        $application['slug']
+        ?? ''
+    );
 
-    $statusLabel = match ($state) {
-        'running' => 'در حال اجرا',
-        'installed' => 'نصب‌شده',
-        'not_installed' => 'نصب نشده',
-        default => 'وضعیت نامشخص',
-    };
+    $name = (string) (
+        $application['name']
+        ?? $slug
+    );
 
-    $statusClasses = match ($state) {
-        'running' => 'border-success/20 bg-success/10 text-success',
-        'installed' => 'border-info/20 bg-info/10 text-info',
-        'not_installed' => 'border-base-300 bg-base-200 text-base-content/60',
-        default => 'border-warning/20 bg-warning/10 text-warning',
-    };
+    $shortDescription = (string) (
+        $application['short_description']
+        ?? ''
+    );
 
-    $statusIcon = match ($state) {
-        'running' => 'o-play',
-        'installed' => 'o-check',
-        'not_installed' => 'o-arrow-down-tray',
-        default => 'o-exclamation-triangle',
-    };
+    $description = $application['description']
+        ?? null;
+
+    $description = is_string($description)
+        && trim($description) !== ''
+            ? trim($description)
+            : null;
+
+    $icon = $application['icon']
+        ?? null;
+
+    $icon = is_string($icon)
+        && trim($icon) !== ''
+            ? trim($icon)
+            : null;
+
+    $usesLucideIcon = $icon !== null
+        && str_starts_with(
+            $icon,
+            'lucide.',
+        );
 @endphp
 
-<a
-    href="{{ route('panel.servers.applications.show', [
-    'server' => $serverId,
-    'application' => $application['type'],
-]) }}"
+<article
+    {{ $attributes->class([
+        'overflow-hidden rounded-2xl',
+        'border border-base-300 bg-base-100',
+    ]) }}
+    x-data="{ expanded: false }"
 >
-    <x-card
-        class="border border-base-300 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
-    >
-        <div class="flex items-center gap-4">
-
+    <div class="p-4 sm:p-5">
+        <div class="flex items-start gap-4">
+            {{-- Application identity --}}
             <div
-                class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 transition-colors duration-200 group-hover:bg-primary/15"
+                class="flex size-12 shrink-0 items-center
+                       justify-center overflow-hidden rounded-xl
+                       border border-base-300 bg-base-200/50"
             >
-                <x-icon
-                    name="o-cube"
-                    class="size-6 text-primary"
-                />
+                @if ($usesLucideIcon)
+                    <x-icon
+                        :name="$icon"
+                        class="size-5.5 text-base-content/65"
+                    />
+                @elseif ($icon !== null)
+                    <img
+                        src="{{ asset($icon) }}"
+                        alt=""
+                        class="size-8 object-contain"
+                    />
+                @else
+                    <x-icon
+                        name="lucide.package"
+                        class="size-5.5 text-base-content/45"
+                    />
+                @endif
             </div>
 
             <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3
+                            dir="ltr"
+                            class="truncate text-left text-base
+                                   font-semibold text-base-content"
+                        >
+                            {{ $name }}
+                        </h3>
 
-                <div class="flex flex-wrap items-center gap-2">
+                        @if ($shortDescription !== '')
+                            <p
+                                class="mt-1 line-clamp-2
+                                       text-sm leading-6
+                                       text-base-content/50"
+                            >
+                                {{ $shortDescription }}
+                            </p>
+                        @endif
+                    </div>
 
-                    <h2 class="truncate text-lg font-semibold text-base-content">
-                        {{ $application['name'] }}
-                    </h2>
-
-                    <span
-                        class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium {{ $statusClasses }}"
-                    >
-                        <x-icon
-                            :name="$statusIcon"
-                            class="size-3.5"
-                        />
-
-                        {{ $statusLabel }}
-                    </span>
-
-                </div>
-
-                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-base-content/60">
-
-                    <span>
-                        {{ $application['type'] }}
-                    </span>
-
-                    @if ($application['version'])
-                        <span class="size-1 rounded-full bg-base-content/30"></span>
-
-                        <span dir="ltr">
-                            v{{ $application['version'] }}
-                        </span>
+                    @if ($description !== null)
+                        <button
+                            type="button"
+                            class="flex size-8 shrink-0 items-center
+                                   justify-center rounded-lg
+                                   text-base-content/40 transition-colors
+                                   hover:bg-base-200/70
+                                   hover:text-base-content"
+                            @click="expanded = ! expanded"
+                            x-bind:aria-expanded="expanded.toString()"
+                            aria-label="اطلاعات بیشتر درباره {{ $name }}"
+                        >
+                            <x-icon
+                                name="lucide.info"
+                                class="size-4"
+                            />
+                        </button>
                     @endif
-
                 </div>
-
             </div>
-
-            <x-icon
-                name="o-chevron-left"
-                class="size-5 shrink-0 text-base-content/40 transition-transform duration-200 group-hover:-translate-x-1 group-hover:text-primary"
-            />
-
         </div>
-    </x-card>
-</a>
+
+        @if ($description !== null)
+            <div
+                x-cloak
+                x-show="expanded"
+                x-transition.opacity.duration.150ms
+                class="mt-4 border-t border-base-300 pt-4"
+            >
+                <p
+                    class="text-sm leading-7
+                           text-base-content/55"
+                >
+                    {{ $description }}
+                </p>
+            </div>
+        @endif
+
+        <div
+            class="mt-5 flex justify-end"
+        >
+            <a
+                href="{{ route('panel.servers.applications.show', [
+                    'server' => $serverId,
+                    'application' => $slug,
+                ]) }}"
+                wire:navigate
+                class="inline-flex items-center gap-1.5
+                       rounded-xl bg-primary px-3.5 py-2
+                       text-sm font-medium text-primary-content
+                       transition-opacity hover:opacity-90"
+            >
+                مشاهده برنامه
+
+                <x-icon
+                    name="lucide.chevron-left"
+                    class="size-4"
+                />
+            </a>
+        </div>
+    </div>
+</article>

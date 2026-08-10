@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Application\Applications\Manager;
 
-use App\Application\Applications\Actions\GetApplicationOverviewAction;
 use App\Application\Applications\Actions\InstallApplicationAction;
 use App\Application\Applications\Actions\RestartApplicationAction;
 use App\Application\Applications\Actions\StartApplicationAction;
@@ -24,31 +23,12 @@ final readonly class ApplicationManager
     public function __construct(
         private ConnectServerAction $connectServerAction,
         private ApplicationRegistryInterface $applicationRegistry,
-        private GetApplicationOverviewAction $getApplicationOverviewAction,
         private InstallApplicationAction $installApplicationAction,
         private UninstallApplicationAction $uninstallApplicationAction,
         private StartApplicationAction $startApplicationAction,
         private StopApplicationAction $stopApplicationAction,
         private RestartApplicationAction $restartApplicationAction,
     ) {}
-
-    /**
-     * @return array<int, array{
-     *     type: ApplicationType,
-     *     name: string,
-     *     info: ApplicationInfo,
-     * }>
-     */
-    public function overview(
-        User $user,
-        Server $server,
-    ): array {
-        return $this->onServer(
-            user: $user,
-            server: $server,
-            operation: fn (): array => $this->getApplicationOverviewAction->execute(),
-        );
-    }
 
     public function inspect(
         User $user,

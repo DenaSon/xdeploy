@@ -23,34 +23,11 @@ final readonly class ApplicationService
         return $this->registry->all();
     }
 
-    public function inspect(ApplicationType $type): ApplicationInfo
-    {
+    public function inspect(
+        ApplicationType $type,
+    ): ApplicationInfo {
         return $this->registry
             ->find($type)
             ->inspect();
-    }
-
-    /**
-     * @return array<int, array{
-     *     type: ApplicationType,
-     *     name: string,
-     *     info: ApplicationInfo,
-     * }>
-     */
-    public function inspectAll(): array
-    {
-        $applications = [];
-
-        foreach ($this->registry->all() as $application) {
-            $info = $application->inspect();
-
-            $applications[] = [
-                'type' => $application->type(),
-                'name' => $application->name(),
-                'info' => $info,
-            ];
-        }
-
-        return $applications;
     }
 }
