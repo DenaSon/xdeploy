@@ -9,7 +9,7 @@ use App\Domain\Application\Marzban\Setup\Enums\MarzbanSetupState;
 final readonly class MarzbanAdminOverview
 {
     /**
-     * @param list<MarzbanAdminInfo> $admins
+     * @param  list<MarzbanAdminInfo>  $admins
      */
     public function __construct(
         public MarzbanSetupState $state,
@@ -17,7 +17,7 @@ final readonly class MarzbanAdminOverview
     ) {}
 
     /**
-     * @param list<MarzbanAdminInfo> $admins
+     * @param  list<MarzbanAdminInfo>  $admins
      */
     public static function fromAdmins(
         array $admins,

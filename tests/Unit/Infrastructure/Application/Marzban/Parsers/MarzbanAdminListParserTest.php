@@ -22,7 +22,7 @@ final class MarzbanAdminListParserTest extends TestCase
 └──────────┴───────┴───────────────┴─────────────┴─────────┴─────────────────────┴─────────────┴─────────────────┘
 OUTPUT;
 
-        $overview = (new MarzbanAdminListParser())
+        $overview = (new MarzbanAdminListParser)
             ->parse(
                 $output,
             );
@@ -38,8 +38,7 @@ OUTPUT;
                 'operator',
             ],
             array_map(
-                static fn ($admin): string =>
-                    $admin->username,
+                static fn ($admin): string => $admin->username,
                 $overview->admins,
             ),
         );
@@ -54,7 +53,7 @@ OUTPUT;
 └──────────┴───────┴───────────────┴─────────────┴─────────┴────────────┴─────────────┴─────────────────┘
 OUTPUT;
 
-        $overview = (new MarzbanAdminListParser())
+        $overview = (new MarzbanAdminListParser)
             ->parse(
                 $output,
             );
@@ -70,7 +69,6 @@ OUTPUT;
         );
     }
 
-
     public function test_it_parses_real_wrapped_rich_output_from_marzban(): void
     {
         $output = <<<'OUTPUT'
@@ -85,7 +83,7 @@ OUTPUT;
 └─────────┴───────┴─────────┴─────────┴─────────┴─────────┴──────────┴─────────┘
 OUTPUT;
 
-        $overview = (new MarzbanAdminListParser())
+        $overview = (new MarzbanAdminListParser)
             ->parse(
                 $output,
             );
@@ -112,7 +110,7 @@ OUTPUT;
             MarzbanSetupInspectionException::class,
         );
 
-        (new MarzbanAdminListParser())
+        (new MarzbanAdminListParser)
             ->parse(
                 'Marzban CLI output changed.',
             );
@@ -123,7 +121,7 @@ OUTPUT;
         $output = "\033[32m│ Username │ Usage │\033[0m\n"
             ."\033[36m│ admin    │ 0 B   │\033[0m";
 
-        $overview = (new MarzbanAdminListParser())
+        $overview = (new MarzbanAdminListParser)
             ->parse(
                 $output,
             );

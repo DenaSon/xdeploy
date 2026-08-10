@@ -6,6 +6,7 @@ namespace Tests\Feature\Application\Billing;
 
 use App\Application\Billing\Actions\CalculateCloudPurchasePriceAction;
 use App\Application\Billing\Actions\CreateOrderAction;
+use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Application\Cloud\Actions\ListSupportedCloudImagesAction;
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
@@ -23,11 +24,21 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 use Mockery;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 final class CreateOrderActionTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const string REGION = 'eu-west1-a';
+
+    private const string SIZE_ID = 'eco-2-2-0';
+
+    private const string SUPPORTED_IMAGE_ID =
+        'ubuntu-24-04-image';
+
+    private const string PERIOD = '2_days';
 
     private const array SUPPORTED_OS_MATRIX = [
         'ubuntu' => [
@@ -39,40 +50,7 @@ final class CreateOrderActionTest extends TestCase
     {
         parent::setUp();
 
-        config()->set(
-            'money.currency',
-            'IRR',
-        );
-
-        config()->set(
-            'money.markup_percent',
-            60,
-        );
-
-        config()->set(
-            'money.quote_ttl_minutes',
-            15,
-        );
-
-        config()->set('money.periods', [
-            '2_days' => [
-                'label' => '۲ روزه',
-                'hours' => 48,
-                'pricing' => 'hourly',
-            ],
-
-            '14_days' => [
-                'label' => '۱۴ روزه',
-                'hours' => 336,
-                'pricing' => 'hourly',
-            ],
-
-            '1_month' => [
-                'label' => '۱ ماهه',
-                'hours' => 720,
-                'pricing' => 'monthly',
-            ],
-        ]);
+        $this->configureMoney();
     }
 
     protected function tearDown(): void
@@ -91,43 +69,44 @@ final class CreateOrderActionTest extends TestCase
         );
 
         $user = User::factory()->create();
-
-        $cloud = Mockery::mock(
-            CloudProviderInterface::class,
-        );
-
-        $diskPricing = Mockery::mock(
-            CloudServerResizeCatalogInterface::class,
-        );
+        $cloud = $this->cloud();
+        $diskPricing = $this->diskPricing();
 
         /*
-         * ResolveCloudImageForOrderAction resolves the size once.
-         * CalculateCloudPurchasePriceAction resolves it once again.
+         * ResolveCloudImageForOrderAction resolves the selected
+         * size once for image compatibility validation.
+         *
+         * CalculateCloudPurchasePriceAction resolves the same
+         * size again for authoritative pricing.
          */
         $cloud
             ->shouldReceive('listSizes')
             ->twice()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
-                $this->ecoSmall4(),
+                $this->ecoPlan(),
             ]);
 
         $cloud
             ->shouldReceive('listImages')
             ->once()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
                 $this->ubuntu2404(),
                 $this->ubuntu2204(),
                 $this->debian12(),
             ]);
 
+        /*
+         * The pricing action first resolves the default disk
+         * cost and then the selected disk cost.
+         */
         $diskPricing
             ->shouldReceive('calculateDiskPrice')
             ->once()
             ->with(
-                'eu-west1-a',
-                'eco-2-2-0',
+                self::REGION,
+                self::SIZE_ID,
                 30,
             )
             ->andReturn(
@@ -142,8 +121,8 @@ final class CreateOrderActionTest extends TestCase
             ->shouldReceive('calculateDiskPrice')
             ->once()
             ->with(
-                'eu-west1-a',
-                'eco-2-2-0',
+                self::REGION,
+                self::SIZE_ID,
                 50,
             )
             ->andReturn(
@@ -159,11 +138,11 @@ final class CreateOrderActionTest extends TestCase
             diskPricing: $diskPricing,
         )->execute(
             user: $user,
-            region: 'eu-west1-a',
-            sizeId: 'eco-2-2-0',
-            imageId: 'ubuntu-24-04-image',
+            region: self::REGION,
+            sizeId: self::SIZE_ID,
+            imageId: self::SUPPORTED_IMAGE_ID,
             selectedDiskGiB: 50,
-            period: '2_days',
+            period: self::PERIOD,
         );
 
         $this->assertSame(
@@ -172,17 +151,17 @@ final class CreateOrderActionTest extends TestCase
         );
 
         $this->assertSame(
-            'eu-west1-a',
+            self::REGION,
             $order->region_id,
         );
 
         $this->assertSame(
-            'eco-2-2-0',
+            self::SIZE_ID,
             $order->size_id,
         );
 
         $this->assertSame(
-            'ubuntu-24-04-image',
+            self::SUPPORTED_IMAGE_ID,
             $order->image_id,
         );
 
@@ -212,7 +191,7 @@ final class CreateOrderActionTest extends TestCase
         );
 
         $this->assertSame(
-            '2_days',
+            self::PERIOD,
             $order->period,
         );
 
@@ -257,66 +236,61 @@ final class CreateOrderActionTest extends TestCase
             ),
         );
 
-        $this->assertDatabaseHas('orders', [
-            'id' => $order->id,
+        $this->assertDatabaseHas(
+            'orders',
+            [
+                'id' => $order->id,
+                'user_id' => $user->id,
 
-            'user_id' => $user->id,
+                'region_id' => self::REGION,
+                'size_id' => self::SIZE_ID,
 
-            'region_id' => 'eu-west1-a',
-            'size_id' => 'eco-2-2-0',
+                'image_id' => self::SUPPORTED_IMAGE_ID,
+                'image_name' => 'Ubuntu 24.04',
+                'image_distribution' => 'Ubuntu',
+                'image_version' => '24.04',
 
-            'image_id' => 'ubuntu-24-04-image',
-            'image_name' => 'Ubuntu 24.04',
-            'image_distribution' => 'Ubuntu',
-            'image_version' => '24.04',
+                'default_disk_gib' => 30,
+                'selected_disk_gib' => 50,
 
-            'default_disk_gib' => 30,
-            'selected_disk_gib' => 50,
+                'period' => self::PERIOD,
+                'duration_hours' => 48,
 
-            'period' => '2_days',
-            'duration_hours' => 48,
+                'provider_cost' => 1_353_600,
+                'markup_percent' => 60,
+                'final_amount' => 2_165_760,
 
-            'provider_cost' => 1_353_600,
-            'markup_percent' => 60,
-            'final_amount' => 2_165_760,
-
-            'currency' => 'IRR',
-            'status' => 'pending_payment',
-        ]);
+                'currency' => 'IRR',
+                'status' => 'pending_payment',
+            ],
+        );
     }
 
     public function test_it_rejects_image_version_not_supported_by_xdeploy(): void
     {
         $user = User::factory()->create();
-
-        $cloud = Mockery::mock(
-            CloudProviderInterface::class,
-        );
-
-        $diskPricing = Mockery::mock(
-            CloudServerResizeCatalogInterface::class,
-        );
+        $cloud = $this->cloud();
+        $diskPricing = $this->diskPricing();
 
         $cloud
             ->shouldReceive('listSizes')
             ->once()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
-                $this->ecoSmall4(),
+                $this->ecoPlan(),
             ]);
 
         $cloud
             ->shouldReceive('listImages')
             ->once()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
                 $this->ubuntu2204(),
             ]);
 
-        $diskPricing
-            ->shouldNotReceive(
-                'calculateDiskPrice',
-            );
+        $diskPricing->shouldNotReceive(
+            'calculateDiskPrice',
+        );
 
         $this->expectException(
             InvalidArgumentException::class,
@@ -328,11 +302,11 @@ final class CreateOrderActionTest extends TestCase
                 diskPricing: $diskPricing,
             )->execute(
                 user: $user,
-                region: 'eu-west1-a',
-                sizeId: 'eco-2-2-0',
+                region: self::REGION,
+                sizeId: self::SIZE_ID,
                 imageId: 'ubuntu-22-04-image',
                 selectedDiskGiB: 30,
-                period: '2_days',
+                period: self::PERIOD,
             );
         } finally {
             $this->assertDatabaseCount(
@@ -345,35 +319,28 @@ final class CreateOrderActionTest extends TestCase
     public function test_it_rejects_distribution_not_supported_by_xdeploy(): void
     {
         $user = User::factory()->create();
-
-        $cloud = Mockery::mock(
-            CloudProviderInterface::class,
-        );
-
-        $diskPricing = Mockery::mock(
-            CloudServerResizeCatalogInterface::class,
-        );
+        $cloud = $this->cloud();
+        $diskPricing = $this->diskPricing();
 
         $cloud
             ->shouldReceive('listSizes')
             ->once()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
-                $this->ecoSmall4(),
+                $this->ecoPlan(),
             ]);
 
         $cloud
             ->shouldReceive('listImages')
             ->once()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
                 $this->debian12(),
             ]);
 
-        $diskPricing
-            ->shouldNotReceive(
-                'calculateDiskPrice',
-            );
+        $diskPricing->shouldNotReceive(
+            'calculateDiskPrice',
+        );
 
         $this->expectException(
             InvalidArgumentException::class,
@@ -385,11 +352,11 @@ final class CreateOrderActionTest extends TestCase
                 diskPricing: $diskPricing,
             )->execute(
                 user: $user,
-                region: 'eu-west1-a',
-                sizeId: 'eco-2-2-0',
+                region: self::REGION,
+                sizeId: self::SIZE_ID,
                 imageId: 'debian-12-image',
                 selectedDiskGiB: 30,
-                period: '2_days',
+                period: self::PERIOD,
             );
         } finally {
             $this->assertDatabaseCount(
@@ -402,32 +369,24 @@ final class CreateOrderActionTest extends TestCase
     public function test_it_rejects_disk_smaller_than_size_default_before_image_lookup(): void
     {
         $user = User::factory()->create();
-
-        $cloud = Mockery::mock(
-            CloudProviderInterface::class,
-        );
-
-        $diskPricing = Mockery::mock(
-            CloudServerResizeCatalogInterface::class,
-        );
+        $cloud = $this->cloud();
+        $diskPricing = $this->diskPricing();
 
         $cloud
             ->shouldReceive('listSizes')
             ->once()
-            ->with('eu-west1-a')
+            ->with(self::REGION)
             ->andReturn([
-                $this->ecoSmall4(),
+                $this->ecoPlan(),
             ]);
 
-        $cloud
-            ->shouldNotReceive(
-                'listImages',
-            );
+        $cloud->shouldNotReceive(
+            'listImages',
+        );
 
-        $diskPricing
-            ->shouldNotReceive(
-                'calculateDiskPrice',
-            );
+        $diskPricing->shouldNotReceive(
+            'calculateDiskPrice',
+        );
 
         $this->expectException(
             InvalidArgumentException::class,
@@ -439,11 +398,11 @@ final class CreateOrderActionTest extends TestCase
                 diskPricing: $diskPricing,
             )->execute(
                 user: $user,
-                region: 'eu-west1-a',
-                sizeId: 'eco-2-2-0',
-                imageId: 'ubuntu-24-04-image',
+                region: self::REGION,
+                sizeId: self::SIZE_ID,
+                imageId: self::SUPPORTED_IMAGE_ID,
                 selectedDiskGiB: 20,
-                period: '2_days',
+                period: self::PERIOD,
             );
         } finally {
             $this->assertDatabaseCount(
@@ -453,18 +412,41 @@ final class CreateOrderActionTest extends TestCase
         }
     }
 
+    /**
+     * @return CloudProviderInterface&MockInterface
+     */
+    private function cloud(): CloudProviderInterface
+    {
+        return Mockery::mock(
+            CloudProviderInterface::class,
+        );
+    }
+
+    /**
+     * @return CloudServerResizeCatalogInterface&MockInterface
+     */
+    private function diskPricing(): CloudServerResizeCatalogInterface
+    {
+        return Mockery::mock(
+            CloudServerResizeCatalogInterface::class,
+        );
+    }
+
     private function action(
         CloudProviderInterface $cloud,
         CloudServerResizeCatalogInterface $diskPricing,
     ): CreateOrderAction {
-        $policy = new SupportedOperatingSystemPolicy(
-            matrix: self::SUPPORTED_OS_MATRIX,
-        );
+        $filter =
+            new FilterSupportedCloudImagesAction(
+                operatingSystems: new SupportedOperatingSystemPolicy(
+                    matrix: self::SUPPORTED_OS_MATRIX,
+                ),
+            );
 
         $supportedImages =
             new ListSupportedCloudImagesAction(
                 cloud: $cloud,
-                operatingSystems: $policy,
+                filter: $filter,
             );
 
         $resolveImage =
@@ -486,36 +468,67 @@ final class CreateOrderActionTest extends TestCase
         );
     }
 
-    private function ecoSmall4(): CloudSizeData
+    private function configureMoney(): void
+    {
+        config()->set(
+            'money.currency',
+            'IRR',
+        );
+
+        config()->set(
+            'money.markup_percent',
+            60,
+        );
+
+        config()->set(
+            'money.quote_ttl_minutes',
+            15,
+        );
+
+        config()->set(
+            'money.periods',
+            [
+                '2_days' => [
+                    'label' => '۲ روزه',
+                    'hours' => 48,
+                    'pricing' => 'hourly',
+                ],
+
+                '14_days' => [
+                    'label' => '۱۴ روزه',
+                    'hours' => 336,
+                    'pricing' => 'hourly',
+                ],
+
+                '1_month' => [
+                    'label' => '۱ ماهه',
+                    'hours' => 720,
+                    'pricing' => 'monthly',
+                ],
+            ],
+        );
+    }
+
+    private function ecoPlan(): CloudSizeData
     {
         return new CloudSizeData(
-            id: 'eco-2-2-0',
-
+            id: self::SIZE_ID,
             name: 'eco-small4',
-
-            regionId: 'eu-west1-a',
-
+            regionId: self::REGION,
             vCpu: 2,
-
             memoryMiB: 2048,
-
             diskGiB: 30,
-
             category: 'economic',
 
             hourlyPrice: new CloudPriceData(
                 amount: '23200',
-
                 currencyCode: null,
-
                 billingPeriod: CloudBillingPeriod::Hourly,
             ),
 
             monthlyPrice: new CloudPriceData(
                 amount: '16704000',
-
                 currencyCode: null,
-
                 billingPeriod: CloudBillingPeriod::Monthly,
             ),
         );
@@ -524,7 +537,7 @@ final class CreateOrderActionTest extends TestCase
     private function ubuntu2404(): CloudImageData
     {
         return $this->image(
-            id: 'ubuntu-24-04-image',
+            id: self::SUPPORTED_IMAGE_ID,
             name: 'Ubuntu 24.04',
             distribution: 'Ubuntu',
             version: '24.04',
@@ -559,23 +572,14 @@ final class CreateOrderActionTest extends TestCase
     ): CloudImageData {
         return new CloudImageData(
             id: $id,
-
             name: $name,
-
-            regionId: 'eu-west1-a',
-
+            regionId: self::REGION,
             distribution: $distribution,
-
             version: $version,
-
             architecture: null,
-
             minDiskGiB: null,
-
             minMemoryMiB: null,
-
             supportsSshKey: true,
-
             supportsPassword: true,
         );
     }
@@ -590,17 +594,13 @@ final class CreateOrderActionTest extends TestCase
 
             hourlyPrice: new CloudPriceData(
                 amount: $hourly,
-
                 currencyCode: null,
-
                 billingPeriod: CloudBillingPeriod::Hourly,
             ),
 
             monthlyPrice: new CloudPriceData(
                 amount: $monthly,
-
                 currencyCode: null,
-
                 billingPeriod: CloudBillingPeriod::Monthly,
             ),
         );

@@ -217,7 +217,7 @@ final class BuyTest extends TestCase
                 'Ubuntu',
             )
             ->assertSee(
-                '58,800',
+                '53,760',
             )
             ->assertSee(
                 'تومان',

@@ -1,8 +1,123 @@
 <div
     dir="rtl"
     wire:init="loadCatalog"
+
+    x-data="{
+        catalogReady: false,
+        minimumDelayPassed: false,
+        showInitialLoader: true,
+
+        finishInitialLoader() {
+            if (
+                this.catalogReady
+                && this.minimumDelayPassed
+            ) {
+                this.showInitialLoader = false;
+            }
+        },
+
+        markCatalogReady() {
+            this.catalogReady = true;
+            this.finishInitialLoader();
+        },
+    }"
+
+    x-init="
+        if ($wire.catalogLoaded) {
+            markCatalogReady();
+        }
+
+        $wire.$watch('catalogLoaded', (value) => {
+            if (value) {
+                markCatalogReady();
+            }
+        });
+
+        setTimeout(() => {
+            minimumDelayPassed = true;
+            finishInitialLoader();
+        }, 1200);
+    "
+
     class="pb-24 xl:pb-0"
 >
+    {{-- Initial page loader --}}
+    <div
+        x-show="showInitialLoader"
+        x-transition:leave="
+            transition
+            ease-out
+            duration-300
+        "
+        x-transition:leave-start="
+            opacity-100
+        "
+        x-transition:leave-end="
+            opacity-0
+        "
+        class="
+        opacity-60
+            fixed inset-0 z-70
+            flex items-center
+            justify-center
+            bg-base-100/90
+            backdrop-blur-[2px]
+        "
+        role="status"
+        aria-live="polite"
+        aria-label="در حال آماده‌سازی اطلاعات سرور"
+    >
+        <div
+            class="
+                flex flex-col
+                items-center
+                gap-3
+            "
+        >
+            <div
+                class="
+                    flex size-14
+                    items-center
+                    justify-center
+                    rounded-2xl
+                    border border-base-300
+                    bg-base-100
+                    shadow-sm
+                "
+            >
+                <span
+                    class="
+                        loading
+                        loading-spinner
+                        loading-md
+                        text-primary
+                    "
+                ></span>
+            </div>
+
+            <div class="text-center">
+                <div
+                    class="
+                        text-sm
+                        font-medium
+                        text-base-content/70
+                    "
+                >
+
+                </div>
+
+                <div
+                    class="
+                        mt-1
+                        text-[11px]
+                        text-base-content/35
+                    "
+                >
+                  Loading...
+                </div>
+            </div>
+        </div>
+    </div>
     <div
         wire:offline
         class="

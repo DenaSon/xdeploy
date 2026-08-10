@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
@@ -18,6 +19,7 @@ use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,6 +32,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudProvider();
 
         $this->registerCloudProviderContract();
+        $this->registerCloudCatalogReader();
         $this->registerCloudCapabilityContracts();
     }
 
@@ -156,6 +159,33 @@ final class CloudServiceProvider extends ServiceProvider
             ): CloudProviderInterface {
                 return $this->resolveDefaultCloudProvider(
                     $app,
+                );
+            },
+        );
+    }
+
+    private function registerCloudCatalogReader(): void
+    {
+        $this->app->singleton(
+            CachedCloudCatalogReader::class,
+            static function (
+                Application $app,
+            ): CachedCloudCatalogReader {
+                return new CachedCloudCatalogReader(
+                    cloud: $app->make(
+                        CloudProviderInterface::class,
+                    ),
+                );
+            },
+        );
+
+        $this->app->singleton(
+            CloudCatalogReaderInterface::class,
+            static function (
+                Application $app,
+            ): CloudCatalogReaderInterface {
+                return $app->make(
+                    CachedCloudCatalogReader::class,
                 );
             },
         );

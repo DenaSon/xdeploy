@@ -1,0 +1,26 @@
+files/config/cloud.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/config/cloud.php
+
+files/tests/Feature/Livewire/Servers/BuyTest.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/tests/Feature/Livewire/Servers/BuyTest.php
+
+files/tests/Unit/Application/Cloud/Actions/ListSupportedCloudImagesActionTest.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/tests/Unit/Application/Cloud/Actions/ListSupportedCloudImagesActionTest.php
+
+files/tests/Unit/Infrastructure/Cloud/Catalog/CachedCloudCatalogReaderTest.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/tests/Unit/Infrastructure/Cloud/Catalog/CachedCloudCatalogReaderTest.php
+
+files/app/Application/Cloud/Actions/ListSupportedCloudImagesAction.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/app/Application/Cloud/Actions/ListSupportedCloudImagesAction.php
+
+files/app/Application/Cloud/Actions/FilterSupportedCloudImagesAction.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/app/Application/Cloud/Actions/FilterSupportedCloudImagesAction.php
+
+files/app/Console/Commands/WarmCloudCatalogCommand.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/app/Console/Commands/WarmCloudCatalogCommand.php
+
+files/app/Infrastructure/Cloud/Catalog/CachedCloudCatalogReader.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/app/Infrastructure/Cloud/Catalog/CachedCloudCatalogReader.php
+
+files/app/Domain/Cloud/Contracts/CloudCatalogReaderInterface.php: OK
+No syntax errors detected in /mnt/data/xdeploy-cloud-catalog-cache-v3/files/app/Domain/Cloud/Contracts/CloudCatalogReaderInterface.php

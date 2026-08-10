@@ -48,7 +48,7 @@ final class ManagementPanel extends Component
     }
 
     /**
-     * @param array<string, mixed> $management
+     * @param  array<string, mixed>  $management
      */
     #[On('marzban-management-updated.{serverId}')]
     public function updateManagement(

@@ -7,10 +7,10 @@ namespace App\Livewire\Servers;
 use App\Application\Billing\Actions\CalculateCloudPurchasePriceAction;
 use App\Application\Billing\Actions\CreateOrderAction;
 use App\Application\Billing\Actions\CreatePaymentAction;
-use App\Application\Cloud\Actions\ListSupportedCloudImagesAction;
+use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Exceptions\OrderQuoteExpiredException;
-use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
@@ -511,13 +511,13 @@ final class Buy extends Component
         $this->quoteError = null;
 
         try {
-            $cloud = app(
-                CloudProviderInterface::class,
+            $catalog = app(
+                CloudCatalogReaderInterface::class,
             );
 
             $regions = array_values(
                 array_filter(
-                    $cloud->listRegions(),
+                    $catalog->listRegions(),
                     static fn (
                         CloudRegionData $region,
                     ): bool => $region->canCreateServers
@@ -612,13 +612,13 @@ final class Buy extends Component
                 'hint' => $this->periodHint(
                     $id,
                 ),
-                'recommended' => $id === '1_month',
+                'recommended' => $id === '14_days',
             ];
         }
 
         $preferred = $this->findById(
             $this->periods,
-            '1_month',
+            '14_days',
         );
 
         $this->period =
@@ -641,13 +641,13 @@ final class Buy extends Component
         $this->quote = [];
 
         try {
-            $cloud = app(
-                CloudProviderInterface::class,
+            $catalog = app(
+                CloudCatalogReaderInterface::class,
             );
 
             $purchasableSizes = array_values(
                 array_filter(
-                    $cloud->listSizes(
+                    $catalog->listSizes(
                         $regionId,
                     ),
                     static fn (
@@ -691,9 +691,11 @@ final class Buy extends Component
             );
 
             $supportedImages = app(
-                ListSupportedCloudImagesAction::class,
+                FilterSupportedCloudImagesAction::class,
             )->execute(
-                $regionId,
+                $catalog->listImages(
+                    $regionId,
+                ),
             );
 
             $this->images = array_map(

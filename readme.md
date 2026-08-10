@@ -1,59 +1,114 @@
-# xDeploy — Order Image Snapshot Package
+# xDeploy — Cloud Purchase Catalog Cache Refactor
 
-This package updates the commercial Order flow so the operating system selected
-from the live cloud catalog is persisted as an immutable purchase snapshot.
+Reviewed against GitHub HEAD:
 
-Included changes:
+`c4a9a1c88e4895289ed359fb6ef65cc83db34912`
+`Improve buy.blade.php - polish`
 
-- Order migration updated in place (no follow-up migration).
-- Dynamic supported-image listing based on:
-  - CloudProviderInterface::listImages()
-  - SupportedOperatingSystemPolicy
-  - password-authentication capability
-- Image/size/disk compatibility validation before Order creation.
-- Order snapshot fields:
-  - image_id
-  - image_name
-  - image_distribution
-  - image_version
-- Debug route for listing supported cloud images.
-- Debug Order route accepts image_id.
-- Billing tests updated for the new NOT NULL image snapshot fields.
+## Goal
 
-## Install
+Remove the multi-second ArvanCloud catalog latency from the VPS purchase page without weakening the authoritative commercial flow.
 
-Copy the package contents into the project root, preserving directories.
+The important separation is:
 
-Because the original orders migration was edited in place and this project has
-no production database yet:
+- **Presentation catalog**: cached
+  - regions
+  - sizes
+  - images
+- **Authoritative price / order creation**: still direct provider-backed
+- **Payment / provisioning**: unchanged
 
-    php artisan migrate:fresh
+So the page becomes fast while `CreateOrderAction` and `CalculateCloudPurchasePriceAction` keep their current source-of-truth behavior.
 
-Then run:
+## Architecture
 
-    vendor\bin\pint app/Application/Cloud/Actions/ListSupportedCloudImagesAction.php
-    vendor\bin\pint app/Application/Cloud/Actions/ResolveCloudImageForOrderAction.php
-    vendor\bin\pint app/Application/Billing/Actions/CreateOrderAction.php
-    vendor\bin\pint app/Models/Order.php
-    vendor\bin\pint routes/testRoute.php
-    vendor\bin\pint tests/Feature/Application/Billing/CreateOrderActionTest.php
-    vendor\bin\pint tests/Feature/Application/Billing/CreatePaymentActionTest.php
-    vendor\bin\pint tests/Feature/Application/Billing/VerifyPaymentActionTest.php
+New contract:
 
-Run focused tests:
+`App\Domain\Cloud\Contracts\CloudCatalogReaderInterface`
 
-    php artisan test tests/Feature/Application/Billing/CreateOrderActionTest.php
-    php artisan test tests/Feature/Application/Billing/CreatePaymentActionTest.php
-    php artisan test tests/Feature/Application/Billing/VerifyPaymentActionTest.php
+Implementation:
 
-## Manual debug flow
+`App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader`
 
-1. List sellable images:
+The cache reader wraps the existing `CloudProviderInterface` only for presentation reads. Cache policy is provider-neutral and the cache key includes the active provider name.
 
-    http://localhost:8000/debug/cloud/images/eu-west1-a
+`ListSupportedCloudImagesAction` remains authoritative and provider-backed.
 
-2. Pick an image id returned by the API.
+A new `FilterSupportedCloudImagesAction` centralizes the supported-image policy so the Buy page can filter cached raw image data without duplicating the policy.
 
-3. Create an Order:
+## Cache policy
 
-    http://localhost:8000/debug/orders?region=eu-west1-a&size_id=eco-2-2-0&image_id=IMAGE_ID&disk_gib=30&period=2_days
+Default values:
+
+- Regions:
+  - fresh: 30 minutes
+  - stale window: 6 hours
+- Sizes:
+  - fresh: 10 minutes
+  - stale window: 1 hour
+- Images:
+  - fresh: 30 minutes
+  - stale window: 6 hours
+
+Laravel `Cache::flexible()` provides stale-while-revalidate behavior. A stale catalog can be returned immediately while Laravel refreshes it after the response.
+
+The cache is presentation-only. A stale size list can affect what is shown in the selector, but the final order still recalculates the authoritative provider price.
+
+## Apply
+
+From PowerShell:
+
+```powershell
+cd <folder-containing-this-bundle>
+
+.\apply.ps1 -ProjectRoot D:\xDeploy
+```
+
+The script checks the exact reviewed code contexts and stops if the local code has drifted too far.
+
+## Verify
+
+Run in this order:
+
+```powershell
+cd D:\xDeploy
+
+php artisan optimize:clear
+
+php artisan test --filter=CachedCloudCatalogReaderTest
+php artisan test --filter=ListSupportedCloudImagesActionTest
+php artisan test --filter=BuyTest
+
+php artisan test
+
+php artisan cloud:catalog:warm --force
+```
+
+The warm command is automatically discovered from `app/Console/Commands`.
+
+## Expected Debugbar result
+
+After warming the cache and opening `/panel/servers/buy`:
+
+Expected catalog calls:
+
+- `GET /regions` -> cache
+- `GET /regions/{region}/sizes` for selector -> cache
+- `GET /regions/{region}/images` -> cache
+
+One provider `GET /sizes` may still occur for the live quote. This is intentional: the price shown by the quote path remains provider-backed.
+
+That means the previous 5+ second `/regions` call and the cached catalog calls should disappear from the request path.
+
+## Other cleanup included
+
+- 14-day period becomes the real default in `Buy.php`.
+- OS selection no longer recalculates price unless it increases the required disk.
+- The outdated Mary UI `x-group` comment is removed.
+- Buy tests now reflect:
+  - cached presentation catalog,
+  - authoritative live pricing,
+  - 14-day default,
+  - Toman display,
+  - Persian region display name.
+- The 10-plan limit remains intact.

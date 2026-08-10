@@ -177,14 +177,11 @@ final class SetupAdmin extends Component
     protected function messages(): array
     {
         return [
-            'username.regex' =>
-                'نام کاربری فقط می‌تواند شامل حروف انگلیسی کوچک، عدد و زیرخط باشد.',
+            'username.regex' => 'نام کاربری فقط می‌تواند شامل حروف انگلیسی کوچک، عدد و زیرخط باشد.',
 
-            'password.same' =>
-                'رمز عبور و تکرار آن یکسان نیستند.',
+            'password.same' => 'رمز عبور و تکرار آن یکسان نیستند.',
 
-            'password.not_regex' =>
-                'رمز عبور شامل نویسه غیرمجاز است.',
+            'password.not_regex' => 'رمز عبور شامل نویسه غیرمجاز است.',
         ];
     }
 

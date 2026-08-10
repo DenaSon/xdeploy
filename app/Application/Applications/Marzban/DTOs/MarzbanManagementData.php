@@ -50,15 +50,12 @@ final readonly class MarzbanManagementData
                 'is_unknown' => $this->application->isUnknown(),
             ],
 
-            'setup' =>
-                $this->setup->toArray(),
+            'setup' => $this->setup->toArray(),
 
             'https' => [
-                'state' =>
-                    $this->https->state->value,
+                'state' => $this->https->state->value,
 
-                'domain' =>
-                    $this->https->domain,
+                'domain' => $this->https->domain,
             ],
         ];
     }

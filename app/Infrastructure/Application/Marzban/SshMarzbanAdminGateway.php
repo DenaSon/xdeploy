@@ -15,9 +15,7 @@ use App\Infrastructure\Application\Marzban\Parsers\MarzbanAdminListParser;
 use App\Support\SSH\SSHTimeout;
 use Throwable;
 
-final readonly class SshMarzbanAdminGateway implements
-    MarzbanAdminGateway,
-    MarzbanAdminReader
+final readonly class SshMarzbanAdminGateway implements MarzbanAdminGateway, MarzbanAdminReader
 {
     private const string INSPECT_COMMAND = <<<'BASH'
 if docker compose version >/dev/null 2>&1; then
@@ -120,7 +118,7 @@ BASH;
             throw MarzbanSetupInspectionException::failed();
         }
 
-        return (new MarzbanAdminListParser())
+        return (new MarzbanAdminListParser)
             ->parse(
                 $result->output,
             );
@@ -139,8 +137,7 @@ BASH;
         return strtr(
             self::INSPECT_COMMAND,
             [
-                '{{ username_option }}' =>
-                    $usernameOption,
+                '{{ username_option }}' => $usernameOption,
             ],
         );
     }
@@ -152,15 +149,13 @@ BASH;
         return strtr(
             self::CREATE_COMMAND,
             [
-                '{{ username }}' =>
-                    $this->shellArgument(
-                        $username,
-                    ),
+                '{{ username }}' => $this->shellArgument(
+                    $username,
+                ),
 
-                '{{ password }}' =>
-                    $this->shellArgument(
-                        $password,
-                    ),
+                '{{ password }}' => $this->shellArgument(
+                    $password,
+                ),
             ],
         );
     }
