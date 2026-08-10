@@ -5,31 +5,27 @@ declare(strict_types=1);
 namespace Tests\Feature\Application\Billing;
 
 use App\Application\Billing\Actions\BuildCloudServerDataFromOrderAction;
+use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Billing\Enums\OrderStatus;
+use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\DTOs\CloudNetworkData;
+use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\Enums\CloudIpVersion;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 final class BuildCloudServerDataFromOrderActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_builds_provisioning_data_from_order_snapshot_and_infrastructure_defaults(): void
+    public function test_it_builds_provisioning_data_from_order_snapshot_and_region_scoped_infrastructure(): void
     {
         config()->set(
             'cloud.default',
             'arvan',
-        );
-
-        config()->set(
-            'cloud.providers.arvan.defaults.network_id',
-            'network-default',
-        );
-
-        config()->set(
-            'cloud.providers.arvan.defaults.security_group_id',
-            'security-default',
         );
 
         config()->set(
@@ -40,6 +36,20 @@ final class BuildCloudServerDataFromOrderActionTest extends TestCase
         config()->set(
             'cloud.providers.arvan.defaults.ha_enabled',
             false,
+        );
+
+        /*
+         * These old static infrastructure defaults intentionally point to
+         * another region. The action must never use them anymore.
+         */
+        config()->set(
+            'cloud.providers.arvan.defaults.network_id',
+            'network-wrong-region',
+        );
+
+        config()->set(
+            'cloud.providers.arvan.defaults.security_group_id',
+            'security-wrong-region',
         );
 
         /*
@@ -61,10 +71,50 @@ final class BuildCloudServerDataFromOrderActionTest extends TestCase
             999,
         );
 
+        $cloud = Mockery::mock(
+            CloudProviderInterface::class,
+        );
+
+        $cloud
+            ->shouldReceive('listNetworks')
+            ->once()
+            ->with('eu-west1-a')
+            ->andReturn([
+                new CloudNetworkData(
+                    id: 'network-eu-west1',
+                    name: 'default-network',
+                    regionId: 'eu-west1-a',
+                    ipVersion: CloudIpVersion::IPv4,
+                    cidr: null,
+                    gateway: null,
+                    isActive: true,
+                    dhcpEnabled: true,
+                ),
+            ]);
+
+        $cloud
+            ->shouldReceive('listSecurityGroups')
+            ->once()
+            ->with('eu-west1-a')
+            ->andReturn([
+                new CloudSecurityGroupData(
+                    id: 'security-eu-west1',
+                    name: 'default',
+                    regionId: 'eu-west1-a',
+                    description: null,
+                    isDefault: true,
+                    isReadOnly: false,
+                ),
+            ]);
+
         $order = $this->paidOrder();
 
         $action =
-            new BuildCloudServerDataFromOrderAction;
+            new BuildCloudServerDataFromOrderAction(
+                resolveInfrastructure: new ResolveCloudProvisioningInfrastructureAction(
+                    cloud: $cloud,
+                ),
+            );
 
         $data = $action->execute(
             $order,
@@ -95,14 +145,34 @@ final class BuildCloudServerDataFromOrderActionTest extends TestCase
             $data->diskGiB,
         );
 
+        /*
+         * Infrastructure must come from provider resources scoped to the
+         * selected Order region, never from the old global config IDs.
+         */
         $this->assertSame(
-            'network-default',
+            'network-eu-west1',
             $data->networkId,
         );
 
         $this->assertSame(
             [
-                'security-default',
+                'security-eu-west1',
+            ],
+            $data->securityGroupIds,
+        );
+
+        $this->assertNotSame(
+            config(
+                'cloud.providers.arvan.defaults.network_id',
+            ),
+            $data->networkId,
+        );
+
+        $this->assertNotSame(
+            [
+                config(
+                    'cloud.providers.arvan.defaults.security_group_id',
+                ),
             ],
             $data->securityGroupIds,
         );

@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
+use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Models\Order;
 
 final readonly class BuildCloudServerDataFromOrderAction
 {
+    public function __construct(
+        private ResolveCloudProvisioningInfrastructureAction $resolveInfrastructure,
+    ) {}
+
     public function execute(
         Order $order,
     ): CreateCloudServerData {
@@ -37,6 +42,18 @@ final readonly class BuildCloudServerDataFromOrderAction
             FILTER_VALIDATE_BOOL,
         );
 
+        /*
+         * Network and security-group selection must follow the Order region.
+         *
+         * They are xDeploy infrastructure decisions rather than customer
+         * purchase fields, but they still must be resolved from the same
+         * provider region that the customer purchased.
+         */
+        $infrastructure =
+            $this->resolveInfrastructure->execute(
+                $order->region_id,
+            );
+
         return new CreateCloudServerData(
             name: $this->serverName(
                 $order,
@@ -51,18 +68,12 @@ final readonly class BuildCloudServerDataFromOrderAction
             imageId: $order->image_id,
 
             /*
-             * Network/security configuration is an xDeploy
-             * infrastructure decision, not a customer purchase field.
+             * Provider infrastructure is resolved dynamically inside
+             * the selected Order region.
              */
-            networkId: $this->requiredConfigString(
-                "{$prefix}.network_id",
-            ),
+            networkId: $infrastructure->networkId,
 
-            securityGroupIds: [
-                $this->requiredConfigString(
-                    "{$prefix}.security_group_id",
-                ),
-            ],
+            securityGroupIds: $infrastructure->securityGroupIds,
 
             diskGiB: $order->selected_disk_gib,
 
