@@ -29,6 +29,12 @@ class Server extends Model
         'cloud_server_id',
         'cloud_region',
         'provisioned_at',
+        'expires_at',
+        'termination_started_at',
+        'termination_last_attempt_at',
+        'termination_attempts',
+        'termination_last_error',
+        'terminated_at',
     ];
 
     protected $hidden = [
@@ -46,6 +52,11 @@ class Server extends Model
         'authentication_type' => AuthenticationType::class,
 
         'provisioned_at' => 'immutable_datetime',
+        'expires_at' => 'immutable_datetime',
+        'termination_started_at' => 'immutable_datetime',
+        'termination_last_attempt_at' => 'immutable_datetime',
+        'termination_attempts' => 'integer',
+        'terminated_at' => 'immutable_datetime',
     ];
 
     /**
@@ -84,6 +95,19 @@ class Server extends Model
             && trim($this->host) !== '';
     }
 
+    public function hasExpired(): bool
+    {
+        return $this->expires_at !== null
+            && $this->expires_at->lessThanOrEqualTo(
+                now(),
+            );
+    }
+
+    public function isTerminated(): bool
+    {
+        return $this->terminated_at !== null;
+    }
+
     public function scopeActive(
         Builder $query,
     ): void {
@@ -115,6 +139,26 @@ class Server extends Model
             ->where(
                 'status',
                 ServerStatus::Active,
+            );
+    }
+
+    public function scopeExpiredCloud(
+        Builder $query,
+    ): void {
+        $query
+            ->whereNotNull(
+                'cloud_provider',
+            )
+            ->whereNotNull(
+                'cloud_server_id',
+            )
+            ->whereNotNull(
+                'expires_at',
+            )
+            ->where(
+                'expires_at',
+                '<=',
+                now(),
             );
     }
 }

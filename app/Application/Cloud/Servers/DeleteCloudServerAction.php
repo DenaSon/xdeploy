@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Servers;
 
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
+use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use App\Models\User;
 
@@ -40,20 +42,32 @@ final readonly class DeleteCloudServerAction
         );
 
         /*
-         * This action is an internal Cloud lifecycle operation.
+         * Provider deletion is the authoritative external side effect.
          *
-         * User-facing deletion is intentionally blocked for
-         * cloud-provisioned servers by Server\DeleteServerAction
-         * and by the Servers Index UI.
-         *
-         * If Cloud deletion is invoked by a trusted workflow,
-         * the Provider must succeed before the local record is
-         * soft-deleted.
+         * "Not found" is also a successful terminal state: a previous
+         * DELETE may already have removed the resource before xDeploy
+         * persisted its local completion state.
          */
-        $this->lifecycle->deleteServer(
-            region: $cloudRegion,
-            serverId: $cloudServerId,
-        );
+        try {
+            $this->lifecycle->deleteServer(
+                region: $cloudRegion,
+                serverId: $cloudServerId,
+            );
+        } catch (CloudResourceNotFoundException) {
+            // Desired state already reached at the provider.
+        }
+
+        /*
+         * Persist termination metadata before the local soft delete.
+         * If this persistence fails, a later retry can safely call the
+         * provider again; provider "not found" remains idempotent.
+         */
+        $server->forceFill([
+            'status' => ServerStatus::Inactive,
+            'terminated_at' => $server->terminated_at
+                ?? now(),
+            'termination_last_error' => null,
+        ])->saveOrFail();
 
         $server->delete();
     }

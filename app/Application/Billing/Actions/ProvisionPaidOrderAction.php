@@ -349,8 +349,52 @@ final readonly class ProvisionPaidOrderAction
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                /** @var Server $lockedServer */
+                $lockedServer = Server::query()
+                    ->whereKey(
+                        $server->getKey(),
+                    )
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                /*
+                 * The commercial lifetime starts when the provider resource
+                 * starts existing, not when payment or SSH verification
+                 * completes.
+                 *
+                 * Never reset an already-established expiration timestamp
+                 * during provisioning recovery or repeated invocations.
+                 */
+                if ($lockedServer->expires_at === null) {
+                    if ($lockedServer->provisioned_at === null) {
+                        throw new LogicException(
+                            sprintf(
+                                'Cloud Server [%d] has no provisioned_at timestamp.',
+                                $lockedServer->getKey(),
+                            ),
+                        );
+                    }
+
+                    if ($order->duration_hours < 1) {
+                        throw new LogicException(
+                            sprintf(
+                                'Order [%d] has an invalid duration_hours value.',
+                                $order->getKey(),
+                            ),
+                        );
+                    }
+
+                    $lockedServer->forceFill([
+                        'expires_at' => $lockedServer
+                            ->provisioned_at
+                            ->addHours(
+                                $order->duration_hours,
+                            ),
+                    ])->saveOrFail();
+                }
+
                 $order->forceFill([
-                    'server_id' => $server->getKey(),
+                    'server_id' => $lockedServer->getKey(),
 
                     'status' => OrderStatus::Fulfilled,
                 ])->save();

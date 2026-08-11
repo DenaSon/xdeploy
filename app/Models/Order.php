@@ -78,6 +78,8 @@ final class Order extends Model
     }
 
     /**
+     * Current, non-deleted Server relation used by the active product flow.
+     *
      * @return BelongsTo<Server, $this>
      */
     public function server(): BelongsTo
@@ -85,6 +87,22 @@ final class Order extends Model
         return $this->belongsTo(
             Server::class,
         );
+    }
+
+    /**
+     * Historical relation that remains available after a Cloud Server
+     * reaches the end of its lifecycle and is soft-deleted.
+     *
+     * @return BelongsTo<Server, $this>
+     */
+    public function historicalServer(): BelongsTo
+    {
+        return $this
+            ->belongsTo(
+                Server::class,
+                'server_id',
+            )
+            ->withTrashed();
     }
 
     /**
