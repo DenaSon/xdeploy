@@ -27,6 +27,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Renewal payment protection
+    |--------------------------------------------------------------------------
+    |
+    | When a Cloud VPS expires while a renewal payment is already initiating
+    | or pending, termination is delayed briefly so the payment callback can
+    | finish safely. Abandoned attempts stop protecting the resource after
+    | this window.
+    |
+    */
+
+    'renewal_payment_protection_minutes' => 30,
+
+    /*
+    |--------------------------------------------------------------------------
     | Purchase Periods
     |--------------------------------------------------------------------------
     */

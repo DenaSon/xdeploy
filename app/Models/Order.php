@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Domain\Billing\Enums\OrderStatus;
+use App\Domain\Billing\Enums\OrderType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,7 @@ final class Order extends Model
     use HasFactory;
 
     protected $fillable = [
+        'type',
         'user_id',
         'server_id',
 
@@ -49,6 +51,7 @@ final class Order extends Model
     protected function casts(): array
     {
         return [
+            'type' => OrderType::class,
             'server_id' => 'integer',
 
             'default_disk_gib' => 'integer',

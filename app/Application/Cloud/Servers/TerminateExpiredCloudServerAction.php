@@ -6,7 +6,12 @@ namespace App\Application\Cloud\Servers;
 
 use App\Application\Cloud\Events\CloudServerExpired;
 use App\Application\Cloud\Events\CloudServerTerminated;
+use App\Domain\Billing\Enums\OrderStatus;
+use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Billing\Enums\PaymentStatus;
 use App\Domain\Server\Enums\ServerStatus;
+use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -174,6 +179,18 @@ final readonly class TerminateExpiredCloudServerAction
                     return null;
                 }
 
+                /*
+                 * A paid renewal, or a recent active renewal payment, owns a
+                 * short commercial safety window. This prevents the expiration
+                 * worker from deleting the VPS while payment is completing.
+                 *
+                 * Abandoned renewal attempts are invalidated once the window
+                 * has elapsed so they cannot hold a provider resource forever.
+                 */
+                if ($this->renewalPaymentBlocksTermination($server)) {
+                    return null;
+                }
+
                 $firstAttempt =
                     $server->termination_started_at
                     === null;
@@ -201,7 +218,96 @@ final readonly class TerminateExpiredCloudServerAction
                     'first_attempt' => $firstAttempt,
                 ];
             },
+            3,
         );
+    }
+
+    private function renewalPaymentBlocksTermination(
+        Server $server,
+    ): bool {
+        $protectionMinutes = max(
+            1,
+            (int) config(
+                'money.renewal_payment_protection_minutes',
+                30,
+            ),
+        );
+
+        $cutoff = now()->subMinutes(
+            $protectionMinutes,
+        );
+
+        $renewalOrders = Order::query()
+            ->where('server_id', $server->getKey())
+            ->where('user_id', $server->user_id)
+            ->where('type', OrderType::CloudRenewal->value)
+            ->whereIn(
+                'status',
+                [
+                    OrderStatus::PendingPayment->value,
+                    OrderStatus::Paid->value,
+                ],
+            )
+            ->lockForUpdate()
+            ->get();
+
+        $serverProtected = false;
+
+        foreach ($renewalOrders as $order) {
+            if ($order->status === OrderStatus::Paid) {
+                /*
+                 * Customer money has already been verified. Never delete the
+                 * provider resource while fulfillment still needs to extend
+                 * the expiration timestamp.
+                 */
+                return true;
+            }
+
+            $orderProtected = false;
+
+            $activePayments = Payment::query()
+                ->where('order_id', $order->getKey())
+                ->whereIn(
+                    'status',
+                    [
+                        PaymentStatus::Initiating->value,
+                        PaymentStatus::Pending->value,
+                    ],
+                )
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($activePayments as $payment) {
+                if (
+                    $payment->created_at !== null
+                    && $payment->created_at
+                        ->greaterThanOrEqualTo($cutoff)
+                ) {
+                    $orderProtected = true;
+                    $serverProtected = true;
+
+                    continue;
+                }
+
+                $payment->forceFill([
+                    'status' => PaymentStatus::Cancelled,
+                    'failure_code' => 'renewal_payment_window_expired',
+                ])->saveOrFail();
+            }
+
+            if (! $orderProtected) {
+                /*
+                 * Once the Server itself is expired, an unprotected renewal
+                 * quote must not remain payable through the generic payment
+                 * endpoint after provider termination begins.
+                 */
+                $order->forceFill([
+                    'status' => OrderStatus::Expired,
+                ])->saveOrFail();
+            }
+        }
+
+        return $serverProtected;
     }
 
     private function recordFailure(

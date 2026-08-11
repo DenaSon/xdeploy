@@ -11,6 +11,7 @@ use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Domain\Billing\Exceptions\OrderNotPayableException;
 use App\Domain\Billing\Exceptions\OrderQuoteExpiredException;
+use App\Domain\Billing\Exceptions\PaymentInitiationCancelledException;
 use App\Domain\Billing\Exceptions\PaymentInitiationInProgressException;
 use App\Models\Order;
 use App\Models\Payment;
@@ -84,27 +85,21 @@ final readonly class CreatePaymentAction
                 ),
             );
         } catch (Throwable $exception) {
-            $payment->forceFill([
-                'status' => PaymentStatus::Failed,
-
-                'failure_code' => 'initiation_failed',
-            ])->save();
+            $this->markInitiationFailedIfReserved(
+                (int) $payment->getKey(),
+            );
 
             throw $exception;
         }
 
-        $payment->forceFill([
-            'status' => PaymentStatus::Pending,
-
-            'gateway_reference' => $initiation->reference,
-
-            'redirect_url' => $initiation->redirectUrl,
-
-            'failure_code' => null,
-        ])->save();
+        $payment = $this->completeInitiation(
+            paymentId: (int) $payment->getKey(),
+            reference: $initiation->reference,
+            redirectUrl: $initiation->redirectUrl,
+        );
 
         return $this->createdPaymentData(
-            $payment->fresh(),
+            $payment,
         );
     }
 
@@ -265,6 +260,75 @@ final readonly class CreatePaymentAction
                     'expired' => false,
                 ];
             },
+        );
+    }
+
+    private function completeInitiation(
+        int $paymentId,
+        string $reference,
+        string $redirectUrl,
+    ): Payment {
+        return DB::transaction(
+            static function () use (
+                $paymentId,
+                $reference,
+                $redirectUrl,
+            ): Payment {
+                /** @var Payment $payment */
+                $payment = Payment::query()
+                    ->whereKey($paymentId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($payment->status === PaymentStatus::Cancelled) {
+                    throw PaymentInitiationCancelledException::forPayment(
+                        $payment->getKey(),
+                    );
+                }
+
+                if ($payment->status !== PaymentStatus::Initiating) {
+                    throw PaymentInitiationInProgressException::forOrder(
+                        $payment->order_id,
+                    );
+                }
+
+                $payment->forceFill([
+                    'status' => PaymentStatus::Pending,
+                    'gateway_reference' => $reference,
+                    'redirect_url' => $redirectUrl,
+                    'failure_code' => null,
+                ])->saveOrFail();
+
+                return $payment->fresh();
+            },
+            3,
+        );
+    }
+
+    private function markInitiationFailedIfReserved(
+        int $paymentId,
+    ): void {
+        DB::transaction(
+            static function () use ($paymentId): void {
+                /** @var Payment|null $payment */
+                $payment = Payment::query()
+                    ->whereKey($paymentId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (
+                    ! $payment instanceof Payment
+                    || $payment->status !== PaymentStatus::Initiating
+                ) {
+                    return;
+                }
+
+                $payment->forceFill([
+                    'status' => PaymentStatus::Failed,
+                    'failure_code' => 'initiation_failed',
+                ])->saveOrFail();
+            },
+            3,
         );
     }
 

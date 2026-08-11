@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
-use App\Application\Billing\Jobs\ProvisionPaidOrderJob;
-use App\Domain\Billing\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Payment;
 
@@ -13,6 +11,7 @@ final readonly class VerifyPaymentAndQueueProvisioningAction
 {
     public function __construct(
         private VerifyPaymentAction $verifyPayment,
+        private FulfillPaidOrderAction $fulfillPaidOrder,
     ) {}
 
     public function execute(
@@ -31,30 +30,15 @@ final readonly class VerifyPaymentAndQueueProvisioningAction
             ->firstOrFail();
 
         /*
-         * Only a freshly payable Order should enter the fulfillment queue.
+         * Commercial fulfillment is selected by Order type:
+         * - cloud purchase -> queued provider provisioning
+         * - cloud renewal  -> idempotent expiration extension
          *
-         * Repeated gateway callbacks after provisioning has started or
-         * completed are successful/idempotent payment callbacks, but they
-         * must not enqueue another infrastructure workflow.
+         * Repeated callbacks are safe because each fulfillment path owns an
+         * independent status/idempotency boundary.
          */
-        if (
-            $order->status
-            !== OrderStatus::Paid
-        ) {
-            return $payment;
-        }
-
-        /*
-         * At this point the payment transaction is already committed.
-         * The queued job therefore observes OrderStatus::Paid.
-         *
-         * ShouldBeUnique prevents duplicate queued/running jobs for the
-         * same Order. ProvisionPaidOrderAction independently protects the
-         * Paid -> Provisioning transition and provider creation as the
-         * authoritative second safety boundary.
-         */
-        ProvisionPaidOrderJob::dispatch(
-            $order->getKey(),
+        $this->fulfillPaidOrder->execute(
+            $order,
         );
 
         return $payment;
