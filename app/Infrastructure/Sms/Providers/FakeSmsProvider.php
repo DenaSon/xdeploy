@@ -17,7 +17,16 @@ final readonly class FakeSmsProvider implements SmsProviderInterface
     ): void {
         Log::info('Fake SMS sent.', [
             'phone' => (string) $phone,
-            'code' => (string) $code,
+            'type' => 'verification_code',
+        ]);
+    }
+
+    public function sendCloudServerExpirationWarning(
+        PhoneNumber $phone,
+    ): void {
+        Log::info('Fake SMS sent.', [
+            'phone' => (string) $phone,
+            'type' => 'cloud_server_expiring_soon',
         ]);
     }
 }

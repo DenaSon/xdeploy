@@ -16,4 +16,11 @@ interface SmsProviderInterface
         PhoneNumber $phone,
         OtpCode $code,
     ): void;
+
+    /**
+     * Send the 24-hour cloud server expiration warning.
+     */
+    public function sendCloudServerExpirationWarning(
+        PhoneNumber $phone,
+    ): void;
 }

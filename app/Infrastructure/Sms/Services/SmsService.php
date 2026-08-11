@@ -23,4 +23,12 @@ final readonly class SmsService
             $code,
         );
     }
+
+    public function sendCloudServerExpirationWarning(
+        PhoneNumber $phone,
+    ): void {
+        $this->provider->sendCloudServerExpirationWarning(
+            $phone,
+        );
+    }
 }

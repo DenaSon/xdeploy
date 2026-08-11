@@ -46,9 +46,16 @@ final class SmsServiceProvider extends ServiceProvider
                         templateId: $app->make('config')->integer(
                             'services.smsir.template_id',
                         ),
+                        expiringSoonTemplateId: $app->make('config')->integer(
+                            'services.smsir.expiring_soon_template_id',
+                        ),
                         parameterName: $app->make('config')->string(
                             'services.smsir.parameter_name',
                             'Code',
+                        ),
+                        expiringSoonParameterName: $app->make('config')->string(
+                            'services.smsir.expiring_soon_parameter_name',
+                            'Hours',
                         ),
                     ),
 

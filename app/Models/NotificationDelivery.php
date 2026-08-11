@@ -11,9 +11,13 @@ final class NotificationDelivery extends Model
 {
     public const string STATUS_PENDING = 'pending';
 
+    public const string STATUS_SENDING = 'sending';
+
     public const string STATUS_DELIVERED = 'delivered';
 
     public const string STATUS_FAILED = 'failed';
+
+    public const string STATUS_FAILED_PERMANENT = 'failed_permanent';
 
     protected $fillable = [
         'user_id',
