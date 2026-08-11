@@ -6,6 +6,7 @@ namespace App\Application\Server\Actions;
 
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -25,12 +26,6 @@ final readonly class UpdateServerAction
                 $server,
                 $attributes,
             ): Server {
-                /*
-                 * Re-resolve through the authenticated user.
-                 *
-                 * Even if UI authorization is accidentally removed
-                 * later, this action cannot update another user's server.
-                 */
                 $ownedServer = $user
                     ->servers()
                     ->whereKey(
@@ -39,30 +34,40 @@ final readonly class UpdateServerAction
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                /*
+                 * Host is part of the Server identity and is immutable
+                 * after registration.
+                 */
+                $mutableAttributes = Arr::only(
+                    $attributes,
+                    [
+                        'name',
+                        'port',
+                        'username',
+                        'credential',
+                    ],
+                );
+
                 $this->guardAgainstDuplicateServer(
                     user: $user,
                     server: $ownedServer,
-                    attributes: $attributes,
+                    attributes: $mutableAttributes,
                 );
 
-                /*
-                 * Empty credential means:
-                 * keep the currently stored credential.
-                 */
                 if (
                     array_key_exists(
                         'credential',
-                        $attributes,
+                        $mutableAttributes,
                     )
-                    && $attributes['credential'] === ''
+                    && $mutableAttributes['credential'] === ''
                 ) {
                     unset(
-                        $attributes['credential'],
+                        $mutableAttributes['credential'],
                     );
                 }
 
                 $ownedServer->update(
-                    $attributes,
+                    $mutableAttributes,
                 );
 
                 return $ownedServer->refresh();
@@ -78,9 +83,6 @@ final readonly class UpdateServerAction
         Server $server,
         array $attributes,
     ): void {
-        $host = $attributes['host']
-            ?? $server->host;
-
         $port = $attributes['port']
             ?? $server->port;
 
@@ -91,7 +93,7 @@ final readonly class UpdateServerAction
             )
             ->where(
                 'host',
-                $host,
+                $server->host,
             )
             ->where(
                 'port',
@@ -104,7 +106,7 @@ final readonly class UpdateServerAction
         }
 
         throw ValidationException::withMessages([
-            'host' => [
+            'port' => [
                 'سروری با این آدرس و پورت قبلاً ثبت شده است.',
             ],
         ]);

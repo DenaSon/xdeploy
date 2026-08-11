@@ -20,7 +20,7 @@
             </h2>
 
             <p class="mt-1 text-xs leading-6 text-base-content/45">
-                اطلاعات SSH موردنیاز برای اتصال xDeploy به سرور را وارد کن.
+                اطلاعات SSH موردنیاز برای اتصال xDeploy به سرور را وارد کنید.
             </p>
         </div>
 
@@ -28,13 +28,23 @@
         {{-- Host --}}
         <x-input
             label="آدرس سرور"
-            hint="آدرس IP یا دامنه سرور."
+            :hint="$editing
+                ? 'آدرس سرور پس از ثبت قابل تغییر نیست.'
+                : 'آدرس IP یا دامنه سرور.'"
             hintClass="text-xs text-base-content/50"
             icon="lucide.globe"
             placeholder="192.168.1.10"
             wire:model.live.blur="host"
+            :readonly="$editing"
             dir="ltr"
-            class="technical-value text-left"
+            class="
+                technical-value
+                text-left
+                {{ $editing
+                    ? 'cursor-not-allowed bg-base-200/50 text-base-content/55'
+                    : ''
+                }}
+            "
         />
 
 
@@ -70,7 +80,7 @@
             <x-password
                 label="رمز عبور"
                 :hint="$editing
-                    ? 'برای حفظ رمز عبور فعلی، این فیلد را خالی بگذار.'
+                    ? 'برای حفظ رمز عبور فعلی، این فیلد را خالی بگذارید.'
                     : 'رمز عبور کاربر SSH.'"
                 hintClass="text-xs text-base-content/50"
                 icon-right="lucide.key-round"
@@ -99,7 +109,6 @@
             "
         >
 
-            {{-- Test connection --}}
             <x-button
                 type="button"
                 :label="$connectionVerified
@@ -118,7 +127,6 @@
             />
 
 
-            {{-- Submit --}}
             <x-button
                 type="submit"
                 :label="$button"
@@ -129,9 +137,7 @@
                     btn-primary
                     w-full
                     rounded-xl
-
                     font-medium
-
                     sm:w-auto
                 "
             />

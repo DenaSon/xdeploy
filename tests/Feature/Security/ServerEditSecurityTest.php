@@ -116,6 +116,48 @@ final class ServerEditSecurityTest extends TestCase
         );
     }
 
+    public function test_update_action_cannot_change_server_host(): void
+    {
+        $user = $this->createUser(
+            phone: '09127777777',
+        );
+
+        $server = $this->createServer(
+            user: $user,
+            credential: 'original-password',
+        );
+
+        $originalHost = $server->host;
+
+        $updatedServer = app(
+            UpdateServerAction::class,
+        )->handle(
+            user: $user,
+            server: $server,
+            attributes: [
+                'host' => '198.51.100.50',
+                'port' => 2222,
+                'username' => 'deploy',
+                'credential' => '',
+            ],
+        );
+
+        self::assertSame(
+            $originalHost,
+            $updatedServer->host,
+        );
+
+        self::assertSame(
+            2222,
+            $updatedServer->port,
+        );
+
+        self::assertSame(
+            'deploy',
+            $updatedServer->username,
+        );
+    }
+
     public function test_empty_credential_keeps_existing_server_credential(): void
     {
         $user = $this->createUser(
@@ -127,27 +169,19 @@ final class ServerEditSecurityTest extends TestCase
             credential: 'original-password',
         );
 
-        /*
-         * Capture the encrypted database value too.
-         *
-         * This proves that an empty edit doesn't even
-         * re-encrypt or replace the credential.
-         */
         $originalEncryptedCredential =
             $server->getRawOriginal(
                 'credential',
             );
 
-        $action = app(
+        $updatedServer = app(
             UpdateServerAction::class,
-        );
-
-        $updatedServer = $action->handle(
+        )->handle(
             user: $user,
             server: $server,
             attributes: [
                 'name' => 'Updated server name',
-                'host' => $server->host,
+                'host' => '198.51.100.50',
                 'port' => $server->port,
                 'username' => $server->username,
                 'credential' => '',
@@ -157,6 +191,11 @@ final class ServerEditSecurityTest extends TestCase
         self::assertSame(
             'Updated server name',
             $updatedServer->name,
+        );
+
+        self::assertSame(
+            '192.0.2.10',
+            $updatedServer->host,
         );
 
         self::assertSame(
@@ -217,10 +256,6 @@ final class ServerEditSecurityTest extends TestCase
             ],
         );
 
-        /*
-         * Defensive: ensure previously resolved singleton
-         * instances cannot keep another key configuration.
-         */
         app()->forgetInstance(
             CredentialKeyRing::class,
         );

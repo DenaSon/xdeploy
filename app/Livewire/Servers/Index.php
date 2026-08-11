@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Application\Server\Actions\DeleteServerAction;
 use App\Application\Server\Actions\GetServersAction;
+use App\Domain\Server\Exceptions\CloudServerDeletionNotAllowedException;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -22,10 +23,11 @@ final class Index extends Component
 
     public Collection $servers;
 
-    public function mount(GetServersAction $action): void
-    {
+    public function mount(
+        GetServersAction $action,
+    ): void {
         $this->servers = $action->handle(
-            Auth::user()
+            $this->authenticatedUser(),
         );
     }
 
@@ -33,26 +35,53 @@ final class Index extends Component
         int $serverId,
         DeleteServerAction $action,
     ): void {
-        /** @var User $user */
-        $user = Auth::user();
+        try {
+            $action->handle(
+                user: $this->authenticatedUser(),
+                serverId: $serverId,
+            );
+        } catch (CloudServerDeletionNotAllowedException) {
+            $this->warning(
+                'امکان حذف وجود ندارد',
+                'سرورهای خریداری‌شده از xDeploy از این بخش قابل حذف نیستند.',
+            );
 
-        $action->handle(
-            user: $user,
-            serverId: $serverId,
-        );
+            return;
+        }
 
-        $this->servers = $this->servers->reject(
-            static fn (Server $server): bool => $server->getKey() === $serverId,
-        );
+        $this->servers = $this->servers
+            ->reject(
+                static fn (
+                    Server $server,
+                ): bool => $server->getKey()
+                    === $serverId,
+            )
+            ->values();
 
         $this->success(
             'حذف شد',
-            'سرور با موفقیت حذف شد.',
+            'سرور با موفقیت از xDeploy حذف شد.',
         );
     }
 
     public function render(): View
     {
-        return view('livewire.servers.index')->layout('layouts.panel');
+        return view(
+            'livewire.servers.index',
+        )->layout(
+            'layouts.panel',
+        );
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }

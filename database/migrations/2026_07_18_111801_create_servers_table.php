@@ -14,6 +14,7 @@ return new class extends Migration
     {
         Schema::create('servers', function (Blueprint $table) {
             $table->engine = 'InnoDB';
+            $table->softDeletes();
 
             $table->id();
 

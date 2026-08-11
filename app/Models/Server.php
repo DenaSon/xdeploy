@@ -10,9 +10,12 @@ use App\Infrastructure\Security\Casts\ServerCredentialCast;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Server extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'user_id',
         'name',
@@ -67,6 +70,12 @@ class Server extends Model
     {
         return $this->cloud_provider !== null
             && $this->cloud_server_id !== null;
+    }
+
+    public function isUserProvided(): bool
+    {
+        return $this->cloud_provider === null
+            && $this->cloud_server_id === null;
     }
 
     public function hasConnectionHost(): bool

@@ -27,27 +27,14 @@ final class Edit extends Component
     public function mount(
         Server $server,
     ): void {
-        $user = Auth::user();
-
-        abort_unless(
-            $user instanceof User,
-            401,
-        );
-
-        /*
-         * Never trust global route-model binding as proof
-         * that this server belongs to the authenticated user.
-         */
-        $this->server = $user
+        $this->server = $this
+            ->authenticatedUser()
             ->servers()
             ->whereKey(
                 $server->getKey(),
             )
             ->firstOrFail();
 
-        /*
-         * Do NOT read credential here.
-         */
         $this->fillServerForm(
             $this->server->only([
                 'host',
@@ -58,7 +45,8 @@ final class Edit extends Component
     }
 
     /**
-     * Existing credentials are optional during edit.
+     * Host remains in validation because the connection-test workflow
+     * requires it, but update() never persists it.
      *
      * @return array<string, array<int, string>>
      */
@@ -75,44 +63,24 @@ final class Edit extends Component
         $data = $this->validate();
 
         /*
-         * Ignore the current server itself while checking
-         * for duplicate host + port.
+         * Host is immutable after Server registration.
+         * UpdateServerAction also protects this invariant.
          */
-        if (
-            $this->serverAlreadyExists(
-                $this->server,
-            )
-        ) {
-            $this->addError(
-                'host',
-                'سروری با این آدرس و پورت قبلاً ثبت شده است.',
-            );
-
-            return;
-        }
-
-        $user = Auth::user();
-
-        abort_unless(
-            $user instanceof User,
-            401,
+        unset(
+            $data['host'],
         );
 
         $this->server = $action->handle(
-            user: $user,
+            user: $this->authenticatedUser(),
             server: $this->server,
             attributes: $data,
         );
 
-        /*
-         * Never retain a submitted credential in
-         * Livewire state after update.
-         */
         $this->credential = '';
 
         $this->success(
             'ذخیره شد',
-            'اطلاعات سرور با موفقیت بروزرسانی شد.',
+            'اطلاعات اتصال سرور با موفقیت به‌روزرسانی شد.',
         );
 
         $this->redirectRoute(
@@ -121,11 +89,6 @@ final class Edit extends Component
         );
     }
 
-    /**
-     * When editing, an empty credential field means:
-     * use the currently stored credential only on the backend
-     * for the connection test.
-     */
     protected function credentialForConnectionTest(): string
     {
         if ($this->credential !== '') {
@@ -140,5 +103,17 @@ final class Edit extends Component
         return view(
             'livewire.servers.edit',
         );
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }
