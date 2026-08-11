@@ -116,19 +116,35 @@
 
 
             {{-- Login --}}
-            <x-button
-                label="ورود"
-                icon="lucide.log-in"
-                :link="route('login')"
-                wire:navigate
-                class="
+         @guest
+                    <x-button
+                        label="ورود"
+                        icon="lucide.log-in"
+                        :link="route('login')"
+                        wire:navigate
+                        class="
                     btn-primary btn-sm
                     rounded-xl
 
                     px-3.5
                     font-medium
                 "
-            />
+                    />
+                @elseauth()
+                    <x-button
+                        label="داشبورد"
+                        icon="lucide.layout-dashboard"
+                        :link="route('panel.servers.index')"
+                        wire:navigate
+                        class="
+                    btn-primary btn-sm
+                    rounded-xl
+                    btn-outline
+                    px-3.5
+                    font-medium
+                "
+                    />
+         @endguest
 
 
             {{-- Theme --}}
