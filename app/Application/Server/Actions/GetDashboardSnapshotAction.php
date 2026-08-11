@@ -106,22 +106,26 @@ final readonly class GetDashboardSnapshotAction
         Server $server,
         bool $fresh = false,
     ): DashboardSnapshotData {
-        if ($fresh) {
-            $this->forget(
-                $server,
-            );
-        }
-
+        /*
+         * Never delete the last successful snapshot before a refresh.
+         *
+         * When $fresh is true we force every segment to be read again,
+         * but cached values stay intact until a successful replacement
+         * is written. If SSH fails, the previous snapshot remains
+         * available for the next page load.
+         */
         $cached = $this->cached(
             $server,
         );
 
-        $missingSegments = array_values(
-            array_diff(
-                self::SEGMENTS,
-                $cached->loadedSegments,
-            ),
-        );
+        $missingSegments = $fresh
+            ? self::SEGMENTS
+            : array_values(
+                array_diff(
+                    self::SEGMENTS,
+                    $cached->loadedSegments,
+                ),
+            );
 
         /*
          * A warm Dashboard can render without opening SSH at all.
@@ -131,8 +135,9 @@ final readonly class GetDashboardSnapshotAction
         }
 
         /*
-         * All cache misses are filled inside ONE ServerReadExecutor
-         * session, so connection + readiness checks happen only once.
+         * All cache misses (or all segments during a forced refresh)
+         * are filled inside ONE ServerReadExecutor session, so connection
+         * + readiness checks happen only once.
          */
         return $this->executor->execute(
             $server,
@@ -277,19 +282,6 @@ final readonly class GetDashboardSnapshotAction
 
             default => 'دریافت اطلاعات این بخش ناموفق بود.',
         };
-    }
-
-    private function forget(
-        Server $server,
-    ): void {
-        foreach (self::SEGMENTS as $segment) {
-            Cache::forget(
-                $this->cacheKey(
-                    server: $server,
-                    segment: $segment,
-                ),
-            );
-        }
     }
 
     private function cacheKey(
