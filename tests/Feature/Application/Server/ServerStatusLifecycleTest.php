@@ -123,8 +123,11 @@ final class ServerStatusLifecycleTest extends TestCase
             serverId: (int) $serverToDelete->getKey(),
         );
 
-        $this->assertModelMissing(
-            $serverToDelete,
+        $this->assertSoftDeleted(
+            'servers',
+            [
+                'id' => $serverToDelete->getKey(),
+            ],
         );
 
         $this->assertServerStatus(
@@ -164,8 +167,11 @@ final class ServerStatusLifecycleTest extends TestCase
             serverId: (int) $serverToDelete->getKey(),
         );
 
-        $this->assertModelMissing(
-            $serverToDelete,
+        $this->assertSoftDeleted(
+            'servers',
+            [
+                'id' => $serverToDelete->getKey(),
+            ],
         );
 
         $this->assertServerStatus(

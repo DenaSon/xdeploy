@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Servers;
 
-use App\Application\Server\Actions\DeleteServerAction;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Models\Server;
@@ -14,7 +13,6 @@ final readonly class DeleteCloudServerAction
 {
     public function __construct(
         private CloudServerLifecycleInterface $lifecycle,
-        private DeleteServerAction $deleteServer,
     ) {}
 
     public function handle(
@@ -42,19 +40,22 @@ final readonly class DeleteCloudServerAction
         );
 
         /*
-         * Provider deletion must succeed before the local record
-         * is removed. On provider failure, xDeploy keeps the
-         * record for retry or manual recovery.
+         * This action is an internal Cloud lifecycle operation.
+         *
+         * User-facing deletion is intentionally blocked for
+         * cloud-provisioned servers by Server\DeleteServerAction
+         * and by the Servers Index UI.
+         *
+         * If Cloud deletion is invoked by a trusted workflow,
+         * the Provider must succeed before the local record is
+         * soft-deleted.
          */
         $this->lifecycle->deleteServer(
             region: $cloudRegion,
             serverId: $cloudServerId,
         );
 
-        $this->deleteServer->handle(
-            user: $user,
-            serverId: $serverId,
-        );
+        $server->delete();
     }
 
     private function ownedServer(

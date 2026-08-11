@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Cloud;
 
 use App\Application\Cloud\Servers\DeleteCloudServerAction;
-use App\Application\Server\Actions\DeleteServerAction;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Exceptions\CloudConnectionException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
@@ -23,7 +22,7 @@ final class DeleteCloudServerActionTest extends TestCase
 
     private int $hostSequence = 10;
 
-    public function test_it_deletes_cloud_server_from_provider_then_removes_local_record(): void
+    public function test_it_deletes_cloud_server_from_provider_then_soft_deletes_local_record(): void
     {
         $user = $this->createUser(
             phone: '09170000001',
@@ -46,8 +45,8 @@ final class DeleteCloudServerActionTest extends TestCase
             )
             ->willReturnCallback(function () use ($server): void {
                 /*
-                 * هنگام حذف از Provider، رکورد داخلی باید هنوز
-                 * موجود باشد.
+                 * During Provider deletion the local record must
+                 * still be visible to normal Eloquent queries.
                  */
                 $this->assertModelExists(
                     $server,
@@ -61,8 +60,11 @@ final class DeleteCloudServerActionTest extends TestCase
             serverId: (int) $server->getKey(),
         );
 
-        $this->assertModelMissing(
-            $server,
+        $this->assertSoftDeleted(
+            'servers',
+            [
+                'id' => $server->getKey(),
+            ],
         );
     }
 
@@ -238,8 +240,11 @@ final class DeleteCloudServerActionTest extends TestCase
             serverId: (int) $activeServer->getKey(),
         );
 
-        $this->assertModelMissing(
-            $activeServer,
+        $this->assertSoftDeleted(
+            'servers',
+            [
+                'id' => $activeServer->getKey(),
+            ],
         );
 
         $this->assertSame(
@@ -263,7 +268,6 @@ final class DeleteCloudServerActionTest extends TestCase
     ): DeleteCloudServerAction {
         return new DeleteCloudServerAction(
             lifecycle: $lifecycle,
-            deleteServer: new DeleteServerAction,
         );
     }
 
