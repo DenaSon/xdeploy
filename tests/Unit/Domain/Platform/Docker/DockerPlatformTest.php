@@ -72,7 +72,7 @@ final class DockerPlatformTest extends TestCase
         );
     }
 
-    public function test_it_installs_docker_using_installer_source_and_privileged_executor(): void
+    public function test_it_installs_docker_on_ubuntu_26_04_using_verified_installer(): void
     {
         $ssh = Mockery::mock(
             SSHConnectionInterface::class,
@@ -84,17 +84,21 @@ final class DockerPlatformTest extends TestCase
 
         $installerCommand = 'xdeploy-docker-installer-command';
 
-        $this->expectUbuntuOperatingSystem(
-            $ssh,
+        $this->expectOperatingSystem(
+            ssh: $ssh,
+            id: 'ubuntu',
+            versionId: '26.04',
+            name: 'Ubuntu',
+            prettyName: 'Ubuntu 26.04 LTS',
         );
 
         $installerSource
             ->shouldReceive('buildExecutionCommand')
             ->once()
             ->with(
-                'docker/ubuntu.sh',
+                'docker/debian-family.sh',
                 (string) config(
-                    'xdeploy.installers.docker.ubuntu.sha256',
+                    'xdeploy.installers.docker.debian_family.sha256',
                 ),
             )
             ->andReturn(
@@ -135,6 +139,44 @@ final class DockerPlatformTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function test_it_rejects_unsupported_operating_system_before_preparing_installer(): void
+    {
+        $ssh = Mockery::mock(
+            SSHConnectionInterface::class,
+        );
+
+        $installerSource = Mockery::mock(
+            InstallerSourceInterface::class,
+        );
+
+        $this->expectOperatingSystem(
+            ssh: $ssh,
+            id: 'ubuntu',
+            versionId: '20.04',
+            name: 'Ubuntu',
+            prettyName: 'Ubuntu 20.04 LTS',
+        );
+
+        $installerSource->shouldNotReceive(
+            'buildExecutionCommand',
+        );
+
+        $this->expectException(
+            PlatformInstallationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'The xDeploy Docker installer does not support [Ubuntu 20.04 LTS].',
+        );
+
+        $this
+            ->platform(
+                ssh: $ssh,
+                installerSource: $installerSource,
+            )
+            ->install();
+    }
+
     public function test_it_throws_when_docker_installer_command_fails(): void
     {
         $ssh = Mockery::mock(
@@ -147,17 +189,21 @@ final class DockerPlatformTest extends TestCase
 
         $installerCommand = 'xdeploy-docker-installer-command';
 
-        $this->expectUbuntuOperatingSystem(
-            $ssh,
+        $this->expectOperatingSystem(
+            ssh: $ssh,
+            id: 'ubuntu',
+            versionId: '24.04',
+            name: 'Ubuntu',
+            prettyName: 'Ubuntu 24.04 LTS',
         );
 
         $installerSource
             ->shouldReceive('buildExecutionCommand')
             ->once()
             ->with(
-                'docker/ubuntu.sh',
+                'docker/debian-family.sh',
                 (string) config(
-                    'xdeploy.installers.docker.ubuntu.sha256',
+                    'xdeploy.installers.docker.debian_family.sha256',
                 ),
             )
             ->andReturn(
@@ -296,9 +342,17 @@ final class DockerPlatformTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    private function expectUbuntuOperatingSystem(
+    private function expectOperatingSystem(
         SSHConnectionInterface $ssh,
+        string $id,
+        string $versionId,
+        string $name,
+        string $prettyName,
     ): void {
+        $idLike = $id === 'ubuntu'
+            ? 'ID_LIKE=debian'.PHP_EOL
+            : '';
+
         $ssh
             ->shouldReceive('executeWithResult')
             ->once()
@@ -311,13 +365,14 @@ final class DockerPlatformTest extends TestCase
             )
             ->andReturn(
                 new SSHResult(
-                    <<<'OS_RELEASE'
-ID=ubuntu
-NAME="Ubuntu"
-VERSION_ID="24.04"
-PRETTY_NAME="Ubuntu 24.04 LTS"
-ID_LIKE=debian
-OS_RELEASE,
+                    sprintf(
+                        "ID=%s\nNAME=\"%s\"\nVERSION_ID=\"%s\"\nPRETTY_NAME=\"%s\"\n%s",
+                        $id,
+                        $name,
+                        $versionId,
+                        $prettyName,
+                        $idLike,
+                    ),
                     0,
                 ),
             );

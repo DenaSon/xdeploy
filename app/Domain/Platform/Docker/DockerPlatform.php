@@ -13,6 +13,7 @@ use App\Domain\Platform\Exceptions\PlatformInstallationException;
 use App\Domain\Platform\Exceptions\PlatformRestartException;
 use App\Domain\Platform\Exceptions\PlatformStartException;
 use App\Domain\Platform\Exceptions\PlatformStopException;
+use App\Domain\Platform\Support\SupportedPlatformOperatingSystems;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
 use App\Infrastructure\Linux\Services\OperatingSystemInspector;
@@ -93,26 +94,16 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
     {
         $os = $this->operatingSystem->inspect();
 
-        if ($os->id !== 'ubuntu') {
-            throw new PlatformInstallationException(
-                sprintf(
-                    'The xDeploy Docker installer currently supports Ubuntu only; detected [%s].',
-                    $os->displayName(),
-                ),
-            );
-        }
-
         if (
-            ! in_array(
-                $os->versionId,
-                ['22.04', '24.04'],
-                true,
+            ! SupportedPlatformOperatingSystems::supportsDockerStack(
+                $os,
             )
         ) {
             throw new PlatformInstallationException(
                 sprintf(
-                    'The xDeploy Docker installer does not support Ubuntu version [%s].',
-                    $os->versionId ?? 'unknown',
+                    'The xDeploy Docker installer does not support [%s]. Supported systems: %s.',
+                    $os->displayName(),
+                    SupportedPlatformOperatingSystems::dockerStackDisplayList(),
                 ),
             );
         }
@@ -120,10 +111,10 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
         try {
             $command = $this->installerSource->buildExecutionCommand(
                 relativePath: (string) config(
-                    'xdeploy.installers.docker.ubuntu.path',
+                    'xdeploy.installers.docker.debian_family.path',
                 ),
                 expectedSha256: (string) config(
-                    'xdeploy.installers.docker.ubuntu.sha256',
+                    'xdeploy.installers.docker.debian_family.sha256',
                 ),
             );
         } catch (RuntimeException $exception) {

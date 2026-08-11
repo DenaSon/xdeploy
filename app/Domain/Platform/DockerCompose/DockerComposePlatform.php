@@ -9,7 +9,9 @@ use App\Domain\Platform\DTOs\PlatformInfo;
 use App\Domain\Platform\Enums\PlatformState;
 use App\Domain\Platform\Enums\PlatformType;
 use App\Domain\Platform\Exceptions\PlatformInstallationException;
+use App\Domain\Platform\Support\SupportedPlatformOperatingSystems;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
 use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
@@ -23,6 +25,7 @@ final readonly class DockerComposePlatform implements PlatformInterface
         private SSHConnectionInterface $ssh,
         private PrivilegedCommandExecutor $privileged,
         private OperatingSystemInspector $operatingSystem,
+        private InstallerSourceInterface $installerSource,
     ) {}
 
     public function type(): PlatformType
@@ -81,36 +84,39 @@ final readonly class DockerComposePlatform implements PlatformInterface
         $os = $this->operatingSystem->inspect();
 
         if (
-            $os->id !== 'ubuntu'
-            || ! in_array($os->versionId, ['22.04', '24.04'], true)
+            ! SupportedPlatformOperatingSystems::supportsDockerStack(
+                $os,
+            )
         ) {
             throw new PlatformInstallationException(
                 sprintf(
-                    'Automatic Docker Compose installation currently supports Ubuntu 22.04 and 24.04 only; detected [%s].',
+                    'Automatic Docker Compose installation does not support [%s]. Supported systems: %s.',
                     $os->displayName(),
+                    SupportedPlatformOperatingSystems::dockerStackDisplayList(),
                 ),
             );
         }
 
+        try {
+            $command = $this->installerSource->buildExecutionCommand(
+                relativePath: (string) config(
+                    'xdeploy.installers.docker.debian_family.path',
+                ),
+                expectedSha256: (string) config(
+                    'xdeploy.installers.docker.debian_family.sha256',
+                ),
+            );
+        } catch (RuntimeException $exception) {
+            throw new PlatformInstallationException(
+                message: 'Docker Compose installer could not be prepared.',
+                previous: $exception,
+            );
+        }
+
         $result = $this->privileged->executeWithResult(
-            command: <<<'BASH'
-set -Eeuo pipefail
-
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-
-if ! apt-cache show docker-compose-v2 >/dev/null 2>&1; then
-    apt-get install -y --no-install-recommends software-properties-common
-    add-apt-repository -y universe
-    apt-get update
-fi
-
-apt-get install -y --no-install-recommends docker-compose-v2
-
-docker compose version
-BASH,
-            timeout: SSHTimeout::SYSTEM_PACKAGE_INSTALL,
+            command: $command,
+            timeout: SSHTimeout::DOCKER_INSTALL,
+            sensitive: true,
         );
 
         if (! $result->successful()) {

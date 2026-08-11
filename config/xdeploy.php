@@ -40,13 +40,13 @@ return [
 
         'docker' => [
 
-            'ubuntu' => [
+            'debian_family' => [
 
-                'path' => 'docker/ubuntu.sh',
+                'path' => 'docker/debian-family.sh',
 
                 'sha256' => env(
-                    'XDEPLOY_DOCKER_UBUNTU_SHA256',
-                    'ecf7b0a8974a2b1e2569b843082a07d52658430ff3fa818d8776c73ee268de5c',
+                    'XDEPLOY_DOCKER_DEBIAN_FAMILY_SHA256',
+                    '95e94552d184155bd9f385c5750538350f28a4ae2f807b19d601a9d16fc34a91',
                 ),
 
             ],
