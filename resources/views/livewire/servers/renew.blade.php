@@ -104,7 +104,7 @@
                             @endif
                         </div>
 
-                        <div class="grid gap-px bg-base-300 sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="grid gap-px bg-base-300 sm:grid-cols-3">
                             <div class="bg-base-100 px-4 py-3.5">
                                 <div class="text-[10px] text-base-content/35">موقعیت</div>
                                 <div class="mt-1 truncate text-xs font-medium text-base-content">{{ $regionLabel }}</div>
@@ -125,22 +125,95 @@
                                     {{ $sourceOrder?->selected_disk_gib ?? '—' }} GB
                                 </div>
                             </div>
-                            <div class="bg-base-100 px-4 py-3.5">
-                                <div class="text-[10px] text-base-content/35">زمان باقی‌مانده</div>
-                                <div
-                                    @class([
-                                        'mt-1 text-xs font-semibold',
-                                        'text-warning' => $isExpiringSoon,
-                                        'text-base-content' => ! $isExpiringSoon,
-                                    ])
-                                >{{ $remainingLabel }}</div>
-                            </div>
                         </div>
+
+                        @if($currentExpiresAt)
+                            <div
+                                wire:ignore
+                                x-data="{
+                                    endAt: {{ $currentExpiresAt->getTimestamp() * 1000 }},
+                                    now: Date.now(),
+                                    timer: null,
+                                    init() {
+                                        this.timer = setInterval(() => this.now = Date.now(), 1000)
+                                    },
+                                    destroy() {
+                                        clearInterval(this.timer)
+                                    },
+                                    get totalSeconds() {
+                                        return Math.max(0, Math.floor((this.endAt - this.now) / 1000))
+                                    },
+                                    get days() {
+                                        return Math.floor(this.totalSeconds / 86400)
+                                    },
+                                    get hours() {
+                                        return Math.floor((this.totalSeconds % 86400) / 3600)
+                                    },
+                                    get minutes() {
+                                        return Math.floor((this.totalSeconds % 3600) / 60)
+                                    },
+                                    get seconds() {
+                                        return this.totalSeconds % 60
+                                    }
+                                }"
+                                class="border-t border-base-300 px-4 py-4 sm:px-5"
+                            >
+                                <div class="mb-3 flex items-center justify-between gap-3">
+                                    <span class="text-xs font-medium text-base-content/55">زمان باقی‌مانده تا پایان سرویس</span>
+                                    @if($isExpiringSoon)
+                                        <span class="text-[10px] font-medium text-warning">کمتر از ۲۴ ساعت</span>
+                                    @endif
+                                </div>
+
+                                <div dir="ltr" class="grid grid-cols-4 gap-2 text-center sm:max-w-md">
+                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
+                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
+                                            <span
+                                                x-bind:style="'--value:' + days"
+                                                x-bind:aria-label="days"
+                                                x-text="days"
+                                            ></span>
+                                        </span>
+                                        <span class="mt-0.5 text-[10px] opacity-65">روز</span>
+                                    </div>
+                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
+                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
+                                            <span
+                                                x-bind:style="'--value:' + hours"
+                                                x-bind:aria-label="hours"
+                                                x-text="hours"
+                                            ></span>
+                                        </span>
+                                        <span class="mt-0.5 text-[10px] opacity-65">ساعت</span>
+                                    </div>
+                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
+                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
+                                            <span
+                                                x-bind:style="'--value:' + minutes"
+                                                x-bind:aria-label="minutes"
+                                                x-text="minutes"
+                                            ></span>
+                                        </span>
+                                        <span class="mt-0.5 text-[10px] opacity-65">دقیقه</span>
+                                    </div>
+                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
+                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
+                                            <span
+                                                x-bind:style="'--value:' + seconds"
+                                                x-bind:aria-label="seconds"
+                                                x-text="seconds"
+                                            ></span>
+                                        </span>
+                                        <span class="mt-0.5 text-[10px] opacity-65">ثانیه</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="flex flex-col gap-2 border-t border-base-300 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                             <span class="text-xs text-base-content/40">تاریخ پایان فعلی</span>
                             <span dir="ltr" class="technical-value text-xs font-medium text-base-content">
-                                {{ $currentExpiresAt?->format('Y/m/d - H:i') ?? '—' }}
+                                {{ $currentExpiresAt ? \App\Support\Date\JalaliDateFormatter::dateTime($currentExpiresAt, ' - ') : '—' }}
                             </span>
                         </div>
                     </section>
@@ -220,11 +293,11 @@
                                 </div>
                                 <div class="flex items-center justify-between gap-3">
                                     <dt class="text-base-content/35">پایان فعلی</dt>
-                                    <dd dir="ltr" class="technical-value text-[11px] font-medium text-base-content">{{ $currentExpiresAt?->format('Y/m/d H:i') ?? '—' }}</dd>
+                                    <dd dir="ltr" class="technical-value text-[11px] font-medium text-base-content">{{ $currentExpiresAt ? \App\Support\Date\JalaliDateFormatter::dateTime($currentExpiresAt) : '—' }}</dd>
                                 </div>
                                 <div class="flex items-center justify-between gap-3">
                                     <dt class="text-base-content/35">پایان پس از تمدید</dt>
-                                    <dd dir="ltr" class="technical-value text-[11px] font-semibold text-success">{{ $projectedExpiresAt?->format('Y/m/d H:i') ?? '—' }}</dd>
+                                    <dd dir="ltr" class="technical-value text-[11px] font-semibold text-success">{{ $projectedExpiresAt ? \App\Support\Date\JalaliDateFormatter::dateTime($projectedExpiresAt) : '—' }}</dd>
                                 </div>
                             </dl>
                             <div class="my-4 border-t border-base-300"></div>
