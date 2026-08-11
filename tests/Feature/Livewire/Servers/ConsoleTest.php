@@ -133,7 +133,8 @@ final class ConsoleTest extends TestCase
                 'consoleError',
                 'برقراری اتصال به کنسول سرور ناموفق بود.',
             )
-            ->assertSee('چند لحظه دیگر دوباره تلاش کنید.');
+            ->assertSee('اتصال به کنسول برقرار نشد')
+            ->assertSee('تلاش مجدد');
     }
 
     private function cloudServer(User $user): Server
