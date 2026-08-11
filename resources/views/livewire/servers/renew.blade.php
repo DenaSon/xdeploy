@@ -96,6 +96,9 @@
                                     مشخصات این VPS در تمدید تغییر نمی‌کند
                                 </p>
                             </div>
+
+
+
                             @if($isExpiringSoon)
                                 <span class="inline-flex items-center gap-1.5 rounded-full border border-warning/20 bg-warning/10 px-2.5 py-1 text-[10px] font-medium text-warning">
                                     <x-icon name="lucide.clock-alert" class="!size-3.5" />
@@ -131,91 +134,136 @@
                             <div
                                 wire:ignore
                                 x-data="{
-                                    endAt: {{ $currentExpiresAt->getTimestamp() * 1000 }},
-                                    now: Date.now(),
-                                    timer: null,
-                                    init() {
-                                        this.timer = setInterval(() => this.now = Date.now(), 1000)
-                                    },
-                                    destroy() {
-                                        clearInterval(this.timer)
-                                    },
-                                    get totalSeconds() {
-                                        return Math.max(0, Math.floor((this.endAt - this.now) / 1000))
-                                    },
-                                    get days() {
-                                        return Math.floor(this.totalSeconds / 86400)
-                                    },
-                                    get hours() {
-                                        return Math.floor((this.totalSeconds % 86400) / 3600)
-                                    },
-                                    get minutes() {
-                                        return Math.floor((this.totalSeconds % 3600) / 60)
-                                    },
-                                    get seconds() {
-                                        return this.totalSeconds % 60
-                                    }
-                                }"
-                                class="border-t border-base-300 px-4 py-4 sm:px-5"
+            endAt: {{ $currentExpiresAt->getTimestamp() * 1000 }},
+            now: Date.now(),
+            timer: null,
+
+            init() {
+                this.timer = setInterval(() => {
+                    this.now = Date.now()
+                }, 1000)
+            },
+
+            destroy() {
+                clearInterval(this.timer)
+            },
+
+            get totalSeconds() {
+                return Math.max(
+                    0,
+                    Math.floor((this.endAt - this.now) / 1000)
+                )
+            },
+
+            get days() {
+                return Math.floor(this.totalSeconds / 86400)
+            },
+
+            get hours() {
+                return Math.floor((this.totalSeconds % 86400) / 3600)
+            },
+
+            get minutes() {
+                return Math.floor((this.totalSeconds % 3600) / 60)
+            },
+
+            get seconds() {
+                return this.totalSeconds % 60
+            }
+        }"
+                                class="flex flex-col gap-3 border-t border-base-300 px-4 py-3
+               sm:flex-row sm:items-center sm:justify-between sm:px-5"
                             >
-                                <div class="mb-3 flex items-center justify-between gap-3">
-                                    <span class="text-xs font-medium text-base-content/55">زمان باقی‌مانده تا پایان سرویس</span>
+                                {{-- Expiration date --}}
+                                <div class="flex items-center gap-2.5">
+            <span class="text-xs text-base-content/40">
+                تاریخ پایان
+            </span>
+
+                                    <span
+                                        dir="ltr"
+                                        class="technical-value text-xs font-medium text-base-content"
+                                    >
+                {{ \App\Support\Date\JalaliDateFormatter::dateTime(
+                    $currentExpiresAt,
+                    ' - '
+                ) }}
+            </span>
+
                                     @if($isExpiringSoon)
-                                        <span class="text-[10px] font-medium text-warning">کمتر از ۲۴ ساعت</span>
+                                        <span
+                                            class="rounded-full bg-warning/10 px-2 py-0.5
+                           text-[9px] font-medium text-warning"
+                                        >
+                    نزدیک انقضا
+                </span>
                                     @endif
                                 </div>
 
-                                <div dir="ltr" class="grid grid-cols-4 gap-2 text-center sm:max-w-md">
-                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
-                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
-                                            <span
-                                                x-bind:style="'--value:' + days"
-                                                x-bind:aria-label="days"
-                                                x-text="days"
-                                            ></span>
-                                        </span>
-                                        <span class="mt-0.5 text-[10px] opacity-65">روز</span>
+                                {{-- Countdown --}}
+                                <div
+                                    dir="ltr"
+                                    class="grid auto-cols-max grid-flow-col gap-4 text-center"
+                                >
+                                    <div class="flex min-w-9 flex-col">
+                <span class="countdown font-mono text-xl font-semibold">
+                    <span
+                        x-bind:style="'--value:' + days"
+                        x-bind:aria-label="days"
+                        x-text="days"
+                    ></span>
+                </span>
+
+                                        <span class="text-[9px] text-base-content/35">
+                    روز
+                </span>
                                     </div>
-                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
-                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
-                                            <span
-                                                x-bind:style="'--value:' + hours"
-                                                x-bind:aria-label="hours"
-                                                x-text="hours"
-                                            ></span>
-                                        </span>
-                                        <span class="mt-0.5 text-[10px] opacity-65">ساعت</span>
+
+                                    <div class="flex min-w-9 flex-col">
+                <span class="countdown font-mono text-xl font-semibold">
+                    <span
+                        x-bind:style="'--value:' + hours + '; --digits: 2;'"
+                        x-bind:aria-label="hours"
+                        x-text="hours"
+                    ></span>
+                </span>
+
+                                        <span class="text-[9px] text-base-content/35">
+                    ساعت
+                </span>
                                     </div>
-                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
-                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
-                                            <span
-                                                x-bind:style="'--value:' + minutes"
-                                                x-bind:aria-label="minutes"
-                                                x-text="minutes"
-                                            ></span>
-                                        </span>
-                                        <span class="mt-0.5 text-[10px] opacity-65">دقیقه</span>
+
+                                    <div class="flex min-w-9 flex-col">
+                <span class="countdown font-mono text-xl font-semibold">
+                    <span
+                        x-bind:style="'--value:' + minutes + '; --digits: 2;'"
+                        x-bind:aria-label="minutes"
+                        x-text="minutes"
+                    ></span>
+                </span>
+
+                                        <span class="text-[9px] text-base-content/35">
+                    دقیقه
+                </span>
                                     </div>
-                                    <div class="flex min-w-0 flex-col rounded-xl bg-neutral p-2 text-neutral-content">
-                                        <span class="countdown font-mono text-2xl font-semibold sm:text-3xl">
-                                            <span
-                                                x-bind:style="'--value:' + seconds"
-                                                x-bind:aria-label="seconds"
-                                                x-text="seconds"
-                                            ></span>
-                                        </span>
-                                        <span class="mt-0.5 text-[10px] opacity-65">ثانیه</span>
+
+                                    <div class="flex min-w-9 flex-col">
+                <span class="countdown font-mono text-xl font-semibold">
+                    <span
+                        x-bind:style="'--value:' + seconds + '; --digits: 2;'"
+                        x-bind:aria-label="seconds"
+                        x-text="seconds"
+                    ></span>
+                </span>
+
+                                        <span class="text-[9px] text-base-content/35">
+                    ثانیه
+                </span>
                                     </div>
                                 </div>
                             </div>
                         @endif
 
-                        <div class="flex flex-col gap-2 border-t border-base-300 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                            <span class="text-xs text-base-content/40">تاریخ پایان فعلی</span>
-                            <span dir="ltr" class="technical-value text-xs font-medium text-base-content">
-                                {{ $currentExpiresAt ? \App\Support\Date\JalaliDateFormatter::dateTime($currentExpiresAt, ' - ') : '—' }}
-                            </span>
-                        </div>
                     </section>
 
                     <section class="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
