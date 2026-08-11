@@ -1,0 +1,16 @@
+; xDeploy queue worker (Supervisor example)
+; Adjust directory, user and PHP path for the production host.
+
+[program:xdeploy-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/bin/php artisan queue:work --queue=provisioning,notifications,default --sleep=1 --tries=1 --timeout=0 --max-time=3600
+directory=/var/www/xdeploy
+user=www-data
+numprocs=1
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+redirect_stderr=true
+stdout_logfile=/var/www/xdeploy/storage/logs/queue-worker.log
+stopwaitsecs=130

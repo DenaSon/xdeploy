@@ -59,8 +59,7 @@ final class VerifyPaymentAndFulfillOrderActionTest extends TestCase
 
         Queue::assertPushed(
             ProvisionPaidOrderJob::class,
-            static fn (ProvisionPaidOrderJob $job): bool =>
-                $job->orderId === $order->id,
+            static fn (ProvisionPaidOrderJob $job): bool => $job->orderId === $order->id,
         );
     }
 

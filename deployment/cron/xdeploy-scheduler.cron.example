@@ -1,0 +1,5 @@
+# xDeploy Laravel Scheduler
+# Adjust the application path and PHP binary for the production host.
+# Install for the same OS user that owns/runs the application.
+
+* * * * * cd /var/www/xdeploy && /usr/bin/php artisan schedule:run >> /dev/null 2>&1

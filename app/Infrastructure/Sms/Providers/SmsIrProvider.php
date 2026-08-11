@@ -50,7 +50,7 @@ final readonly class SmsIrProvider implements SmsProviderInterface
     }
 
     /**
-     * @param array<int, array{name: string, value: string}> $parameters
+     * @param  array<int, array{name: string, value: string}>  $parameters
      */
     private function sendTemplate(
         PhoneNumber $phone,

@@ -61,19 +61,23 @@
             "npx concurrently -c \"#93c5fd,#c4b5fd,#86efac,#fdba74\" \"php artisan serve --host=localhost\" \"php artisan queue:listen --queue=provisioning,notifications,default --tries=1 --timeout=0\" \"php artisan schedule:work\" \"npm run dev\" --names=server,queue,scheduler,vite --kill-others"
         ],
         "lint": [
-            "pint --parallel"
+            "@php vendor/bin/pint --parallel"
         ],
         "lint:check": [
-            "pint --parallel --test"
+            "@php vendor/bin/pint --parallel --test"
+        ],
+        "test:suite": [
+            "@php artisan test --colors=always"
+        ],
+        "test": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan config:clear --ansi",
+            "@lint:check",
+            "@test:suite"
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
             "@test"
-        ],
-        "test": [
-            "@php artisan config:clear --ansi",
-            "@lint:check",
-            "@php artisan test"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

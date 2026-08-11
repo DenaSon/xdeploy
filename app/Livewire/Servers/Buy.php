@@ -454,17 +454,17 @@ final class Buy extends Component
                 ),
 
                 'regionGroupCounts' => [
-                self::REGION_GROUP_IRAN => count(
-                    $this->regionsForGroup(
-                        self::REGION_GROUP_IRAN,
+                    self::REGION_GROUP_IRAN => count(
+                        $this->regionsForGroup(
+                            self::REGION_GROUP_IRAN,
+                        ),
                     ),
-                ),
 
-                self::REGION_GROUP_INTERNATIONAL => count(
-                    $this->regionsForGroup(
-                        self::REGION_GROUP_INTERNATIONAL,
+                    self::REGION_GROUP_INTERNATIONAL => count(
+                        $this->regionsForGroup(
+                            self::REGION_GROUP_INTERNATIONAL,
+                        ),
                     ),
-                ),
                 ],
 
                 'selectedRegion' => $this->findById(

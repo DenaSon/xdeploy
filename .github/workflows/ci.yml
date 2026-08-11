@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: PHP 8.4 / Node 22
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Non-secret deterministic CI-only values. Production must provide real secrets.
+      SERVER_CREDENTIALS_KEY_V1: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      ARVAN_CLOUD_API_KEY: ci-not-a-real-arvan-key
+      ZARINPAL_MERCHANT_ID: 00000000-0000-0000-0000-000000000001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          extensions: mbstring, dom, fileinfo, pdo_sqlite, sqlite3, simplexml, sodium
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Prepare environment
+        run: cp .env.example .env
+
+      - name: Validate Composer metadata
+        run: composer validate
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Generate application key
+        run: php artisan key:generate --force
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Clear configuration cache
+        run: php artisan config:clear --ansi
+
+      - name: Check code style
+        run: composer lint:check
+
+      - name: Run test suite
+        shell: bash
+        run: |
+          set -o pipefail
+          php artisan test --colors=never 2>&1 | tee ci-test-output.log
+
+      - name: Upload test failure log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phpunit-failure-log
+          path: ci-test-output.log
+          if-no-files-found: ignore
+          retention-days: 7
