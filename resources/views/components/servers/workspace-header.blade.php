@@ -43,6 +43,20 @@
         ],
     ];
 
+    if ($server->isCloudProvisioned()) {
+        $navigationItems[] = [
+            'label' => 'کنسول',
+            'icon' => 'lucide.monitor',
+            'route' => route(
+                'panel.servers.console',
+                ['server' => $server],
+            ),
+            'active' => request()->routeIs(
+                'panel.servers.console',
+            ),
+        ];
+    }
+
     $canRenew = $server->isCloudProvisioned()
         && $server->expires_at !== null
         && ! $server->hasExpired()

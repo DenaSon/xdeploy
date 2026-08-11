@@ -7,6 +7,7 @@ use App\Livewire\Applications\Show as ApplicationShow;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Orders\Show as OrderShow;
 use App\Livewire\Servers\Buy as ServerBuy;
+use App\Livewire\Servers\Console as ServerConsole;
 use App\Livewire\Servers\Create as ServerCreate;
 use App\Livewire\Servers\Dashboard as ServerDashboard;
 use App\Livewire\Servers\Edit as ServerEdit;
@@ -63,6 +64,11 @@ Route::middleware(['web', 'auth'])
             '/servers/{server}/renew',
             ServerRenew::class,
         )->name('servers.renew');
+
+        Route::livewire(
+            '/servers/{server}/console',
+            ServerConsole::class,
+        )->name('servers.console');
 
         Route::livewire(
             '/servers/{server}',
