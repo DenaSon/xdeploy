@@ -42,6 +42,26 @@
             ),
         ],
     ];
+
+    $canRenew = $server->isCloudProvisioned()
+        && $server->expires_at !== null
+        && ! $server->hasExpired()
+        && ! $server->isTerminated()
+        && $server->termination_started_at === null;
+
+    if ($canRenew) {
+        $navigationItems[] = [
+            'label' => 'تمدید',
+            'icon' => 'lucide.calendar-plus',
+            'route' => route(
+                'panel.servers.renew',
+                ['server' => $server],
+            ),
+            'active' => request()->routeIs(
+                'panel.servers.renew',
+            ),
+        ];
+    }
 @endphp
 
 <header

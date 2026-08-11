@@ -11,6 +11,7 @@ use App\Livewire\Servers\Create as ServerCreate;
 use App\Livewire\Servers\Dashboard as ServerDashboard;
 use App\Livewire\Servers\Edit as ServerEdit;
 use App\Livewire\Servers\Index as ServersIndex;
+use App\Livewire\Servers\Renew as ServerRenew;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'guest'])
@@ -57,6 +58,11 @@ Route::middleware(['web', 'auth'])
             '/servers/{server}/edit',
             ServerEdit::class,
         )->name('servers.edit');
+
+        Route::livewire(
+            '/servers/{server}/renew',
+            ServerRenew::class,
+        )->name('servers.renew');
 
         Route::livewire(
             '/servers/{server}',

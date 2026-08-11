@@ -68,10 +68,10 @@ final class CloudServerExpiringSoonNotification extends Notification
 
             'expires_at' => $this->expiresAt,
 
-            'action_label' => 'مشاهده سرور',
+            'action_label' => 'تمدید سرویس',
 
             'action_url' => route(
-                'panel.servers.dashboard',
+                'panel.servers.renew',
                 [
                     'server' => $this->serverId,
                 ],

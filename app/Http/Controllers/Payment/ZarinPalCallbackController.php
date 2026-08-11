@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Payment;
 use App\Application\Billing\Actions\CancelPendingPaymentAction;
 use App\Application\Billing\Actions\VerifyPaymentAndFulfillOrderAction;
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,11 +58,9 @@ final class ZarinPalCallbackController extends Controller
                 reference: $authority,
             );
 
-            return redirect()->route(
-                'panel.orders.show',
-                [
-                    'order' => $payment->order_id,
-                ],
+            return $this->redirectAfterPayment(
+                payment: $payment,
+                result: 'cancelled',
             );
         }
 
@@ -73,10 +73,37 @@ final class ZarinPalCallbackController extends Controller
             gatewayReference: $authority,
         );
 
+        return $this->redirectAfterPayment(
+            payment: $payment,
+            result: 'success',
+        );
+    }
+
+    private function redirectAfterPayment(
+        Payment $payment,
+        string $result,
+    ): RedirectResponse {
+        /** @var Order $order */
+        $order = $payment->order()
+            ->firstOrFail();
+
+        if (
+            $order->isRenewal()
+            && $order->server_id !== null
+        ) {
+            return redirect()->route(
+                'panel.servers.renew',
+                [
+                    'server' => $order->server_id,
+                    'payment' => $result,
+                ],
+            );
+        }
+
         return redirect()->route(
             'panel.orders.show',
             [
-                'order' => $payment->order_id,
+                'order' => $order->getKey(),
             ],
         );
     }

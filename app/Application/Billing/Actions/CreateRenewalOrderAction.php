@@ -17,7 +17,7 @@ use LogicException;
 final readonly class CreateRenewalOrderAction
 {
     public function __construct(
-        private CalculateCloudPurchasePriceAction $calculatePrice,
+        private CalculateCloudRenewalPriceAction $calculateRenewalPrice,
     ) {}
 
     public function execute(
@@ -25,25 +25,10 @@ final readonly class CreateRenewalOrderAction
         int $serverId,
         string $period,
     ): Order {
-        $period = trim(
-            $period,
-        );
-
-        [$server, $sourceOrder] = $this->renewalContext(
+        $price = $this->calculateRenewalPrice->execute(
             user: $user,
             serverId: $serverId,
-        );
-
-        /*
-         * Provider catalog calls must remain outside database transactions.
-         * Renewal pricing is authoritative at quote creation time and uses
-         * the current catalog for the already-provisioned plan/disk shape.
-         */
-        $price = $this->calculatePrice->execute(
-            region: $sourceOrder->region_id,
-            sizeId: $sourceOrder->size_id,
-            selectedDiskGiB: $sourceOrder->selected_disk_gib,
-            period: $period,
+            period: trim($period),
         );
 
         $quoteTtlMinutes = max(
@@ -57,48 +42,31 @@ final readonly class CreateRenewalOrderAction
         return DB::transaction(
             function () use (
                 $user,
-                $server,
-                $sourceOrder,
+                $serverId,
                 $price,
                 $quoteTtlMinutes,
             ): Order {
                 /** @var Server $lockedServer */
                 $lockedServer = Server::query()
-                    ->whereKey(
-                        $server->getKey(),
-                    )
-                    ->where(
-                        'user_id',
-                        $user->getKey(),
-                    )
+                    ->whereKey($serverId)
+                    ->where('user_id', $user->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $this->assertCanStartRenewal(
-                    $lockedServer,
-                );
+                /*
+                 * Pricing was fetched outside the transaction. Revalidate the
+                 * service lifetime after taking the Server row lock so expiry
+                 * or termination cannot race quote creation.
+                 */
+                $this->assertCanStartRenewal($lockedServer);
 
                 /** @var Order|null $lockedSourceOrder */
                 $lockedSourceOrder = Order::query()
-                    ->whereKey(
-                        $sourceOrder->getKey(),
-                    )
-                    ->where(
-                        'user_id',
-                        $user->getKey(),
-                    )
-                    ->where(
-                        'server_id',
-                        $lockedServer->getKey(),
-                    )
-                    ->where(
-                        'type',
-                        OrderType::Provisioning,
-                    )
-                    ->where(
-                        'status',
-                        OrderStatus::Fulfilled,
-                    )
+                    ->where('user_id', $user->getKey())
+                    ->where('server_id', $lockedServer->getKey())
+                    ->where('type', OrderType::Provisioning)
+                    ->where('status', OrderStatus::Fulfilled)
+                    ->oldest('id')
                     ->lockForUpdate()
                     ->first();
 
@@ -152,66 +120,6 @@ final readonly class CreateRenewalOrderAction
                 ]);
             },
         );
-    }
-
-    /**
-     * @return array{0: Server, 1: Order}
-     */
-    private function renewalContext(
-        User $user,
-        int $serverId,
-    ): array {
-        /** @var Server $server */
-        $server = Server::query()
-            ->whereKey(
-                $serverId,
-            )
-            ->where(
-                'user_id',
-                $user->getKey(),
-            )
-            ->firstOrFail();
-
-        $this->assertCanStartRenewal(
-            $server,
-        );
-
-        /** @var Order|null $sourceOrder */
-        $sourceOrder = Order::query()
-            ->where(
-                'user_id',
-                $user->getKey(),
-            )
-            ->where(
-                'server_id',
-                $server->getKey(),
-            )
-            ->where(
-                'type',
-                OrderType::Provisioning,
-            )
-            ->where(
-                'status',
-                OrderStatus::Fulfilled,
-            )
-            ->oldest('id')
-            ->first();
-
-        if (! $sourceOrder instanceof Order) {
-            throw CloudServerRenewalException::sourceOrderMissing(
-                (int) $server->getKey(),
-            );
-        }
-
-        $this->assertSourceMatchesServer(
-            server: $server,
-            sourceOrder: $sourceOrder,
-        );
-
-        return [
-            $server,
-            $sourceOrder,
-        ];
     }
 
     private function assertCanStartRenewal(

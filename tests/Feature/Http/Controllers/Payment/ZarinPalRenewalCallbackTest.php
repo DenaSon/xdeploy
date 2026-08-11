@@ -136,8 +136,11 @@ final class ZarinPalRenewalCallbackTest extends TestCase
             )
             ->assertRedirect(
                 route(
-                    'panel.orders.show',
-                    $order,
+                    'panel.servers.renew',
+                    [
+                        'server' => $server,
+                        'payment' => 'success',
+                    ],
                 ),
             );
 

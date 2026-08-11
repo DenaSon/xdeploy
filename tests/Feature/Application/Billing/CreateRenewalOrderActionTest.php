@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Application\Billing;
 
 use App\Application\Billing\Actions\CalculateCloudPurchasePriceAction;
+use App\Application\Billing\Actions\CalculateCloudRenewalPriceAction;
 use App\Application\Billing\Actions\CreateRenewalOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
@@ -348,11 +349,15 @@ final class CreateRenewalOrderActionTest extends TestCase
         CloudProviderInterface $cloud,
         CloudServerResizeCatalogInterface $diskPricing,
     ): CreateRenewalOrderAction {
+        $purchasePrice = new CalculateCloudPurchasePriceAction(
+            cloud: $cloud,
+            pricing: $diskPricing,
+            calculator: new CloudPricingCalculator,
+        );
+
         return new CreateRenewalOrderAction(
-            calculatePrice: new CalculateCloudPurchasePriceAction(
-                cloud: $cloud,
-                pricing: $diskPricing,
-                calculator: new CloudPricingCalculator,
+            calculateRenewalPrice: new CalculateCloudRenewalPriceAction(
+                calculatePrice: $purchasePrice,
             ),
         );
     }

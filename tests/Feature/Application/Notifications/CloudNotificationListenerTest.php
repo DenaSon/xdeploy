@@ -18,36 +18,42 @@ final class CloudNotificationListenerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $event =
-            new CloudServerExpiringSoon(
-                userId: (int) $user->getKey(),
-
-                serverId: 42,
-
-                serverName: 'Cloud VPS',
-
-                expiresAt: now()
-                    ->addHours(23)
-                    ->toIso8601String(),
-            );
+        $event = new CloudServerExpiringSoon(
+            userId: (int) $user->getKey(),
+            serverId: 42,
+            serverName: 'Cloud VPS',
+            expiresAt: now()
+                ->addHours(23)
+                ->toIso8601String(),
+        );
 
         $listener = app(
             SendCloudServerExpiringSoonNotification::class,
         );
 
-        $listener->handle(
-            $event,
-        );
-
-        $listener->handle(
-            $event,
-        );
+        $listener->handle($event);
+        $listener->handle($event);
 
         $this->assertSame(
             1,
-            $user
-                ->notifications()
-                ->count(),
+            $user->notifications()->count(),
+        );
+
+        $notification = $user
+            ->notifications()
+            ->firstOrFail();
+
+        $this->assertSame(
+            'تمدید سرویس',
+            $notification->data['action_label'] ?? null,
+        );
+        $this->assertSame(
+            route(
+                'panel.servers.renew',
+                ['server' => 42],
+                false,
+            ),
+            $notification->data['action_url'] ?? null,
         );
     }
 }
