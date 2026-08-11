@@ -44,6 +44,8 @@
         class="flex shrink-0
                items-center gap-1"
     >
+        <livewire:notifications.bell />
+
         <div
             class="tooltip tooltip-bottom
                    before:z-50 before:text-xs

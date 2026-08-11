@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Jobs;
 
+use App\Application\Cloud\Events\CloudServerTerminationFailed;
 use App\Application\Cloud\Servers\TerminateExpiredCloudServerAction;
+use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -77,6 +79,93 @@ final class TerminateExpiredCloudServerJob implements ShouldBeUnique, ShouldQueu
                     : null,
                 'message' => $exception?->getMessage(),
             ],
+        );
+
+        /** @var Server|null $server */
+        $server = Server::query()
+            ->whereKey(
+                $this->serverId,
+            )
+            ->first();
+
+        if (
+            ! $server instanceof Server
+            || $server->expires_at === null
+        ) {
+            return;
+        }
+
+        $message = trim(
+            (string) (
+                $exception?->getMessage()
+                ?? $server->termination_last_error
+                ?? 'Cloud Server termination failed.'
+            ),
+        );
+
+        if ($message === '') {
+            $message =
+                'Cloud Server termination failed.';
+        }
+
+        try {
+            CloudServerTerminationFailed::dispatch(
+                userId: (int) $server->user_id,
+
+                serverId: (int) $server->getKey(),
+
+                serverName: $this->serverDisplayName(
+                    $server,
+                ),
+
+                expiresAt: $server->expires_at
+                    ->toIso8601String(),
+
+                attempts: max(
+                    1,
+                    $server->termination_attempts,
+                ),
+
+                message: $message,
+            );
+        } catch (Throwable $eventException) {
+            report(
+                $eventException,
+            );
+
+            logger()->warning(
+                'cloud_server.termination_failed_event_dispatch_failed',
+                [
+                    'server_id' => $this->serverId,
+
+                    'message' => $eventException->getMessage(),
+                ],
+            );
+        }
+    }
+
+    private function serverDisplayName(
+        Server $server,
+    ): string {
+        $name = trim(
+            (string) $server->name,
+        );
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        $host = trim(
+            (string) $server->host,
+        );
+
+        if ($host !== '') {
+            return $host;
+        }
+
+        return sprintf(
+            'VPS #%d',
+            (int) $server->getKey(),
         );
     }
 }

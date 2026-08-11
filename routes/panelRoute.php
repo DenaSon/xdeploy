@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\Applications\Index as ApplicationsIndex;
 use App\Livewire\Applications\Show as ApplicationShow;
+use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Orders\Show as OrderShow;
 use App\Livewire\Servers\Buy as ServerBuy;
 use App\Livewire\Servers\Create as ServerCreate;
@@ -29,6 +30,11 @@ Route::middleware(['web', 'auth'])
     ->prefix('panel')
     ->as('panel.')
     ->group(function (): void {
+        Route::livewire(
+            '/notifications',
+            NotificationsIndex::class,
+        )->name('notifications.index');
+
         Route::livewire(
             '/servers',
             ServersIndex::class,
