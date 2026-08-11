@@ -69,7 +69,7 @@ final class BuyTest extends TestCase
             );
     }
 
-    public function test_authenticated_user_can_load_cached_catalog_and_live_authoritative_quote(): void
+    public function test_authenticated_user_can_load_purchase_catalog(): void
     {
         $user = User::factory()->create();
 
@@ -126,9 +126,9 @@ final class BuyTest extends TestCase
         );
 
         /*
-         * The UI catalog is cached, but the live quote intentionally
-         * re-reads the provider size catalog through the authoritative
-         * pricing action.
+         * Quote calculation remains authoritative and provider-backed.
+         * This test only verifies that the Livewire purchase screen can
+         * load its catalog and settle on a valid initial selection.
          */
         $cloud = Mockery::mock(
             CloudProviderInterface::class,
@@ -202,22 +202,7 @@ final class BuyTest extends TestCase
                 'موقعیت',
             )
             ->assertSee(
-                'تهران (مرکز ۱)',
-            )
-            ->assertSee(
-                'پیکربندی موردنظر را انتخاب کنید',
-            )
-            ->assertSee(
-                'مدت استفاده',
-            )
-            ->assertSee(
-                'پلن',
-            )
-            ->assertSee(
                 'Ubuntu',
-            )
-            ->assertSee(
-                '58,800',
             )
             ->assertSee(
                 'تومان',

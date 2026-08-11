@@ -14,6 +14,8 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\Cloud\CloudRegionLabel;
+use App\Support\Money\MoneyFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -160,6 +162,12 @@ final class Show extends Component
                     order: $order,
                     server: $server,
                 ),
+
+                ...$this->presentationData(
+                    order: $order,
+                    server: $server,
+                ),
+
             ],
         )->layout(
             'layouts.panel',
@@ -206,7 +214,7 @@ final class Show extends Component
             ) {
                 return [
                     'label' => 'آماده استفاده',
-                    'description' => 'سرور با موفقیت ساخته شده و اتصال xDeploy نیز آماده استفاده است.',
+                    'description' => 'سرور با موفقیت ساخته شده و اتصال آن نیز آماده استفاده است.',
                     'icon' => 'lucide.circle-check',
                     'badge' => 'badge-success',
                 ];
@@ -214,7 +222,7 @@ final class Show extends Component
 
             return [
                 'label' => 'VPS ساخته شد',
-                'description' => 'ساخت VPS با موفقیت تکمیل شده است. در حال بررسی آمادگی اتصال xDeploy هستیم.',
+                'description' => 'ساخت VPS با موفقیت تکمیل شده است. در حال بررسی آمادگی اتصال هستیم.',
                 'icon' => 'lucide.server',
                 'badge' => 'badge-info',
             ];
@@ -323,7 +331,7 @@ final class Show extends Component
         if (
             $order->status === OrderStatus::Paid
             || $order->status
-                === OrderStatus::Provisioning
+            === OrderStatus::Provisioning
         ) {
             return true;
         }
@@ -344,6 +352,240 @@ final class Show extends Component
         return is_string($label)
             ? $label
             : $period;
+    }
+
+    /**
+     * @return array{
+     *     serverReady: bool,
+     *     regionLabel: string,
+     *     paid: bool,
+     *     statusTone: string,
+     *     amountLabel: string,
+     *     amountToman: string,
+     *     steps: list<array{
+     *         title: string,
+     *         description: string,
+     *         icon: string,
+     *         state: string
+     *     }>,
+     *     isProvisioning: bool,
+     *     isFailed: bool,
+     *     canCreateNewOrder: bool,
+     *     estimatedReadyAt: int|null
+     * }
+     */
+    private function presentationData(
+        Order $order,
+        ?Server $server,
+    ): array {
+        $serverReady =
+            $server instanceof Server
+            && $server->isActive();
+
+        $paid = $this->isPaid(
+            $order,
+        );
+
+        $providerDone =
+            $order->status
+            === OrderStatus::Fulfilled;
+
+        return [
+            'serverReady' => $serverReady,
+
+            'regionLabel' => CloudRegionLabel::for(
+                $order->region_id,
+            ),
+
+            'paid' => $paid,
+
+            'statusTone' => $this->statusTone(
+                order: $order,
+                serverReady: $serverReady,
+            ),
+
+            'amountLabel' => $this->amountLabel(
+                order: $order,
+                paid: $paid,
+            ),
+
+            'amountToman' => MoneyFormatter::tomanFromRial(
+                $order->final_amount,
+            ),
+
+            'steps' => $this->provisioningSteps(
+                order: $order,
+                serverReady: $serverReady,
+                paid: $paid,
+                providerDone: $providerDone,
+            ),
+
+            'isProvisioning' => $order->status
+                === OrderStatus::Provisioning,
+
+            'isFailed' => $order->status
+                === OrderStatus::Failed,
+
+            'canCreateNewOrder' => in_array(
+                $order->status,
+                [
+                    OrderStatus::Expired,
+                    OrderStatus::Cancelled,
+                ],
+                true,
+            ),
+            'estimatedReadyAt' => $order->paid_at
+                ?->addSeconds(100)
+                ->timestamp,
+        ];
+    }
+
+    private function isPaid(
+        Order $order,
+    ): bool {
+        if ($order->paid_at !== null) {
+            return true;
+        }
+
+        return in_array(
+            $order->status,
+            [
+                OrderStatus::Paid,
+                OrderStatus::Provisioning,
+                OrderStatus::Fulfilled,
+                OrderStatus::Failed,
+            ],
+            true,
+        );
+    }
+
+    private function statusTone(
+        Order $order,
+        bool $serverReady,
+    ): string {
+        return match ($order->status) {
+            OrderStatus::PendingPayment,
+            OrderStatus::Expired => 'warning',
+
+            OrderStatus::Paid => 'success',
+
+            OrderStatus::Provisioning => 'primary',
+
+            OrderStatus::Fulfilled => $serverReady
+                ? 'success'
+                : 'info',
+
+            OrderStatus::Failed => 'error',
+
+            OrderStatus::Cancelled => 'neutral',
+        };
+    }
+
+    private function amountLabel(
+        Order $order,
+        bool $paid,
+    ): string {
+        if ($paid) {
+            return 'مبلغ پرداخت‌شده';
+        }
+
+        if (
+            $order->status
+            === OrderStatus::PendingPayment
+        ) {
+            return 'مبلغ قابل پرداخت';
+        }
+
+        return 'مبلغ سفارش';
+    }
+
+    /**
+     * @return list<array{
+     *     title: string,
+     *     description: string,
+     *     icon: string,
+     *     state: string
+     * }>
+     */
+    private function provisioningSteps(
+        Order $order,
+        bool $serverReady,
+        bool $paid,
+        bool $providerDone,
+    ): array {
+        $queued = in_array(
+            $order->status,
+            [
+                OrderStatus::Provisioning,
+                OrderStatus::Fulfilled,
+                OrderStatus::Failed,
+            ],
+            true,
+        );
+
+        return [
+            [
+                'title' => 'پرداخت',
+                'description' => 'تأیید تراکنش مالی',
+                'icon' => 'lucide.credit-card',
+
+                'state' => $paid
+                    ? 'completed'
+                    : (
+                        $order->status
+                        === OrderStatus::PendingPayment
+                            ? 'current'
+                            : 'upcoming'
+                    ),
+            ],
+
+            [
+                'title' => 'ثبت سفارش',
+                'description' => 'ورود به صف آماده‌سازی',
+                'icon' => 'lucide.list-checks',
+
+                'state' => $queued
+                    ? 'completed'
+                    : (
+                        $order->status
+                        === OrderStatus::Paid
+                            ? 'current'
+                            : 'upcoming'
+                    ),
+            ],
+
+            [
+                'title' => 'ساخت VPS',
+                'description' => 'ایجاد در زیرساخت ابری',
+                'icon' => 'lucide.cloud-cog',
+
+                'state' => match (true) {
+                    $order->status
+                    === OrderStatus::Failed => 'failed',
+
+                    $providerDone => 'completed',
+
+                    $order->status
+                    === OrderStatus::Provisioning => 'current',
+
+                    default => 'upcoming',
+                },
+            ],
+
+            [
+                'title' => 'اتصال',
+                'description' => 'بررسی آمادگی SSH',
+                'icon' => 'lucide.server',
+
+                'state' => match (true) {
+                    $serverReady => 'completed',
+
+                    $providerDone => 'current',
+
+                    default => 'upcoming',
+                },
+            ],
+        ];
     }
 
     private function authenticatedUser(): User

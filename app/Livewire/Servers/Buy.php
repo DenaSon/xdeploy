@@ -15,6 +15,8 @@ use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Models\User;
+use App\Support\Cloud\CloudRegionLabel;
+use App\Support\Money\MoneyFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Title;
@@ -32,15 +34,6 @@ final class Buy extends Component
     private const int MAX_VISIBLE_PLANS = 10;
 
     private const string REGION_GROUP_INTERNATIONAL = 'international';
-
-    private const array REGION_DISPLAY_NAMES = [
-        'ir-thr-ba1' => 'تهران (مرکز ۱)',
-        'ir-thr-fr1' => 'تهران (مرکز ۲)',
-        'ir-thr-si1' => 'تهران (مرکز ۳)',
-        'ir-tbz-sh1' => 'تبریز (مرکز ۱)',
-        'ir-southwest1-a' => 'اهواز (مرکز ۱)',
-        'eu-west1-a' => 'آلمان (مرکز اروپا)',
-    ];
 
     /**
      * @var list<array{
@@ -133,10 +126,16 @@ final class Buy extends Component
         $regionId = $region['id'] ?? null;
 
         if (
-            $regionId !== null
-            && isset(self::REGION_DISPLAY_NAMES[$regionId])
+            is_string($regionId)
+            && $regionId !== ''
         ) {
-            return self::REGION_DISPLAY_NAMES[$regionId];
+            $label = CloudRegionLabel::for(
+                $regionId,
+            );
+
+            if ($label !== $regionId) {
+                return $label;
+            }
         }
 
         return $region['city']
@@ -455,17 +454,17 @@ final class Buy extends Component
                 ),
 
                 'regionGroupCounts' => [
-                    self::REGION_GROUP_IRAN => count(
-                        $this->regionsForGroup(
-                            self::REGION_GROUP_IRAN,
-                        ),
+                self::REGION_GROUP_IRAN => count(
+                    $this->regionsForGroup(
+                        self::REGION_GROUP_IRAN,
                     ),
+                ),
 
-                    self::REGION_GROUP_INTERNATIONAL => count(
-                        $this->regionsForGroup(
-                            self::REGION_GROUP_INTERNATIONAL,
-                        ),
+                self::REGION_GROUP_INTERNATIONAL => count(
+                    $this->regionsForGroup(
+                        self::REGION_GROUP_INTERNATIONAL,
                     ),
+                ),
                 ],
 
                 'selectedRegion' => $this->findById(
@@ -753,8 +752,8 @@ final class Buy extends Component
     public function formatToman(
         int $rialAmount,
     ): string {
-        return number_format(
-            intdiv($rialAmount, 10),
+        return MoneyFormatter::tomanFromRial(
+            $rialAmount,
         );
     }
 
@@ -851,7 +850,7 @@ final class Buy extends Component
                 $this->period,
             ) !== null
             && $this->selectedDiskGiB
-                >= $this->minimumDiskGiB();
+            >= $this->minimumDiskGiB();
     }
 
     /**

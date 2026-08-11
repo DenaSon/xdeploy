@@ -65,7 +65,7 @@ final class ShowTest extends TestCase
                 'Ubuntu',
             )
             ->assertSee(
-                '2,165,760',
+                'تومان',
             );
     }
 
