@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Payment;
 
 use App\Application\Billing\Actions\CancelPendingPaymentAction;
-use App\Application\Billing\Actions\VerifyPaymentAndQueueProvisioningAction;
+use App\Application\Billing\Actions\VerifyPaymentAndFulfillOrderAction;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -15,7 +15,7 @@ final class ZarinPalCallbackController extends Controller
 {
     public function __invoke(
         Request $request,
-        VerifyPaymentAndQueueProvisioningAction $verifyAndQueue,
+        VerifyPaymentAndFulfillOrderAction $verifyAndFulfill,
         CancelPendingPaymentAction $cancel,
     ): JsonResponse|RedirectResponse {
         $authority = trim(
@@ -65,10 +65,11 @@ final class ZarinPalCallbackController extends Controller
         }
 
         /*
-         * Financial verification is completed and committed first.
-         * Only then is asynchronous cloud fulfillment queued.
+         * Financial verification is committed first. The order type then
+         * selects its fulfillment strategy: asynchronous provider creation
+         * for provisioning or immediate DB-only extension for renewal.
          */
-        $payment = $verifyAndQueue->execute(
+        $payment = $verifyAndFulfill->execute(
             gatewayReference: $authority,
         );
 

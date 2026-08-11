@@ -6,6 +6,7 @@ namespace App\Application\Billing\Actions;
 
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
+use App\Domain\Billing\Enums\OrderType;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,7 @@ final readonly class CreateOrderAction
         return DB::transaction(
             static fn (): Order => Order::query()->create([
                 'user_id' => $user->getKey(),
+                'type' => OrderType::Provisioning,
 
                 'region_id' => $price->regionId,
                 'size_id' => $price->sizeId,
