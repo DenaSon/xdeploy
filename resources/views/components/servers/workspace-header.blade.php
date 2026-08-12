@@ -53,6 +53,18 @@
                 'panel.servers.applications.*',
             ),
         ],
+
+        [
+            'label' => 'دامنه‌ها',
+            'icon' => 'lucide.globe-2',
+            'route' => route(
+                'panel.servers.domains.index',
+                ['server' => $server],
+            ),
+            'active' => request()->routeIs(
+                'panel.servers.domains.*',
+            ),
+        ],
     ];
 
     if ($server->isCloudProvisioned()) {

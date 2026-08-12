@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Servers\RevealServerCredentialController;
 use App\Livewire\Applications\Index as ApplicationsIndex;
 use App\Livewire\Applications\Show as ApplicationShow;
+use App\Livewire\Domains\Index as DomainsIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Orders\Show as OrderShow;
 use App\Livewire\Servers\Buy as ServerBuy;
@@ -93,6 +94,11 @@ Route::middleware(['web', 'auth'])
             '/servers/{server}/applications',
             ApplicationsIndex::class,
         )->name('servers.applications.index');
+
+        Route::livewire(
+            '/servers/{server}/domains',
+            DomainsIndex::class,
+        )->name('servers.domains.index');
 
         Route::livewire(
             '/servers/{server}/applications/{application}',
