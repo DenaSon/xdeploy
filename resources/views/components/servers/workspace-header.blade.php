@@ -31,6 +31,18 @@
         ],
 
         [
+            'label' => 'اطلاعات',
+            'icon' => 'lucide.server-cog',
+            'route' => route(
+                'panel.servers.details',
+                ['server' => $server],
+            ),
+            'active' => request()->routeIs(
+                'panel.servers.details',
+            ),
+        ],
+
+        [
             'label' => 'برنامه‌ها',
             'icon' => 'lucide.package',
             'route' => route(

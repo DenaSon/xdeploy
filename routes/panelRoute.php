@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Servers\RevealServerCredentialController;
 use App\Livewire\Applications\Index as ApplicationsIndex;
 use App\Livewire\Applications\Show as ApplicationShow;
 use App\Livewire\Notifications\Index as NotificationsIndex;
@@ -10,6 +11,7 @@ use App\Livewire\Servers\Buy as ServerBuy;
 use App\Livewire\Servers\Console as ServerConsole;
 use App\Livewire\Servers\Create as ServerCreate;
 use App\Livewire\Servers\Dashboard as ServerDashboard;
+use App\Livewire\Servers\Details as ServerDetails;
 use App\Livewire\Servers\Edit as ServerEdit;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\Renew as ServerRenew;
@@ -59,6 +61,18 @@ Route::middleware(['web', 'auth'])
             '/servers/{server}/edit',
             ServerEdit::class,
         )->name('servers.edit');
+
+        Route::livewire(
+            '/servers/{server}/details',
+            ServerDetails::class,
+        )->name('servers.details');
+
+        Route::post(
+            '/servers/{server}/credential/reveal',
+            RevealServerCredentialController::class,
+        )
+            ->middleware('throttle:10,1')
+            ->name('servers.credential.reveal');
 
         Route::livewire(
             '/servers/{server}/renew',
