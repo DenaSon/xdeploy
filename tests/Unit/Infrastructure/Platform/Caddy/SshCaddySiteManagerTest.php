@@ -33,13 +33,13 @@ OUTPUT,
             ),
         );
 
-        $result = $this->manager($ssh)->upsert(
-            CaddySite::reverseProxy(
-                key: CaddySiteKey::from('marzban'),
-                domain: 'panel.example.com',
-                upstream: 'unix//var/lib/marzban/marzban.socket',
-            ),
+        $site = CaddySite::reverseProxy(
+            key: CaddySiteKey::from('marzban'),
+            domain: 'panel.example.com',
+            upstream: '127.0.0.1:8000',
         );
+
+        $result = $this->manager($ssh)->upsert($site);
 
         self::assertTrue(
             $result->changed,
@@ -89,12 +89,32 @@ OUTPUT,
             $ssh->command,
         );
 
+        $payload = base64_encode(
+            (new CaddySiteConfigurationFactory)->make($site),
+        );
+
+        self::assertStringContainsString(
+            'site_payload='.escapeshellarg($payload),
+            $ssh->command,
+        );
+
+        $decodedPayload = base64_decode(
+            $payload,
+            true,
+        );
+
+        self::assertIsString(
+            $decodedPayload,
+        );
+
         self::assertStringContainsString(
             'panel.example.com',
-            base64_decode(
-                $this->extractPayload($ssh->command),
-                true,
-            ) ?: '',
+            $decodedPayload,
+        );
+
+        self::assertStringContainsString(
+            '127.0.0.1:8000',
+            $decodedPayload,
         );
 
         self::assertSame(
@@ -154,7 +174,12 @@ OUTPUT,
         );
 
         self::assertStringContainsString(
-            "action='remove'",
+            'action='.escapeshellarg('remove'),
+            $ssh->command,
+        );
+
+        self::assertStringContainsString(
+            'site_key='.escapeshellarg('marzban'),
             $ssh->command,
         );
     }
@@ -222,7 +247,7 @@ OUTPUT,
                 CaddySite::reverseProxy(
                     key: CaddySiteKey::from('marzban'),
                     domain: 'panel.example.com',
-                    upstream: 'unix//var/lib/marzban/marzban.socket',
+                    upstream: '127.0.0.1:8000',
                 ),
             );
 
@@ -304,22 +329,6 @@ OUTPUT,
             ),
             configurationFactory: new CaddySiteConfigurationFactory,
         );
-    }
-
-    private function extractPayload(
-        string $command,
-    ): string {
-        if (
-            preg_match(
-                "/site_payload='([^']*)'/",
-                $command,
-                $matches,
-            ) !== 1
-        ) {
-            return '';
-        }
-
-        return $matches[1];
     }
 }
 
