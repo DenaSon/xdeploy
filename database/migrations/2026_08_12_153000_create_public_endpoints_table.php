@@ -10,7 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('public_endpoints', function (Blueprint $table): void {
+        $driver = Schema::getConnection()->getDriverName();
+
+        Schema::create('public_endpoints', function (Blueprint $table) use ($driver): void {
             $table->id();
 
             $table
@@ -23,13 +25,16 @@ return new class extends Migration
                 64,
             );
 
-            $table
-                ->string(
-                    'domain',
-                    253,
-                )
-                ->charset('ascii')
-                ->collation('ascii_general_ci');
+            $domain = $table->string(
+                'domain',
+                253,
+            );
+
+            if ($driver === 'mysql') {
+                $domain
+                    ->charset('ascii')
+                    ->collation('ascii_general_ci');
+            }
 
             $table
                 ->timestamp('activated_at')
