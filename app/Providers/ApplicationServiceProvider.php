@@ -8,9 +8,11 @@ use App\Domain\Application\Contracts\ApplicationInterface;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Marzban\Admin\MarzbanAdminGateway;
 use App\Domain\Application\Marzban\Admin\MarzbanAdminReader;
+use App\Domain\Application\Marzban\Https\MarzbanHttpsDisabler;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
 use App\Domain\Application\Marzban\MarzbanApplication;
 use App\Domain\Application\Registry\ApplicationRegistry;
+use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsDisabler;
 use App\Infrastructure\Application\Marzban\SshMarzbanAdminGateway;
 use App\Infrastructure\Application\Marzban\SshMarzbanHttpsGateway;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -34,6 +36,11 @@ final class ApplicationServiceProvider extends ServiceProvider
         $this->app->bind(
             MarzbanHttpsGateway::class,
             SshMarzbanHttpsGateway::class,
+        );
+
+        $this->app->bind(
+            MarzbanHttpsDisabler::class,
+            SshMarzbanHttpsDisabler::class,
         );
 
         /*
