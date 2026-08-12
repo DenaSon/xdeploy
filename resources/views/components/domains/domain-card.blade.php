@@ -166,12 +166,23 @@
                     />
                 @endif
 
-                @if ($manageEndpointId !== null)
+                @if ($manageEndpointId !== null && $state === 'pending')
                     <x-button
                         label="مدیریت"
                         icon="lucide.settings-2"
                         wire:click="manageEndpoint({{ (int) $manageEndpointId }})"
                         class="btn-ghost btn-sm rounded-xl"
+                    />
+                @endif
+
+                @if ($manageEndpointId !== null && $state !== 'pending')
+                    <x-button
+                        label="حذف دامنه"
+                        icon="lucide.unlink"
+                        wire:click="removeEndpoint({{ (int) $manageEndpointId }})"
+                        spinner="removeEndpoint"
+                        wire:confirm="دامنه {{ $domain }} از {{ $application }} حذف شود؟ برنامه روی سرور باقی می‌ماند اما دسترسی عمومی این دامنه و HTTPS آن غیرفعال می‌شود."
+                        class="btn-error btn-outline btn-sm rounded-xl"
                     />
                 @endif
 
