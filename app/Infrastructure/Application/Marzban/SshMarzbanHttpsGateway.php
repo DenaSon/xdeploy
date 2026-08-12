@@ -226,8 +226,16 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
         }
 
         if (
+            $runtime->usesManagedReverseProxyRuntime()
+            && $domain === null
+        ) {
+            return new MarzbanHttpsInfo(
+                state: MarzbanHttpsState::Disabled,
+            );
+        }
+
+        if (
             $runtime->uds !== null
-            || $runtime->usesManagedReverseProxyRuntime()
             || $domain !== null
         ) {
             return new MarzbanHttpsInfo(
