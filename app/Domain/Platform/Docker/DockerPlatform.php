@@ -23,6 +23,11 @@ use RuntimeException;
 
 final readonly class DockerPlatform implements PlatformInterface, StartablePlatformInterface
 {
+    private const array INSTALLER_TIMEOUT_EXIT_CODES = [
+        124,
+        137,
+    ];
+
     public function __construct(
         private SSHConnectionInterface $ssh,
         private PrivilegedCommandExecutor $privileged,
@@ -132,7 +137,10 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
 
         if (! $result->successful()) {
             throw new PlatformInstallationException(
-                'Docker installation using the xDeploy installer failed.',
+                $this->installerFailureMessage(
+                    output: $result->output,
+                    exitCode: $result->exitCode,
+                ),
             );
         }
 
@@ -228,6 +236,36 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
                 'Docker did not restart successfully.',
             );
         }
+    }
+
+    private function installerFailureMessage(
+        string $output,
+        int $exitCode,
+    ): string {
+        if (
+            in_array(
+                $exitCode,
+                self::INSTALLER_TIMEOUT_EXIT_CODES,
+                true,
+            )
+        ) {
+            return 'Docker installation exceeded the server-side installer time limit.';
+        }
+
+        if (
+            preg_match(
+                '/\[xDeploy\]\[docker\]\[error\] stage=([a-z0-9_]+) exit_code=\d+/',
+                $output,
+                $matches,
+            ) === 1
+        ) {
+            return sprintf(
+                'Docker installation failed during installer stage [%s].',
+                $matches[1],
+            );
+        }
+
+        return 'Docker installation using the xDeploy installer failed.';
     }
 
     private function extractVersion(
