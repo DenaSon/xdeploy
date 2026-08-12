@@ -52,6 +52,7 @@ final class CaddySiteMutationException extends RuntimeException
             CaddySiteMutationFailure::Reload => 'Caddy could not reload the new site configuration.',
             CaddySiteMutationFailure::Recovery => 'The Caddy site mutation failed and recovery did not complete.',
             CaddySiteMutationFailure::Busy => 'Another Caddy site mutation is already in progress.',
+            CaddySiteMutationFailure::Conflict => 'The xDeploy-managed Caddy configuration contains an ownership conflict.',
         };
     }
 }

@@ -6,10 +6,15 @@ namespace App\Domain\Platform\Caddy\Sites\Contracts;
 
 use App\Domain\Platform\Caddy\Sites\CaddySite;
 use App\Domain\Platform\Caddy\Sites\CaddySiteKey;
+use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteInfo;
 use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteMutationResult;
 
 interface CaddySiteManagerInterface
 {
+    public function inspect(
+        CaddySiteKey $key,
+    ): CaddySiteInfo;
+
     public function upsert(
         CaddySite $site,
     ): CaddySiteMutationResult;
