@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Applications\Marzban;
 
 use App\Application\Applications\Marzban\Actions\CreateMarzbanAdminAction;
+use App\Application\Applications\Marzban\Actions\DisableMarzbanHttpsAction;
 use App\Application\Applications\Marzban\Actions\EnableMarzbanHttpsAction;
 use App\Application\Applications\Marzban\Actions\GetMarzbanManagementOverviewAction;
 use App\Application\Applications\Marzban\Actions\PreflightMarzbanHttpsAction;
@@ -26,6 +27,7 @@ final readonly class MarzbanManager
         private PreflightMarzbanHttpsDomainAction $preflightHttpsDomainAction,
         private PreflightMarzbanHttpsAction $preflightHttpsAction,
         private EnableMarzbanHttpsAction $enableHttpsAction,
+        private DisableMarzbanHttpsAction $disableHttpsAction,
     ) {}
 
     public function overview(
@@ -102,6 +104,23 @@ final readonly class MarzbanManager
         $this->enableHttpsAction->execute(
             domain: $domain,
             knownServerAddress: $ownedServer->host,
+        );
+
+        return $this->getOverviewAction->execute();
+    }
+
+    public function disableHttps(
+        User $user,
+        Server $server,
+        string $domain,
+    ): MarzbanManagementData {
+        $this->connect(
+            user: $user,
+            server: $server,
+        );
+
+        $this->disableHttpsAction->execute(
+            domain: $domain,
         );
 
         return $this->getOverviewAction->execute();
