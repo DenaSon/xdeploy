@@ -26,10 +26,16 @@ final readonly class EnableMarzbanHttpsAction
         string $domain,
         ?string $knownServerAddress = null,
     ): MarzbanHttpsApplyResult {
-        if (
-            $this->inspectAction->execute()->state
-            !== MarzbanHttpsState::Disabled
-        ) {
+        $state = $this->inspectAction->execute()->state;
+
+        if (! in_array(
+            $state,
+            [
+                MarzbanHttpsState::Disabled,
+                MarzbanHttpsState::ManagedIncomplete,
+            ],
+            true,
+        )) {
             throw MarzbanHttpsApplyException::existingConfiguration();
         }
 
