@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Platform\Caddy\CaddyPlatform;
 use App\Domain\Platform\Caddy\Sites\Contracts\CaddySiteManagerInterface;
+use App\Domain\Platform\Caddy\Sites\Contracts\CaddySiteReaderInterface;
 use App\Domain\Platform\Contracts\PlatformInterface;
 use App\Domain\Platform\Contracts\PlatformRegistryInterface;
 use App\Domain\Platform\Docker\DockerPlatform;
@@ -15,6 +16,7 @@ use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
 use App\Infrastructure\Installers\Sources\HttpInstallerSource;
 use App\Infrastructure\Installers\Sources\LocalInstallerSource;
 use App\Infrastructure\Platform\Caddy\SshCaddySiteManager;
+use App\Infrastructure\Platform\Caddy\SshCaddySiteReader;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
@@ -62,6 +64,11 @@ final class PlatformServiceProvider extends ServiceProvider
         $this->app->bind(
             CaddySiteManagerInterface::class,
             SshCaddySiteManager::class,
+        );
+
+        $this->app->bind(
+            CaddySiteReaderInterface::class,
+            SshCaddySiteReader::class,
         );
 
         /*

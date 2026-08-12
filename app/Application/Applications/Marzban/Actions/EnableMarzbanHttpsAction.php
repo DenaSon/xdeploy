@@ -10,12 +10,15 @@ use App\Domain\Application\Marzban\Https\DTOs\MarzbanHttpsApplyResult;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
 use App\Domain\Application\Marzban\Https\ValueObjects\MarzbanDomain;
+use App\Domain\Platform\Enums\PlatformType;
+use App\Domain\Platform\Services\PlatformInstallationService;
 
 final readonly class EnableMarzbanHttpsAction
 {
     public function __construct(
         private InspectMarzbanHttpsAction $inspectAction,
         private PreflightMarzbanHttpsAction $preflightAction,
+        private PlatformInstallationService $platforms,
         private MarzbanHttpsGateway $gateway,
     ) {}
 
@@ -38,6 +41,10 @@ final readonly class EnableMarzbanHttpsAction
         if (! $preflight->ready()) {
             throw MarzbanHttpsPreflightException::notReady();
         }
+
+        $this->platforms->ensure(
+            PlatformType::Caddy,
+        );
 
         return $this->gateway->enable(
             MarzbanDomain::from($preflight->dns->domain),
