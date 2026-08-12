@@ -117,6 +117,90 @@ final class SshMarzbanHttpsGatewayTest extends TestCase
         );
     }
 
+    public function test_it_reports_a_managed_site_with_reset_runtime_as_incomplete(): void
+    {
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection(
+            freshRuntime: true,
+        );
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $reader->siteExists = true;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
+
+        $info = $this->gateway(
+            ssh: $ssh,
+            reader: $reader,
+            sites: $sites,
+        )->inspect();
+
+        self::assertSame(
+            MarzbanHttpsState::ManagedIncomplete,
+            $info->state,
+        );
+        self::assertNull($info->domain);
+    }
+
+    public function test_it_repairs_a_matching_managed_site_without_removing_it(): void
+    {
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection(
+            freshRuntime: true,
+        );
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $reader->siteExists = true;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
+        $sites->upsertChanged = false;
+
+        $result = $this->gateway(
+            ssh: $ssh,
+            reader: $reader,
+            sites: $sites,
+        )->enable(
+            MarzbanDomain::from('panel.example.com'),
+        );
+
+        self::assertSame('panel.example.com', $result->domain);
+        self::assertTrue($result->configurationChanged);
+        self::assertNotNull($sites->upserted);
+        self::assertNull($sites->removed);
+        self::assertNotNull($reader->matchedSite);
+        self::assertSame(
+            'panel.example.com',
+            $reader->matchedSite->domain,
+        );
+    }
+
+    public function test_it_never_overwrites_a_different_existing_managed_site(): void
+    {
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection(
+            freshRuntime: true,
+        );
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $reader->siteExists = true;
+        $reader->matchesSite = false;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
+
+        try {
+            $this->gateway(
+                ssh: $ssh,
+                reader: $reader,
+                sites: $sites,
+            )->enable(
+                MarzbanDomain::from('panel.example.com'),
+            );
+
+            self::fail(
+                'Expected a Marzban HTTPS apply exception.',
+            );
+        } catch (MarzbanHttpsApplyException $exception) {
+            self::assertSame(
+                MarzbanHttpsApplyFailure::ExistingConfiguration,
+                $exception->failure,
+            );
+        }
+
+        self::assertNull($sites->upserted);
+        self::assertNull($sites->removed);
+    }
+
     public function test_it_reports_a_fresh_marzban_runtime_as_disabled_without_a_caddy_site(): void
     {
         $ssh = new MarzbanHttpsGatewayFakeSshConnection(
@@ -193,6 +277,40 @@ final class SshMarzbanHttpsGatewayTest extends TestCase
         self::assertSame('marzban', $sites->removed?->value);
     }
 
+    public function test_it_keeps_a_preexisting_matching_site_when_runtime_repair_fails(): void
+    {
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection(
+            failPrepare: true,
+            freshRuntime: true,
+        );
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $reader->siteExists = true;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
+        $sites->upsertChanged = false;
+
+        try {
+            $this->gateway(
+                ssh: $ssh,
+                reader: $reader,
+                sites: $sites,
+            )->enable(
+                MarzbanDomain::from('panel.example.com'),
+            );
+
+            self::fail(
+                'Expected a Marzban HTTPS apply exception.',
+            );
+        } catch (MarzbanHttpsApplyException $exception) {
+            self::assertSame(
+                MarzbanHttpsApplyFailure::CandidateValidation,
+                $exception->failure,
+            );
+        }
+
+        self::assertNotNull($sites->upserted);
+        self::assertNull($sites->removed);
+    }
+
     private function gateway(
         SSHConnectionInterface $ssh,
         CaddySiteReaderInterface $reader,
@@ -251,6 +369,8 @@ final class MarzbanHttpsGatewayFakeCaddySiteReader implements CaddySiteReaderInt
 
 final class MarzbanHttpsGatewayFakeCaddySiteManager implements CaddySiteManagerInterface
 {
+    public bool $upsertChanged = true;
+
     public ?CaddySite $upserted = null;
 
     public ?CaddySiteKey $removed = null;
@@ -262,7 +382,7 @@ final class MarzbanHttpsGatewayFakeCaddySiteManager implements CaddySiteManagerI
 
         return new CaddySiteMutationResult(
             key: $site->key,
-            changed: true,
+            changed: $this->upsertChanged,
         );
     }
 
