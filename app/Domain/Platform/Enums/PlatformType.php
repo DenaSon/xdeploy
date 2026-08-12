@@ -9,4 +9,6 @@ enum PlatformType: string
     case Docker = 'docker';
 
     case DockerCompose = 'docker-compose';
+
+    case Caddy = 'caddy';
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Platform\Caddy\CaddyPlatform;
 use App\Domain\Platform\Contracts\PlatformInterface;
 use App\Domain\Platform\Contracts\PlatformRegistryInterface;
 use App\Domain\Platform\Docker\DockerPlatform;
@@ -85,6 +86,10 @@ final class PlatformServiceProvider extends ServiceProvider
 
             $app->make(
                 DockerComposePlatform::class,
+            ),
+
+            $app->make(
+                CaddyPlatform::class,
             ),
         ];
     }

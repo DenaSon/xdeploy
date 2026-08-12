@@ -42,6 +42,11 @@ final class SSHTimeout
     public const int DOCKER_INSTALL = 400;
 
     /**
+     * Caddy installation.
+     */
+    public const int CADDY_INSTALL = 300;
+
+    /**
      * Operating-system package installation.
      */
     public const int SYSTEM_PACKAGE_INSTALL = 180;

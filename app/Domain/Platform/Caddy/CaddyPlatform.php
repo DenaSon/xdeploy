@@ -1,0 +1,262 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Platform\Caddy;
+
+use App\Domain\Platform\Contracts\PlatformInterface;
+use App\Domain\Platform\Contracts\StartablePlatformInterface;
+use App\Domain\Platform\DTOs\PlatformInfo;
+use App\Domain\Platform\Enums\PlatformState;
+use App\Domain\Platform\Enums\PlatformType;
+use App\Domain\Platform\Exceptions\PlatformInstallationException;
+use App\Domain\Platform\Exceptions\PlatformRestartException;
+use App\Domain\Platform\Exceptions\PlatformStartException;
+use App\Domain\Platform\Exceptions\PlatformStopException;
+use App\Domain\Platform\Support\SupportedPlatformOperatingSystems;
+use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\Linux\Services\OperatingSystemInspector;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Support\SSH\SSHTimeout;
+use RuntimeException;
+
+final readonly class CaddyPlatform implements PlatformInterface, StartablePlatformInterface
+{
+    public function __construct(
+        private SSHConnectionInterface $ssh,
+        private PrivilegedCommandExecutor $privileged,
+        private OperatingSystemInspector $operatingSystem,
+        private InstallerSourceInterface $installerSource,
+    ) {}
+
+    public function type(): PlatformType
+    {
+        return PlatformType::Caddy;
+    }
+
+    public function name(): string
+    {
+        return 'Caddy';
+    }
+
+    public function inspect(): PlatformInfo
+    {
+        $existsResult = $this->ssh->executeWithResult(
+            command: 'command -v caddy >/dev/null 2>&1',
+            timeout: SSHTimeout::QUICK,
+        );
+
+        if (! $existsResult->successful()) {
+            return $this->notInstalled();
+        }
+
+        $versionResult = $this->ssh->executeWithResult(
+            command: 'caddy version',
+            timeout: SSHTimeout::QUICK,
+        );
+
+        if (! $versionResult->successful()) {
+            return $this->unknown();
+        }
+
+        $serviceResult = $this->ssh->executeWithResult(
+            command: 'systemctl is-active caddy',
+            timeout: SSHTimeout::QUICK,
+        );
+
+        $serviceState = trim(
+            $serviceResult->output,
+        );
+
+        $state = match ($serviceState) {
+            'active' => PlatformState::Running,
+
+            'inactive',
+            'failed',
+            'deactivating' => PlatformState::Installed,
+
+            default => PlatformState::Unknown,
+        };
+
+        return new PlatformInfo(
+            state: $state,
+            metadata: [
+                'version' => $this->extractVersion(
+                    $versionResult->output,
+                ),
+                'service_state' => $serviceState,
+            ],
+        );
+    }
+
+    public function install(): void
+    {
+        $os = $this->operatingSystem->inspect();
+
+        if (
+            ! SupportedPlatformOperatingSystems::supportsCaddy(
+                $os,
+            )
+        ) {
+            throw new PlatformInstallationException(
+                sprintf(
+                    'The xDeploy Caddy installer does not support [%s]. Supported systems: %s.',
+                    $os->displayName(),
+                    SupportedPlatformOperatingSystems::caddyDisplayList(),
+                ),
+            );
+        }
+
+        try {
+            $command = $this->installerSource->buildExecutionCommand(
+                relativePath: (string) config(
+                    'xdeploy.installers.caddy.debian_family.path',
+                ),
+                expectedSha256: (string) config(
+                    'xdeploy.installers.caddy.debian_family.sha256',
+                ),
+            );
+        } catch (RuntimeException $exception) {
+            throw new PlatformInstallationException(
+                message: 'Caddy installer could not be prepared.',
+                previous: $exception,
+            );
+        }
+
+        $result = $this->privileged->executeWithResult(
+            command: $command,
+            timeout: SSHTimeout::CADDY_INSTALL,
+            sensitive: true,
+        );
+
+        if (! $result->successful()) {
+            throw new PlatformInstallationException(
+                'Caddy installation using the xDeploy installer failed.',
+            );
+        }
+
+        $info = $this->inspect();
+
+        if (
+            $info->isNotInstalled()
+            || $info->isUnknown()
+        ) {
+            throw new PlatformInstallationException(
+                'Caddy installation verification failed.',
+            );
+        }
+    }
+
+    /**
+     * @return list<PlatformType>
+     */
+    public function dependencies(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function systemPackages(): array
+    {
+        return [
+            'apt-transport-https',
+            'ca-certificates',
+            'curl',
+            'debian-archive-keyring',
+            'debian-keyring',
+            'gnupg',
+        ];
+    }
+
+    public function start(): void
+    {
+        $result = $this->privileged->executeWithResult(
+            command: 'systemctl enable --now caddy',
+            timeout: SSHTimeout::NORMAL,
+        );
+
+        if (! $result->successful()) {
+            throw new PlatformStartException(
+                'Failed to start Caddy.',
+            );
+        }
+
+        if (! $this->inspect()->isRunning()) {
+            throw new PlatformStartException(
+                'Caddy did not enter the running state.',
+            );
+        }
+    }
+
+    public function stop(): void
+    {
+        $result = $this->privileged->executeWithResult(
+            command: 'systemctl stop caddy',
+            timeout: SSHTimeout::NORMAL,
+        );
+
+        if (! $result->successful()) {
+            throw new PlatformStopException(
+                'Failed to stop Caddy.',
+            );
+        }
+
+        if (
+            $this->inspect()->state
+            !== PlatformState::Installed
+        ) {
+            throw new PlatformStopException(
+                'Caddy did not stop successfully.',
+            );
+        }
+    }
+
+    public function restart(): void
+    {
+        $result = $this->privileged->executeWithResult(
+            command: 'systemctl restart caddy',
+            timeout: SSHTimeout::NORMAL,
+        );
+
+        if (! $result->successful()) {
+            throw new PlatformRestartException(
+                'Failed to restart Caddy.',
+            );
+        }
+
+        if (! $this->inspect()->isRunning()) {
+            throw new PlatformRestartException(
+                'Caddy did not restart successfully.',
+            );
+        }
+    }
+
+    private function extractVersion(
+        string $output,
+    ): ?string {
+        preg_match(
+            '/v?(\d+\.\d+\.\d+)/',
+            $output,
+            $matches,
+        );
+
+        return $matches[1] ?? null;
+    }
+
+    private function notInstalled(): PlatformInfo
+    {
+        return new PlatformInfo(
+            state: PlatformState::NotInstalled,
+        );
+    }
+
+    private function unknown(): PlatformInfo
+    {
+        return new PlatformInfo(
+            state: PlatformState::Unknown,
+        );
+    }
+}

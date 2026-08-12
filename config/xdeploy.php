@@ -53,6 +53,21 @@ return [
 
         ],
 
+        'caddy' => [
+
+            'debian_family' => [
+
+                'path' => 'caddy/debian-family.sh',
+
+                'sha256' => env(
+                    'XDEPLOY_CADDY_DEBIAN_FAMILY_SHA256',
+                    '9f0c4df4a95263b131371959e027a2e6281e663333879902e73a6a5846582aff',
+                ),
+
+            ],
+
+        ],
+
         'marzban' => [
 
             'ubuntu' => [
