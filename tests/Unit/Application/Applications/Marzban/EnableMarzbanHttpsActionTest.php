@@ -56,6 +56,28 @@ final class EnableMarzbanHttpsActionTest extends TestCase
         self::assertSame('panel.example.com', $result->domain);
     }
 
+    public function test_it_repairs_an_incomplete_xdeploy_managed_configuration(): void
+    {
+        $gateway = new EnableActionFakeGateway;
+        $gateway->httpsInfo = new MarzbanHttpsInfo(
+            state: MarzbanHttpsState::ManagedIncomplete,
+            domain: 'panel.example.com',
+        );
+        $caddy = new EnableActionFakeCaddyPlatform;
+
+        $result = $this->makeAction(
+            gateway: $gateway,
+            caddy: $caddy,
+        )->execute(
+            domain: 'panel.example.com',
+            knownServerAddress: '203.0.113.10',
+        );
+
+        self::assertGreaterThan(0, $caddy->inspectCalls);
+        self::assertTrue($gateway->enableCalled);
+        self::assertSame('panel.example.com', $result->domain);
+    }
+
     public function test_it_does_not_ensure_caddy_or_apply_when_the_fresh_preflight_is_not_ready(): void
     {
         $gateway = new EnableActionFakeGateway;
