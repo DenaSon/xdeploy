@@ -4,6 +4,10 @@ set -Eeuo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+CADDYFILE='/etc/caddy/Caddyfile'
+MANAGED_ROOT='/etc/caddy/xdeploy'
+SITES_DIR="$MANAGED_ROOT/sites"
+
 log() {
     printf '[xDeploy][caddy] %s\n' "$1"
 }
@@ -21,6 +25,29 @@ cleanup() {
     if [[ -n "${repo_file:-}" && -f "$repo_file" ]]; then
         rm -f "$repo_file"
     fi
+}
+
+write_managed_configuration() {
+    local candidate="${CADDYFILE}.xdeploy-new.$$"
+
+    install -d -m 0755 "$MANAGED_ROOT"
+    install -d -m 0755 "$SITES_DIR"
+
+    cat >"$candidate" <<'CADDY'
+# xDeploy: caddy-platform
+import xdeploy/sites/*.caddy
+CADDY
+
+    chmod 0644 "$candidate"
+
+    if ! caddy validate \
+        --config "$candidate" \
+        --adapter caddyfile >/dev/null 2>&1; then
+        rm -f "$candidate"
+        fail 'The xDeploy-managed Caddy configuration is invalid.'
+    fi
+
+    mv -f "$candidate" "$CADDYFILE"
 }
 
 trap cleanup EXIT
@@ -52,6 +79,16 @@ if command -v caddy >/dev/null 2>&1; then
     fi
 
     log 'Caddy is already installed.'
+
+    if grep -Fxq '# xDeploy: caddy-platform' "$CADDYFILE" 2>/dev/null &&
+        grep -Fxq 'import xdeploy/sites/*.caddy' "$CADDYFILE" 2>/dev/null; then
+        install -d -m 0755 "$MANAGED_ROOT"
+        install -d -m 0755 "$SITES_DIR"
+
+        log 'xDeploy-managed Caddy configuration detected.'
+    else
+        log 'Existing Caddy configuration is externally managed; leaving it unchanged.'
+    fi
 
     systemctl enable --now caddy
     caddy version
@@ -103,6 +140,10 @@ apt-get update
 
 log 'Installing Caddy.'
 apt-get install -y --no-install-recommends caddy
+
+log 'Preparing xDeploy-managed Caddy configuration.'
+systemctl stop caddy >/dev/null 2>&1 || true
+write_managed_configuration
 
 log 'Enabling Caddy service.'
 systemctl enable --now caddy
