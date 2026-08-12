@@ -449,34 +449,19 @@ BASH;
         }
 
         $failure = match ($result->exitCode) {
-            self::ENVIRONMENT_UNAVAILABLE =>
-                CaddySiteMutationFailure::Environment,
-
-            self::CANDIDATE_INVALID =>
-                CaddySiteMutationFailure::CandidateValidation,
-
-            self::MUTATION_FAILED =>
-                CaddySiteMutationFailure::Mutation,
-
-            self::RELOAD_FAILED =>
-                CaddySiteMutationFailure::Reload,
-
-            self::RECOVERY_FAILED =>
-                CaddySiteMutationFailure::Recovery,
-
-            self::BUSY =>
-                CaddySiteMutationFailure::Busy,
-
-            default =>
-                CaddySiteMutationFailure::Environment,
+            self::ENVIRONMENT_UNAVAILABLE => CaddySiteMutationFailure::Environment,
+            self::CANDIDATE_INVALID => CaddySiteMutationFailure::CandidateValidation,
+            self::MUTATION_FAILED => CaddySiteMutationFailure::Mutation,
+            self::RELOAD_FAILED => CaddySiteMutationFailure::Reload,
+            self::RECOVERY_FAILED => CaddySiteMutationFailure::Recovery,
+            self::BUSY => CaddySiteMutationFailure::Busy,
+            default => CaddySiteMutationFailure::Environment,
         };
 
         throw new CaddySiteMutationException(
             failure: $failure,
-            configurationRestored:
-                ($values['configuration_restored'] ?? null) === '1',
-            serviceRecovered:
-                ($values['service_recovered'] ?? null) === '1',
+            configurationRestored: ($values['configuration_restored'] ?? null) === '1',
+            serviceRecovered: ($values['service_recovered'] ?? null) === '1',
         );
     }
 
@@ -488,10 +473,7 @@ BASH;
     ): array {
         $values = [];
 
-        foreach (
-            preg_split('/\R/', trim($output)) ?: []
-            as $line
-        ) {
+        foreach (preg_split('/\R/', trim($output)) ?: [] as $line) {
             if (! str_contains($line, '=')) {
                 continue;
             }

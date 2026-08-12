@@ -46,23 +46,12 @@ final class CaddySiteMutationException extends RuntimeException
         CaddySiteMutationFailure $failure,
     ): string {
         return match ($failure) {
-            CaddySiteMutationFailure::Environment =>
-                'The xDeploy-managed Caddy environment is not ready.',
-
-            CaddySiteMutationFailure::CandidateValidation =>
-                'The candidate Caddy site configuration is invalid.',
-
-            CaddySiteMutationFailure::Mutation =>
-                'The Caddy site configuration could not be changed.',
-
-            CaddySiteMutationFailure::Reload =>
-                'Caddy could not reload the new site configuration.',
-
-            CaddySiteMutationFailure::Recovery =>
-                'The Caddy site mutation failed and recovery did not complete.',
-
-            CaddySiteMutationFailure::Busy =>
-                'Another Caddy site mutation is already in progress.',
+            CaddySiteMutationFailure::Environment => 'The xDeploy-managed Caddy environment is not ready.',
+            CaddySiteMutationFailure::CandidateValidation => 'The candidate Caddy site configuration is invalid.',
+            CaddySiteMutationFailure::Mutation => 'The Caddy site configuration could not be changed.',
+            CaddySiteMutationFailure::Reload => 'Caddy could not reload the new site configuration.',
+            CaddySiteMutationFailure::Recovery => 'The Caddy site mutation failed and recovery did not complete.',
+            CaddySiteMutationFailure::Busy => 'Another Caddy site mutation is already in progress.',
         };
     }
 }

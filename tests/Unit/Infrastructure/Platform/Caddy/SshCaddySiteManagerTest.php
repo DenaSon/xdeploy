@@ -65,7 +65,7 @@ OUTPUT,
         );
 
         self::assertStringContainsString(
-            "sites_dir=\"\$managed_root/sites\"",
+            'sites_dir="$managed_root/sites"',
             $ssh->command,
         );
 
