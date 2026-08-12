@@ -55,7 +55,6 @@
         ></div>
     </div>
 
-
     <div
         class="
             mx-auto
@@ -73,7 +72,6 @@
             lg:px-8 lg:py-24
         "
     >
-
         {{-- Copy --}}
         <div
             class="
@@ -85,7 +83,6 @@
                 lg:text-start
             "
         >
-
             {{-- Eyebrow --}}
             <div
                 class="
@@ -110,9 +107,8 @@
                     "
                 ></span>
 
-                مدیریت VPS، بدون پیچیدگی اضافه
+                مدیریت یکپارچه VPS و سرویس‌ها
             </div>
-
 
             {{-- Heading --}}
             <h1
@@ -130,13 +126,12 @@
                     lg:text-[3.5rem]
                 "
             >
-                از VPS تا یک برنامه آماده،
+                از تهیه VPS تا راه‌اندازی سرویس،
 
                 <span class="text-primary">
-                    همه‌چیز در یک مسیر ساده.
+                    یک مسیر یکپارچه برای مدیریت سرور.
                 </span>
             </h1>
-
 
             {{-- Description --}}
             <p
@@ -154,11 +149,11 @@
                     lg:mx-0
                 "
             >
-                سرور خودت را متصل کن یا یک VPS جدید تهیه کن؛
-                xDeploy آماده‌سازی سرور، مانیتورینگ و راه‌اندازی
-                برنامه‌های پشتیبانی‌شده را در یک تجربه یکپارچه مدیریت می‌کند.
+                VPS موجود خود را متصل کنید یا مستقیماً یک سرور جدید
+                تهیه کنید. xDeploy آماده‌سازی سرور، پایش منابع و نصب
+                و مدیریت برنامه‌های پشتیبانی‌شده را در یک پنل
+                یکپارچه در اختیار شما قرار می‌دهد.
             </p>
-
 
             {{-- Actions --}}
             <div
@@ -176,7 +171,7 @@
                 "
             >
                 <x-button
-                    label="شروع با xDeploy"
+                    label="شروع"
                     icon="lucide.arrow-left"
                     :link="route('login')"
                     wire:navigate
@@ -204,7 +199,7 @@
                     "
                 >
                     <span>
-                        نحوه کار
+                        نحوه عملکرد
                     </span>
 
                     <x-icon
@@ -213,7 +208,6 @@
                     />
                 </a>
             </div>
-
 
             {{-- Capability line --}}
             <div
@@ -245,7 +239,7 @@
                         class="!size-3.5 stroke-[1.6]"
                     />
 
-                    خرید VPS
+                    تهیه VPS جدید
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
@@ -254,7 +248,7 @@
                         class="!size-3.5 stroke-[1.6]"
                     />
 
-                    مانیتورینگ
+                    پایش سرور
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
@@ -263,12 +257,10 @@
                         class="!size-3.5 stroke-[1.6]"
                     />
 
-                    مدیریت برنامه‌ها
+                    نصب و مدیریت برنامه‌ها
                 </span>
             </div>
-
         </div>
-
 
         {{-- Product visual --}}
         <div
@@ -280,7 +272,6 @@
                 lg:max-w-none
             "
         >
-
             {{-- Ambient glow --}}
             <div
                 aria-hidden="true"
@@ -292,7 +283,6 @@
                     blur-3xl
                 "
             ></div>
-
 
             {{-- Product diagram --}}
             <div
@@ -313,7 +303,6 @@
                     sm:p-6
                 "
             >
-
                 {{-- Top bar --}}
                 <div
                     class="
@@ -325,7 +314,6 @@
                     "
                 >
                     <div class="flex items-center gap-2.5">
-
                         <span
                             class="
                                 flex size-8
@@ -349,7 +337,7 @@
                                     text-base-content/75
                                 "
                             >
-                                مسیر مدیریت
+                                فرآیند مدیریت
                             </div>
 
                             <div
@@ -363,9 +351,7 @@
                                 Server → Application
                             </div>
                         </div>
-
                     </div>
-
 
                     <span
                         class="
@@ -393,10 +379,8 @@
                     </span>
                 </div>
 
-
                 {{-- Flow --}}
                 <div class="py-6">
-
                     {{-- Server → xDeploy --}}
                     <div
                         class="
@@ -406,7 +390,6 @@
                             gap-3
                         "
                     >
-
                         {{-- VPS --}}
                         <div
                             class="
@@ -451,10 +434,9 @@
                                     text-base-content/45
                                 "
                             >
-                                موجود یا خرید جدید
+                                سرور موجود یا جدید
                             </div>
                         </div>
-
 
                         {{-- Connection --}}
                         <div
@@ -476,7 +458,6 @@
                                 class="!size-4 stroke-[1.5]"
                             />
                         </div>
-
 
                         {{-- xDeploy --}}
                         <div
@@ -539,12 +520,10 @@
                                     text-base-content/45
                                 "
                             >
-                                آماده‌سازی و مدیریت
+                                آماده‌سازی، استقرار و مدیریت
                             </div>
                         </div>
-
                     </div>
-
 
                     {{-- Vertical connector --}}
                     <div
@@ -577,7 +556,6 @@
                         </div>
                     </div>
 
-
                     {{-- Application --}}
                     <div
                         class="
@@ -595,7 +573,6 @@
                             "
                         >
                             <div class="flex min-w-0 items-center gap-3">
-
                                 <span
                                     class="
                                         flex size-10 shrink-0
@@ -612,9 +589,7 @@
                                     />
                                 </span>
 
-
                                 <div class="min-w-0">
-
                                     <div
                                         class="
                                             truncate
@@ -632,13 +607,10 @@
                                             text-base-content/45
                                         "
                                     >
-                                        نصب، آماده‌سازی و مدیریت
+                                        نصب، اجرا و مدیریت
                                     </div>
-
                                 </div>
-
                             </div>
-
 
                             <div
                                 class="
@@ -661,12 +633,9 @@
 
                                 آماده
                             </div>
-
                         </div>
                     </div>
-
                 </div>
-
 
                 {{-- Bottom status --}}
                 <div
@@ -715,7 +684,6 @@
                         </div>
                     </div>
 
-
                     <div
                         class="
                             rounded-xl
@@ -743,7 +711,6 @@
                         </div>
                     </div>
 
-
                     <div
                         class="
                             rounded-xl
@@ -770,11 +737,8 @@
                             xDeploy
                         </div>
                     </div>
-
                 </div>
-
             </div>
-
 
             {{-- Floating status --}}
             <div
@@ -823,8 +787,9 @@
                             text-base-content/40
                         "
                     >
-                        وضعیت
+                        وضعیت سیستم
                     </div>
+
 
                     <div
                         class="
@@ -833,12 +798,10 @@
                             text-base-content/75
                         "
                     >
-                        آماده مدیریت
+                        آماده استفاده
                     </div>
                 </div>
             </div>
-
         </div>
-
     </div>
 </section>

@@ -166,9 +166,12 @@
     </div>
 
 
+
     {{-- Buy VPS CTA --}}
-    <x-servers.buy-vps-cta
-        :link="route('home')"
-    />
+    @if (! auth()->user()->servers()->exists())
+        <x-servers.buy-vps-cta
+            :link="route('panel.servers.buy')"
+        />
+    @endif
 
 </div>
