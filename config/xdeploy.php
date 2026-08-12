@@ -61,7 +61,7 @@ return [
 
                 'sha256' => env(
                     'XDEPLOY_CADDY_DEBIAN_FAMILY_SHA256',
-                    '9f0c4df4a95263b131371959e027a2e6281e663333879902e73a6a5846582aff',
+                    '84bcc5941b92efdf1bab1a0006150e79db618749b75717ffba4e5a2be121bce5',
                 ),
 
             ],
