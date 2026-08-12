@@ -7,7 +7,6 @@ namespace App\Infrastructure\Sms\Services;
 use App\Domain\Authentication\ValueObjects\OtpCode;
 use App\Domain\User\ValueObjects\PhoneNumber;
 use App\Infrastructure\Sms\Contracts\SmsProviderInterface;
-use Log;
 
 final readonly class SmsService
 {
@@ -19,15 +18,10 @@ final readonly class SmsService
         PhoneNumber $phone,
         OtpCode $code,
     ): void {
-        if (! app()->environment('local')) {
-            return;
-        }
-
-        Log::info('Fake SMS sent.', [
-            'phone' => (string) $phone,
-            'type' => 'verification_code',
-            'code' => (string) $code,
-        ]);
+        $this->provider->sendVerificationCode(
+            $phone,
+            $code,
+        );
     }
 
     public function sendCloudServerExpirationWarning(
