@@ -32,6 +32,11 @@ final class SSHTimeout
     public const int DEFAULT = 60;
 
     /**
+     * Slow stateful runtime mutations that may recreate services.
+     */
+    public const int SLOW = 600;
+
+    /**
      * Long-running application installers.
      */
     public const int APPLICATION_INSTALL = 600;
