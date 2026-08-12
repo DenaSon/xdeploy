@@ -11,6 +11,7 @@ use App\Domain\Application\Marzban\Admin\MarzbanAdminReader;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsDisabler;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
 use App\Domain\Application\Marzban\MarzbanApplication;
+use App\Domain\Application\N8n\N8nApplication;
 use App\Domain\Application\Registry\ApplicationRegistry;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsDisabler;
 use App\Infrastructure\Application\Marzban\SshMarzbanAdminGateway;
@@ -68,6 +69,9 @@ final class ApplicationServiceProvider extends ServiceProvider
         return [
             $app->make(
                 MarzbanApplication::class,
+            ),
+            $app->make(
+                N8nApplication::class,
             ),
         ];
     }

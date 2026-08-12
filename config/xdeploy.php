@@ -83,6 +83,21 @@ return [
 
         ],
 
+        'n8n' => [
+
+            'docker' => [
+
+                'path' => 'n8n/docker.sh',
+
+                'sha256' => env(
+                    'XDEPLOY_N8N_DOCKER_SHA256',
+                    '2fc78cf0cecdaa8f47655b9b25d339755a7cd86552dd024295ecca9e9d340222',
+                ),
+
+            ],
+
+        ],
+
     ],
 
 ];

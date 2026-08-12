@@ -18,6 +18,7 @@ enum SoftwareType: string
 
     case Marzban = 'marzban';
     case Xray = 'xray';
+    case N8n = 'n8n';
 
     public function label(): string
     {
@@ -31,6 +32,7 @@ enum SoftwareType: string
             self::Redis => 'Redis',
             self::Marzban => 'Marzban',
             self::Xray => 'Xray',
+            self::N8n => 'n8n',
         };
     }
 }

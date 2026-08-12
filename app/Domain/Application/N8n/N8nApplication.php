@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Application\Marzban;
+namespace App\Domain\Application\N8n;
 
 use App\Domain\Application\Shared\Abstracts\DockerComposeApplication;
 use App\Domain\Application\Shared\Enums\ApplicationType;
@@ -17,7 +17,7 @@ use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 use RuntimeException;
 
-final readonly class MarzbanApplication extends DockerComposeApplication
+final readonly class N8nApplication extends DockerComposeApplication
 {
     public function __construct(
         SSHConnectionInterface $ssh,
@@ -32,12 +32,12 @@ final readonly class MarzbanApplication extends DockerComposeApplication
 
     public function type(): ApplicationType
     {
-        return ApplicationType::Marzban;
+        return ApplicationType::N8n;
     }
 
     public function name(): string
     {
-        return 'Marzban';
+        return 'n8n';
     }
 
     public function requirements(): ApplicationRequirements
@@ -60,11 +60,7 @@ final readonly class MarzbanApplication extends DockerComposeApplication
     {
         return [
             new ProvidedSoftware(
-                SoftwareType::Marzban,
-            ),
-
-            new ProvidedSoftware(
-                SoftwareType::Xray,
+                SoftwareType::N8n,
             ),
         ];
     }
@@ -72,24 +68,37 @@ final readonly class MarzbanApplication extends DockerComposeApplication
     protected function inspectCommand(): string
     {
         return <<<'BASH'
-if [ -f /opt/marzban/.xdeploy-install-complete ]; then
-    exit 0
-fi
+marker='/opt/n8n/.xdeploy-install-complete'
 
 if ! command -v docker >/dev/null 2>&1; then
-    exit 1
+    test -f "$marker"
+    exit $?
 fi
 
 container_id="$(
     docker ps -a \
-        --filter "label=com.docker.compose.project=marzban" \
-        --filter "label=com.docker.compose.service=marzban" \
+        --filter "label=com.docker.compose.project=n8n" \
+        --filter "label=com.docker.compose.service=n8n" \
         --format "{{.ID}}" \
         2>/dev/null \
         | head -n 1
 )"
 
-test -n "$container_id"
+if [ -n "$container_id" ]; then
+    image="$(
+        docker inspect \
+            --format '{{.Config.Image}}' \
+            "$container_id" 2>/dev/null || true
+    )"
+
+    if [ -n "$image" ]; then
+        printf '%s\n' "${image##*:}"
+    fi
+
+    exit 0
+fi
+
+test -f "$marker"
 BASH;
     }
 
@@ -99,7 +108,21 @@ BASH;
     protected function metadataFromOutput(
         string $output,
     ): array {
-        return [];
+        $version = trim($output);
+
+        if (
+            $version === ''
+            || preg_match(
+                '/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9._-]+)?$/',
+                $version,
+            ) !== 1
+        ) {
+            return [];
+        }
+
+        return [
+            'version' => $version,
+        ];
     }
 
     protected function installCommand(): string
@@ -107,15 +130,15 @@ BASH;
         try {
             return $this->installerSource->buildExecutionCommand(
                 relativePath: (string) config(
-                    'xdeploy.installers.marzban.ubuntu.path',
+                    'xdeploy.installers.n8n.docker.path',
                 ),
                 expectedSha256: (string) config(
-                    'xdeploy.installers.marzban.ubuntu.sha256',
+                    'xdeploy.installers.n8n.docker.sha256',
                 ),
             );
         } catch (RuntimeException $exception) {
             throw new ApplicationInstallationException(
-                message: 'Marzban installer could not be prepared.',
+                message: 'n8n installer could not be prepared.',
                 previous: $exception,
             );
         }
@@ -134,7 +157,7 @@ BASH;
                 'down --remove-orphans',
             ),
             <<<'BASH'
-rm -f /opt/marzban/.xdeploy-install-complete
+rm -f /opt/n8n/.xdeploy-install-complete
 BASH,
         );
     }
@@ -151,21 +174,21 @@ BASH,
 
     protected function composeProject(): string
     {
-        return 'marzban';
+        return 'n8n';
     }
 
     protected function composeService(): string
     {
-        return 'marzban';
+        return 'n8n';
     }
 
     protected function composeFile(): string
     {
-        return '/opt/marzban/docker-compose.yml';
+        return '/opt/n8n/docker-compose.yml';
     }
 
     protected function composeEnvFile(): string
     {
-        return '/opt/marzban/.env';
+        return '/opt/n8n/.env';
     }
 }
