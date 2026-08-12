@@ -68,6 +68,75 @@
         <x-panel.header />
 
         <x-panel.page-container>
+            @if(session('payment_verification_pending'))
+                @php
+                    $paymentVerificationRetryUrl = session(
+                        'payment_verification_retry_url',
+                    );
+                @endphp
+
+                <div
+                    role="alert"
+                    class="
+                        mb-4
+                        flex flex-col gap-3
+                        rounded-2xl
+                        border border-warning/20
+                        bg-warning/[0.06]
+                        px-4 py-3.5
+                        sm:flex-row
+                        sm:items-center
+                        sm:justify-between
+                    "
+                >
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="
+                                flex size-9 shrink-0
+                                items-center justify-center
+                                rounded-xl
+                                bg-warning/10
+                                text-warning
+                            "
+                        >
+                            <x-icon
+                                name="lucide.clock-alert"
+                                class="!size-4.5"
+                            />
+                        </div>
+
+                        <div>
+                            <div
+                                class="text-sm font-semibold text-base-content"
+                            >
+                                تأیید پرداخت موقتاً در دسترس نیست
+                            </div>
+
+                            <p
+                                class="mt-1 text-xs leading-6 text-base-content/55"
+                            >
+                                اگر مبلغ از حساب شما کسر شده است، پرداخت جدید انجام ندهید. چند لحظه بعد دوباره وضعیت همین پرداخت را بررسی کنید.
+                            </p>
+                        </div>
+                    </div>
+
+                    @if(
+                        is_string($paymentVerificationRetryUrl)
+                        && $paymentVerificationRetryUrl !== ''
+                    )
+                        <x-button
+                            label="بررسی مجدد پرداخت"
+                            icon="lucide.refresh-cw"
+                            :link="$paymentVerificationRetryUrl"
+                            class="
+                                btn-warning btn-sm
+                                shrink-0 rounded-xl
+                            "
+                        />
+                    @endif
+                </div>
+            @endif
+
             {{ $slot }}
         </x-panel.page-container>
 

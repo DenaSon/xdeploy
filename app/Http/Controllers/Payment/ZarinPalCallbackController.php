@@ -7,11 +7,13 @@ namespace App\Http\Controllers\Payment;
 use App\Application\Billing\Actions\CancelPendingPaymentAction;
 use App\Application\Billing\Actions\VerifyPaymentAndFulfillOrderAction;
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Payment\ZarinPal\ZarinPalPaymentException;
 use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 final class ZarinPalCallbackController extends Controller
 {
@@ -69,9 +71,53 @@ final class ZarinPalCallbackController extends Controller
          * selects its fulfillment strategy: asynchronous provider creation
          * for provisioning or immediate DB-only extension for renewal.
          */
-        $payment = $verifyAndFulfill->execute(
-            gatewayReference: $authority,
-        );
+        try {
+            $payment = $verifyAndFulfill->execute(
+                gatewayReference: $authority,
+            );
+        } catch (ZarinPalPaymentException $exception) {
+            if (! $exception->isRetryable()) {
+                throw $exception;
+            }
+
+            $payment = Payment::query()
+                ->where('gateway', 'zarinpal')
+                ->where('gateway_reference', $authority)
+                ->first();
+
+            if (! $payment instanceof Payment) {
+                throw $exception;
+            }
+
+            Log::warning(
+                'Payment verification temporarily unavailable.',
+                [
+                    'gateway' => 'zarinpal',
+                    'payment_id' => $payment->getKey(),
+                    'order_id' => $payment->order_id,
+                    'code' => $exception->getCode(),
+                ],
+            );
+
+            return $this
+                ->redirectAfterPayment(
+                    payment: $payment,
+                )
+                ->with(
+                    'payment_verification_pending',
+                    true,
+                )
+                ->with(
+                    'payment_verification_retry_url',
+                    route(
+                        'payments.zarinpal.callback',
+                        [
+                            'Authority' => $authority,
+                            'Status' => 'OK',
+                        ],
+                    ),
+                );
+        }
 
         return $this->redirectAfterPayment(
             payment: $payment,
@@ -81,7 +127,7 @@ final class ZarinPalCallbackController extends Controller
 
     private function redirectAfterPayment(
         Payment $payment,
-        string $result,
+        ?string $result = null,
     ): RedirectResponse {
         /** @var Order $order */
         $order = $payment->order()
@@ -91,12 +137,17 @@ final class ZarinPalCallbackController extends Controller
             $order->isRenewal()
             && $order->server_id !== null
         ) {
+            $parameters = [
+                'server' => $order->server_id,
+            ];
+
+            if ($result !== null) {
+                $parameters['payment'] = $result;
+            }
+
             return redirect()->route(
                 'panel.servers.renew',
-                [
-                    'server' => $order->server_id,
-                    'payment' => $result,
-                ],
+                $parameters,
             );
         }
 

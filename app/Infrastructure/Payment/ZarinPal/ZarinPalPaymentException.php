@@ -33,4 +33,14 @@ final class ZarinPalPaymentException extends RuntimeException
             "ZarinPal returned an invalid response for [{$operation}].",
         );
     }
+
+    public function isRetryable(): bool
+    {
+        $code = $this->getCode();
+
+        return $code === 0
+            || $code === 408
+            || $code === 429
+            || $code >= 500;
+    }
 }
