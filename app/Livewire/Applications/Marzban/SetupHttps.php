@@ -9,9 +9,13 @@ use App\Domain\Application\Marzban\Exceptions\InvalidMarzbanDomainException;
 use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsApplyException;
 use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsPreflightException;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsApplyFailure;
+use App\Domain\Application\Marzban\Https\ValueObjects\MarzbanDomain;
+use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Models\PublicEndpoint;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -21,6 +25,9 @@ final class SetupHttps extends Component
 {
     #[Locked]
     public int $serverId;
+
+    #[Locked]
+    public ?int $endpointId = null;
 
     public string $domain = '';
 
@@ -52,6 +59,35 @@ final class SetupHttps extends Component
     public ?string $preflightError = null;
 
     public ?string $activationError = null;
+
+    public function mount(
+        int $serverId,
+        ?int $endpointId = null,
+    ): void {
+        $this->serverId = (int) $this->ownedServer(
+            $serverId,
+        )->getKey();
+
+        if ($endpointId === null) {
+            return;
+        }
+
+        $endpoint = PublicEndpoint::query()
+            ->where(
+                'server_id',
+                $this->serverId,
+            )
+            ->where(
+                'application_type',
+                ApplicationType::Marzban->value,
+            )
+            ->findOrFail(
+                $endpointId,
+            );
+
+        $this->endpointId = (int) $endpoint->getKey();
+        $this->domain = $endpoint->domain;
+    }
 
     /**
      * @return array<string, list<string>>
@@ -97,18 +133,23 @@ final class SetupHttps extends Component
         $this->activationError = null;
 
         try {
-            $user = $this->authenticatedUser();
+            $normalizedDomain = MarzbanDomain::from(
+                $this->domain,
+            )->value;
 
-            $server = Server::query()
-                ->ownedBy($user)
-                ->findOrFail(
-                    $this->serverId,
-                );
+            if (! $this->persistPendingEndpoint($normalizedDomain)) {
+                return;
+            }
+
+            $user = $this->authenticatedUser();
+            $server = $this->ownedServer(
+                $this->serverId,
+            );
 
             $result = $manager->preflightHttps(
                 user: $user,
                 server: $server,
-                domain: $this->domain,
+                domain: $normalizedDomain,
             );
 
             $this->domain = $result->dns->domain;
@@ -118,6 +159,10 @@ final class SetupHttps extends Component
 
             $this->serverPreflight =
                 $result->server?->toArray();
+
+            $this->dispatch(
+                "public-endpoints-updated.{$this->serverId}",
+            );
         } catch (InvalidMarzbanDomainException) {
             $this->addError(
                 'domain',
@@ -156,18 +201,36 @@ final class SetupHttps extends Component
 
         try {
             $user = $this->authenticatedUser();
-
-            $server = Server::query()
-                ->ownedBy($user)
-                ->findOrFail(
-                    $this->serverId,
-                );
+            $server = $this->ownedServer(
+                $this->serverId,
+            );
 
             $management = $manager->enableHttps(
                 user: $user,
                 server: $server,
                 domain: $this->domain,
             )->toArray();
+
+            PublicEndpoint::query()
+                ->where(
+                    'server_id',
+                    $this->serverId,
+                )
+                ->where(
+                    'application_type',
+                    ApplicationType::Marzban->value,
+                )
+                ->where(
+                    'domain',
+                    $this->domain,
+                )
+                ->update([
+                    'activated_at' => now(),
+                ]);
+
+            $this->dispatch(
+                "public-endpoints-updated.{$this->serverId}",
+            );
 
             $this->dispatch(
                 "marzban-management-updated.{$this->serverId}",
@@ -214,6 +277,78 @@ final class SetupHttps extends Component
         );
     }
 
+    private function persistPendingEndpoint(
+        string $domain,
+    ): bool {
+        try {
+            $endpoint = PublicEndpoint::query()
+                ->where(
+                    'server_id',
+                    $this->serverId,
+                )
+                ->where(
+                    'application_type',
+                    ApplicationType::Marzban->value,
+                )
+                ->first();
+
+            if ($endpoint?->isActive() === true) {
+                $this->activationError =
+                    'برای Marzban از قبل یک دامنه فعال ثبت شده است.';
+
+                return false;
+            }
+
+            if ($endpoint === null) {
+                $endpoint = new PublicEndpoint([
+                    'application_type' => ApplicationType::Marzban,
+                    'domain' => $domain,
+                ]);
+
+                $endpoint->server()->associate(
+                    $this->ownedServer(
+                        $this->serverId,
+                    ),
+                );
+            } else {
+                $endpoint->domain = $domain;
+            }
+
+            $endpoint->activated_at = null;
+            $endpoint->save();
+
+            $this->endpointId = (int) $endpoint->getKey();
+            $this->domain = $endpoint->domain;
+
+            return true;
+        } catch (QueryException $exception) {
+            if ($this->isUniqueConstraintViolation($exception)) {
+                $this->addError(
+                    'domain',
+                    'این دامنه قبلاً به برنامه دیگری روی این سرور متصل شده است.',
+                );
+
+                return false;
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function isUniqueConstraintViolation(
+        QueryException $exception,
+    ): bool {
+        return in_array(
+            (string) $exception->getCode(),
+            [
+                '19',
+                '23000',
+                '23505',
+            ],
+            true,
+        );
+    }
+
     private function readyForActivation(): bool
     {
         return ($this->dnsPreflight['ready'] ?? false) === true
@@ -240,6 +375,18 @@ final class SetupHttps extends Component
             MarzbanHttpsApplyFailure::Mutation,
             MarzbanHttpsApplyFailure::Verification => 'فعال‌سازی HTTPS کامل نشد. پیش از تلاش دوباره وضعیت Marzban را بروزرسانی کنید.',
         };
+    }
+
+    private function ownedServer(
+        int $serverId,
+    ): Server {
+        return Server::query()
+            ->ownedBy(
+                $this->authenticatedUser(),
+            )
+            ->findOrFail(
+                $serverId,
+            );
     }
 
     private function authenticatedUser(): User

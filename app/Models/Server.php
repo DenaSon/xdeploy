@@ -10,6 +10,7 @@ use App\Infrastructure\Security\Casts\ServerCredentialCast;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Server extends Model
@@ -68,6 +69,18 @@ class Server extends Model
     {
         return $this->belongsTo(
             User::class,
+        );
+    }
+
+    /**
+     * Public endpoints assigned to applications on this server.
+     *
+     * @return HasMany<PublicEndpoint, $this>
+     */
+    public function publicEndpoints(): HasMany
+    {
+        return $this->hasMany(
+            PublicEndpoint::class,
         );
     }
 

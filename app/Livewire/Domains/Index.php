@@ -7,9 +7,15 @@ namespace App\Livewire\Domains;
 use App\Application\Applications\Marzban\MarzbanManager;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Shared\Enums\ApplicationState;
+use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\PublicEndpoint\Exceptions\InvalidPublicEndpointDomainException;
+use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
+use App\Models\PublicEndpoint;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -34,6 +40,12 @@ final class Index extends Component
 
     public bool $showDrawer = false;
 
+    public bool $showSetup = false;
+
+    public ?string $selectedApplication = null;
+
+    public ?string $endpointError = null;
+
     public function mount(Server $server): void
     {
         $server = Server::query()
@@ -56,11 +68,97 @@ final class Index extends Component
 
     public function openDomainDrawer(): void
     {
-        if (! $this->canAddDomain()) {
+        if (! $this->loaded || $this->unavailable) {
             return;
         }
 
+        $this->endpointError = null;
+        $this->showSetup = false;
+        $this->selectedApplication = null;
         $this->showDrawer = true;
+
+        $available = $this->availableApplications();
+
+        if (count($available) === 1) {
+            $this->selectedApplication = $available[0]['type'];
+        }
+    }
+
+    public function selectApplication(
+        string $application,
+    ): void {
+        $type = ApplicationType::tryFrom(
+            $application,
+        );
+
+        if (
+            $type === null
+            || ! $this->applicationCanReceiveEndpoint($type)
+        ) {
+            return;
+        }
+
+        $this->selectedApplication = $type->value;
+        $this->showSetup = false;
+        $this->endpointError = null;
+    }
+
+    public function continueDomainSetup(): void
+    {
+        $type = $this->selectedApplicationType();
+
+        if (
+            $type === null
+            || ! $this->applicationCanReceiveEndpoint($type)
+        ) {
+            $this->endpointError =
+                'یک برنامه آماده را برای اتصال دامنه انتخاب کنید.';
+
+            return;
+        }
+
+        $this->endpointError = null;
+        $this->showSetup = true;
+    }
+
+    public function manageEndpoint(
+        int $endpointId,
+    ): void {
+        $endpoint = $this->endpoint(
+            $endpointId,
+        );
+
+        $this->selectedApplication =
+            $endpoint->application_type->value;
+
+        $this->endpointError = null;
+        $this->showSetup = ! $endpoint->isActive();
+        $this->showDrawer = true;
+    }
+
+    public function cancelPendingEndpoint(
+        int $endpointId,
+    ): void {
+        $endpoint = $this->endpoint(
+            $endpointId,
+        );
+
+        if ($endpoint->isActive()) {
+            return;
+        }
+
+        $endpoint->delete();
+
+        $this->selectedApplication = null;
+        $this->showSetup = false;
+        $this->showDrawer = false;
+        $this->endpointError = null;
+    }
+
+    #[On('public-endpoints-updated.{serverId}')]
+    public function endpointUpdated(): void
+    {
+        // Re-render from the database without opening a new SSH connection.
     }
 
     /**
@@ -91,7 +189,16 @@ final class Index extends Component
         $this->management = $management;
         $this->loaded = true;
         $this->unavailable = false;
-        $this->showDrawer = false;
+
+        $this->reconcileMarzbanEndpoint();
+
+        if (
+            $httpsState === MarzbanHttpsState::Enabled->value
+        ) {
+            $this->showDrawer = false;
+            $this->showSetup = false;
+            $this->selectedApplication = null;
+        }
     }
 
     public function render(): View
@@ -100,6 +207,10 @@ final class Index extends Component
             'livewire.domains.index',
             [
                 'server' => $this->server(),
+                'endpoints' => $this->endpointPresentation(),
+                'availableApplications' => $this->availableApplications(),
+                'canAddDomain' => $this->canAddDomain(),
+                'selectedEndpoint' => $this->selectedEndpoint(),
             ],
         )->title('دامنه‌ها');
     }
@@ -116,6 +227,7 @@ final class Index extends Component
                 )
                 ->toArray();
 
+            $this->reconcileMarzbanEndpoint();
             $this->unavailable = false;
         } catch (Throwable $exception) {
             report($exception);
@@ -127,19 +239,258 @@ final class Index extends Component
         }
     }
 
-    private function canAddDomain(): bool
+    private function reconcileMarzbanEndpoint(): void
     {
-        return $this->loaded
-            && ! $this->unavailable
-            && data_get(
+        $httpsState = data_get(
+            $this->management,
+            'https.state',
+        );
+
+        $domain = data_get(
+            $this->management,
+            'https.domain',
+        );
+
+        if (
+            $httpsState !== MarzbanHttpsState::Enabled->value
+            || ! is_string($domain)
+            || trim($domain) === ''
+        ) {
+            return;
+        }
+
+        try {
+            $normalizedDomain = PublicEndpointDomain::from(
+                $domain,
+            )->value;
+
+            $endpoint = PublicEndpoint::query()
+                ->firstOrNew([
+                    'server_id' => $this->serverId,
+                    'application_type' => ApplicationType::Marzban->value,
+                ]);
+
+            $endpoint->domain = $normalizedDomain;
+            $endpoint->activated_at ??= now();
+            $endpoint->save();
+        } catch (
+            InvalidPublicEndpointDomainException|QueryException $exception
+        ) {
+            report($exception);
+
+            $this->endpointError =
+                'دامنه فعال روی سرور با وضعیت ثبت‌شده xDeploy همگام نشد. پیش از تغییر HTTPS وضعیت دامنه را بررسی کنید.';
+        }
+    }
+
+    /**
+     * @return list<array{
+     *     id: int,
+     *     application_type: string,
+     *     application_name: string,
+     *     domain: string,
+     *     state: string,
+     *     open_url: ?string,
+     *     application_url: string,
+     *     active: bool
+     * }>
+     */
+    private function endpointPresentation(): array
+    {
+        return $this->endpoints()
+            ->map(function (PublicEndpoint $endpoint): array {
+                $active = $endpoint->isActive();
+
+                return [
+                    'id' => (int) $endpoint->getKey(),
+                    'application_type' => $endpoint->application_type->value,
+                    'application_name' => $this->applicationName(
+                        $endpoint->application_type,
+                    ),
+                    'domain' => $endpoint->domain,
+                    'state' => $active
+                        ? $this->activeEndpointState($endpoint)
+                        : 'pending',
+                    'open_url' => $active
+                        ? $this->applicationOpenUrl($endpoint)
+                        : null,
+                    'application_url' => route(
+                        'panel.servers.applications.show',
+                        [
+                            'server' => $this->serverId,
+                            'application' => $endpoint->application_type->value,
+                        ],
+                    ),
+                    'active' => $active,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{
+     *     type: string,
+     *     name: string,
+     *     description: string,
+     *     icon: string
+     * }>
+     */
+    private function availableApplications(): array
+    {
+        if (
+            ! $this->loaded
+            || $this->unavailable
+            || data_get(
                 $this->management,
                 'application.is_installed',
                 false,
-            ) === true
-            && data_get(
+            ) !== true
+            || ! $this->applicationCanReceiveEndpoint(
+                ApplicationType::Marzban,
+            )
+        ) {
+            return [];
+        }
+
+        return [[
+            'type' => ApplicationType::Marzban->value,
+            'name' => 'Marzban',
+            'description' => 'پنل مدیریت Marzban را روی دامنه یا زیردامنه خود منتشر کنید.',
+            'icon' => 'lucide.box',
+        ]];
+    }
+
+    private function applicationCanReceiveEndpoint(
+        ApplicationType $type,
+    ): bool {
+        if ($type !== ApplicationType::Marzban) {
+            return false;
+        }
+
+        if (
+            data_get(
                 $this->management,
-                'https.state',
-            ) === MarzbanHttpsState::Disabled->value;
+                'application.is_installed',
+                false,
+            ) !== true
+        ) {
+            return false;
+        }
+
+        return ! PublicEndpoint::query()
+            ->where(
+                'server_id',
+                $this->serverId,
+            )
+            ->where(
+                'application_type',
+                $type->value,
+            )
+            ->exists();
+    }
+
+    private function canAddDomain(): bool
+    {
+        return $this->availableApplications() !== [];
+    }
+
+    private function selectedApplicationType(): ?ApplicationType
+    {
+        if ($this->selectedApplication === null) {
+            return null;
+        }
+
+        return ApplicationType::tryFrom(
+            $this->selectedApplication,
+        );
+    }
+
+    private function selectedEndpoint(): ?PublicEndpoint
+    {
+        $type = $this->selectedApplicationType();
+
+        if ($type === null) {
+            return null;
+        }
+
+        return PublicEndpoint::query()
+            ->where(
+                'server_id',
+                $this->serverId,
+            )
+            ->where(
+                'application_type',
+                $type->value,
+            )
+            ->first();
+    }
+
+    /**
+     * @return Collection<int, PublicEndpoint>
+     */
+    private function endpoints(): Collection
+    {
+        return PublicEndpoint::query()
+            ->where(
+                'server_id',
+                $this->serverId,
+            )
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function endpoint(
+        int $endpointId,
+    ): PublicEndpoint {
+        return PublicEndpoint::query()
+            ->where(
+                'server_id',
+                $this->serverId,
+            )
+            ->findOrFail(
+                $endpointId,
+            );
+    }
+
+    private function activeEndpointState(
+        PublicEndpoint $endpoint,
+    ): string {
+        if ($endpoint->application_type !== ApplicationType::Marzban) {
+            return 'unknown';
+        }
+
+        $runtimeState = data_get(
+            $this->management,
+            'https.state',
+        );
+
+        $runtimeDomain = data_get(
+            $this->management,
+            'https.domain',
+        );
+
+        return $runtimeState === MarzbanHttpsState::Enabled->value
+            && is_string($runtimeDomain)
+            && strtolower(trim($runtimeDomain)) === $endpoint->domain
+                ? 'enabled'
+                : 'misconfigured';
+    }
+
+    private function applicationOpenUrl(
+        PublicEndpoint $endpoint,
+    ): string {
+        return match ($endpoint->application_type) {
+            ApplicationType::Marzban => 'https://'.$endpoint->domain.'/dashboard/',
+        };
+    }
+
+    private function applicationName(
+        ApplicationType $type,
+    ): string {
+        return match ($type) {
+            ApplicationType::Marzban => 'Marzban',
+        };
     }
 
     private function server(): Server

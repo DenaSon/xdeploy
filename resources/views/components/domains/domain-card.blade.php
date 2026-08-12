@@ -4,6 +4,7 @@
     'state' => 'unknown',
     'openUrl' => null,
     'applicationUrl' => null,
+    'manageEndpointId' => null,
 ])
 
 @php
@@ -25,6 +26,24 @@
             'dotClasses' => 'bg-success',
         ],
 
+        'pending' => [
+            'label' => 'در انتظار راه‌اندازی',
+            'description' => 'دامنه به برنامه تخصیص داده شده است؛ بررسی DNS و فعال‌سازی HTTPS را تکمیل کنید.',
+            'icon' => 'lucide.globe-2',
+            'iconClasses' => 'bg-warning/10 text-warning',
+            'badgeClasses' => 'border-warning/20 bg-warning/10 text-warning',
+            'dotClasses' => 'bg-warning',
+        ],
+
+        'checking' => [
+            'label' => 'در حال بررسی',
+            'description' => 'اتصال دامنه ثبت شده و وضعیت واقعی HTTPS از سرور در حال دریافت است.',
+            'icon' => 'lucide.loader-circle',
+            'iconClasses' => 'bg-info/10 text-info',
+            'badgeClasses' => 'border-info/20 bg-info/10 text-info',
+            'dotClasses' => 'bg-info',
+        ],
+
         'managed_externally' => [
             'label' => 'مدیریت خارجی',
             'description' => 'HTTPS شناسایی شده اما خارج از xDeploy مدیریت می‌شود.',
@@ -36,7 +55,7 @@
 
         'misconfigured' => [
             'label' => 'نیازمند بررسی',
-            'description' => 'پیکربندی دامنه یا HTTPS شناسایی شده اما به‌درستی کار نمی‌کند.',
+            'description' => 'وضعیت ثبت‌شده دامنه با پیکربندی فعلی سرور هم‌خوان نیست.',
             'icon' => 'lucide.triangle-alert',
             'iconClasses' => 'bg-error/10 text-error',
             'badgeClasses' => 'border-error/20 bg-error/10 text-error',
@@ -116,6 +135,15 @@
 
                                 HTTPS فعال
                             </span>
+                        @elseif ($state === 'pending')
+                            <span class="inline-flex items-center gap-1.5 text-warning">
+                                <x-icon
+                                    name="lucide.clock-3"
+                                    class="!size-3.5"
+                                />
+
+                                HTTPS هنوز فعال نشده
+                            </span>
                         @endif
                     </div>
 
@@ -134,6 +162,15 @@
                         icon="lucide.package-open"
                         :link="$applicationUrl"
                         wire:navigate
+                        class="btn-ghost btn-sm rounded-xl"
+                    />
+                @endif
+
+                @if ($manageEndpointId !== null)
+                    <x-button
+                        label="مدیریت"
+                        icon="lucide.settings-2"
+                        wire:click="manageEndpoint({{ (int) $manageEndpointId }})"
                         class="btn-ghost btn-sm rounded-xl"
                     />
                 @endif
@@ -196,6 +233,19 @@
                     </div>
                 </div>
             </div>
+        </div>
+    @elseif ($state === 'pending')
+        <div
+            class="flex items-center gap-2.5 border-t border-warning/15 bg-warning/[0.035] px-5 py-3.5 sm:px-6"
+        >
+            <x-icon
+                name="lucide.info"
+                class="!size-3.5 shrink-0 text-warning"
+            />
+
+            <p class="text-xs leading-6 text-base-content/55">
+                پس از تنظیم رکورد A، از «مدیریت» بررسی DNS را اجرا و HTTPS را فعال کنید.
+            </p>
         </div>
     @endif
 </article>
