@@ -49,5 +49,6 @@ final class PublicEndpointDomainTest extends TestCase
         yield 'empty label' => ['panel..example.com'];
         yield 'leading hyphen' => ['-panel.example.com'];
         yield 'numeric tld' => ['panel.example.123'];
+        yield 'unicode literal' => ['پنل.example.com'];
     }
 }
