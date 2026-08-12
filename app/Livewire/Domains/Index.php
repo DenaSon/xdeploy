@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Domains;
 
 use App\Application\Applications\Marzban\MarzbanManager;
+use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsApplyException;
+use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsApplyFailure;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
@@ -153,6 +155,54 @@ final class Index extends Component
         $this->showSetup = false;
         $this->showDrawer = false;
         $this->endpointError = null;
+    }
+
+    public function removeEndpoint(
+        int $endpointId,
+        MarzbanManager $manager,
+    ): void {
+        $endpoint = $this->endpoint(
+            $endpointId,
+        );
+
+        if (! $endpoint->isActive()) {
+            return;
+        }
+
+        if ($endpoint->application_type !== ApplicationType::Marzban) {
+            return;
+        }
+
+        $this->endpointError = null;
+
+        try {
+            $management = $manager->disableHttps(
+                user: $this->authenticatedUser(),
+                server: $this->server(),
+                domain: $endpoint->domain,
+            )->toArray();
+
+            $endpoint->delete();
+
+            $this->management = $management;
+            $this->loaded = true;
+            $this->unavailable = false;
+            $this->selectedApplication = null;
+            $this->showSetup = false;
+            $this->showDrawer = false;
+            $this->endpointError = null;
+        } catch (MarzbanHttpsApplyException $exception) {
+            report($exception);
+
+            $this->endpointError = $this->removeErrorMessage(
+                $exception,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $this->endpointError =
+                'حذف دامنه با خطای پیش‌بینی‌نشده متوقف شد. وضعیت سرور را بروزرسانی و دوباره بررسی کنید.';
+        }
     }
 
     #[On('public-endpoints-updated.{serverId}')]
@@ -490,6 +540,27 @@ final class Index extends Component
     ): string {
         return match ($type) {
             ApplicationType::Marzban => 'Marzban',
+        };
+    }
+
+    private function removeErrorMessage(
+        MarzbanHttpsApplyException $exception,
+    ): string {
+        if ($exception->recoveryAttempted()) {
+            if ($exception->recovered()) {
+                return 'حذف دامنه کامل نشد؛ تغییرات با موفقیت بازگردانده شدند و دامنه قبلی همچنان فعال است.';
+            }
+
+            return 'حذف دامنه شکست خورد و بازیابی کامل نشد. تا بررسی دستی وضعیت Marzban و Caddy دوباره تلاش نکنید.';
+        }
+
+        return match ($exception->failure) {
+            MarzbanHttpsApplyFailure::ExistingConfiguration => 'پیکربندی HTTPS روی سرور با دامنه ثبت‌شده xDeploy هم‌خوان نیست. وضعیت دامنه را بروزرسانی و بررسی کنید.',
+            MarzbanHttpsApplyFailure::OperationInProgress => 'یک عملیات HTTPS دیگر روی این سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
+            MarzbanHttpsApplyFailure::EnvironmentUnavailable => 'ابزارها یا فایل‌های لازم برای حذف امن دامنه در دسترس نیستند. ساختار نصب Marzban را بررسی کنید.',
+            MarzbanHttpsApplyFailure::CandidateValidation => 'تنظیمات امن برای حذف دامنه معتبر نبود و دامنه قبلی حفظ شد.',
+            MarzbanHttpsApplyFailure::Mutation,
+            MarzbanHttpsApplyFailure::Verification => 'حذف دامنه کامل نشد. وضعیت Marzban و Caddy را بروزرسانی و دوباره بررسی کنید.',
         };
     }
 
