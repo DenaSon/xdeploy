@@ -8,6 +8,7 @@ enum MarzbanHttpsState: string
 {
     case Disabled = 'disabled';
     case Enabled = 'enabled';
+    case ManagedIncomplete = 'managed_incomplete';
     case ManagedExternally = 'managed_externally';
     case Misconfigured = 'misconfigured';
     case Unknown = 'unknown';
