@@ -287,6 +287,7 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
         return match ($exception->failure) {
             CaddySiteMutationFailure::Environment => MarzbanHttpsApplyException::environmentUnavailable(),
             CaddySiteMutationFailure::CandidateValidation => MarzbanHttpsApplyException::candidateValidationFailed(),
+            CaddySiteMutationFailure::Conflict => MarzbanHttpsApplyException::existingConfiguration(),
             CaddySiteMutationFailure::Busy => MarzbanHttpsApplyException::operationInProgress(),
             CaddySiteMutationFailure::Mutation,
             CaddySiteMutationFailure::Reload,

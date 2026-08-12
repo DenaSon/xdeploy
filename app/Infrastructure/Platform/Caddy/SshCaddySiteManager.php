@@ -7,10 +7,8 @@ namespace App\Infrastructure\Platform\Caddy;
 use App\Domain\Platform\Caddy\Sites\CaddySite;
 use App\Domain\Platform\Caddy\Sites\CaddySiteKey;
 use App\Domain\Platform\Caddy\Sites\Contracts\CaddySiteManagerInterface;
-use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteInfo;
 use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteMutationResult;
 use App\Domain\Platform\Caddy\Sites\Enums\CaddySiteMutationFailure;
-use App\Domain\Platform\Caddy\Sites\Exceptions\CaddySiteInspectionException;
 use App\Domain\Platform\Caddy\Sites\Exceptions\CaddySiteMutationException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\Platform\Caddy\Configuration\CaddySiteConfigurationFactory;
@@ -31,68 +29,6 @@ final readonly class SshCaddySiteManager implements CaddySiteManagerInterface
     private const int BUSY = 75;
 
     private const int CONFIGURATION_CONFLICT = 76;
-
-    private const int INSPECTION_FAILED = 77;
-
-    private const string INSPECT_COMMAND = <<<'BASH'
-site_key=__XDEPLOY_SITE_KEY__
-
-caddyfile='/etc/caddy/Caddyfile'
-managed_root='/etc/caddy/xdeploy'
-sites_dir="$managed_root/sites"
-site_file="$sites_dir/$site_key.caddy"
-managed_marker='# xDeploy: caddy-platform'
-managed_import='import xdeploy/sites/*.caddy'
-site_marker="# xDeploy: caddy-site:$site_key"
-
-if ! command -v cat >/dev/null 2>&1 ||
-    ! command -v head >/dev/null 2>&1 ||
-    ! command -v grep >/dev/null 2>&1; then
-    exit 77
-fi
-
-if [ ! -r "$caddyfile" ] ||
-    [ -L "$caddyfile" ] ||
-    [ ! -d "$managed_root" ] ||
-    [ -L "$managed_root" ] ||
-    [ ! -d "$sites_dir" ] ||
-    [ -L "$sites_dir" ]; then
-    exit 77
-fi
-
-expected_root="$(
-    printf '%s\n%s' \
-        "$managed_marker" \
-        "$managed_import"
-)"
-
-actual_root="$(cat "$caddyfile")"
-
-if [ "$actual_root" != "$expected_root" ]; then
-    exit 77
-fi
-
-printf 'xdeploy_caddy_site_inspection=1\n'
-
-if [ ! -e "$site_file" ]; then
-    printf 'status=missing\n'
-    exit 0
-fi
-
-if [ -L "$site_file" ] ||
-    [ ! -f "$site_file" ] ||
-    [ ! -r "$site_file" ]; then
-    printf 'status=conflict\n'
-    exit 0
-fi
-
-if head -n 1 "$site_file" |
-    grep -Fxq "$site_marker"; then
-    printf 'status=managed\n'
-else
-    printf 'status=conflict\n'
-fi
-BASH;
 
     private const string MUTATE_COMMAND = <<<'BASH'
 action=__XDEPLOY_ACTION__
@@ -271,6 +207,11 @@ if ! flock -n 9; then
     exit 75
 fi
 
+if ! systemctl is-active --quiet caddy; then
+    emit_failure 'environment' 0 0
+    exit 70
+fi
+
 expected_root="$(
     printf '%s\n%s' \
         "$managed_marker" \
@@ -285,7 +226,7 @@ if [ "$actual_root" != "$expected_root" ]; then
 fi
 
 for current_site in "$sites_dir"/*.caddy; do
-    [ -e "$current_site" ] || continue
+    [ -e "$current_site" ] || [ -L "$current_site" ] || continue
 
     if [ -L "$current_site" ] ||
         [ ! -f "$current_site" ] ||
@@ -304,7 +245,7 @@ for current_site in "$sites_dir"/*.caddy; do
     fi
 done
 
-if [ "$action" = 'remove' ] && [ ! -e "$site_file" ]; then
+if [ "$action" = 'remove' ] && [ ! -e "$site_file" ] && [ ! -L "$site_file" ]; then
     workflow_finished=1
     emit_success 'unchanged' 0
     exit 0
@@ -487,61 +428,6 @@ BASH;
         private PrivilegedCommandExecutor $privileged,
         private CaddySiteConfigurationFactory $configurationFactory,
     ) {}
-
-    public function inspect(
-        CaddySiteKey $key,
-    ): CaddySiteInfo {
-        $command = str_replace(
-            '__XDEPLOY_SITE_KEY__',
-            escapeshellarg($key->value),
-            self::INSPECT_COMMAND,
-        );
-
-        $result = $this->privileged->executeWithResult(
-            command: $command,
-            timeout: SSHTimeout::QUICK,
-        );
-
-        if (
-            ! $result->successful()
-            || $result->exitCode === self::INSPECTION_FAILED
-        ) {
-            throw CaddySiteInspectionException::failed();
-        }
-
-        $values = $this->parseKeyValueOutput(
-            $result->output,
-        );
-
-        if (
-            ($values['xdeploy_caddy_site_inspection'] ?? null)
-            !== '1'
-        ) {
-            throw CaddySiteInspectionException::failed();
-        }
-
-        return match ($values['status'] ?? null) {
-            'missing' => new CaddySiteInfo(
-                key: $key,
-                exists: false,
-                managed: false,
-            ),
-
-            'managed' => new CaddySiteInfo(
-                key: $key,
-                exists: true,
-                managed: true,
-            ),
-
-            'conflict' => new CaddySiteInfo(
-                key: $key,
-                exists: true,
-                managed: false,
-            ),
-
-            default => throw CaddySiteInspectionException::failed(),
-        };
-    }
 
     public function upsert(
         CaddySite $site,

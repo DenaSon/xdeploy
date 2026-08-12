@@ -89,6 +89,31 @@ OUTPUT,
             $ssh->command,
         );
 
+        self::assertStringContainsString(
+            '[ "$actual_root" != "$expected_root" ]',
+            $ssh->command,
+        );
+
+        self::assertStringContainsString(
+            'current_marker="# xDeploy: caddy-site:$current_key"',
+            $ssh->command,
+        );
+
+        self::assertStringContainsString(
+            'head -n 1 "$current_site"',
+            $ssh->command,
+        );
+
+        self::assertStringContainsString(
+            '--config "$caddyfile"',
+            $ssh->command,
+        );
+
+        self::assertStringContainsString(
+            'preserve_candidate=1',
+            $ssh->command,
+        );
+
         $payload = base64_encode(
             (new CaddySiteConfigurationFactory)->make($site),
         );
@@ -182,6 +207,41 @@ OUTPUT,
             'site_key='.escapeshellarg('marzban'),
             $ssh->command,
         );
+    }
+
+    public function test_it_reports_ownership_conflict_without_recovery(): void
+    {
+        $ssh = new CaddySiteManagerFakeSshConnection(
+            mutationResult: new SSHResult(
+                output: <<<'OUTPUT'
+xdeploy_caddy_site_mutation=1
+status=failed
+stage=conflict
+configuration_restored=0
+service_recovered=0
+OUTPUT,
+                exitCode: 76,
+            ),
+        );
+
+        try {
+            $this->manager($ssh)->remove(
+                CaddySiteKey::from('n8n'),
+            );
+
+            self::fail(
+                'Expected a Caddy site mutation exception.',
+            );
+        } catch (CaddySiteMutationException $exception) {
+            self::assertSame(
+                CaddySiteMutationFailure::Conflict,
+                $exception->failure,
+            );
+
+            self::assertFalse(
+                $exception->recoveryAttempted(),
+            );
+        }
     }
 
     public function test_it_reports_candidate_validation_failure_without_recovery(): void

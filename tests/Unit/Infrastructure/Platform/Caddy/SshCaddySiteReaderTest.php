@@ -51,6 +51,16 @@ final class SshCaddySiteReaderTest extends TestCase
         );
 
         self::assertStringContainsString(
+            'actual_root="$(cat "$root")"',
+            implode("\n", $ssh->commands),
+        );
+
+        self::assertStringContainsString(
+            '[ "$actual_root" = "$expected_root" ]',
+            implode("\n", $ssh->commands),
+        );
+
+        self::assertStringContainsString(
             '/etc/caddy/xdeploy/sites/marzban.caddy',
             implode("\n", $ssh->commands),
         );

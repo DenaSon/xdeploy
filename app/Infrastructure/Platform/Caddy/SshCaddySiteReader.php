@@ -32,8 +32,15 @@ if [ ! -r "$root" ] ||
     exit 1
 fi
 
-grep -Fxq "$managed_marker" "$root" &&
-grep -Fxq "$managed_import" "$root"
+expected_root="$(
+    printf '%s\n%s' \
+        "$managed_marker" \
+        "$managed_import"
+)"
+
+actual_root="$(cat "$root")"
+
+[ "$actual_root" = "$expected_root" ]
 BASH;
 
     public function __construct(

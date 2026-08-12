@@ -416,6 +416,7 @@ BASH;
         return match ($exception->failure) {
             CaddySiteMutationFailure::Environment => PublicEndpointOperationException::environmentUnavailable(),
             CaddySiteMutationFailure::CandidateValidation => PublicEndpointOperationException::candidateValidationFailed(),
+            CaddySiteMutationFailure::Conflict => PublicEndpointOperationException::existingConfiguration(),
             CaddySiteMutationFailure::Busy => PublicEndpointOperationException::operationInProgress(),
             CaddySiteMutationFailure::Mutation,
             CaddySiteMutationFailure::Reload,
