@@ -92,7 +92,7 @@ final class DetailsTest extends TestCase
             ->assertDontSee('never-render-this-password');
     }
 
-    public function test_cloud_server_metadata_is_visible_to_owner(): void
+    public function test_cloud_infrastructure_metadata_is_hidden_from_owner(): void
     {
         $user = $this->createUser('09120000005');
 
@@ -111,10 +111,14 @@ final class DetailsTest extends TestCase
                 ),
             )
             ->assertOk()
-            ->assertSee('اطلاعات سرویس ابری')
-            ->assertSee('ArvanCloud')
-            ->assertSee('eu-west1-a')
-            ->assertSee('provider-server-123');
+            ->assertSee('مشخصات سرور')
+            ->assertSee('خرید از xDeploy')
+            ->assertSee('شروع سرویس')
+            ->assertSee('پایان سرویس')
+            ->assertDontSee('اطلاعات سرویس ابری')
+            ->assertDontSee('ArvanCloud')
+            ->assertDontSee('eu-west1-a')
+            ->assertDontSee('provider-server-123');
     }
 
     private function createUser(string $phone): User
