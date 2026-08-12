@@ -12,4 +12,5 @@ enum CaddySiteMutationFailure: string
     case Reload = 'reload';
     case Recovery = 'recovery';
     case Busy = 'busy';
+    case Conflict = 'conflict';
 }

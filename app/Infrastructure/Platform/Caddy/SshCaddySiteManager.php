@@ -7,8 +7,10 @@ namespace App\Infrastructure\Platform\Caddy;
 use App\Domain\Platform\Caddy\Sites\CaddySite;
 use App\Domain\Platform\Caddy\Sites\CaddySiteKey;
 use App\Domain\Platform\Caddy\Sites\Contracts\CaddySiteManagerInterface;
+use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteInfo;
 use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteMutationResult;
 use App\Domain\Platform\Caddy\Sites\Enums\CaddySiteMutationFailure;
+use App\Domain\Platform\Caddy\Sites\Exceptions\CaddySiteInspectionException;
 use App\Domain\Platform\Caddy\Sites\Exceptions\CaddySiteMutationException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\Platform\Caddy\Configuration\CaddySiteConfigurationFactory;
@@ -27,6 +29,70 @@ final readonly class SshCaddySiteManager implements CaddySiteManagerInterface
     private const int RECOVERY_FAILED = 74;
 
     private const int BUSY = 75;
+
+    private const int CONFIGURATION_CONFLICT = 76;
+
+    private const int INSPECTION_FAILED = 77;
+
+    private const string INSPECT_COMMAND = <<<'BASH'
+site_key=__XDEPLOY_SITE_KEY__
+
+caddyfile='/etc/caddy/Caddyfile'
+managed_root='/etc/caddy/xdeploy'
+sites_dir="$managed_root/sites"
+site_file="$sites_dir/$site_key.caddy"
+managed_marker='# xDeploy: caddy-platform'
+managed_import='import xdeploy/sites/*.caddy'
+site_marker="# xDeploy: caddy-site:$site_key"
+
+if ! command -v cat >/dev/null 2>&1 ||
+    ! command -v head >/dev/null 2>&1 ||
+    ! command -v grep >/dev/null 2>&1; then
+    exit 77
+fi
+
+if [ ! -r "$caddyfile" ] ||
+    [ -L "$caddyfile" ] ||
+    [ ! -d "$managed_root" ] ||
+    [ -L "$managed_root" ] ||
+    [ ! -d "$sites_dir" ] ||
+    [ -L "$sites_dir" ]; then
+    exit 77
+fi
+
+expected_root="$(
+    printf '%s\n%s' \
+        "$managed_marker" \
+        "$managed_import"
+)"
+
+actual_root="$(cat "$caddyfile")"
+
+if [ "$actual_root" != "$expected_root" ]; then
+    exit 77
+fi
+
+printf 'xdeploy_caddy_site_inspection=1\n'
+
+if [ ! -e "$site_file" ]; then
+    printf 'status=missing\n'
+    exit 0
+fi
+
+if [ -L "$site_file" ] ||
+    [ ! -f "$site_file" ] ||
+    [ ! -r "$site_file" ]; then
+    printf 'status=conflict\n'
+    exit 0
+fi
+
+if head -n 1 "$site_file" |
+    grep -Fxq "$site_marker"; then
+    printf 'status=managed\n'
+else
+    printf 'status=conflict\n'
+fi
+BASH;
 
     private const string MUTATE_COMMAND = <<<'BASH'
 action=__XDEPLOY_ACTION__
@@ -48,6 +114,7 @@ previous_exists=0
 mutation_started=0
 reload_attempted=0
 workflow_finished=0
+preserve_candidate=0
 
 emit_failure() {
     stage="$1"
@@ -134,7 +201,9 @@ compensate() {
 }
 
 cleanup() {
-    if [ -n "$candidate_dir" ] && [ -d "$candidate_dir" ]; then
+    if [ "$preserve_candidate" -eq 0 ] &&
+        [ -n "$candidate_dir" ] &&
+        [ -d "$candidate_dir" ]; then
         rm -rf "$candidate_dir"
     fi
 }
@@ -148,7 +217,14 @@ on_exit() {
         [ "$workflow_finished" -eq 0 ] &&
         [ -n "$candidate_dir" ] &&
         [ -d "$candidate_dir" ]; then
-        compensate >/dev/null 2>&1 || true
+        recovery="$(compensate 2>/dev/null || printf '0|0')"
+
+        if [ "${recovery%%|*}" -eq 1 ] &&
+            [ "${recovery#*|}" -eq 1 ]; then
+            preserve_candidate=0
+        else
+            preserve_candidate=1
+        fi
     fi
 
     cleanup
@@ -159,7 +235,8 @@ trap on_exit EXIT HUP INT TERM
 umask 077
 
 for required_command in \
-    base64 caddy cat chmod cmp cp flock grep install mkdir mktemp mv rm systemctl
+    base64 basename caddy cat chmod cmp cp flock grep head install mkdir \
+    mktemp mv rm systemctl
 do
     if ! command -v "$required_command" >/dev/null 2>&1; then
         emit_failure 'environment' 0 0
@@ -173,31 +250,13 @@ if [ "$action" != 'upsert' ] && [ "$action" != 'remove' ]; then
 fi
 
 if ! systemctl cat caddy.service >/dev/null 2>&1 ||
+    ! systemctl is-active --quiet caddy ||
     [ ! -r "$caddyfile" ] ||
     [ -L "$caddyfile" ] ||
-    ! grep -Fxq "$managed_marker" "$caddyfile" ||
-    ! grep -Fxq "$managed_import" "$caddyfile" ||
     [ ! -d "$managed_root" ] ||
     [ -L "$managed_root" ] ||
     [ ! -d "$sites_dir" ] ||
     [ -L "$sites_dir" ]; then
-    emit_failure 'environment' 0 0
-    exit 70
-fi
-
-for current_site in "$sites_dir"/*.caddy; do
-    [ -e "$current_site" ] || continue
-
-    if [ -L "$current_site" ] ||
-        [ ! -f "$current_site" ] ||
-        [ ! -r "$current_site" ]; then
-        emit_failure 'environment' 0 0
-        exit 70
-    fi
-done
-
-if [ -e "$site_file" ] &&
-    { [ -L "$site_file" ] || [ ! -f "$site_file" ] || [ ! -r "$site_file" ]; }; then
     emit_failure 'environment' 0 0
     exit 70
 fi
@@ -211,6 +270,39 @@ if ! flock -n 9; then
     emit_failure 'busy' 0 0
     exit 75
 fi
+
+expected_root="$(
+    printf '%s\n%s' \
+        "$managed_marker" \
+        "$managed_import"
+)"
+
+actual_root="$(cat "$caddyfile")"
+
+if [ "$actual_root" != "$expected_root" ]; then
+    emit_failure 'conflict' 0 0
+    exit 76
+fi
+
+for current_site in "$sites_dir"/*.caddy; do
+    [ -e "$current_site" ] || continue
+
+    if [ -L "$current_site" ] ||
+        [ ! -f "$current_site" ] ||
+        [ ! -r "$current_site" ]; then
+        emit_failure 'conflict' 0 0
+        exit 76
+    fi
+
+    current_key="$(basename "$current_site" .caddy)"
+    current_marker="# xDeploy: caddy-site:$current_key"
+
+    if ! head -n 1 "$current_site" |
+        grep -Fxq "$current_marker"; then
+        emit_failure 'conflict' 0 0
+        exit 76
+    fi
+done
 
 if [ "$action" = 'remove' ] && [ ! -e "$site_file" ]; then
     workflow_finished=1
@@ -264,7 +356,8 @@ if [ "$action" = 'upsert' ]; then
 
     chmod 0644 "$candidate_site"
 
-    if ! grep -Fxq "$site_marker" "$candidate_site"; then
+    if ! head -n 1 "$candidate_site" |
+        grep -Fxq "$site_marker"; then
         emit_failure 'candidate' 0 0
         exit 71
     fi
@@ -299,6 +392,7 @@ if ! caddy validate \
 fi
 
 mutation_started=1
+preserve_candidate=1
 
 if [ "$action" = 'upsert' ]; then
     if ! atomic_install "$candidate_site" "$site_file"; then
@@ -312,6 +406,7 @@ if [ "$action" = 'upsert' ]; then
 
         if [ "${recovery%%|*}" -eq 1 ] &&
             [ "${recovery#*|}" -eq 1 ]; then
+            preserve_candidate=0
             exit 72
         fi
 
@@ -329,11 +424,32 @@ else
 
         if [ "${recovery%%|*}" -eq 1 ] &&
             [ "${recovery#*|}" -eq 1 ]; then
+            preserve_candidate=0
             exit 72
         fi
 
         exit 74
     fi
+fi
+
+if ! caddy validate \
+    --config "$caddyfile" \
+    --adapter caddyfile >/dev/null 2>&1; then
+    recovery="$(compensate)"
+    workflow_finished=1
+
+    emit_failure \
+        'mutation' \
+        "${recovery%%|*}" \
+        "${recovery#*|}"
+
+    if [ "${recovery%%|*}" -eq 1 ] &&
+        [ "${recovery#*|}" -eq 1 ]; then
+        preserve_candidate=0
+        exit 72
+    fi
+
+    exit 74
 fi
 
 reload_attempted=1
@@ -350,12 +466,14 @@ if ! systemctl reload caddy >/dev/null 2>&1 ||
 
     if [ "${recovery%%|*}" -eq 1 ] &&
         [ "${recovery#*|}" -eq 1 ]; then
+        preserve_candidate=0
         exit 73
     fi
 
     exit 74
 fi
 
+preserve_candidate=0
 workflow_finished=1
 
 if [ "$action" = 'upsert' ]; then
@@ -369,6 +487,61 @@ BASH;
         private PrivilegedCommandExecutor $privileged,
         private CaddySiteConfigurationFactory $configurationFactory,
     ) {}
+
+    public function inspect(
+        CaddySiteKey $key,
+    ): CaddySiteInfo {
+        $command = str_replace(
+            '__XDEPLOY_SITE_KEY__',
+            escapeshellarg($key->value),
+            self::INSPECT_COMMAND,
+        );
+
+        $result = $this->privileged->executeWithResult(
+            command: $command,
+            timeout: SSHTimeout::QUICK,
+        );
+
+        if (
+            ! $result->successful()
+            || $result->exitCode === self::INSPECTION_FAILED
+        ) {
+            throw CaddySiteInspectionException::failed();
+        }
+
+        $values = $this->parseKeyValueOutput(
+            $result->output,
+        );
+
+        if (
+            ($values['xdeploy_caddy_site_inspection'] ?? null)
+            !== '1'
+        ) {
+            throw CaddySiteInspectionException::failed();
+        }
+
+        return match ($values['status'] ?? null) {
+            'missing' => new CaddySiteInfo(
+                key: $key,
+                exists: false,
+                managed: false,
+            ),
+
+            'managed' => new CaddySiteInfo(
+                key: $key,
+                exists: true,
+                managed: true,
+            ),
+
+            'conflict' => new CaddySiteInfo(
+                key: $key,
+                exists: true,
+                managed: false,
+            ),
+
+            default => throw CaddySiteInspectionException::failed(),
+        };
+    }
 
     public function upsert(
         CaddySite $site,
@@ -455,6 +628,7 @@ BASH;
             self::RELOAD_FAILED => CaddySiteMutationFailure::Reload,
             self::RECOVERY_FAILED => CaddySiteMutationFailure::Recovery,
             self::BUSY => CaddySiteMutationFailure::Busy,
+            self::CONFIGURATION_CONFLICT => CaddySiteMutationFailure::Conflict,
             default => CaddySiteMutationFailure::Environment,
         };
 
