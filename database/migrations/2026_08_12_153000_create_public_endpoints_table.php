@@ -23,10 +23,13 @@ return new class extends Migration
                 64,
             );
 
-            $table->string(
-                'domain',
-                253,
-            );
+            $table
+                ->string(
+                    'domain',
+                    253,
+                )
+                ->charset('ascii')
+                ->collation('ascii_general_ci');
 
             $table
                 ->timestamp('activated_at')
