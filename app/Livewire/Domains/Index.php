@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Domains;
 
-use App\Application\Applications\Marzban\MarzbanManager;
-use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsApplyException;
-use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsApplyFailure;
-use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
+use App\Application\PublicEndpoint\Contracts\PublicEndpointDriverInterface;
+use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
+use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\Exceptions\InvalidPublicEndpointDomainException;
+use App\Domain\PublicEndpoint\Exceptions\PublicEndpointOperationException;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Models\PublicEndpoint;
 use App\Models\Server;
@@ -31,10 +33,11 @@ final class Index extends Component
     #[Locked]
     public int $serverId;
 
-    /**
-     * @var array<string, mixed>
-     */
-    public array $management = [];
+    /** @var array<string, array<string, mixed>> */
+    public array $statuses = [];
+
+    /** @var array<string, array{type:string,name:string,description:string,icon:string}> */
+    public array $applications = [];
 
     public bool $loaded = false;
 
@@ -58,14 +61,14 @@ final class Index extends Component
         $this->serverId = (int) $server->getKey();
     }
 
-    public function loadDomains(MarzbanManager $manager): void
+    public function loadDomains(PublicEndpointDriverRegistry $drivers): void
     {
-        $this->loadManagement($manager);
+        $this->loadStatuses($drivers);
     }
 
-    public function refreshDomains(MarzbanManager $manager): void
+    public function refreshDomains(PublicEndpointDriverRegistry $drivers): void
     {
-        $this->loadManagement($manager);
+        $this->loadStatuses($drivers);
     }
 
     public function openDomainDrawer(): void
@@ -86,17 +89,11 @@ final class Index extends Component
         }
     }
 
-    public function selectApplication(
-        string $application,
-    ): void {
-        $type = ApplicationType::tryFrom(
-            $application,
-        );
+    public function selectApplication(string $application): void
+    {
+        $type = ApplicationType::tryFrom($application);
 
-        if (
-            $type === null
-            || ! $this->applicationCanReceiveEndpoint($type)
-        ) {
+        if ($type === null || ! $this->applicationCanReceiveEndpoint($type)) {
             return;
         }
 
@@ -109,12 +106,8 @@ final class Index extends Component
     {
         $type = $this->selectedApplicationType();
 
-        if (
-            $type === null
-            || ! $this->applicationCanReceiveEndpoint($type)
-        ) {
-            $this->endpointError =
-                'یک برنامه آماده را برای اتصال دامنه انتخاب کنید.';
+        if ($type === null || ! $this->applicationCanReceiveEndpoint($type)) {
+            $this->endpointError = 'یک برنامه آماده را برای اتصال دامنه انتخاب کنید.';
 
             return;
         }
@@ -123,34 +116,24 @@ final class Index extends Component
         $this->showSetup = true;
     }
 
-    public function manageEndpoint(
-        int $endpointId,
-    ): void {
-        $endpoint = $this->endpoint(
-            $endpointId,
-        );
-
-        $this->selectedApplication =
-            $endpoint->application_type->value;
-
+    public function manageEndpoint(int $endpointId): void
+    {
+        $endpoint = $this->endpoint($endpointId);
+        $this->selectedApplication = $endpoint->application_type->value;
         $this->endpointError = null;
         $this->showSetup = ! $endpoint->isActive();
         $this->showDrawer = true;
     }
 
-    public function cancelPendingEndpoint(
-        int $endpointId,
-    ): void {
-        $endpoint = $this->endpoint(
-            $endpointId,
-        );
+    public function cancelPendingEndpoint(int $endpointId): void
+    {
+        $endpoint = $this->endpoint($endpointId);
 
         if ($endpoint->isActive()) {
             return;
         }
 
         $endpoint->delete();
-
         $this->selectedApplication = null;
         $this->showSetup = false;
         $this->showDrawer = false;
@@ -159,92 +142,82 @@ final class Index extends Component
 
     public function removeEndpoint(
         int $endpointId,
-        MarzbanManager $manager,
+        PublicEndpointDriverRegistry $drivers,
     ): void {
-        $endpoint = $this->endpoint(
-            $endpointId,
-        );
+        $endpoint = $this->endpoint($endpointId);
 
         if (! $endpoint->isActive()) {
-            return;
-        }
-
-        if ($endpoint->application_type !== ApplicationType::Marzban) {
             return;
         }
 
         $this->endpointError = null;
 
         try {
-            $management = $manager->disableHttps(
+            $driver = $drivers->find($endpoint->application_type);
+            $domain = PublicEndpointDomain::from($endpoint->domain);
+            $status = $driver->disable(
                 user: $this->authenticatedUser(),
                 server: $this->server(),
-                domain: $endpoint->domain,
-            )->toArray();
+                domain: $domain,
+            );
 
             $endpoint->delete();
-
-            $this->management = $management;
+            $this->statuses[$driver->type()->value] = $this->presentStatus($driver, $status);
             $this->loaded = true;
             $this->unavailable = false;
             $this->selectedApplication = null;
             $this->showSetup = false;
             $this->showDrawer = false;
             $this->endpointError = null;
-        } catch (MarzbanHttpsApplyException $exception) {
+        } catch (InvalidPublicEndpointDomainException) {
+            $this->endpointError = 'دامنه ثبت‌شده معتبر نیست. پیش از حذف، وضعیت endpoint را بررسی کنید.';
+        } catch (PublicEndpointOperationException $exception) {
             report($exception);
-
-            $this->endpointError = $this->removeErrorMessage(
-                $exception,
-            );
+            $this->endpointError = $this->removeErrorMessage($exception);
         } catch (Throwable $exception) {
             report($exception);
-
-            $this->endpointError =
-                'حذف دامنه با خطای پیش‌بینی‌نشده متوقف شد. وضعیت سرور را بروزرسانی و دوباره بررسی کنید.';
+            $this->endpointError = 'حذف دامنه با خطای پیش‌بینی‌نشده متوقف شد. وضعیت سرور را بروزرسانی و دوباره بررسی کنید.';
         }
     }
 
     #[On('public-endpoints-updated.{serverId}')]
     public function endpointUpdated(): void
     {
-        // Re-render from the database without opening a new SSH connection.
+        // Re-render database state without opening another SSH connection.
     }
 
-    /**
-     * @param  array<string, mixed>  $management
-     */
-    #[On('marzban-management-updated.{serverId}')]
-    public function updateManagement(array $management): void
-    {
-        $applicationState = data_get(
-            $management,
-            'application.state',
-        );
-
-        $httpsState = data_get(
-            $management,
-            'https.state',
-        );
+    /** @param array<string, mixed> $status */
+    #[On('public-endpoint-status-updated.{serverId}')]
+    public function updateEndpointStatus(
+        string $application,
+        array $status,
+        ?string $openUrl = null,
+    ): void {
+        $type = ApplicationType::tryFrom($application);
+        $applicationState = data_get($status, 'application.state');
+        $endpointState = data_get($status, 'endpoint.state');
 
         if (
-            ! is_string($applicationState)
+            $type === null
+            || ! isset($this->applications[$type->value])
+            || ! is_string($applicationState)
             || ApplicationState::tryFrom($applicationState) === null
-            || ! is_string($httpsState)
-            || MarzbanHttpsState::tryFrom($httpsState) === null
+            || ! is_string($endpointState)
+            || PublicEndpointRuntimeState::tryFrom($endpointState) === null
         ) {
             return;
         }
 
-        $this->management = $management;
+        if (is_string($openUrl) && str_starts_with($openUrl, 'https://')) {
+            data_set($status, 'endpoint.open_url', $openUrl);
+        }
+
+        $this->statuses[$type->value] = $status;
         $this->loaded = true;
         $this->unavailable = false;
+        $this->reconcileRuntimeEndpoint($type, $status);
 
-        $this->reconcileMarzbanEndpoint();
-
-        if (
-            $httpsState === MarzbanHttpsState::Enabled->value
-        ) {
+        if ($endpointState === PublicEndpointRuntimeState::Enabled->value) {
             $this->showDrawer = false;
             $this->showSetup = false;
             $this->selectedApplication = null;
@@ -253,190 +226,163 @@ final class Index extends Component
 
     public function render(): View
     {
-        return view(
-            'livewire.domains.index',
-            [
-                'server' => $this->server(),
-                'endpoints' => $this->endpointPresentation(),
-                'availableApplications' => $this->availableApplications(),
-                'canAddDomain' => $this->canAddDomain(),
-                'selectedEndpoint' => $this->selectedEndpoint(),
-            ],
-        )->title('دامنه‌ها');
+        return view('livewire.domains.index', [
+            'server' => $this->server(),
+            'endpoints' => $this->endpointPresentation(),
+            'availableApplications' => $this->availableApplications(),
+            'canAddDomain' => $this->canAddDomain(),
+            'selectedEndpoint' => $this->selectedEndpoint(),
+            'selectedApplicationMeta' => $this->selectedApplicationMeta(),
+            'hasInstalledApplications' => $this->hasInstalledApplications(),
+        ])->title('دامنه‌ها');
     }
 
-    private function loadManagement(MarzbanManager $manager): void
+    private function loadStatuses(PublicEndpointDriverRegistry $drivers): void
     {
         $this->unavailable = false;
+        $this->statuses = [];
+        $this->applications = [];
+        $this->endpointError = null;
+        $successful = 0;
 
-        try {
-            $this->management = $manager
-                ->overview(
+        foreach ($drivers->all() as $driver) {
+            $type = $driver->type();
+            $this->applications[$type->value] = [
+                'type' => $type->value,
+                'name' => $driver->name(),
+                'description' => $driver->description(),
+                'icon' => $driver->icon(),
+            ];
+
+            try {
+                $status = $driver->status(
                     user: $this->authenticatedUser(),
                     server: $this->server(),
-                )
-                ->toArray();
-
-            $this->reconcileMarzbanEndpoint();
-            $this->unavailable = false;
-        } catch (Throwable $exception) {
-            report($exception);
-
-            $this->management = [];
-            $this->unavailable = true;
-        } finally {
-            $this->loaded = true;
+                );
+                $presented = $this->presentStatus($driver, $status);
+                $this->statuses[$type->value] = $presented;
+                $this->reconcileRuntimeEndpoint($type, $presented);
+                $successful++;
+            } catch (Throwable $exception) {
+                report($exception);
+                $this->statuses[$type->value] = ['unavailable' => true];
+            }
         }
+
+        $this->unavailable = $successful === 0;
+        $this->loaded = true;
     }
 
-    private function reconcileMarzbanEndpoint(): void
+    /** @return array<string, mixed> */
+    private function presentStatus(
+        PublicEndpointDriverInterface $driver,
+        PublicEndpointApplicationStatus $status,
+    ): array {
+        $presented = $status->toArray();
+        $domain = $status->endpoint->domain;
+
+        if ($status->endpoint->state === PublicEndpointRuntimeState::Enabled && is_string($domain)) {
+            try {
+                data_set(
+                    $presented,
+                    'endpoint.open_url',
+                    $driver->openUrl(PublicEndpointDomain::from($domain)),
+                );
+            } catch (InvalidPublicEndpointDomainException) {
+                // Invalid remote state remains visible as a mismatch.
+            }
+        }
+
+        return $presented;
+    }
+
+    /** @param array<string, mixed> $status */
+    private function reconcileRuntimeEndpoint(ApplicationType $type, array $status): void
     {
-        $httpsState = data_get(
-            $this->management,
-            'https.state',
-        );
+        $state = data_get($status, 'endpoint.state');
+        $domain = data_get($status, 'endpoint.domain');
 
-        $domain = data_get(
-            $this->management,
-            'https.domain',
-        );
-
-        if (
-            $httpsState !== MarzbanHttpsState::Enabled->value
-            || ! is_string($domain)
-            || trim($domain) === ''
-        ) {
+        if ($state !== PublicEndpointRuntimeState::Enabled->value || ! is_string($domain) || trim($domain) === '') {
             return;
         }
 
         try {
-            $normalizedDomain = PublicEndpointDomain::from(
-                $domain,
-            )->value;
-
-            $endpoint = PublicEndpoint::query()
-                ->firstOrNew([
-                    'server_id' => $this->serverId,
-                    'application_type' => ApplicationType::Marzban->value,
-                ]);
-
-            $endpoint->domain = $normalizedDomain;
+            $normalized = PublicEndpointDomain::from($domain)->value;
+            $endpoint = PublicEndpoint::query()->firstOrNew([
+                'server_id' => $this->serverId,
+                'application_type' => $type->value,
+            ]);
+            $endpoint->domain = $normalized;
             $endpoint->activated_at ??= now();
             $endpoint->save();
-        } catch (
-            InvalidPublicEndpointDomainException|QueryException $exception
-        ) {
+        } catch (InvalidPublicEndpointDomainException|QueryException $exception) {
             report($exception);
-
-            $this->endpointError =
-                'دامنه فعال روی سرور با وضعیت ثبت‌شده xDeploy همگام نشد. پیش از تغییر HTTPS وضعیت دامنه را بررسی کنید.';
+            $this->endpointError = 'یک دامنه فعال روی سرور با وضعیت ثبت‌شده xDeploy همگام نشد. پیش از تغییر HTTPS وضعیت دامنه‌ها را بررسی کنید.';
         }
     }
 
-    /**
-     * @return list<array{
-     *     id: int,
-     *     application_type: string,
-     *     application_name: string,
-     *     domain: string,
-     *     state: string,
-     *     open_url: ?string,
-     *     application_url: string,
-     *     active: bool
-     * }>
-     */
+    /** @return list<array<string, mixed>> */
     private function endpointPresentation(): array
     {
         return $this->endpoints()
             ->map(function (PublicEndpoint $endpoint): array {
-                $active = $endpoint->isActive();
+                $type = $endpoint->application_type;
+                $state = $endpoint->isActive()
+                    ? $this->activeEndpointState($endpoint)
+                    : 'pending';
 
                 return [
                     'id' => (int) $endpoint->getKey(),
-                    'application_type' => $endpoint->application_type->value,
-                    'application_name' => $this->applicationName(
-                        $endpoint->application_type,
-                    ),
+                    'application_type' => $type->value,
+                    'application_name' => $this->applications[$type->value]['name'] ?? $type->value,
                     'domain' => $endpoint->domain,
-                    'state' => $active
-                        ? $this->activeEndpointState($endpoint)
-                        : 'pending',
-                    'open_url' => $active
-                        ? $this->applicationOpenUrl($endpoint)
+                    'state' => $state,
+                    'open_url' => $state === 'enabled'
+                        ? data_get($this->statuses, "{$type->value}.endpoint.open_url")
                         : null,
-                    'application_url' => route(
-                        'panel.servers.applications.show',
-                        [
-                            'server' => $this->serverId,
-                            'application' => $endpoint->application_type->value,
-                        ],
-                    ),
-                    'active' => $active,
+                    'application_url' => route('panel.servers.applications.show', [
+                        'server' => $this->serverId,
+                        'application' => $type->value,
+                    ]),
+                    'active' => $endpoint->isActive(),
                 ];
             })
             ->values()
             ->all();
     }
 
-    /**
-     * @return list<array{
-     *     type: string,
-     *     name: string,
-     *     description: string,
-     *     icon: string
-     * }>
-     */
+    /** @return list<array{type:string,name:string,description:string,icon:string}> */
     private function availableApplications(): array
     {
-        if (
-            ! $this->loaded
-            || $this->unavailable
-            || data_get(
-                $this->management,
-                'application.is_installed',
-                false,
-            ) !== true
-            || ! $this->applicationCanReceiveEndpoint(
-                ApplicationType::Marzban,
-            )
-        ) {
+        if (! $this->loaded || $this->unavailable) {
             return [];
         }
 
-        return [[
-            'type' => ApplicationType::Marzban->value,
-            'name' => 'Marzban',
-            'description' => 'پنل مدیریت Marzban را روی دامنه یا زیردامنه خود منتشر کنید.',
-            'icon' => 'lucide.box',
-        ]];
-    }
+        $available = [];
 
-    private function applicationCanReceiveEndpoint(
-        ApplicationType $type,
-    ): bool {
-        if ($type !== ApplicationType::Marzban) {
-            return false;
+        foreach ($this->applications as $application) {
+            $type = ApplicationType::tryFrom($application['type']);
+
+            if ($type !== null && $this->applicationCanReceiveEndpoint($type)) {
+                $available[] = $application;
+            }
         }
 
+        return $available;
+    }
+
+    private function applicationCanReceiveEndpoint(ApplicationType $type): bool
+    {
         if (
-            data_get(
-                $this->management,
-                'application.is_installed',
-                false,
-            ) !== true
+            ! isset($this->applications[$type->value])
+            || data_get($this->statuses, "{$type->value}.application.is_installed", false) !== true
         ) {
             return false;
         }
 
         return ! PublicEndpoint::query()
-            ->where(
-                'server_id',
-                $this->serverId,
-            )
-            ->where(
-                'application_type',
-                $type->value,
-            )
+            ->where('server_id', $this->serverId)
+            ->where('application_type', $type->value)
             ->exists();
     }
 
@@ -445,15 +391,32 @@ final class Index extends Component
         return $this->availableApplications() !== [];
     }
 
-    private function selectedApplicationType(): ?ApplicationType
+    private function hasInstalledApplications(): bool
     {
-        if ($this->selectedApplication === null) {
-            return null;
+        foreach ($this->applications as $application) {
+            if (data_get($this->statuses, "{$application['type']}.application.is_installed", false) === true) {
+                return true;
+            }
         }
 
-        return ApplicationType::tryFrom(
-            $this->selectedApplication,
-        );
+        return false;
+    }
+
+    private function selectedApplicationType(): ?ApplicationType
+    {
+        return $this->selectedApplication === null
+            ? null
+            : ApplicationType::tryFrom($this->selectedApplication);
+    }
+
+    /** @return array<string, string>|null */
+    private function selectedApplicationMeta(): ?array
+    {
+        $type = $this->selectedApplicationType();
+
+        return $type === null
+            ? null
+            : ($this->applications[$type->value] ?? null);
     }
 
     private function selectedEndpoint(): ?PublicEndpoint
@@ -465,102 +428,69 @@ final class Index extends Component
         }
 
         return PublicEndpoint::query()
-            ->where(
-                'server_id',
-                $this->serverId,
-            )
-            ->where(
-                'application_type',
-                $type->value,
-            )
+            ->where('server_id', $this->serverId)
+            ->where('application_type', $type->value)
             ->first();
     }
 
-    /**
-     * @return Collection<int, PublicEndpoint>
-     */
+    /** @return Collection<int, PublicEndpoint> */
     private function endpoints(): Collection
     {
         return PublicEndpoint::query()
-            ->where(
-                'server_id',
-                $this->serverId,
-            )
+            ->where('server_id', $this->serverId)
             ->orderBy('id')
             ->get();
     }
 
-    private function endpoint(
-        int $endpointId,
-    ): PublicEndpoint {
+    private function endpoint(int $endpointId): PublicEndpoint
+    {
         return PublicEndpoint::query()
-            ->where(
-                'server_id',
-                $this->serverId,
-            )
-            ->findOrFail(
-                $endpointId,
-            );
+            ->where('server_id', $this->serverId)
+            ->findOrFail($endpointId);
     }
 
-    private function activeEndpointState(
-        PublicEndpoint $endpoint,
-    ): string {
-        if ($endpoint->application_type !== ApplicationType::Marzban) {
+    private function activeEndpointState(PublicEndpoint $endpoint): string
+    {
+        $status = $this->statuses[$endpoint->application_type->value] ?? null;
+
+        if (! is_array($status)) {
             return 'unknown';
         }
 
-        $runtimeState = data_get(
-            $this->management,
-            'https.state',
-        );
+        $runtimeState = data_get($status, 'endpoint.state');
+        $runtimeDomain = data_get($status, 'endpoint.domain');
 
-        $runtimeDomain = data_get(
-            $this->management,
-            'https.domain',
-        );
-
-        return $runtimeState === MarzbanHttpsState::Enabled->value
+        if (
+            $runtimeState === PublicEndpointRuntimeState::Enabled->value
             && is_string($runtimeDomain)
             && strtolower(trim($runtimeDomain)) === $endpoint->domain
-                ? 'enabled'
-                : 'misconfigured';
+        ) {
+            return 'enabled';
+        }
+
+        return $runtimeState === PublicEndpointRuntimeState::Unknown->value
+            ? 'unknown'
+            : 'misconfigured';
     }
 
-    private function applicationOpenUrl(
-        PublicEndpoint $endpoint,
-    ): string {
-        return match ($endpoint->application_type) {
-            ApplicationType::Marzban => 'https://'.$endpoint->domain.'/dashboard/',
-        };
-    }
-
-    private function applicationName(
-        ApplicationType $type,
-    ): string {
-        return match ($type) {
-            ApplicationType::Marzban => 'Marzban',
-        };
-    }
-
-    private function removeErrorMessage(
-        MarzbanHttpsApplyException $exception,
-    ): string {
+    private function removeErrorMessage(PublicEndpointOperationException $exception): string
+    {
         if ($exception->recoveryAttempted()) {
             if ($exception->recovered()) {
                 return 'حذف دامنه کامل نشد؛ تغییرات با موفقیت بازگردانده شدند و دامنه قبلی همچنان فعال است.';
             }
 
-            return 'حذف دامنه شکست خورد و بازیابی کامل نشد. تا بررسی دستی وضعیت Marzban و Caddy دوباره تلاش نکنید.';
+            return 'حذف دامنه شکست خورد و بازیابی کامل نشد. تا بررسی دستی وضعیت برنامه و Caddy دوباره تلاش نکنید.';
         }
 
         return match ($exception->failure) {
-            MarzbanHttpsApplyFailure::ExistingConfiguration => 'پیکربندی HTTPS روی سرور با دامنه ثبت‌شده xDeploy هم‌خوان نیست. وضعیت دامنه را بروزرسانی و بررسی کنید.',
-            MarzbanHttpsApplyFailure::OperationInProgress => 'یک عملیات HTTPS دیگر روی این سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
-            MarzbanHttpsApplyFailure::EnvironmentUnavailable => 'ابزارها یا فایل‌های لازم برای حذف امن دامنه در دسترس نیستند. ساختار نصب Marzban را بررسی کنید.',
-            MarzbanHttpsApplyFailure::CandidateValidation => 'تنظیمات امن برای حذف دامنه معتبر نبود و دامنه قبلی حفظ شد.',
-            MarzbanHttpsApplyFailure::Mutation,
-            MarzbanHttpsApplyFailure::Verification => 'حذف دامنه کامل نشد. وضعیت Marzban و Caddy را بروزرسانی و دوباره بررسی کنید.',
+            PublicEndpointOperationFailure::ExistingConfiguration => 'پیکربندی دامنه روی سرور با endpoint ثبت‌شده هم‌خوان نیست. برای جلوگیری از حذف تنظیمات ناشناخته عملیات متوقف شد.',
+            PublicEndpointOperationFailure::OperationInProgress => 'یک عملیات دامنه دیگر روی سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
+            PublicEndpointOperationFailure::EnvironmentUnavailable => 'ابزارها یا فایل‌های لازم برای حذف امن دامنه در دسترس نیستند.',
+            PublicEndpointOperationFailure::CandidateValidation,
+            PublicEndpointOperationFailure::Mutation,
+            PublicEndpointOperationFailure::Verification,
+            PublicEndpointOperationFailure::Preflight => 'حذف دامنه کامل نشد. وضعیت برنامه و Caddy را بروزرسانی و دوباره بررسی کنید.',
         };
     }
 
@@ -574,11 +504,7 @@ final class Index extends Component
     private function authenticatedUser(): User
     {
         $user = Auth::user();
-
-        abort_unless(
-            $user instanceof User,
-            401,
-        );
+        abort_unless($user instanceof User, 401);
 
         return $user;
     }

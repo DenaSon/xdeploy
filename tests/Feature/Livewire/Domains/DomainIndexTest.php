@@ -4,16 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Domains;
 
-use App\Application\Server\Actions\ConnectServerAction;
+use App\Application\PublicEndpoint\Contracts\PublicEndpointDriverInterface;
+use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
+use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
+use App\Domain\Application\Shared\DTOs\ApplicationInfo;
+use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
-use App\Domain\Server\Enums\ServerStatus;
+use App\Domain\PublicEndpoint\DTOs\PublicEndpointDnsPreflightResult;
+use App\Domain\PublicEndpoint\DTOs\PublicEndpointPreflightResult;
+use App\Domain\PublicEndpoint\DTOs\PublicEndpointRuntimeInfo;
+use App\Domain\PublicEndpoint\DTOs\PublicEndpointServerPreflightResult;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
+use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Livewire\Domains\Index as DomainsIndex;
 use App\Models\PublicEndpoint;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use LogicException;
 use Tests\TestCase;
 
 final class DomainIndexTest extends TestCase
@@ -26,9 +34,9 @@ final class DomainIndexTest extends TestCase
         $server = $this->createServer($user);
 
         $this->app->bind(
-            ConnectServerAction::class,
-            static fn (): never => throw new LogicException(
-                'Domains initial render must not connect through SSH.',
+            PublicEndpointDriverRegistry::class,
+            static fn (): never => throw new \LogicException(
+                'Initial render must not resolve public endpoint drivers.',
             ),
         );
 
@@ -41,155 +49,151 @@ final class DomainIndexTest extends TestCase
                 ),
             )
             ->assertOk()
-            ->assertSee('دامنه‌ها و HTTPS')
-            ->assertSee('دامنه‌ها');
+            ->assertSee('دامنه‌ها و HTTPS');
     }
 
-    public function test_domains_workspace_adopts_an_existing_active_marzban_domain(): void
+    public function test_domains_workspace_lists_both_installed_endpoint_capable_applications(): void
     {
         $user = $this->createUser('09173432202');
         $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+
+        $this->bindDrivers($marzban, $n8n);
 
         Livewire::actingAs($user)
-            ->test(
-                DomainsIndex::class,
-                ['server' => $server],
-            )
-            ->call(
-                'updateManagement',
-                $this->management(
-                    httpsState: 'enabled',
-                    domain: 'panel.example.com',
-                ),
-            )
-            ->assertSet('loaded', true)
-            ->assertSet('showDrawer', false)
-            ->assertSee('panel.example.com')
-            ->assertSee('HTTPS فعال');
-
-        $this->assertDatabaseHas(
-            'public_endpoints',
-            [
-                'server_id' => $server->getKey(),
-                'application_type' => ApplicationType::Marzban->value,
-                'domain' => 'panel.example.com',
-            ],
-        );
-
-        self::assertNotNull(
-            PublicEndpoint::query()->firstOrFail()->activated_at,
-        );
-    }
-
-    public function test_domains_workspace_selects_an_available_application_before_domain_setup(): void
-    {
-        $user = $this->createUser('09173432203');
-        $server = $this->createServer($user);
-
-        Livewire::actingAs($user)
-            ->test(
-                DomainsIndex::class,
-                ['server' => $server],
-            )
-            ->call(
-                'updateManagement',
-                $this->management(
-                    httpsState: 'disabled',
-                ),
-            )
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
             ->call('openDomainDrawer')
-            ->assertSet('showDrawer', true)
-            ->assertSet(
-                'selectedApplication',
-                ApplicationType::Marzban->value,
-            )
-            ->assertSet('showSetup', false)
-            ->assertSee('برنامه مقصد را انتخاب کنید')
+            ->assertSet('loaded', true)
+            ->assertSet('unavailable', false)
             ->assertSee('Marzban')
+            ->assertSee('n8n')
+            ->call('selectApplication', ApplicationType::N8n->value)
+            ->assertSet('selectedApplication', ApplicationType::N8n->value)
             ->call('continueDomainSetup')
             ->assertSet('showSetup', true)
             ->assertSee('برنامه مقصد');
     }
 
-    public function test_pending_endpoint_survives_page_state_and_can_be_cancelled(): void
+    public function test_domains_workspace_adopts_existing_active_n8n_endpoint(): void
     {
-        $user = $this->createUser('09173432204');
+        $user = $this->createUser('09173432203');
         $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+        $n8n->runtimeState = PublicEndpointRuntimeState::Enabled;
+        $n8n->runtimeDomain = 'automation.example.com';
 
-        $endpoint = PublicEndpoint::query()->create([
-            'server_id' => $server->getKey(),
-            'application_type' => ApplicationType::Marzban,
-            'domain' => 'pending.example.com',
-        ]);
+        $this->bindDrivers($marzban, $n8n);
 
         Livewire::actingAs($user)
-            ->test(
-                DomainsIndex::class,
-                ['server' => $server],
-            )
-            ->call(
-                'updateManagement',
-                $this->management(
-                    httpsState: 'disabled',
-                ),
-            )
-            ->assertSee('pending.example.com')
-            ->assertSee('در انتظار راه‌اندازی')
-            ->call(
-                'manageEndpoint',
-                (int) $endpoint->getKey(),
-            )
-            ->assertSet('showDrawer', true)
-            ->assertSet('showSetup', true)
-            ->call(
-                'cancelPendingEndpoint',
-                (int) $endpoint->getKey(),
-            )
-            ->assertSet('showDrawer', false);
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->assertSee('automation.example.com')
+            ->assertSee('HTTPS فعال');
 
-        $this->assertDatabaseMissing(
-            'public_endpoints',
-            [
-                'id' => $endpoint->getKey(),
-            ],
+        $this->assertDatabaseHas('public_endpoints', [
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n->value,
+            'domain' => 'automation.example.com',
+        ]);
+
+        $this->assertNotNull(
+            PublicEndpoint::query()
+                ->where('application_type', ApplicationType::N8n->value)
+                ->firstOrFail()
+                ->activated_at,
         );
     }
 
-    public function test_active_endpoint_cannot_be_cancelled_from_pending_flow(): void
+    public function test_existing_marzban_endpoint_keeps_n8n_available_for_new_domain(): void
     {
-        $user = $this->createUser('09173432205');
+        $user = $this->createUser('09173432204');
         $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
 
-        $endpoint = PublicEndpoint::query()->create([
+        PublicEndpoint::query()->create([
             'server_id' => $server->getKey(),
             'application_type' => ApplicationType::Marzban,
-            'domain' => 'active.example.com',
+            'domain' => 'panel.example.com',
             'activated_at' => now(),
         ]);
 
-        Livewire::actingAs($user)
-            ->test(
-                DomainsIndex::class,
-                ['server' => $server],
-            )
-            ->call(
-                'cancelPendingEndpoint',
-                (int) $endpoint->getKey(),
-            );
+        $marzban->runtimeState = PublicEndpointRuntimeState::Enabled;
+        $marzban->runtimeDomain = 'panel.example.com';
 
-        $this->assertDatabaseHas(
-            'public_endpoints',
-            [
-                'id' => $endpoint->getKey(),
-                'domain' => 'active.example.com',
-            ],
-        );
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->call('openDomainDrawer')
+            ->assertSet('selectedApplication', ApplicationType::N8n->value)
+            ->assertSee('n8n');
+    }
+
+    public function test_active_n8n_endpoint_is_removed_through_its_driver(): void
+    {
+        $user = $this->createUser('09173432205');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+            'activated_at' => now(),
+        ]);
+
+        $n8n->runtimeState = PublicEndpointRuntimeState::Enabled;
+        $n8n->runtimeDomain = 'automation.example.com';
+
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->call('removeEndpoint', (int) $endpoint->getKey())
+            ->assertSet('showDrawer', false)
+            ->assertSet('endpointError', null);
+
+        $this->assertSame(1, $n8n->disableCalls);
+        $this->assertDatabaseMissing('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
+    }
+
+    public function test_pending_endpoint_can_be_cancelled_without_remote_mutation(): void
+    {
+        $user = $this->createUser('09173432206');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'pending.example.com',
+        ]);
+
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->call('manageEndpoint', (int) $endpoint->getKey())
+            ->assertSet('showSetup', true)
+            ->call('cancelPendingEndpoint', (int) $endpoint->getKey())
+            ->assertSet('showDrawer', false);
+
+        $this->assertDatabaseMissing('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
+        $this->assertSame(0, $n8n->disableCalls);
     }
 
     public function test_domains_workspace_rejects_a_foreign_server(): void
     {
-        $user = $this->createUser('09173432206');
-        $otherUser = $this->createUser('09173432207');
+        $user = $this->createUser('09173432207');
+        $otherUser = $this->createUser('09173432208');
         $foreignServer = $this->createServer($otherUser);
 
         $this
@@ -205,7 +209,7 @@ final class DomainIndexTest extends TestCase
 
     public function test_domains_workspace_requires_authentication(): void
     {
-        $user = $this->createUser('09173432208');
+        $user = $this->createUser('09173432209');
         $server = $this->createServer($user);
 
         $this
@@ -215,29 +219,25 @@ final class DomainIndexTest extends TestCase
                     ['server' => $server],
                 ),
             )
-            ->assertRedirect(
-                route('login'),
-            );
+            ->assertRedirect(route('login'));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function management(
-        string $httpsState,
-        ?string $domain = null,
-    ): array {
+    /** @return array{0: DomainIndexFakeDriver, 1: DomainIndexFakeDriver} */
+    private function drivers(): array
+    {
         return [
-            'application' => [
-                'state' => 'running',
-                'is_installed' => true,
-                'is_running' => true,
-            ],
-            'https' => [
-                'state' => $httpsState,
-                'domain' => $domain,
-            ],
+            new DomainIndexFakeDriver(ApplicationType::Marzban, 'Marzban'),
+            new DomainIndexFakeDriver(ApplicationType::N8n, 'n8n'),
         ];
+    }
+
+    private function bindDrivers(
+        DomainIndexFakeDriver ...$drivers,
+    ): void {
+        $this->app->instance(
+            PublicEndpointDriverRegistry::class,
+            new PublicEndpointDriverRegistry($drivers),
+        );
     }
 
     private function createUser(string $phone): User
@@ -249,19 +249,127 @@ final class DomainIndexTest extends TestCase
 
     private function createServer(User $user): Server
     {
-        $server = new Server([
+        return $user->servers()->create([
             'name' => 'domains-test-server-'.$user->getKey(),
             'host' => '192.0.2.'.(30 + (int) $user->getKey()),
             'port' => 22,
             'username' => 'root',
         ]);
+    }
+}
 
-        $server->status = ServerStatus::Active;
+final class DomainIndexFakeDriver implements PublicEndpointDriverInterface
+{
+    public PublicEndpointRuntimeState $runtimeState = PublicEndpointRuntimeState::Disabled;
 
-        $user
-            ->servers()
-            ->save($server);
+    public ?string $runtimeDomain = null;
 
-        return $server->refresh();
+    public int $disableCalls = 0;
+
+    public function __construct(
+        private readonly ApplicationType $applicationType,
+        private readonly string $applicationName,
+    ) {}
+
+    public function type(): ApplicationType
+    {
+        return $this->applicationType;
+    }
+
+    public function name(): string
+    {
+        return $this->applicationName;
+    }
+
+    public function description(): string
+    {
+        return "Public endpoint for {$this->applicationName}.";
+    }
+
+    public function icon(): string
+    {
+        return $this->applicationType === ApplicationType::N8n
+            ? 'lucide.workflow'
+            : 'lucide.box';
+    }
+
+    public function openUrl(PublicEndpointDomain $domain): string
+    {
+        return "https://{$domain->value}/";
+    }
+
+    public function status(
+        User $user,
+        Server $server,
+    ): PublicEndpointApplicationStatus {
+        return $this->statusResult(
+            state: $this->runtimeState,
+            domain: $this->runtimeDomain,
+        );
+    }
+
+    public function preflight(
+        User $user,
+        Server $server,
+        PublicEndpointDomain $domain,
+    ): PublicEndpointPreflightResult {
+        return new PublicEndpointPreflightResult(
+            dns: new PublicEndpointDnsPreflightResult(
+                domain: $domain->value,
+                serverIpv4Address: '203.0.113.20',
+                resolvedIpv4Addresses: ['203.0.113.20'],
+                resolvedIpv6Addresses: [],
+            ),
+            server: new PublicEndpointServerPreflightResult(
+                layoutState: 'supported',
+                layoutSupported: true,
+                managedCaddyDetected: true,
+                hasPortConflict: false,
+                ready: true,
+            ),
+        );
+    }
+
+    public function enable(
+        User $user,
+        Server $server,
+        PublicEndpointDomain $domain,
+    ): PublicEndpointApplicationStatus {
+        $this->runtimeState = PublicEndpointRuntimeState::Enabled;
+        $this->runtimeDomain = $domain->value;
+
+        return $this->statusResult(
+            state: $this->runtimeState,
+            domain: $this->runtimeDomain,
+        );
+    }
+
+    public function disable(
+        User $user,
+        Server $server,
+        PublicEndpointDomain $domain,
+    ): PublicEndpointApplicationStatus {
+        $this->disableCalls++;
+        $this->runtimeState = PublicEndpointRuntimeState::Disabled;
+        $this->runtimeDomain = null;
+
+        return $this->statusResult(
+            PublicEndpointRuntimeState::Disabled,
+        );
+    }
+
+    private function statusResult(
+        PublicEndpointRuntimeState $state,
+        ?string $domain = null,
+    ): PublicEndpointApplicationStatus {
+        return new PublicEndpointApplicationStatus(
+            application: new ApplicationInfo(
+                ApplicationState::Running,
+            ),
+            endpoint: new PublicEndpointRuntimeInfo(
+                state: $state,
+                domain: $domain,
+            ),
+        );
     }
 }
