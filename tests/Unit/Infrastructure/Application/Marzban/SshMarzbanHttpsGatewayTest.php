@@ -17,10 +17,8 @@ use App\Domain\Platform\Caddy\Sites\Contracts\CaddySiteReaderInterface;
 use App\Domain\Platform\Caddy\Sites\DTOs\CaddySiteMutationResult;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
-use App\Infrastructure\Application\Marzban\Configuration\MarzbanCaddyfileFactory;
-use App\Infrastructure\Application\Marzban\Configuration\MarzbanComposeOverrideFactory;
+use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsPreflight;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsRuntimeManager;
-use App\Infrastructure\Application\Marzban\SshManagedMarzbanHttpsGateway;
 use App\Infrastructure\Application\Marzban\SshMarzbanHttpsGateway;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
@@ -28,13 +26,13 @@ use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
 use PHPUnit\Framework\TestCase;
 
-final class SshManagedMarzbanHttpsGatewayTest extends TestCase
+final class SshMarzbanHttpsGatewayTest extends TestCase
 {
-    public function test_it_configures_caddy_as_a_consumer_and_moves_marzban_to_loopback_runtime(): void
+    public function test_it_configures_host_caddy_and_moves_marzban_to_loopback_runtime(): void
     {
-        $ssh = new ManagedGatewayFakeSshConnection;
-        $reader = new ManagedGatewayFakeCaddySiteReader;
-        $sites = new ManagedGatewayFakeCaddySiteManager;
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection;
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
 
         $result = $this->gateway(
             ssh: $ssh,
@@ -79,12 +77,16 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
             'XRAY_SUBSCRIPTION_URL_PREFIX=https://$domain',
             $commands,
         );
-        self::assertStringContainsString(
-            '-f "$compose_file"',
+        self::assertStringNotContainsString(
+            'docker-compose.xdeploy.yml',
             $commands,
         );
         self::assertStringNotContainsString(
-            '-f "$legacy_overlay"',
+            '/opt/marzban/Caddyfile',
+            $commands,
+        );
+        self::assertStringNotContainsString(
+            'caddy:2-alpine',
             $commands,
         );
         self::assertStringNotContainsString(
@@ -93,12 +95,12 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
         );
     }
 
-    public function test_it_reports_the_new_host_caddy_runtime_as_enabled(): void
+    public function test_it_reports_the_host_caddy_runtime_as_enabled(): void
     {
-        $ssh = new ManagedGatewayFakeSshConnection;
-        $reader = new ManagedGatewayFakeCaddySiteReader;
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection;
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
         $reader->siteExists = true;
-        $sites = new ManagedGatewayFakeCaddySiteManager;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
 
         $info = $this->gateway(
             ssh: $ssh,
@@ -115,11 +117,29 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
         );
     }
 
+    public function test_it_reports_a_fresh_marzban_runtime_as_disabled_without_a_caddy_site(): void
+    {
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection(
+            freshRuntime: true,
+        );
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
+
+        $info = $this->gateway(
+            ssh: $ssh,
+            reader: $reader,
+            sites: $sites,
+        )->inspect();
+
+        self::assertSame(MarzbanHttpsState::Disabled, $info->state);
+        self::assertNull($info->domain);
+    }
+
     public function test_it_treats_ports_owned_by_managed_host_caddy_as_available_for_xdeploy(): void
     {
-        $ssh = new ManagedGatewayFakeSshConnection;
-        $reader = new ManagedGatewayFakeCaddySiteReader;
-        $sites = new ManagedGatewayFakeCaddySiteManager;
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection;
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
 
         $preflight = $this->gateway(
             ssh: $ssh,
@@ -145,11 +165,11 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
 
     public function test_it_removes_the_caddy_site_when_marzban_runtime_preparation_fails(): void
     {
-        $ssh = new ManagedGatewayFakeSshConnection(
+        $ssh = new MarzbanHttpsGatewayFakeSshConnection(
             failPrepare: true,
         );
-        $reader = new ManagedGatewayFakeCaddySiteReader;
-        $sites = new ManagedGatewayFakeCaddySiteManager;
+        $reader = new MarzbanHttpsGatewayFakeCaddySiteReader;
+        $sites = new MarzbanHttpsGatewayFakeCaddySiteManager;
 
         try {
             $this->gateway(
@@ -177,7 +197,7 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
         SSHConnectionInterface $ssh,
         CaddySiteReaderInterface $reader,
         CaddySiteManagerInterface $sites,
-    ): SshManagedMarzbanHttpsGateway {
+    ): SshMarzbanHttpsGateway {
         $privileged = new PrivilegedCommandExecutor(
             ssh: $ssh,
             preflight: new PrivilegedExecutionPreflight(
@@ -185,13 +205,11 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
             ),
         );
 
-        return new SshManagedMarzbanHttpsGateway(
+        return new SshMarzbanHttpsGateway(
             ssh: $ssh,
-            legacyGateway: new SshMarzbanHttpsGateway(
+            preflight: new SshMarzbanHttpsPreflight(
                 ssh: $ssh,
                 privileged: $privileged,
-                composeOverrideFactory: new MarzbanComposeOverrideFactory,
-                caddyfileFactory: new MarzbanCaddyfileFactory,
             ),
             runtime: new SshMarzbanHttpsRuntimeManager(
                 ssh: $ssh,
@@ -203,7 +221,7 @@ final class SshManagedMarzbanHttpsGatewayTest extends TestCase
     }
 }
 
-final class ManagedGatewayFakeCaddySiteReader implements CaddySiteReaderInterface
+final class MarzbanHttpsGatewayFakeCaddySiteReader implements CaddySiteReaderInterface
 {
     public bool $environmentReady = true;
 
@@ -231,7 +249,7 @@ final class ManagedGatewayFakeCaddySiteReader implements CaddySiteReaderInterfac
     }
 }
 
-final class ManagedGatewayFakeCaddySiteManager implements CaddySiteManagerInterface
+final class MarzbanHttpsGatewayFakeCaddySiteManager implements CaddySiteManagerInterface
 {
     public ?CaddySite $upserted = null;
 
@@ -260,7 +278,7 @@ final class ManagedGatewayFakeCaddySiteManager implements CaddySiteManagerInterf
     }
 }
 
-final class ManagedGatewayFakeSshConnection implements SSHConnectionInterface
+final class MarzbanHttpsGatewayFakeSshConnection implements SSHConnectionInterface
 {
     /**
      * @var list<string>
@@ -269,6 +287,7 @@ final class ManagedGatewayFakeSshConnection implements SSHConnectionInterface
 
     public function __construct(
         private readonly bool $failPrepare = false,
+        private readonly bool $freshRuntime = false,
     ) {}
 
     public function connect(Server $server): bool
@@ -302,7 +321,16 @@ final class ManagedGatewayFakeSshConnection implements SSHConnectionInterface
 
         if (str_contains($command, "printf 'host=%s")) {
             return new SSHResult(
-                output: <<<'OUTPUT'
+                output: $this->freshRuntime
+                    ? <<<'OUTPUT'
+host=0.0.0.0
+port=8000
+uds=
+cert=
+key=
+subscription_url=
+OUTPUT
+                    : <<<'OUTPUT'
 host=127.0.0.1
 port=8000
 uds=
@@ -319,7 +347,6 @@ OUTPUT,
                 output: <<<'OUTPUT'
 xdeploy_server_preflight=1
 layout_state=supported
-managed_caddy=0
 port_80_state=conflict
 port_80_owner=caddy
 port_443_state=conflict
@@ -362,6 +389,13 @@ OUTPUT,
         }
 
         if (str_contains($command, '.xdeploy-https-runtime-transaction')) {
+            return new SSHResult(
+                output: '',
+                exitCode: 0,
+            );
+        }
+
+        if (str_contains($command, 'https://panel.example.com/dashboard/')) {
             return new SSHResult(
                 output: '',
                 exitCode: 0,

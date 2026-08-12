@@ -273,19 +273,9 @@ BASH,
             <<<'BASH'
 set -euo pipefail
 
-compose_files=(
-    -f /opt/marzban/docker-compose.yml
-)
-
-if [ -f /opt/marzban/docker-compose.xdeploy.yml ]; then
-    compose_files+=(
-        -f /opt/marzban/docker-compose.xdeploy.yml
-    )
-fi
-
 docker compose \
     --env-file /opt/marzban/.env \
-    "${compose_files[@]}" \
+    -f /opt/marzban/docker-compose.yml \
     -p marzban \
     %s
 BASH,

@@ -95,8 +95,6 @@ domain=__XDEPLOY_DOMAIN__
 marzban_path='/opt/marzban'
 compose_file="$marzban_path/docker-compose.yml"
 env_file="$marzban_path/.env"
-legacy_overlay="$marzban_path/docker-compose.xdeploy.yml"
-legacy_caddyfile="$marzban_path/Caddyfile"
 backup_root="$marzban_path/.xdeploy-backups/https-runtime"
 transaction_file="$marzban_path/.xdeploy-https-runtime-transaction"
 lock_file='/var/lock/xdeploy-marzban-https-runtime.lock'
@@ -230,11 +228,7 @@ if ! docker compose version >/dev/null 2>&1 ||
     [ ! -r "$compose_file" ] ||
     [ ! -r "$env_file" ] ||
     [ -L "$compose_file" ] ||
-    [ -L "$env_file" ] ||
-    [ -e "$legacy_overlay" ] ||
-    [ -L "$legacy_overlay" ] ||
-    [ -e "$legacy_caddyfile" ] ||
-    [ -L "$legacy_caddyfile" ]; then
+    [ -L "$env_file" ]; then
     emit_failure 'environment' 0 0
     exit 70
 fi
