@@ -55,30 +55,35 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
 
             $runtime = $this->runtime->inspect();
             $domain = $this->domainFromUrl($runtime->subscriptionUrl);
+            $hasCertificate = $runtime->sslCertificateFile !== null;
+            $hasKey = $runtime->sslKeyFile !== null;
 
-            if ($domain === null) {
+            if ($hasCertificate || $hasKey) {
                 return new MarzbanHttpsInfo(
                     state: MarzbanHttpsState::Misconfigured,
-                );
-            }
-
-            $site = $this->site(
-                MarzbanDomain::from($domain),
-            );
-
-            if (
-                $runtime->usesManagedReverseProxyRuntime()
-                && $this->caddySites->matches($site)
-                && $this->httpsReachable($domain)
-            ) {
-                return new MarzbanHttpsInfo(
-                    state: MarzbanHttpsState::Enabled,
                     domain: $domain,
                 );
             }
 
+            if ($domain !== null) {
+                $site = $this->site(
+                    MarzbanDomain::from($domain),
+                );
+
+                if (
+                    $runtime->usesManagedReverseProxyRuntime()
+                    && $this->caddySites->matches($site)
+                    && $this->httpsReachable($domain)
+                ) {
+                    return new MarzbanHttpsInfo(
+                        state: MarzbanHttpsState::Enabled,
+                        domain: $domain,
+                    );
+                }
+            }
+
             return new MarzbanHttpsInfo(
-                state: MarzbanHttpsState::Misconfigured,
+                state: MarzbanHttpsState::ManagedIncomplete,
                 domain: $domain,
             );
         } catch (MarzbanHttpsInspectionException $exception) {
@@ -126,12 +131,15 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
         }
 
         $key = $this->siteKey();
+        $site = $this->site($domain);
+        $siteExisted = $this->caddySites->exists($key);
 
-        if ($this->caddySites->exists($key)) {
+        if (
+            $siteExisted
+            && ! $this->caddySites->matches($site)
+        ) {
             throw MarzbanHttpsApplyException::existingConfiguration();
         }
-
-        $site = $this->site($domain);
 
         try {
             $siteMutation = $this->caddySiteManager->upsert($site);
@@ -142,7 +150,11 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
         try {
             $runtimeMutation = $this->runtime->prepare($domain);
         } catch (MarzbanHttpsApplyException $exception) {
-            if (! $this->removeSiteAfterFailure($key, $siteMutation->changed)) {
+            if (! $this->recoverSiteAfterFailure(
+                key: $key,
+                existedBefore: $siteExisted,
+                changed: $siteMutation->changed,
+            )) {
                 throw MarzbanHttpsApplyException::mutationFailed(
                     new MarzbanHttpsRecoveryResult(
                         configurationRestored: false,
@@ -155,9 +167,10 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
         }
 
         if (! $this->runtime->verifyHttps($domain)) {
-            $siteRecovered = $this->removeSiteAfterFailure(
-                $key,
-                $siteMutation->changed,
+            $siteRecovered = $this->recoverSiteAfterFailure(
+                key: $key,
+                existedBefore: $siteExisted,
+                changed: $siteMutation->changed,
             );
 
             $runtimeRecovery = $this->runtime->restore(
@@ -280,12 +293,17 @@ final readonly class SshMarzbanHttpsGateway implements MarzbanHttpsGateway
         };
     }
 
-    private function removeSiteAfterFailure(
+    private function recoverSiteAfterFailure(
         CaddySiteKey $key,
+        bool $existedBefore,
         bool $changed,
     ): bool {
         if (! $changed) {
             return true;
+        }
+
+        if ($existedBefore) {
+            return false;
         }
 
         try {
