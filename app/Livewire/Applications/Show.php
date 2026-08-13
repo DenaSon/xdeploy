@@ -61,6 +61,8 @@ final class Show extends Component
 
     public bool $operationActive = false;
 
+    public bool $runtimeLoaded = false;
+
     public int $managementPanelRevision = 0;
 
     /**
@@ -89,14 +91,12 @@ final class Show extends Component
     public ?string $errorMessage = null;
 
     public function mount(
-        int|string $server,
+        Server $server,
         string $application,
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
         ApplicationManagementPanelResolver $managementPanelResolver,
         GetApplicationCatalogItemAction $getApplicationCatalogItem,
     ): void {
-        $server = $this->resolveOwnedServerById($server);
+        $server = $this->resolveOwnedServer($server);
 
         $type = ApplicationType::tryFrom($application);
 
@@ -132,78 +132,42 @@ final class Show extends Component
 
         $this->managementPanel = $managementPanelResolver->resolve($type);
 
+        /*
+         * Keep the first page response local and fast. Existing background
+         * mutations are recovered from persistence immediately, while the
+         * SSH-backed runtime inspection is triggered after first paint by
+         * wire:init.
+         */
         $this->syncActiveOperation();
 
         if ($this->operationActive) {
-            /*
-             * A page reload during provisioning must not start a competing
-             * SSH inspection. Polling reads only local operation state until
-             * the background mutation reaches a terminal state.
-             */
             $this->processing = true;
+        }
+    }
 
+    public function loadRuntime(
+        ApplicationManager $applicationManager,
+        SSHConnectionCircuitBreaker $circuitBreaker,
+    ): void {
+        if (
+            $this->runtimeLoaded
+            || $this->operationActive
+        ) {
             return;
         }
 
-        $this->loadApplication(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            server: $server,
-        );
-    }
+        $this->processing = true;
 
-    /**
-     * Render only local application metadata while the full page is deferred.
-     * The expensive SSH-backed mount runs in Livewire's follow-up request.
-     *
-     * @param  array<string, mixed>  $params
-     */
-    public function placeholder(array $params = []): View
-    {
-        $serverId = $params['server'] ?? null;
-
-        abort_unless(
-            is_int($serverId) || is_string($serverId),
-            404,
-        );
-
-        $server = $this->resolveOwnedServerById($serverId);
-
-        $type = ApplicationType::tryFrom(
-            (string) ($params['application'] ?? ''),
-        );
-
-        abort_if(
-            $type === null,
-            404,
-            'Application not found.',
-        );
-
-        $catalogItem = app(
-            GetApplicationCatalogItemAction::class,
-        )->execute($type);
-
-        $icon = $catalogItem['icon'] ?? null;
-
-        $icon = is_string($icon)
-        && trim($icon) !== ''
-            ? trim($icon)
-            : null;
-
-        return view(
-            'livewire.applications.show-placeholder',
-            [
-                'server' => $server,
-                'serverId' => (int) $server->getKey(),
-                'application' => $type->value,
-                'name' => (string) $catalogItem['name'],
-                'shortDescription' => (string) (
-                    $catalogItem['short_description']
-                    ?? ''
-                ),
-                'icon' => $icon,
-            ],
-        );
+        try {
+            $this->loadApplication(
+                applicationManager: $applicationManager,
+                circuitBreaker: $circuitBreaker,
+                server: $this->server(),
+            );
+        } finally {
+            $this->runtimeLoaded = true;
+            $this->processing = false;
+        }
     }
 
     public function refreshApplication(
@@ -222,6 +186,8 @@ final class Show extends Component
             server: $this->server(),
             notifyOnSshFailure: true,
         );
+
+        $this->runtimeLoaded = true;
     }
 
     public function retryConnection(
@@ -248,6 +214,8 @@ final class Show extends Component
             notifyOnSshFailure: false,
             clearSshStateOnSuccess: false,
         );
+
+        $this->runtimeLoaded = true;
 
         if ($loaded) {
             $this->clearSshUnavailable(
@@ -348,6 +316,8 @@ final class Show extends Component
             server: $this->server(),
             notifyOnSshFailure: true,
         );
+
+        $this->runtimeLoaded = true;
 
         if ($operationStatus === ApplicationOperationStatus::Succeeded) {
             if ($loaded) {
@@ -567,6 +537,8 @@ final class Show extends Component
                 notifyOnSshFailure: true,
             );
 
+            $this->runtimeLoaded = true;
+
             if (! $loaded) {
                 if (
                     ! $this->sshUnavailable
@@ -590,6 +562,7 @@ final class Show extends Component
                 )
             ) {
                 $this->prepareUnavailableApplicationState();
+                $this->runtimeLoaded = true;
 
                 return;
             }
@@ -731,12 +704,12 @@ final class Show extends Component
         return ApplicationType::from($this->application);
     }
 
-    private function resolveOwnedServerById(
-        int|string $serverId,
+    private function resolveOwnedServer(
+        Server $server,
     ): Server {
         return $this->authenticatedUser()
             ->servers()
-            ->whereKey($serverId)
+            ->whereKey($server->getKey())
             ->firstOrFail();
     }
 
