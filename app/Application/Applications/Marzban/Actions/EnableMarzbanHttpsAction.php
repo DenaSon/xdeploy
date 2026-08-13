@@ -9,6 +9,7 @@ use App\Domain\Application\Marzban\Exceptions\MarzbanHttpsPreflightException;
 use App\Domain\Application\Marzban\Https\DTOs\MarzbanHttpsApplyResult;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
+use App\Domain\Application\Marzban\Https\MarzbanHttpsInterruptedOperationRecovery;
 use App\Domain\Application\Marzban\Https\ValueObjects\MarzbanDomain;
 use App\Domain\Platform\Enums\PlatformType;
 use App\Domain\Platform\Services\PlatformInstallationService;
@@ -20,12 +21,15 @@ final readonly class EnableMarzbanHttpsAction
         private PreflightMarzbanHttpsAction $preflightAction,
         private PlatformInstallationService $platforms,
         private MarzbanHttpsGateway $gateway,
+        private MarzbanHttpsInterruptedOperationRecovery $interruptedRecovery,
     ) {}
 
     public function execute(
         string $domain,
         ?string $knownServerAddress = null,
     ): MarzbanHttpsApplyResult {
+        $this->interruptedRecovery->recover();
+
         $state = $this->inspectAction->execute()->state;
 
         if (! in_array(

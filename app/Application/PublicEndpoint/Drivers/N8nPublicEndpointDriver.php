@@ -8,6 +8,7 @@ use App\Application\Applications\Manager\ApplicationManager;
 use App\Application\PublicEndpoint\Contracts\PublicEndpointDriverInterface;
 use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
 use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointGateway;
+use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointInterruptedOperationRecovery;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Platform\Enums\PlatformType;
 use App\Domain\Platform\Services\PlatformInstallationService;
@@ -25,6 +26,7 @@ final readonly class N8nPublicEndpointDriver implements PublicEndpointDriverInte
         private ApplicationManager $applications,
         private N8nPublicEndpointGateway $gateway,
         private PlatformInstallationService $platforms,
+        private N8nPublicEndpointInterruptedOperationRecovery $interruptedRecovery,
     ) {}
 
     public function type(): ApplicationType
@@ -101,6 +103,9 @@ final readonly class N8nPublicEndpointDriver implements PublicEndpointDriverInte
         Server $server,
         PublicEndpointDomain $domain,
     ): PublicEndpointApplicationStatus {
+        $this->status($user, $server);
+        $this->interruptedRecovery->recover();
+
         $current = $this->status($user, $server);
 
         if (! in_array(
@@ -146,6 +151,9 @@ final readonly class N8nPublicEndpointDriver implements PublicEndpointDriverInte
         Server $server,
         PublicEndpointDomain $domain,
     ): PublicEndpointApplicationStatus {
+        $this->status($user, $server);
+        $this->interruptedRecovery->recover();
+
         $current = $this->status($user, $server);
 
         if ($current->endpoint->state === PublicEndpointRuntimeState::Disabled) {
