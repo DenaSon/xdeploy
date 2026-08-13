@@ -415,23 +415,15 @@ final class Setup extends Component
     private function operationFailureMessage(?string $failureCode): string
     {
         return match ($failureCode) {
-            PublicEndpointOperationFailure::Preflight->value =>
-                'آمادگی دامنه یا سرور تغییر کرده است. بررسی آمادگی را دوباره اجرا کنید.',
-            PublicEndpointOperationFailure::ExistingConfiguration->value =>
-                'وضعیت دامنه روی سرور تغییر کرده است. صفحه دامنه‌ها را بروزرسانی کنید.',
-            PublicEndpointOperationFailure::OperationInProgress->value =>
-                'یک عملیات دامنه دیگر روی این سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
-            PublicEndpointOperationFailure::EnvironmentUnavailable->value =>
-                'ابزارها یا فایل‌های لازم برای اعمال امن HTTPS در دسترس نیستند.',
-            PublicEndpointOperationFailure::CandidateValidation->value =>
-                'تنظیمات پیشنهادی معتبر نبود و هیچ تغییری روی فایل‌های اصلی اعمال نشد.',
+            PublicEndpointOperationFailure::Preflight->value => 'آمادگی دامنه یا سرور تغییر کرده است. بررسی آمادگی را دوباره اجرا کنید.',
+            PublicEndpointOperationFailure::ExistingConfiguration->value => 'وضعیت دامنه روی سرور تغییر کرده است. صفحه دامنه‌ها را بروزرسانی کنید.',
+            PublicEndpointOperationFailure::OperationInProgress->value => 'یک عملیات دامنه دیگر روی این سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
+            PublicEndpointOperationFailure::EnvironmentUnavailable->value => 'ابزارها یا فایل‌های لازم برای اعمال امن HTTPS در دسترس نیستند.',
+            PublicEndpointOperationFailure::CandidateValidation->value => 'تنظیمات پیشنهادی معتبر نبود و هیچ تغییری روی فایل‌های اصلی اعمال نشد.',
             PublicEndpointOperationFailure::Mutation->value,
-            PublicEndpointOperationFailure::Verification->value =>
-                'فعال‌سازی HTTPS کامل نشد. تغییرات ایمن‌سازی یا بازیابی شدند؛ وضعیت برنامه را بررسی کنید.',
-            'dispatch_failed' =>
-                'عملیات فعال‌سازی در صف اجرا قرار نگرفت. دوباره تلاش کنید.',
-            default =>
-                'فعال‌سازی HTTPS در پس‌زمینه با خطا متوقف شد. وضعیت برنامه را بروزرسانی کنید.',
+            PublicEndpointOperationFailure::Verification->value => 'فعال‌سازی HTTPS کامل نشد. تغییرات ایمن‌سازی یا بازیابی شدند؛ وضعیت برنامه را بررسی کنید.',
+            'dispatch_failed' => 'عملیات فعال‌سازی در صف اجرا قرار نگرفت. دوباره تلاش کنید.',
+            default => 'فعال‌سازی HTTPS در پس‌زمینه با خطا متوقف شد. وضعیت برنامه را بروزرسانی کنید.',
         };
     }
 
