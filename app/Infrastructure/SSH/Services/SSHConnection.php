@@ -93,9 +93,7 @@ final class SSHConnection implements SSHConnectionInterface
                 return false;
             }
 
-            $this->ssh->setTimeout(
-                SSHTimeout::DEFAULT,
-            );
+            $this->configureAuthenticatedTransport($this->ssh);
 
             $this->recordConnectionSuccess($server);
 
@@ -298,6 +296,17 @@ final class SSHConnection implements SSHConnectionInterface
              * the original exception.
              */
         }
+    }
+
+    private function configureAuthenticatedTransport(SSH2 $ssh): void
+    {
+        $ssh->setKeepAlive(
+            SSHTimeout::KEEPALIVE,
+        );
+
+        $ssh->setTimeout(
+            SSHTimeout::DEFAULT,
+        );
     }
 
     private function ensureConnection(): void

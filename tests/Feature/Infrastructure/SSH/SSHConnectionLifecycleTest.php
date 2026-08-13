@@ -10,6 +10,9 @@ use App\Domain\Server\Contracts\SystemPackageManager;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Services\SSHConnection;
 use App\Models\Server;
+use App\Support\SSH\SSHTimeout;
+use phpseclib3\Net\SSH2;
+use ReflectionMethod;
 use ReflectionProperty;
 use Tests\TestCase;
 
@@ -28,6 +31,40 @@ final class SSHConnectionLifecycleTest extends TestCase
         self::assertSame(
             $first,
             $second,
+        );
+    }
+
+    public function test_authenticated_transport_enables_keepalive(): void
+    {
+        $connection = app(
+            SSHConnectionInterface::class,
+        );
+
+        self::assertInstanceOf(
+            SSHConnection::class,
+            $connection,
+        );
+
+        $ssh = $this->createMock(
+            SSH2::class,
+        );
+
+        $ssh->expects(self::once())
+            ->method('setKeepAlive')
+            ->with(SSHTimeout::KEEPALIVE);
+
+        $ssh->expects(self::once())
+            ->method('setTimeout')
+            ->with(SSHTimeout::DEFAULT);
+
+        $method = new ReflectionMethod(
+            SSHConnection::class,
+            'configureAuthenticatedTransport',
+        );
+
+        $method->invoke(
+            $connection,
+            $ssh,
         );
     }
 

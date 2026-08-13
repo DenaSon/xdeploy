@@ -17,6 +17,11 @@ final class SSHTimeout
     public const int AUTHENTICATION = 40;
 
     /**
+     * Transport keepalive interval for authenticated SSH sessions.
+     */
+    public const int KEEPALIVE = 15;
+
+    /**
      * Fast inspection commands.
      */
     public const int QUICK = 20;
