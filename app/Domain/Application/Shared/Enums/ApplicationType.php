@@ -8,4 +8,5 @@ enum ApplicationType: string
 {
     case Marzban = 'marzban';
     case N8n = 'n8n';
+    case AmneziaWg = 'amneziawg';
 }

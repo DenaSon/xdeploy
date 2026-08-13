@@ -98,6 +98,21 @@ return [
 
         ],
 
+        'amneziawg' => [
+
+            'docker' => [
+
+                'path' => 'amneziawg/docker.sh',
+
+                'sha256' => env(
+                    'XDEPLOY_AMNEZIAWG_DOCKER_SHA256',
+                    '35fdd8483ac0f464142483c9d0fe92c4dfb2afb7b2c8865168f521743d26a299',
+                ),
+
+            ],
+
+        ],
+
     ],
 
 ];

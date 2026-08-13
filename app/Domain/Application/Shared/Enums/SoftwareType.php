@@ -19,6 +19,7 @@ enum SoftwareType: string
     case Marzban = 'marzban';
     case Xray = 'xray';
     case N8n = 'n8n';
+    case AmneziaWg = 'amneziawg';
 
     public function label(): string
     {
@@ -33,6 +34,7 @@ enum SoftwareType: string
             self::Marzban => 'Marzban',
             self::Xray => 'Xray',
             self::N8n => 'n8n',
+            self::AmneziaWg => 'AmneziaWG',
         };
     }
 }

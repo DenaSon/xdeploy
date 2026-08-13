@@ -29,6 +29,7 @@ final class ApplicationCatalogSeederTest extends TestCase
             [
                 'marzban',
                 'n8n',
+                'amneziawg',
             ],
             array_column(
                 $catalog,
@@ -39,10 +40,10 @@ final class ApplicationCatalogSeederTest extends TestCase
         $this->assertDatabaseHas(
             'applications',
             [
-                'slug' => 'n8n',
-                'name' => 'n8n',
+                'slug' => 'amneziawg',
+                'name' => 'AmneziaWG',
                 'is_published' => true,
-                'sort_order' => 20,
+                'sort_order' => 30,
             ],
         );
     }

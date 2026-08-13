@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Application\PublicEndpoint\Drivers\MarzbanPublicEndpointDriver;
 use App\Application\PublicEndpoint\Drivers\N8nPublicEndpointDriver;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
+use App\Domain\Application\AmneziaWg\AmneziaWgApplication;
 use App\Domain\Application\Contracts\ApplicationInterface;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Marzban\Admin\MarzbanAdminGateway;
@@ -100,6 +101,7 @@ final class ApplicationServiceProvider extends ServiceProvider
         return [
             $app->make(MarzbanApplication::class),
             $app->make(N8nApplication::class),
+            $app->make(AmneziaWgApplication::class),
         ];
     }
 }

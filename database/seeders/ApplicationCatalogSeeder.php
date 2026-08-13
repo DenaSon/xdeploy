@@ -38,5 +38,19 @@ final class ApplicationCatalogSeeder extends Seeder
                 'sort_order' => 20,
             ],
         );
+
+        ApplicationCatalogItem::query()->updateOrCreate(
+            [
+                'slug' => 'amneziawg',
+            ],
+            [
+                'name' => 'AmneziaWG',
+                'short_description' => 'پروتکل VPN سریع و مقاوم در برابر شناسایی مبتنی بر WireGuard',
+                'description' => 'AmneziaWG یک پروتکل VPN متن‌باز مبتنی بر WireGuard است که با افزودن روش‌های استتار ترافیک، شناسایی اتصال توسط سامانه‌های تحلیل عمیق بسته‌ها را دشوارتر می‌کند و در عین حال سرعت و سادگی WireGuard را حفظ می‌کند.',
+                'icon' => 'lucide.shield',
+                'is_published' => true,
+                'sort_order' => 30,
+            ],
+        );
     }
 }
