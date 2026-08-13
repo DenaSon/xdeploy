@@ -89,14 +89,14 @@ final class Show extends Component
     public ?string $errorMessage = null;
 
     public function mount(
-        Server $server,
+        int|string $server,
         string $application,
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
         ApplicationManagementPanelResolver $managementPanelResolver,
         GetApplicationCatalogItemAction $getApplicationCatalogItem,
     ): void {
-        $server = $this->resolveOwnedServer($server);
+        $server = $this->resolveOwnedServerById($server);
 
         $type = ApplicationType::tryFrom($application);
 
@@ -160,13 +160,14 @@ final class Show extends Component
      */
     public function placeholder(array $params = []): View
     {
-        $serverParam = $params['server'] ?? null;
+        $serverId = $params['server'] ?? null;
 
-        $server = $serverParam instanceof Server
-            ? $serverParam
-            : Server::query()->findOrFail($serverParam);
+        abort_unless(
+            is_int($serverId) || is_string($serverId),
+            404,
+        );
 
-        $server = $this->resolveOwnedServer($server);
+        $server = $this->resolveOwnedServerById($serverId);
 
         $type = ApplicationType::tryFrom(
             (string) ($params['application'] ?? ''),
@@ -730,12 +731,12 @@ final class Show extends Component
         return ApplicationType::from($this->application);
     }
 
-    private function resolveOwnedServer(
-        Server $server,
+    private function resolveOwnedServerById(
+        int|string $serverId,
     ): Server {
         return $this->authenticatedUser()
             ->servers()
-            ->whereKey($server->getKey())
+            ->whereKey($serverId)
             ->firstOrFail();
     }
 
