@@ -8,7 +8,6 @@ use App\Application\Applications\AmneziaWg\Actions\CreateAmneziaWgPeerAction;
 use App\Domain\Application\AmneziaWg\Peer\AmneziaWgPeerGateway;
 use App\Domain\Application\AmneziaWg\Peer\AmneziaWgPeerLifecycleService;
 use App\Domain\Application\AmneziaWg\Peer\DTOs\AmneziaWgPeerProvisioningResult;
-use App\Models\AmneziaWgPeer;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
