@@ -22,6 +22,7 @@ use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsPortOwner;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsPortState;
 use App\Domain\Application\Marzban\Https\Enums\MarzbanHttpsState;
 use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
+use App\Domain\Application\Marzban\Https\MarzbanHttpsInterruptedOperationRecovery;
 use App\Domain\Application\Marzban\Https\ValueObjects\MarzbanDomain;
 use App\Domain\Platform\Contracts\PlatformInterface;
 use App\Domain\Platform\Contracts\PlatformRegistryInterface;
@@ -41,15 +42,18 @@ final class EnableMarzbanHttpsActionTest extends TestCase
     {
         $gateway = new EnableActionFakeGateway;
         $caddy = new EnableActionFakeCaddyPlatform;
+        $recovery = new EnableActionFakeInterruptedOperationRecovery;
 
         $result = $this->makeAction(
             gateway: $gateway,
             caddy: $caddy,
+            recovery: $recovery,
         )->execute(
             domain: 'PANEL.EXAMPLE.COM.',
             knownServerAddress: '203.0.113.10',
         );
 
+        self::assertSame(1, $recovery->calls);
         self::assertGreaterThan(0, $caddy->inspectCalls);
         self::assertTrue($gateway->enableCalled);
         self::assertSame('panel.example.com', $gateway->enabledDomain);
@@ -134,6 +138,7 @@ final class EnableMarzbanHttpsActionTest extends TestCase
     private function makeAction(
         EnableActionFakeGateway $gateway,
         EnableActionFakeCaddyPlatform $caddy,
+        ?EnableActionFakeInterruptedOperationRecovery $recovery = null,
     ): EnableMarzbanHttpsAction {
         return new EnableMarzbanHttpsAction(
             inspectAction: new InspectMarzbanHttpsAction($gateway),
@@ -152,7 +157,19 @@ final class EnableMarzbanHttpsActionTest extends TestCase
                 ),
             ),
             gateway: $gateway,
+            interruptedRecovery: $recovery
+                ?? new EnableActionFakeInterruptedOperationRecovery,
         );
+    }
+}
+
+final class EnableActionFakeInterruptedOperationRecovery implements MarzbanHttpsInterruptedOperationRecovery
+{
+    public int $calls = 0;
+
+    public function recover(): void
+    {
+        $this->calls++;
     }
 }
 
