@@ -61,6 +61,8 @@ final class Show extends Component
 
     public bool $operationActive = false;
 
+    public bool $runtimeLoaded = false;
+
     public int $managementPanelRevision = 0;
 
     /**
@@ -91,8 +93,6 @@ final class Show extends Component
     public function mount(
         Server $server,
         string $application,
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
         ApplicationManagementPanelResolver $managementPanelResolver,
         GetApplicationCatalogItemAction $getApplicationCatalogItem,
     ): void {
@@ -132,24 +132,42 @@ final class Show extends Component
 
         $this->managementPanel = $managementPanelResolver->resolve($type);
 
+        /*
+         * Keep the first page response local and fast. Existing background
+         * mutations are recovered from persistence immediately, while the
+         * SSH-backed runtime inspection is triggered after first paint by
+         * wire:init.
+         */
         $this->syncActiveOperation();
 
         if ($this->operationActive) {
-            /*
-             * A page reload during provisioning must not start a competing
-             * SSH inspection. Polling reads only local operation state until
-             * the background mutation reaches a terminal state.
-             */
             $this->processing = true;
+        }
+    }
 
+    public function loadRuntime(
+        ApplicationManager $applicationManager,
+        SSHConnectionCircuitBreaker $circuitBreaker,
+    ): void {
+        if (
+            $this->runtimeLoaded
+            || $this->operationActive
+        ) {
             return;
         }
 
-        $this->loadApplication(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            server: $server,
-        );
+        $this->processing = true;
+
+        try {
+            $this->loadApplication(
+                applicationManager: $applicationManager,
+                circuitBreaker: $circuitBreaker,
+                server: $this->server(),
+            );
+        } finally {
+            $this->runtimeLoaded = true;
+            $this->processing = false;
+        }
     }
 
     public function refreshApplication(
@@ -168,6 +186,8 @@ final class Show extends Component
             server: $this->server(),
             notifyOnSshFailure: true,
         );
+
+        $this->runtimeLoaded = true;
     }
 
     public function retryConnection(
@@ -194,6 +214,8 @@ final class Show extends Component
             notifyOnSshFailure: false,
             clearSshStateOnSuccess: false,
         );
+
+        $this->runtimeLoaded = true;
 
         if ($loaded) {
             $this->clearSshUnavailable(
@@ -294,6 +316,8 @@ final class Show extends Component
             server: $this->server(),
             notifyOnSshFailure: true,
         );
+
+        $this->runtimeLoaded = true;
 
         if ($operationStatus === ApplicationOperationStatus::Succeeded) {
             if ($loaded) {
@@ -513,6 +537,8 @@ final class Show extends Component
                 notifyOnSshFailure: true,
             );
 
+            $this->runtimeLoaded = true;
+
             if (! $loaded) {
                 if (
                     ! $this->sshUnavailable
@@ -536,6 +562,7 @@ final class Show extends Component
                 )
             ) {
                 $this->prepareUnavailableApplicationState();
+                $this->runtimeLoaded = true;
 
                 return;
             }
