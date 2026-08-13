@@ -103,7 +103,9 @@ Route::middleware(['web', 'auth'])
         Route::livewire(
             '/servers/{server}/applications/{application}',
             ApplicationShow::class,
-        )->name('servers.applications.show');
+        )
+            ->defer()
+            ->name('servers.applications.show');
 
         Route::livewire(
             '/orders/{order}',
