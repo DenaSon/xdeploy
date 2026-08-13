@@ -46,7 +46,7 @@ return [
 
                 'sha256' => env(
                     'XDEPLOY_DOCKER_DEBIAN_FAMILY_SHA256',
-                    '0e794bfcd221def8f5e1f321c87e523ba97059e2b084b174aebeaed90985e87d',
+                    '342c871ae21c0f42fe63dc6519c1e7abae78ee8fe0ede2fccc94c2327102397b',
                 ),
 
             ],
@@ -91,7 +91,7 @@ return [
 
                 'sha256' => env(
                     'XDEPLOY_N8N_DOCKER_SHA256',
-                    '2fc78cf0cecdaa8f47655b9b25d339755a7cd86552dd024295ecca9e9d340222',
+                    '1607dd0eed65caacc2a05ff8ea9ecbce9370e1df9c4c4a908cd955e542cf6fe3',
                 ),
 
             ],

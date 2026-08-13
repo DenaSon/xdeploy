@@ -26,6 +26,7 @@ final class CloudConfigurationTest extends TestCase
         $this->assertArrayHasKey('api_key', $configuration);
         $this->assertArrayHasKey('region', $configuration);
         $this->assertArrayHasKey('timeouts', $configuration);
+        $this->assertArrayHasKey('package_repositories', $configuration);
         $this->assertArrayHasKey('defaults', $configuration);
     }
 
@@ -37,6 +38,19 @@ final class CloudConfigurationTest extends TestCase
 
         $this->assertIsInt(
             config('cloud.providers.arvan.timeouts.request'),
+        );
+    }
+
+    public function test_arvan_ubuntu_package_mirror_is_https(): void
+    {
+        $mirror = config(
+            'cloud.providers.arvan.package_repositories.ubuntu_mirror',
+        );
+
+        $this->assertIsString($mirror);
+        $this->assertStringStartsWith(
+            'https://',
+            $mirror,
         );
     }
 

@@ -43,12 +43,17 @@ final class DockerInstallerAssetTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            'INSTALLER_TIMEOUT_SECONDS=300',
+            'INSTALLER_TIMEOUT_SECONDS=1800',
             $script,
         );
 
         $this->assertStringContainsString(
             'DPkg::Lock::Timeout=',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'Acquire::ForceIPv4=true',
             $script,
         );
 
@@ -63,7 +68,7 @@ final class DockerInstallerAssetTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            '--max-time 60',
+            '--max-time 30',
             $script,
         );
 
@@ -73,7 +78,98 @@ final class DockerInstallerAssetTest extends TestCase
         );
 
         $this->assertStringContainsString(
+            "stage='docker_ce_package_download'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='install_docker_ce'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
             'docker buildx version',
+            $script,
+        );
+    }
+
+    public function test_docker_installer_uses_a_safe_ubuntu_repository_fallback(): void
+    {
+        $script = file_get_contents(
+            public_path(
+                'assets/installers/docker/debian-family.sh',
+            ),
+        );
+
+        $this->assertIsString($script);
+
+        $this->assertStringContainsString(
+            "XDEPLOY_DOCKER_KEYRING='/etc/apt/keyrings/xdeploy-docker.asc'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "XDEPLOY_DOCKER_SOURCE='/etc/apt/sources.list.d/xdeploy-docker.list'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'install_ubuntu_repository_fallback()',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker.io',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker-compose-v2',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker-buildx',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker_ce_package_preflight',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'apt_get install --dry-run --no-install-recommends',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='ubuntu_fallback_package_download'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='ubuntu_fallback_package_install'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            '--download-only',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            '--no-download',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'if [[ "$ID" == \'ubuntu\' ]]; then',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'Refusing Ubuntu Docker fallback because Docker CE packages are already installed.',
             $script,
         );
     }

@@ -38,7 +38,7 @@ final readonly class ApplicationManager
         return $this->onServer(
             user: $user,
             server: $server,
-            operation: fn (): ApplicationInfo => $this->applicationRegistry
+            operation: fn (Server $ownedServer): ApplicationInfo => $this->applicationRegistry
                 ->find($type)
                 ->inspect(),
         );
@@ -52,8 +52,11 @@ final readonly class ApplicationManager
         return $this->onServer(
             user: $user,
             server: $server,
-            operation: fn (): InstallReport => $this->installApplicationAction
-                ->execute($type),
+            operation: fn (Server $ownedServer): InstallReport => $this->installApplicationAction
+                ->execute(
+                    server: $ownedServer,
+                    type: $type,
+                ),
         );
     }
 
@@ -65,7 +68,7 @@ final readonly class ApplicationManager
         $this->onServer(
             user: $user,
             server: $server,
-            operation: fn () => $this->uninstallApplicationAction
+            operation: fn (Server $ownedServer) => $this->uninstallApplicationAction
                 ->execute($type),
         );
     }
@@ -78,7 +81,7 @@ final readonly class ApplicationManager
         $this->onServer(
             user: $user,
             server: $server,
-            operation: fn () => $this->startApplicationAction
+            operation: fn (Server $ownedServer) => $this->startApplicationAction
                 ->execute($type),
         );
     }
@@ -91,7 +94,7 @@ final readonly class ApplicationManager
         $this->onServer(
             user: $user,
             server: $server,
-            operation: fn () => $this->stopApplicationAction
+            operation: fn (Server $ownedServer) => $this->stopApplicationAction
                 ->execute($type),
         );
     }
@@ -104,7 +107,7 @@ final readonly class ApplicationManager
         $this->onServer(
             user: $user,
             server: $server,
-            operation: fn () => $this->restartApplicationAction
+            operation: fn (Server $ownedServer) => $this->restartApplicationAction
                 ->execute($type),
         );
     }
@@ -112,7 +115,7 @@ final readonly class ApplicationManager
     /**
      * @template TResult
      *
-     * @param  Closure(): TResult  $operation
+     * @param  Closure(Server): TResult  $operation
      * @return TResult
      */
     private function onServer(
@@ -124,7 +127,9 @@ final readonly class ApplicationManager
          * Re-resolve the server through the authenticated user.
          *
          * Presentation mistakes must never allow a remote operation
-         * against another tenant's server.
+         * against another tenant's server. The authoritative persisted
+         * instance is also passed into the operation so provider metadata
+         * cannot be supplied by an untrusted caller-side model instance.
          */
         $ownedServer = Server::query()
             ->ownedBy($user)
@@ -137,6 +142,8 @@ final readonly class ApplicationManager
             $ownedServer,
         );
 
-        return $operation();
+        return $operation(
+            $ownedServer,
+        );
     }
 }

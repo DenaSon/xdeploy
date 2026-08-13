@@ -1,35 +1,66 @@
 @php
     $state = $info['state'] ?? 'unknown';
 
-    $status = match ($state) {
-        'running' => [
-            'label' => 'در حال اجرا',
-            'icon' => 'lucide.circle-play',
-            'classes' => 'border-success/20 bg-success/10 text-success',
-            'dot' => 'bg-success',
-        ],
+    $operationProgressLabel = match (true) {
+        $operationType === 'install' && $operationStatus === 'pending'
+            => 'در صف نصب',
+        $operationType === 'install'
+            => 'در حال نصب',
+        $operationType === 'uninstall' && $operationStatus === 'pending'
+            => 'در صف حذف',
+        $operationType === 'uninstall'
+            => 'در حال حذف',
+        default => 'در حال انجام عملیات',
+    };
 
-        'installed' => [
-            'label' => 'نصب‌شده',
-            'icon' => 'lucide.circle-check',
+    $operationProgressMessage = match (true) {
+        $operationType === 'install' && $operationStatus === 'pending'
+            => "نصب {$name} در صف اجرا قرار دارد.",
+        $operationType === 'install'
+            => "xDeploy در حال نصب و راه‌اندازی {$name} روی سرور است.",
+        $operationType === 'uninstall' && $operationStatus === 'pending'
+            => "حذف {$name} در صف اجرا قرار دارد.",
+        $operationType === 'uninstall'
+            => "xDeploy در حال حذف {$name} از سرور است.",
+        default => 'عملیات برنامه در پس‌زمینه در حال انجام است.',
+    };
+
+    $status = $operationActive
+        ? [
+            'label' => $operationProgressLabel,
+            'icon' => 'lucide.loader-circle',
             'classes' => 'border-info/20 bg-info/10 text-info',
             'dot' => 'bg-info',
-        ],
+        ]
+        : match ($state) {
+            'running' => [
+                'label' => 'در حال اجرا',
+                'icon' => 'lucide.circle-play',
+                'classes' => 'border-success/20 bg-success/10 text-success',
+                'dot' => 'bg-success',
+            ],
 
-        'not_installed' => [
-            'label' => 'نصب نشده',
-            'icon' => 'lucide.package-plus',
-            'classes' => 'border-base-300 bg-base-200/70 text-base-content/55',
-            'dot' => 'bg-base-content/30',
-        ],
+            'installed' => [
+                'label' => 'نصب‌شده',
+                'icon' => 'lucide.circle-check',
+                'classes' => 'border-info/20 bg-info/10 text-info',
+                'dot' => 'bg-info',
+            ],
 
-        default => [
-            'label' => 'وضعیت نامشخص',
-            'icon' => 'lucide.circle-help',
-            'classes' => 'border-warning/20 bg-warning/10 text-warning',
-            'dot' => 'bg-warning',
-        ],
-    };
+            'not_installed' => [
+                'label' => 'نصب نشده',
+                'icon' => 'lucide.package-plus',
+                'classes' => 'border-base-300 bg-base-200/70 text-base-content/55',
+                'dot' => 'bg-base-content/30',
+            ],
+
+            default => [
+                'label' => 'وضعیت نامشخص',
+                'icon' => 'lucide.circle-help',
+                'classes' => 'border-warning/20 bg-warning/10 text-warning',
+                'dot' => 'bg-warning',
+            ],
+        };
 
     $version = $info['version'] ?? null;
 
@@ -52,7 +83,12 @@
 
 <x-servers.workspace :server="$server">
 
-    <div class="space-y-5">
+    <div
+        class="space-y-5"
+        @if ($operationActive)
+            wire:poll.2s="pollOperation"
+        @endif
+    >
 
         {{-- Application context --}}
         <section
@@ -229,7 +265,7 @@
                     @endif
 
                     {{-- Refresh runtime --}}
-                    @if (! $sshUnavailable)
+                    @if (! $sshUnavailable && ! $operationActive)
 
                         <div
                             class="tooltip tooltip-bottom
@@ -330,7 +366,7 @@
             @endif
 
             {{-- Runtime facts --}}
-            @if (! $sshUnavailable)
+            @if (! $sshUnavailable && ! $operationActive)
 
                 <div
                     class="grid grid-cols-1
@@ -470,6 +506,36 @@
                 :retry-after="$sshRetryAfter"
                 retry-action="retryConnection"
             />
+
+        @endif
+
+        {{-- Background operation state --}}
+        @if ($operationActive)
+
+            <x-alert
+                icon="lucide.clock-3"
+                class="border border-info/20
+                       bg-info/[0.08]
+                       text-info"
+            >
+                <div class="flex items-center gap-3">
+                    <span
+                        class="loading loading-spinner
+                               loading-sm shrink-0"
+                    ></span>
+
+                    <div>
+                        <p class="font-medium">
+                            {{ $operationProgressLabel }}
+                        </p>
+
+                        <p class="mt-0.5 text-sm opacity-80">
+                            {{ $operationProgressMessage }}
+                            می‌توانید این صفحه را ترک کنید؛ عملیات در پس‌زمینه ادامه پیدا می‌کند.
+                        </p>
+                    </div>
+                </div>
+            </x-alert>
 
         @endif
 
@@ -627,8 +693,40 @@
                     class="px-5 py-4
                            sm:px-6"
                 >
+                    {{-- Background mutation --}}
+                    @if ($operationActive)
+
+                        <div
+                            class="flex items-center gap-3
+                                   rounded-xl
+                                   bg-base-200/40
+                                   px-4 py-3"
+                        >
+                            <span
+                                class="loading loading-spinner
+                                       loading-sm shrink-0
+                                       text-info"
+                            ></span>
+
+                            <div>
+                                <p
+                                    class="text-sm font-medium
+                                           text-base-content"
+                                >
+                                    {{ $operationProgressLabel }}
+                                </p>
+
+                                <p
+                                    class="mt-0.5 text-sm
+                                           text-base-content/50"
+                                >
+                                    تا پایان عملیات، سایر تغییرات این برنامه موقتاً غیرفعال هستند.
+                                </p>
+                            </div>
+                        </div>
+
                     {{-- Unknown --}}
-                    @if ($info['is_unknown'])
+                    @elseif ($info['is_unknown'])
 
                         <div
                             class="flex flex-col gap-3
@@ -773,7 +871,7 @@
             </section>
 
             {{-- Application-specific management --}}
-            @if ($info['is_running'])
+            @if ($info['is_running'] && ! $operationActive)
 
                 <livewire:is
                     :component="$managementPanel"

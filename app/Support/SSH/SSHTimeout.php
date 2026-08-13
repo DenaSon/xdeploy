@@ -42,9 +42,10 @@ final class SSHTimeout
     public const int APPLICATION_INSTALL = 600;
 
     /**
-     * Docker installation.
+     * Docker installation. The installer enforces its own 30-minute
+     * server-side lifecycle, so the SSH channel gets a small grace window.
      */
-    public const int DOCKER_INSTALL = 400;
+    public const int DOCKER_INSTALL = 1860;
 
     /**
      * Caddy installation.

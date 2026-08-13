@@ -6,11 +6,16 @@ namespace App\Livewire\Applications;
 
 use App\Application\Applications\Actions\GetApplicationCatalogItemAction;
 use App\Application\Applications\Manager\ApplicationManager;
+use App\Application\Applications\Operations\Exceptions\ApplicationOperationInProgressException;
+use App\Application\Applications\Operations\QueueApplicationOperationAction;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
+use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
+use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Infrastructure\SSH\Services\SSHConnectionCircuitBreaker;
 use App\Livewire\Applications\Resolvers\ApplicationManagementPanelResolver;
 use App\Livewire\Concerns\HandlesSshAvailability;
+use App\Models\ApplicationOperation;
 use App\Models\Server;
 use App\Models\User;
 use Closure;
@@ -47,6 +52,15 @@ final class Show extends Component
     #[Locked]
     public int $serverId;
 
+    #[Locked]
+    public ?int $operationId = null;
+
+    public ?string $operationType = null;
+
+    public ?string $operationStatus = null;
+
+    public bool $operationActive = false;
+
     public int $managementPanelRevision = 0;
 
     /**
@@ -82,13 +96,9 @@ final class Show extends Component
         ApplicationManagementPanelResolver $managementPanelResolver,
         GetApplicationCatalogItemAction $getApplicationCatalogItem,
     ): void {
-        $server = $this->resolveOwnedServer(
-            $server,
-        );
+        $server = $this->resolveOwnedServer($server);
 
-        $type = ApplicationType::tryFrom(
-            $application,
-        );
+        $type = ApplicationType::tryFrom($application);
 
         abort_if(
             $type === null,
@@ -96,41 +106,44 @@ final class Show extends Component
             'Application not found.',
         );
 
-        $catalogItem = $getApplicationCatalogItem->execute(
-            $type,
-        );
+        $catalogItem = $getApplicationCatalogItem->execute($type);
 
         $this->serverId = (int) $server->getKey();
-
         $this->application = $type->value;
-
         $this->name = (string) $catalogItem['name'];
-
         $this->shortDescription = (string) (
             $catalogItem['short_description']
             ?? ''
         );
 
-        $description = $catalogItem['description']
-            ?? null;
+        $description = $catalogItem['description'] ?? null;
 
         $this->description = is_string($description)
         && trim($description) !== ''
             ? trim($description)
             : null;
 
-        $icon = $catalogItem['icon']
-            ?? null;
+        $icon = $catalogItem['icon'] ?? null;
 
         $this->icon = is_string($icon)
         && trim($icon) !== ''
             ? trim($icon)
             : null;
 
-        $this->managementPanel =
-            $managementPanelResolver->resolve(
-                $type,
-            );
+        $this->managementPanel = $managementPanelResolver->resolve($type);
+
+        $this->syncActiveOperation();
+
+        if ($this->operationActive) {
+            /*
+             * A page reload during provisioning must not start a competing
+             * SSH inspection. Polling reads only local operation state until
+             * the background mutation reaches a terminal state.
+             */
+            $this->processing = true;
+
+            return;
+        }
 
         $this->loadApplication(
             applicationManager: $applicationManager,
@@ -143,6 +156,10 @@ final class Show extends Component
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
     ): void {
+        if ($this->operationActive) {
+            return;
+        }
+
         $this->resetMessages();
 
         $this->loadApplication(
@@ -157,12 +174,12 @@ final class Show extends Component
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
     ): void {
+        if ($this->operationActive) {
+            return;
+        }
+
         $server = $this->server();
 
-        /*
-         * The persistent SSH alert remains visible until the following
-         * application inspection succeeds.
-         */
         $this->resetSshCircuit(
             circuitBreaker: $circuitBreaker,
             server: $server,
@@ -204,63 +221,109 @@ final class Show extends Component
     }
 
     public function install(
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
+        QueueApplicationOperationAction $queueOperation,
     ): void {
-        $this->performOperation(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            operation: static function (
-                ApplicationManager $manager,
-                User $user,
-                Server $server,
-                ApplicationType $type,
-            ): void {
-                $manager->install(
-                    user: $user,
-                    server: $server,
-                    type: $type,
-                );
-            },
-            successMessage: sprintf(
-                '%s با موفقیت نصب و اجرا شد.',
-                $this->name,
-            ),
+        $this->queueBackgroundOperation(
+            queueOperation: $queueOperation,
+            operationType: ApplicationOperationType::Install,
             failureMessage: sprintf(
-                'نصب %s با خطا مواجه شد.',
+                'شروع نصب %s با خطا مواجه شد.',
                 $this->name,
             ),
         );
     }
 
     public function uninstall(
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
+        QueueApplicationOperationAction $queueOperation,
     ): void {
-        $this->performOperation(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            operation: static function (
-                ApplicationManager $manager,
-                User $user,
-                Server $server,
-                ApplicationType $type,
-            ): void {
-                $manager->uninstall(
-                    user: $user,
-                    server: $server,
-                    type: $type,
-                );
-            },
-            successMessage: sprintf(
-                '%s با موفقیت حذف شد.',
-                $this->name,
-            ),
+        $this->queueBackgroundOperation(
+            queueOperation: $queueOperation,
+            operationType: ApplicationOperationType::Uninstall,
             failureMessage: sprintf(
-                'حذف %s با خطا مواجه شد.',
+                'شروع حذف %s با خطا مواجه شد.',
                 $this->name,
             ),
         );
+    }
+
+    public function pollOperation(
+        ApplicationManager $applicationManager,
+        SSHConnectionCircuitBreaker $circuitBreaker,
+    ): void {
+        if (
+            ! $this->operationActive
+            || $this->operationId === null
+        ) {
+            return;
+        }
+
+        $operation = ApplicationOperation::query()
+            ->whereKey($this->operationId)
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('application_type', $this->application)
+            ->first();
+
+        if (! $operation instanceof ApplicationOperation) {
+            $this->clearOperationState();
+            $this->processing = false;
+            $this->errorMessage = 'وضعیت عملیات پس‌زمینه در دسترس نیست.';
+
+            return;
+        }
+
+        $this->setOperationState($operation);
+
+        if ($operation->isActive()) {
+            return;
+        }
+
+        $operationType = $operation->operation;
+        $operationStatus = $operation->status;
+
+        $this->clearOperationState();
+        $this->processing = false;
+
+        /*
+         * The remote mutation is over now, so a single runtime inspection is
+         * safe and gives the user the verified final application state.
+         */
+        $loaded = $this->loadApplication(
+            applicationManager: $applicationManager,
+            circuitBreaker: $circuitBreaker,
+            server: $this->server(),
+            notifyOnSshFailure: true,
+        );
+
+        if ($operationStatus === ApplicationOperationStatus::Succeeded) {
+            if ($loaded) {
+                $this->successMessage = match ($operationType) {
+                    ApplicationOperationType::Install => sprintf(
+                        '%s با موفقیت نصب و اجرا شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Uninstall => sprintf(
+                        '%s با موفقیت حذف شد.',
+                        $this->name,
+                    ),
+                };
+            }
+
+            return;
+        }
+
+        if (! $this->sshUnavailable) {
+            $this->errorMessage = match ($operationType) {
+                ApplicationOperationType::Install => sprintf(
+                    'نصب %s با خطا مواجه شد.',
+                    $this->name,
+                ),
+                ApplicationOperationType::Uninstall => sprintf(
+                    'حذف %s با خطا مواجه شد.',
+                    $this->name,
+                ),
+            };
+        }
     }
 
     public function start(
@@ -360,9 +423,50 @@ final class Show extends Component
             [
                 'server' => $this->server(),
             ],
-        )->title(
-            $this->name,
-        );
+        )->title($this->name);
+    }
+
+    private function queueBackgroundOperation(
+        QueueApplicationOperationAction $queueOperation,
+        ApplicationOperationType $operationType,
+        string $failureMessage,
+    ): void {
+        if (
+            $this->processing
+            || $this->operationActive
+            || $this->sshUnavailable
+        ) {
+            return;
+        }
+
+        $server = $this->server();
+        $user = $this->authenticatedUser();
+
+        $this->processing = true;
+        $this->resetMessages();
+
+        try {
+            $operation = $queueOperation->execute(
+                user: $user,
+                server: $server,
+                applicationType: $this->applicationType(),
+                operationType: $operationType,
+            );
+
+            $this->setOperationState($operation);
+        } catch (ApplicationOperationInProgressException) {
+            $this->syncActiveOperation();
+
+            if (! $this->operationActive) {
+                $this->processing = false;
+                $this->errorMessage = 'عملیات دیگری برای این برنامه در حال انجام است.';
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $this->processing = false;
+            $this->errorMessage = $failureMessage;
+        }
     }
 
     /**
@@ -382,16 +486,12 @@ final class Show extends Component
     ): void {
         if (
             $this->processing
+            || $this->operationActive
             || $this->sshUnavailable
         ) {
             return;
         }
 
-        /*
-         * Resolve ownership before entering the operation try/catch.
-         * A missing or foreign server must remain a 404 rather than
-         * being converted into an application operation error.
-         */
         $server = $this->server();
         $user = $this->authenticatedUser();
 
@@ -406,10 +506,6 @@ final class Show extends Component
                 $this->applicationType(),
             );
 
-            /*
-             * Do not report operation success until the final application
-             * state has been fetched and verified successfully.
-             */
             $loaded = $this->loadApplication(
                 applicationManager: $applicationManager,
                 circuitBreaker: $circuitBreaker,
@@ -422,15 +518,13 @@ final class Show extends Component
                     ! $this->sshUnavailable
                     && $this->errorMessage === null
                 ) {
-                    $this->errorMessage =
-                        $failureMessage;
+                    $this->errorMessage = $failureMessage;
                 }
 
                 return;
             }
 
-            $this->successMessage =
-                $successMessage;
+            $this->successMessage = $successMessage;
         } catch (Throwable $exception) {
             if (
                 $this->handleSshFailure(
@@ -446,15 +540,49 @@ final class Show extends Component
                 return;
             }
 
-            report(
-                $exception,
-            );
+            report($exception);
 
-            $this->errorMessage =
-                $failureMessage;
+            $this->errorMessage = $failureMessage;
         } finally {
             $this->processing = false;
         }
+    }
+
+    private function syncActiveOperation(): void
+    {
+        $operation = ApplicationOperation::query()
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('application_type', $this->application)
+            ->active()
+            ->latest('id')
+            ->first();
+
+        if (! $operation instanceof ApplicationOperation) {
+            $this->clearOperationState();
+
+            return;
+        }
+
+        $this->setOperationState($operation);
+    }
+
+    private function setOperationState(
+        ApplicationOperation $operation,
+    ): void {
+        $this->operationId = (int) $operation->getKey();
+        $this->operationType = $operation->operation->value;
+        $this->operationStatus = $operation->status->value;
+        $this->operationActive = $operation->isActive();
+        $this->processing = $this->operationActive;
+    }
+
+    private function clearOperationState(): void
+    {
+        $this->operationId = null;
+        $this->operationType = null;
+        $this->operationStatus = null;
+        $this->operationActive = false;
     }
 
     private function loadApplication(
@@ -471,11 +599,6 @@ final class Show extends Component
                 type: $this->applicationType(),
             );
 
-            /*
-             * Some application inspectors convert infrastructure exceptions
-             * into an Unknown application state. The circuit failure counter
-             * allows the UI to recognize the underlying SSH problem.
-             */
             if (
                 $info->isUnknown()
                 && $this->hasSshFailureSignal(
@@ -497,12 +620,8 @@ final class Show extends Component
                 return false;
             }
 
-            $this->setApplicationInfo(
-                $info,
-            );
-
+            $this->setApplicationInfo($info);
             $this->managementPanelRevision++;
-
             $this->errorMessage = null;
 
             if ($clearSshStateOnSuccess) {
@@ -524,15 +643,10 @@ final class Show extends Component
                 return false;
             }
 
-            report(
-                $exception,
-            );
+            report($exception);
 
-            $this->info =
-                $this->unknownApplicationInfo();
-
-            $this->errorMessage =
-                'دریافت وضعیت برنامه از سرور با خطا مواجه شد.';
+            $this->info = $this->unknownApplicationInfo();
+            $this->errorMessage = 'دریافت وضعیت برنامه از سرور با خطا مواجه شد.';
 
             return false;
         }
@@ -540,9 +654,7 @@ final class Show extends Component
 
     private function prepareUnavailableApplicationState(): void
     {
-        $this->info =
-            $this->unknownApplicationInfo();
-
+        $this->info = $this->unknownApplicationInfo();
         $this->successMessage = null;
         $this->errorMessage = null;
     }
@@ -562,9 +674,7 @@ final class Show extends Component
 
     private function applicationType(): ApplicationType
     {
-        return ApplicationType::from(
-            $this->application,
-        );
+        return ApplicationType::from($this->application);
     }
 
     private function resolveOwnedServer(
@@ -572,9 +682,7 @@ final class Show extends Component
     ): Server {
         return $this->authenticatedUser()
             ->servers()
-            ->whereKey(
-                $server->getKey(),
-            )
+            ->whereKey($server->getKey())
             ->firstOrFail();
     }
 
@@ -582,9 +690,7 @@ final class Show extends Component
     {
         return $this->authenticatedUser()
             ->servers()
-            ->whereKey(
-                $this->serverId,
-            )
+            ->whereKey($this->serverId)
             ->firstOrFail();
     }
 
