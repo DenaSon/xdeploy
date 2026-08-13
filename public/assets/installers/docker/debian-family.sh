@@ -29,18 +29,18 @@ ubuntu_docker_packages=(
 )
 
 log() {
-    printf '[xDeploy][docker] %s\n' "$1"
+    printf '[xDeploy][docker] %s\\n' "$1"
 }
 
 fail() {
-    printf '[xDeploy][docker][error] %s\n' "$1" >&2
+    printf '[xDeploy][docker][error] %s\\n' "$1" >&2
     exit 1
 }
 
 on_error() {
     local exit_code=$?
 
-    printf '[xDeploy][docker][error] stage=%s exit_code=%s\n' \
+    printf '[xDeploy][docker][error] stage=%s exit_code=%s\\n' \
         "$stage" \
         "$exit_code" >&2
 
@@ -113,39 +113,31 @@ verify_docker_stack() {
     systemctl is-active --quiet docker
 }
 
-install_ubuntu_repository_fallback() {
-    local reason="$1"
+ensure_no_official_docker_packages_installed() {
     local package
-
-    log "Official Docker repository is unavailable during [${reason}]. Falling back to Ubuntu packages."
-
-    remove_xdeploy_official_repository
-
-    stage='ubuntu_fallback_repository_update'
-    apt_get update
-
-    stage='ubuntu_fallback_package_preflight'
-    if ! all_packages_have_candidates "${ubuntu_docker_packages[@]}"; then
-        fail 'Ubuntu Docker fallback packages are not available for this release.'
-    fi
-
-    if ! apt_get install --dry-run --no-install-recommends \
-        "${ubuntu_docker_packages[@]}" >/dev/null; then
-        fail 'The Ubuntu Docker fallback package transaction cannot be resolved safely.'
-    fi
 
     for package in "${official_docker_packages[@]}"; do
         if package_is_installed "$package"; then
-            fail 'Refusing Ubuntu Docker fallback because Docker CE packages are already installed.'
+            fail 'Refusing Ubuntu repository installation because Docker CE packages are already installed.'
         fi
     done
+}
 
-    stage='ubuntu_fallback_package_download'
+ubuntu_repository_package_set_available() {
+    all_packages_have_candidates "${ubuntu_docker_packages[@]}" \
+        && apt_get install --dry-run --no-install-recommends \
+            "${ubuntu_docker_packages[@]}" >/dev/null
+}
+
+install_ubuntu_repository_packages() {
+    ensure_no_official_docker_packages_installed
+
+    stage='ubuntu_package_download'
     log 'Downloading Docker Engine, Buildx, and Docker Compose V2 from Ubuntu repositories.'
     apt_get install -y --download-only --no-install-recommends \
         "${ubuntu_docker_packages[@]}"
 
-    stage='ubuntu_fallback_package_install'
+    stage='ubuntu_package_install'
     log 'Installing the downloaded Ubuntu Docker package set.'
     apt_get install -y --no-download --no-install-recommends \
         "${ubuntu_docker_packages[@]}"
@@ -154,8 +146,114 @@ install_ubuntu_repository_fallback() {
 
     trap - ERR
 
-    log 'Docker installation completed successfully using Ubuntu repository fallback.'
+    log 'Docker installation completed successfully using Ubuntu repositories.'
     exit 0
+}
+
+install_official_docker_repository_packages() {
+    stage='apt_prerequisites_update'
+    log 'Refreshing operating-system package metadata.'
+    apt_get update
+
+    stage='apt_prerequisites_install'
+    log 'Installing Docker repository prerequisites.'
+    apt_get install -y --no-install-recommends \
+        ca-certificates \
+        curl
+
+    stage='docker_repository_key'
+    log 'Configuring the official Docker APT repository.'
+    install -m 0755 -d /etc/apt/keyrings
+
+    local key_candidate
+    key_candidate="$(mktemp)"
+    trap 'rm -f "$key_candidate"' EXIT
+
+    if ! curl \
+        --ipv4 \
+        --http1.1 \
+        --proto '=https' \
+        --tlsv1.2 \
+        --fail \
+        --silent \
+        --show-error \
+        --location \
+        --retry 2 \
+        --retry-delay 2 \
+        --retry-all-errors \
+        --connect-timeout 10 \
+        --max-time 30 \
+        "https://download.docker.com/linux/${ID}/gpg" \
+        -o "$key_candidate"; then
+        fail 'Unable to download the official Docker repository signing key.'
+    fi
+
+    install -m 0644 \
+        "$key_candidate" \
+        "$XDEPLOY_DOCKER_KEYRING"
+    rm -f "$key_candidate"
+    trap - EXIT
+
+    local architecture
+    architecture="$(dpkg --print-architecture)"
+
+    cat > "$XDEPLOY_DOCKER_SOURCE" <<EOF_REPOSITORY
+deb [arch=${architecture} signed-by=${XDEPLOY_DOCKER_KEYRING}] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable
+EOF_REPOSITORY
+
+    stage='docker_repository_update'
+    log 'Refreshing Docker repository metadata.'
+    apt_get update
+
+    stage='docker_ce_package_preflight'
+    if ! all_packages_have_candidates "${official_docker_packages[@]}"; then
+        fail 'The complete Docker CE package set is not available from the official repository.'
+    fi
+
+    if ! apt_get install --dry-run --no-install-recommends \
+        "${official_docker_packages[@]}" >/dev/null; then
+        fail 'The Docker CE package transaction cannot be resolved safely.'
+    fi
+
+    stage='docker_ce_package_download'
+    log 'Downloading Docker Engine, Buildx, and Docker Compose V2 from the official Docker repository.'
+    apt_get install -y --download-only --no-install-recommends \
+        "${official_docker_packages[@]}"
+
+    local conflicting_packages=(
+        docker.io
+        docker-doc
+        docker-compose
+        docker-compose-v2
+        podman-docker
+        containerd
+        runc
+    )
+    local installed_conflicts=()
+    local package
+
+    for package in "${conflicting_packages[@]}"; do
+        if package_is_installed "$package"; then
+            installed_conflicts+=("$package")
+        fi
+    done
+
+    if (( ${#installed_conflicts[@]} > 0 )); then
+        stage='remove_conflicting_packages'
+        log 'Removing packages that conflict with Docker CE.'
+        apt_get remove -y "${installed_conflicts[@]}"
+    fi
+
+    stage='install_docker_ce'
+    log 'Installing the downloaded Docker CE package set.'
+    apt_get install -y --no-download --no-install-recommends \
+        "${official_docker_packages[@]}"
+
+    verify_docker_stack
+
+    trap - ERR
+
+    log 'Docker installation completed successfully using the official Docker repository.'
 }
 
 trap on_error ERR
@@ -212,124 +310,23 @@ if command -v docker >/dev/null 2>&1 \
     exit 0
 fi
 
-stage='apt_prerequisites_update'
-log 'Refreshing operating-system package metadata.'
-apt_get update
+if [[ "$ID" == 'ubuntu' ]]; then
+    stage='ubuntu_repository_cleanup'
+    log 'Removing xDeploy-managed official Docker repository metadata before using Ubuntu repositories.'
+    remove_xdeploy_official_repository
 
-stage='apt_prerequisites_install'
-log 'Installing Docker repository prerequisites.'
-apt_get install -y --no-install-recommends \
-    ca-certificates \
-    curl
+    stage='ubuntu_repository_update'
+    log 'Refreshing Ubuntu repository metadata.'
 
-stage='docker_repository_key'
-log 'Configuring the official Docker APT repository.'
-install -m 0755 -d /etc/apt/keyrings
+    if apt_get update; then
+        stage='ubuntu_package_preflight'
 
-key_candidate="$(mktemp)"
-trap 'rm -f "$key_candidate"' EXIT
-
-if ! curl \
-    --ipv4 \
-    --http1.1 \
-    --proto '=https' \
-    --tlsv1.2 \
-    --fail \
-    --silent \
-    --show-error \
-    --location \
-    --retry 2 \
-    --retry-delay 2 \
-    --retry-all-errors \
-    --connect-timeout 10 \
-    --max-time 30 \
-    "https://download.docker.com/linux/${ID}/gpg" \
-    -o "$key_candidate"; then
-    if [[ "$ID" == 'ubuntu' ]]; then
-        install_ubuntu_repository_fallback "$stage"
+        if ubuntu_repository_package_set_available; then
+            install_ubuntu_repository_packages
+        fi
     fi
 
-    fail 'Unable to download the official Docker repository signing key.'
+    log 'Ubuntu Docker package set is unavailable; falling back to the official Docker repository.'
 fi
 
-install -m 0644 \
-    "$key_candidate" \
-    "$XDEPLOY_DOCKER_KEYRING"
-rm -f "$key_candidate"
-trap - EXIT
-
-architecture="$(dpkg --print-architecture)"
-
-cat > "$XDEPLOY_DOCKER_SOURCE" <<EOF_REPOSITORY
-deb [arch=${architecture} signed-by=${XDEPLOY_DOCKER_KEYRING}] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable
-EOF_REPOSITORY
-
-stage='docker_repository_update'
-log 'Refreshing Docker repository metadata.'
-
-if ! apt_get update; then
-    if [[ "$ID" == 'ubuntu' ]]; then
-        install_ubuntu_repository_fallback "$stage"
-    fi
-
-    fail 'Unable to refresh the official Docker repository metadata.'
-fi
-
-stage='docker_ce_package_preflight'
-
-if ! all_packages_have_candidates "${official_docker_packages[@]}"; then
-    if [[ "$ID" == 'ubuntu' ]]; then
-        install_ubuntu_repository_fallback "$stage"
-    fi
-
-    fail 'The complete Docker CE package set is not available from the official repository.'
-fi
-
-if ! apt_get install --dry-run --no-install-recommends \
-    "${official_docker_packages[@]}" >/dev/null; then
-    if [[ "$ID" == 'ubuntu' ]]; then
-        install_ubuntu_repository_fallback "$stage"
-    fi
-
-    fail 'The Docker CE package transaction cannot be resolved safely.'
-fi
-
-stage='docker_ce_package_download'
-log 'Downloading Docker Engine, Buildx, and Docker Compose V2 from the official Docker repository.'
-apt_get install -y --download-only --no-install-recommends \
-    "${official_docker_packages[@]}"
-
-conflicting_packages=(
-    docker.io
-    docker-doc
-    docker-compose
-    docker-compose-v2
-    podman-docker
-    containerd
-    runc
-)
-
-installed_conflicts=()
-
-for package in "${conflicting_packages[@]}"; do
-    if package_is_installed "$package"; then
-        installed_conflicts+=("$package")
-    fi
-done
-
-if (( ${#installed_conflicts[@]} > 0 )); then
-    stage='remove_conflicting_packages'
-    log 'Removing packages that conflict with Docker CE.'
-    apt_get remove -y "${installed_conflicts[@]}"
-fi
-
-stage='install_docker_ce'
-log 'Installing the downloaded Docker CE package set.'
-apt_get install -y --no-download --no-install-recommends \
-    "${official_docker_packages[@]}"
-
-verify_docker_stack
-
-trap - ERR
-
-log 'Docker installation completed successfully.'
+install_official_docker_repository_packages

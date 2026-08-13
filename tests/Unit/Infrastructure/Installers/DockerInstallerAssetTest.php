@@ -78,12 +78,12 @@ final class DockerInstallerAssetTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            "stage='docker_ce_package_download'",
+            "stage='ubuntu_package_download'",
             $script,
         );
 
         $this->assertStringContainsString(
-            "stage='install_docker_ce'",
+            "stage='docker_ce_package_download'",
             $script,
         );
 
@@ -93,7 +93,94 @@ final class DockerInstallerAssetTest extends TestCase
         );
     }
 
-    public function test_docker_installer_uses_a_safe_ubuntu_repository_fallback(): void
+    public function test_docker_installer_prefers_ubuntu_repository_packages(): void
+    {
+        $script = file_get_contents(
+            public_path(
+                'assets/installers/docker/debian-family.sh',
+            ),
+        );
+
+        $this->assertIsString($script);
+
+        $this->assertStringContainsString(
+            'install_ubuntu_repository_packages()',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'ubuntu_repository_package_set_available()',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker.io',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker-compose-v2',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'docker-buildx',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'if [[ "$ID" == \'ubuntu\' ]]; then',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='ubuntu_repository_cleanup'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='ubuntu_repository_update'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='ubuntu_package_preflight'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            "stage='ubuntu_package_install'",
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'Refusing Ubuntu repository installation because Docker CE packages are already installed.',
+            $script,
+        );
+
+        $this->assertStringContainsString(
+            'Ubuntu Docker package set is unavailable; falling back to the official Docker repository.',
+            $script,
+        );
+
+        $ubuntuPathPosition = strpos(
+            $script,
+            'if [[ "$ID" == \'ubuntu\' ]]; then',
+        );
+        $officialFallbackPosition = strrpos(
+            $script,
+            'install_official_docker_repository_packages',
+        );
+
+        $this->assertIsInt($ubuntuPathPosition);
+        $this->assertIsInt($officialFallbackPosition);
+        $this->assertLessThan(
+            $officialFallbackPosition,
+            $ubuntuPathPosition,
+        );
+    }
+
+    public function test_docker_installer_keeps_the_official_repository_as_fallback(): void
     {
         $script = file_get_contents(
             public_path(
@@ -114,42 +201,42 @@ final class DockerInstallerAssetTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            'install_ubuntu_repository_fallback()',
+            'install_official_docker_repository_packages()',
             $script,
         );
 
         $this->assertStringContainsString(
-            'docker.io',
+            'https://download.docker.com/linux/${ID}',
             $script,
         );
 
         $this->assertStringContainsString(
-            'docker-compose-v2',
+            'docker-ce',
             $script,
         );
 
         $this->assertStringContainsString(
-            'docker-buildx',
+            'docker-compose-plugin',
             $script,
         );
 
         $this->assertStringContainsString(
-            'docker_ce_package_preflight',
+            'docker-buildx-plugin',
             $script,
         );
 
         $this->assertStringContainsString(
-            'apt_get install --dry-run --no-install-recommends',
+            "stage='docker_ce_package_preflight'",
             $script,
         );
 
         $this->assertStringContainsString(
-            "stage='ubuntu_fallback_package_download'",
+            "stage='docker_ce_package_download'",
             $script,
         );
 
         $this->assertStringContainsString(
-            "stage='ubuntu_fallback_package_install'",
+            "stage='install_docker_ce'",
             $script,
         );
 
@@ -160,16 +247,6 @@ final class DockerInstallerAssetTest extends TestCase
 
         $this->assertStringContainsString(
             '--no-download',
-            $script,
-        );
-
-        $this->assertStringContainsString(
-            'if [[ "$ID" == \'ubuntu\' ]]; then',
-            $script,
-        );
-
-        $this->assertStringContainsString(
-            'Refusing Ubuntu Docker fallback because Docker CE packages are already installed.',
             $script,
         );
     }
