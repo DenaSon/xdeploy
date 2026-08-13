@@ -72,12 +72,12 @@
         "test": [
             "Composer\\Config::disableProcessTimeout",
             "@php artisan config:clear --ansi",
-            "@lint:check",
             "@test:suite"
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
-            "@test"
+            "@php artisan config:clear --ansi",
+            "@test:suite"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
