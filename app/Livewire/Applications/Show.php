@@ -152,6 +152,59 @@ final class Show extends Component
         );
     }
 
+    /**
+     * Render only local application metadata while the full page is deferred.
+     * The expensive SSH-backed mount runs in Livewire's follow-up request.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    public function placeholder(array $params = []): View
+    {
+        $serverParam = $params['server'] ?? null;
+
+        $server = $serverParam instanceof Server
+            ? $serverParam
+            : Server::query()->findOrFail($serverParam);
+
+        $server = $this->resolveOwnedServer($server);
+
+        $type = ApplicationType::tryFrom(
+            (string) ($params['application'] ?? ''),
+        );
+
+        abort_if(
+            $type === null,
+            404,
+            'Application not found.',
+        );
+
+        $catalogItem = app(
+            GetApplicationCatalogItemAction::class,
+        )->execute($type);
+
+        $icon = $catalogItem['icon'] ?? null;
+
+        $icon = is_string($icon)
+        && trim($icon) !== ''
+            ? trim($icon)
+            : null;
+
+        return view(
+            'livewire.applications.show-placeholder',
+            [
+                'server' => $server,
+                'serverId' => (int) $server->getKey(),
+                'application' => $type->value,
+                'name' => (string) $catalogItem['name'],
+                'shortDescription' => (string) (
+                    $catalogItem['short_description']
+                    ?? ''
+                ),
+                'icon' => $icon,
+            ],
+        );
+    }
+
     public function refreshApplication(
         ApplicationManager $applicationManager,
         SSHConnectionCircuitBreaker $circuitBreaker,
