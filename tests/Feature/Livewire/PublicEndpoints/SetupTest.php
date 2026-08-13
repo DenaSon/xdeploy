@@ -84,8 +84,7 @@ final class SetupTest extends TestCase
 
         Queue::assertPushed(
             RunPublicEndpointOperationJob::class,
-            fn (RunPublicEndpointOperationJob $job): bool =>
-                $job->operationId === (int) $operation->getKey(),
+            fn (RunPublicEndpointOperationJob $job): bool => $job->operationId === (int) $operation->getKey(),
         );
     }
 
