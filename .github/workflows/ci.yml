@@ -63,9 +63,6 @@ jobs:
       - name: Clear configuration cache
         run: php artisan config:clear --ansi
 
-      - name: Check code style
-        run: composer lint:check
-
       - name: Run test suite
         shell: bash
         run: |

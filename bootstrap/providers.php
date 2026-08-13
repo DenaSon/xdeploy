@@ -1,5 +1,6 @@
 <?php
 
+use App\Providers\AmneziaWgServiceProvider;
 use App\Providers\ApplicationServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\CloudServiceProvider;
@@ -15,6 +16,7 @@ return [
     AppServiceProvider::class,
     ServerServiceProvider::class,
     ApplicationServiceProvider::class,
+    AmneziaWgServiceProvider::class,
     PlatformServiceProvider::class,
     CloudServiceProvider::class,
     SmsServiceProvider::class,
