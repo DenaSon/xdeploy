@@ -6,6 +6,7 @@ namespace Tests\Feature\Livewire\PublicEndpoints;
 
 use App\Application\PublicEndpoint\Contracts\PublicEndpointDriverInterface;
 use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
+use App\Application\PublicEndpoint\Operations\RunPublicEndpointOperationJob;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationState;
@@ -14,13 +15,16 @@ use App\Domain\PublicEndpoint\DTOs\PublicEndpointDnsPreflightResult;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointPreflightResult;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointRuntimeInfo;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointServerPreflightResult;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Livewire\PublicEndpoints\Setup;
 use App\Models\PublicEndpoint;
+use App\Models\PublicEndpointOperation;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -28,8 +32,10 @@ final class SetupTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_generic_setup_persists_pending_endpoint_and_activates_it(): void
+    public function test_activation_is_queued_without_running_remote_mutation_in_the_livewire_request(): void
     {
+        Queue::fake();
+
         $user = $this->createUser('09173432401');
         $server = $this->createServer($user);
         $driver = new SetupFakePublicEndpointDriver(ApplicationType::N8n);
@@ -48,9 +54,12 @@ final class SetupTest extends TestCase
             ->assertSet('dnsPreflight.ready', true)
             ->assertSet('serverPreflight.ready', true)
             ->call('activateEndpoint')
+            ->assertSet('operationActive', true)
+            ->assertSet('operationStatus', PublicEndpointOperationStatus::Pending->value)
             ->assertHasNoErrors();
 
         $endpoint = PublicEndpoint::query()->firstOrFail();
+        $operation = PublicEndpointOperation::query()->firstOrFail();
 
         $this->assertSame(
             ApplicationType::N8n,
@@ -60,9 +69,81 @@ final class SetupTest extends TestCase
             'automation.example.com',
             $endpoint->domain,
         );
-        $this->assertNotNull($endpoint->activated_at);
+        $this->assertNull($endpoint->activated_at);
         $this->assertSame(1, $driver->preflightCalls);
+        $this->assertSame(0, $driver->enableCalls);
+
+        $this->assertSame(
+            $endpoint->getKey(),
+            $operation->public_endpoint_id,
+        );
+        $this->assertSame(
+            PublicEndpointOperationStatus::Pending,
+            $operation->status,
+        );
+
+        Queue::assertPushed(
+            RunPublicEndpointOperationJob::class,
+            fn (RunPublicEndpointOperationJob $job): bool =>
+                $job->operationId === (int) $operation->getKey(),
+        );
+    }
+
+    public function test_queued_job_activates_endpoint_only_after_remote_enable_succeeds(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09173432403');
+        $server = $this->createServer($user);
+        $driver = new SetupFakePublicEndpointDriver(ApplicationType::N8n);
+
+        $this->bindDriver($driver);
+
+        $component = Livewire::actingAs($user)
+            ->test(Setup::class, [
+                'serverId' => $server->getKey(),
+                'applicationType' => ApplicationType::N8n->value,
+                'applicationName' => 'n8n',
+            ])
+            ->set('domain', 'automation.example.com')
+            ->call('runPreflight')
+            ->call('activateEndpoint');
+
+        $endpoint = PublicEndpoint::query()->firstOrFail();
+        $operation = PublicEndpointOperation::query()->firstOrFail();
+
+        $this->assertNull($endpoint->activated_at);
+
+        (new RunPublicEndpointOperationJob(
+            (int) $operation->getKey(),
+        ))->handle(
+            app(PublicEndpointDriverRegistry::class),
+        );
+
+        $endpoint->refresh();
+        $operation->refresh();
+
+        $this->assertNotNull($endpoint->activated_at);
+        $this->assertSame(
+            PublicEndpointOperationStatus::Succeeded,
+            $operation->status,
+        );
         $this->assertSame(1, $driver->enableCalls);
+
+        $component
+            ->call('pollOperation')
+            ->assertSet('operationActive', false)
+            ->assertSet(
+                'operationStatus',
+                PublicEndpointOperationStatus::Succeeded->value,
+            )
+            ->assertSet(
+                'activationSuccess',
+                'دامنه و HTTPS با موفقیت فعال شد.',
+            )
+            ->assertDispatched(
+                "public-endpoints-updated.{$server->getKey()}",
+            );
     }
 
     public function test_active_endpoint_cannot_be_replaced_from_setup_flow(): void

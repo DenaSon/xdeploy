@@ -1,4 +1,9 @@
-<div class="space-y-4">
+<div
+    class="space-y-4"
+    @if ($operationActive)
+        wire:poll.2s="pollOperation"
+    @endif
+>
     <section class="overflow-hidden rounded-2xl border border-base-300 bg-base-100">
         <header class="flex items-start gap-3.5 px-5 py-5 sm:px-6">
             <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary">
@@ -29,6 +34,7 @@
                     hint="دامنه را بدون https://، مسیر یا شماره پورت وارد کنید."
                     dir="ltr"
                     autocomplete="off"
+                    :disabled="$operationActive"
                     wire:loading.attr="disabled"
                     wire:target="runPreflight"
                 />
@@ -38,6 +44,7 @@
                     label="بررسی آمادگی"
                     icon="lucide.search-check"
                     spinner="runPreflight"
+                    :disabled="$operationActive"
                     wire:loading.attr="disabled"
                     wire:target="runPreflight"
                     class="btn-primary btn-sm rounded-xl lg:mb-6"
@@ -61,6 +68,27 @@
             </div>
         </form>
     </section>
+
+    @if ($operationActive)
+        <div
+            role="status"
+            aria-live="polite"
+            class="flex items-start gap-3 rounded-2xl border border-info/20 bg-info/5 px-5 py-4"
+        >
+            <span class="loading loading-spinner loading-sm mt-0.5 shrink-0 text-info"></span>
+
+            <div>
+                <p class="text-sm font-semibold text-base-content">
+                    فعال‌سازی HTTPS در پس‌زمینه
+                </p>
+
+                <p class="mt-1 text-sm leading-7 text-base-content/60">
+                    تنظیمات دامنه، Caddy و {{ $applicationName }} در صف provisioning در حال اعمال و بررسی است.
+                    می‌توانید این صفحه را باز نگه دارید؛ وضعیت عملیات به‌صورت خودکار بروزرسانی می‌شود.
+                </p>
+            </div>
+        </div>
+    @endif
 
     @if ($preflightError !== null)
         <div
@@ -267,6 +295,22 @@
         </section>
     @endif
 
+    @if ($activationSuccess !== null)
+        <div
+            role="status"
+            class="flex items-start gap-3 rounded-2xl border border-success/20 bg-success/5 px-5 py-4"
+        >
+            <x-icon
+                name="lucide.circle-check"
+                class="mt-0.5 !size-4 shrink-0 text-success"
+            />
+
+            <p class="text-sm leading-7 text-base-content/60">
+                {{ $activationSuccess }}
+            </p>
+        </div>
+    @endif
+
     @if ($activationError !== null)
         <div
             role="alert"
@@ -306,10 +350,11 @@
             </div>
 
             <x-button
-                label="فعال‌سازی HTTPS"
+                :label="$operationActive ? 'در حال فعال‌سازی…' : 'فعال‌سازی HTTPS'"
                 icon="lucide.lock-keyhole"
                 wire:click="activateEndpoint"
                 spinner="activateEndpoint"
+                :disabled="$operationActive"
                 wire:loading.attr="disabled"
                 wire:target="activateEndpoint"
                 class="btn-success btn-sm shrink-0 rounded-xl"

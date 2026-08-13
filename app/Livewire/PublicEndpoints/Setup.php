@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\PublicEndpoints;
 
+use App\Application\PublicEndpoint\Operations\Exceptions\PublicEndpointOperationInProgressException;
+use App\Application\PublicEndpoint\Operations\QueuePublicEndpointOperationAction;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Domain\PublicEndpoint\Exceptions\InvalidPublicEndpointDomainException;
 use App\Domain\PublicEndpoint\Exceptions\PublicEndpointOperationException;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Models\PublicEndpoint;
+use App\Models\PublicEndpointOperation;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -34,6 +39,13 @@ final class Setup extends Component
     #[Locked]
     public string $applicationName;
 
+    #[Locked]
+    public ?int $operationId = null;
+
+    public ?string $operationStatus = null;
+
+    public bool $operationActive = false;
+
     public string $domain = '';
 
     /** @var array<string, mixed>|null */
@@ -45,6 +57,8 @@ final class Setup extends Component
     public ?string $preflightError = null;
 
     public ?string $activationError = null;
+
+    public ?string $activationSuccess = null;
 
     public function mount(
         int $serverId,
@@ -73,6 +87,8 @@ final class Setup extends Component
 
         $this->endpointId = (int) $endpoint->getKey();
         $this->domain = $endpoint->domain;
+
+        $this->syncActiveOperation();
     }
 
     /** @return array<string, list<string>> */
@@ -91,22 +107,32 @@ final class Setup extends Component
 
     public function updatedDomain(): void
     {
+        if ($this->operationActive) {
+            return;
+        }
+
         $this->dnsPreflight = null;
         $this->serverPreflight = null;
         $this->preflightError = null;
         $this->activationError = null;
+        $this->activationSuccess = null;
         $this->resetValidation('domain');
     }
 
     public function runPreflight(
         PublicEndpointDriverRegistry $drivers,
     ): void {
+        if ($this->operationActive) {
+            return;
+        }
+
         $this->validate();
 
         $this->dnsPreflight = null;
         $this->serverPreflight = null;
         $this->preflightError = null;
         $this->activationError = null;
+        $this->activationSuccess = null;
 
         try {
             $domain = PublicEndpointDomain::from($this->domain);
@@ -146,10 +172,15 @@ final class Setup extends Component
     }
 
     public function activateEndpoint(
-        PublicEndpointDriverRegistry $drivers,
+        QueuePublicEndpointOperationAction $queueOperation,
     ): void {
+        if ($this->operationActive) {
+            return;
+        }
+
         $this->validate();
         $this->activationError = null;
+        $this->activationSuccess = null;
 
         if (! $this->readyForActivation()) {
             $this->activationError =
@@ -160,46 +191,93 @@ final class Setup extends Component
 
         try {
             $domain = PublicEndpointDomain::from($this->domain);
-            $driver = $drivers->find($this->type());
-            $status = $driver->enable(
+            $endpoint = $this->pendingEndpoint();
+
+            if ($endpoint->domain !== $domain->value) {
+                $this->activationError =
+                    'دامنه پس از آخرین بررسی تغییر کرده است. بررسی آمادگی را دوباره اجرا کنید.';
+
+                return;
+            }
+
+            $operation = $queueOperation->execute(
                 user: $this->authenticatedUser(),
                 server: $this->ownedServer($this->serverId),
-                domain: $domain,
+                endpoint: $endpoint,
+                operationType: PublicEndpointOperationType::Enable,
             );
 
-            $endpoint = $this->pendingEndpoint();
-            $endpoint->domain = $domain->value;
-            $endpoint->activated_at = now();
-            $endpoint->save();
-
-            $this->dispatch(
-                "public-endpoints-updated.{$this->serverId}",
-            );
-
-            $this->dispatch(
-                "public-endpoint-status-updated.{$this->serverId}",
-                application: $this->applicationType,
-                status: $status->toArray(),
-                openUrl: $driver->openUrl($domain),
-            );
+            $this->operationId = (int) $operation->getKey();
+            $this->operationStatus = $operation->status->value;
+            $this->operationActive = true;
         } catch (InvalidPublicEndpointDomainException) {
             $this->addError(
                 'domain',
                 'فقط دامنه یا ساب‌دامنه معتبر وارد کنید؛ بدون پروتکل، مسیر، پورت یا Wildcard.',
             );
-        } catch (PublicEndpointOperationException $exception) {
-            report($exception);
-
-            if ($exception->failure === PublicEndpointOperationFailure::Preflight) {
-                $this->dnsPreflight = null;
-                $this->serverPreflight = null;
-            }
-
-            $this->activationError = $this->activationErrorMessage($exception);
+        } catch (PublicEndpointOperationInProgressException) {
+            $this->syncActiveOperation();
+            $this->activationError =
+                'فعال‌سازی این دامنه از قبل در حال انجام است.';
         } catch (Throwable $exception) {
             report($exception);
             $this->activationError =
-                'فعال‌سازی HTTPS با خطای پیش‌بینی‌نشده متوقف شد. وضعیت برنامه را بروزرسانی و دوباره بررسی کنید.';
+                'شروع فعال‌سازی HTTPS با خطا مواجه شد. دوباره تلاش کنید.';
+        }
+    }
+
+    public function pollOperation(): void
+    {
+        if ($this->operationId === null) {
+            $this->syncActiveOperation();
+
+            return;
+        }
+
+        $operation = PublicEndpointOperation::query()
+            ->whereKey($this->operationId)
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('application_type', $this->applicationType)
+            ->first();
+
+        if (! $operation instanceof PublicEndpointOperation) {
+            $this->operationId = null;
+            $this->operationStatus = null;
+            $this->operationActive = false;
+            $this->activationError =
+                'وضعیت عملیات فعال‌سازی در دسترس نیست. صفحه را بروزرسانی کنید.';
+
+            return;
+        }
+
+        $this->operationStatus = $operation->status->value;
+        $this->operationActive = $operation->isActive();
+
+        if ($this->operationActive) {
+            return;
+        }
+
+        if ($operation->status === PublicEndpointOperationStatus::Succeeded) {
+            $this->activationError = null;
+            $this->activationSuccess =
+                'دامنه و HTTPS با موفقیت فعال شد.';
+
+            $this->dispatch(
+                "public-endpoints-updated.{$this->serverId}",
+            );
+
+            return;
+        }
+
+        $this->activationSuccess = null;
+        $this->activationError = $this->operationFailureMessage(
+            $operation->failure_code,
+        );
+
+        if ($operation->failure_code === PublicEndpointOperationFailure::Preflight->value) {
+            $this->dnsPreflight = null;
+            $this->serverPreflight = null;
         }
     }
 
@@ -224,6 +302,23 @@ final class Setup extends Component
                     'برای این برنامه از قبل یک دامنه فعال ثبت شده است.';
 
                 return false;
+            }
+
+            if ($endpoint !== null) {
+                $activeOperationExists = PublicEndpointOperation::query()
+                    ->where('public_endpoint_id', $endpoint->getKey())
+                    ->active()
+                    ->exists();
+
+                if ($activeOperationExists) {
+                    $this->endpointId = (int) $endpoint->getKey();
+                    $this->domain = $endpoint->domain;
+                    $this->syncActiveOperation();
+                    $this->activationError =
+                        'فعال‌سازی این دامنه از قبل در حال انجام است.';
+
+                    return false;
+                }
             }
 
             if ($endpoint === null) {
@@ -280,6 +375,34 @@ final class Setup extends Component
             && ($this->dnsPreflight['domain'] ?? null) === $this->domain;
     }
 
+    private function syncActiveOperation(): void
+    {
+        if ($this->endpointId === null) {
+            $this->operationId = null;
+            $this->operationStatus = null;
+            $this->operationActive = false;
+
+            return;
+        }
+
+        $operation = PublicEndpointOperation::query()
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('public_endpoint_id', $this->endpointId)
+            ->where('application_type', $this->applicationType)
+            ->active()
+            ->latest('id')
+            ->first();
+
+        $this->operationId = $operation instanceof PublicEndpointOperation
+            ? (int) $operation->getKey()
+            : null;
+        $this->operationStatus = $operation instanceof PublicEndpointOperation
+            ? $operation->status->value
+            : null;
+        $this->operationActive = $operation instanceof PublicEndpointOperation;
+    }
+
     private function preflightErrorMessage(
         PublicEndpointOperationException $exception,
     ): string {
@@ -289,25 +412,26 @@ final class Setup extends Component
         };
     }
 
-    private function activationErrorMessage(
-        PublicEndpointOperationException $exception,
-    ): string {
-        if ($exception->recoveryAttempted()) {
-            if ($exception->recovered()) {
-                return 'فعال‌سازی کامل نشد؛ تغییرات با موفقیت بازگردانده شدند و برنامه در وضعیت قبلی اجرا می‌شود.';
-            }
-
-            return 'فعال‌سازی شکست خورد و بازیابی کامل نشد. تا بررسی دستی وضعیت برنامه و Caddy دوباره تلاش نکنید.';
-        }
-
-        return match ($exception->failure) {
-            PublicEndpointOperationFailure::Preflight => 'آمادگی دامنه یا سرور تغییر کرده است. بررسی آمادگی را دوباره اجرا کنید.',
-            PublicEndpointOperationFailure::ExistingConfiguration => 'وضعیت دامنه روی سرور تغییر کرده است. صفحه دامنه‌ها را بروزرسانی کنید.',
-            PublicEndpointOperationFailure::OperationInProgress => 'یک عملیات دامنه دیگر روی این سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
-            PublicEndpointOperationFailure::EnvironmentUnavailable => 'ابزارها یا فایل‌های لازم برای اعمال امن HTTPS در دسترس نیستند.',
-            PublicEndpointOperationFailure::CandidateValidation => 'تنظیمات پیشنهادی معتبر نبود و هیچ تغییری روی فایل‌های اصلی اعمال نشد.',
-            PublicEndpointOperationFailure::Mutation,
-            PublicEndpointOperationFailure::Verification => 'فعال‌سازی HTTPS کامل نشد. وضعیت برنامه را بروزرسانی و دوباره بررسی کنید.',
+    private function operationFailureMessage(?string $failureCode): string
+    {
+        return match ($failureCode) {
+            PublicEndpointOperationFailure::Preflight->value =>
+                'آمادگی دامنه یا سرور تغییر کرده است. بررسی آمادگی را دوباره اجرا کنید.',
+            PublicEndpointOperationFailure::ExistingConfiguration->value =>
+                'وضعیت دامنه روی سرور تغییر کرده است. صفحه دامنه‌ها را بروزرسانی کنید.',
+            PublicEndpointOperationFailure::OperationInProgress->value =>
+                'یک عملیات دامنه دیگر روی این سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
+            PublicEndpointOperationFailure::EnvironmentUnavailable->value =>
+                'ابزارها یا فایل‌های لازم برای اعمال امن HTTPS در دسترس نیستند.',
+            PublicEndpointOperationFailure::CandidateValidation->value =>
+                'تنظیمات پیشنهادی معتبر نبود و هیچ تغییری روی فایل‌های اصلی اعمال نشد.',
+            PublicEndpointOperationFailure::Mutation->value,
+            PublicEndpointOperationFailure::Verification->value =>
+                'فعال‌سازی HTTPS کامل نشد. تغییرات ایمن‌سازی یا بازیابی شدند؛ وضعیت برنامه را بررسی کنید.',
+            'dispatch_failed' =>
+                'عملیات فعال‌سازی در صف اجرا قرار نگرفت. دوباره تلاش کنید.',
+            default =>
+                'فعال‌سازی HTTPS در پس‌زمینه با خطا متوقف شد. وضعیت برنامه را بروزرسانی کنید.',
         };
     }
 
