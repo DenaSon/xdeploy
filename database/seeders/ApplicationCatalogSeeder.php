@@ -18,7 +18,7 @@ final class ApplicationCatalogSeeder extends Seeder
             [
                 'name' => 'Marzban',
                 'short_description' => 'پنل مدیریت کاربران و سرویس‌های مبتنی بر Xray',
-                'description' => 'Marzban یک پنل مدیریت Xray است. xDeploy نصب، راه‌اندازی و مدیریت چرخه اجرای آن را روی سرور انجام می‌دهد.',
+                'description' => 'Marzban یک پنل متن‌باز برای مدیریت کاربران و سرویس‌های مبتنی بر Xray است که امکاناتی مانند مدیریت دسترسی‌ها، مصرف ترافیک، محدودیت کاربران و پروتکل‌های مختلف اتصال را فراهم می‌کند.',
                 'icon' => 'lucide.shield-check',
                 'is_published' => true,
                 'sort_order' => 10,
@@ -31,8 +31,8 @@ final class ApplicationCatalogSeeder extends Seeder
             ],
             [
                 'name' => 'n8n',
-                'short_description' => 'ساخت و اجرای گردش‌کارهای اتوماسیون روی سرور شخصی',
-                'description' => 'n8n یک پلتفرم اتوماسیون self-hosted برای اتصال سرویس‌ها، APIها و ساخت workflow است. xDeploy نصب و مدیریت چرخه اجرای آن را روی سرور انجام می‌دهد.',
+                'short_description' => 'پلتفرم اتوماسیون و ساخت گردش‌کار بین سرویس‌ها و APIها',
+                'description' => 'n8n یک پلتفرم متن‌باز برای ساخت و اجرای گردش‌کارهای خودکار است که امکان اتصال سرویس‌ها، APIها، پایگاه‌های داده و ابزارهای مختلف را بدون نیاز به توسعه یکپارچه‌سازی‌های پیچیده فراهم می‌کند.',
                 'icon' => 'lucide.workflow',
                 'is_published' => true,
                 'sort_order' => 20,
