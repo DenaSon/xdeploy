@@ -36,7 +36,7 @@ final class InterruptedOperationRecoveryTest extends TestCase
             $command,
         );
         self::assertStringContainsString(
-            "transaction_file=\"$marzban_path/.xdeploy-https-runtime-transaction\"",
+            'transaction_file="$marzban_path/.xdeploy-https-runtime-transaction"',
             $command,
         );
         self::assertStringContainsString(
@@ -90,7 +90,7 @@ final class InterruptedOperationRecoveryTest extends TestCase
             $command,
         );
         self::assertStringContainsString(
-            "transaction_file=\"$app_dir/.xdeploy-public-endpoint-transaction\"",
+            'transaction_file="$app_dir/.xdeploy-public-endpoint-transaction"',
             $command,
         );
         self::assertStringContainsString(
