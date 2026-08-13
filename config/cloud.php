@@ -225,6 +225,23 @@ return [
 
             /*
             |--------------------------------------------------------------------------
+            | Package Repositories
+            |--------------------------------------------------------------------------
+            |
+            | Arvan-provisioned Ubuntu servers use the provider-local HTTPS mirror
+            | before xDeploy performs package-based application provisioning.
+            |
+            */
+
+            'package_repositories' => [
+                'ubuntu_mirror' => env(
+                    'ARVAN_CLOUD_UBUNTU_MIRROR',
+                    'https://mirror.arvancloud.ir/ubuntu',
+                ),
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
             | Provisioning Defaults
             |--------------------------------------------------------------------------
             */

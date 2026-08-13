@@ -4,13 +4,29 @@ set -Eeuo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-readonly INSTALLER_TIMEOUT_SECONDS=300
+readonly INSTALLER_TIMEOUT_SECONDS=1800
 readonly INSTALLER_KILL_AFTER_SECONDS=10
 readonly APT_LOCK_TIMEOUT_SECONDS=120
 readonly APT_ACQUIRE_TIMEOUT_SECONDS=45
 readonly APT_RETRIES=3
+readonly XDEPLOY_DOCKER_KEYRING='/etc/apt/keyrings/xdeploy-docker.asc'
+readonly XDEPLOY_DOCKER_SOURCE='/etc/apt/sources.list.d/xdeploy-docker.list'
 
 stage='initialization'
+
+official_docker_packages=(
+    docker-ce
+    docker-ce-cli
+    containerd.io
+    docker-buildx-plugin
+    docker-compose-plugin
+)
+
+ubuntu_docker_packages=(
+    docker.io
+    docker-compose-v2
+    docker-buildx
+)
 
 log() {
     printf '[xDeploy][docker] %s\n' "$1"
@@ -34,10 +50,112 @@ on_error() {
 apt_get() {
     apt-get \
         -o "DPkg::Lock::Timeout=${APT_LOCK_TIMEOUT_SECONDS}" \
+        -o Acquire::ForceIPv4=true \
         -o "Acquire::Retries=${APT_RETRIES}" \
         -o "Acquire::http::Timeout=${APT_ACQUIRE_TIMEOUT_SECONDS}" \
         -o "Acquire::https::Timeout=${APT_ACQUIRE_TIMEOUT_SECONDS}" \
         "$@"
+}
+
+package_is_installed() {
+    dpkg-query -W -f='${Status}' -- "$1" 2>/dev/null \
+        | grep -q '^install ok installed$'
+}
+
+package_has_candidate() {
+    local candidate
+
+    candidate="$(
+        apt-cache policy "$1" \
+            | awk '/Candidate:/ { print $2; exit }'
+    )"
+
+    [[ -n "$candidate" && "$candidate" != '(none)' ]]
+}
+
+all_packages_have_candidates() {
+    local package
+
+    for package in "$@"; do
+        if ! package_has_candidate "$package"; then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+remove_xdeploy_official_repository() {
+    rm -f \
+        "$XDEPLOY_DOCKER_SOURCE" \
+        "$XDEPLOY_DOCKER_KEYRING"
+}
+
+verify_docker_stack() {
+    stage='enable_docker_service'
+    log 'Enabling Docker service.'
+    systemctl enable --now docker
+
+    stage='verify_docker_cli'
+    log 'Verifying Docker CLI.'
+    docker --version
+
+    stage='verify_docker_compose'
+    log 'Verifying Docker Compose V2.'
+    docker compose version
+
+    stage='verify_docker_buildx'
+    log 'Verifying Docker Buildx.'
+    docker buildx version
+
+    stage='verify_docker_service'
+    log 'Verifying Docker service state.'
+    systemctl is-active --quiet docker
+}
+
+install_ubuntu_repository_fallback() {
+    local reason="$1"
+    local package
+
+    log "Official Docker repository is unavailable during [${reason}]. Falling back to Ubuntu packages."
+
+    remove_xdeploy_official_repository
+
+    stage='ubuntu_fallback_repository_update'
+    apt_get update
+
+    stage='ubuntu_fallback_package_preflight'
+    if ! all_packages_have_candidates "${ubuntu_docker_packages[@]}"; then
+        fail 'Ubuntu Docker fallback packages are not available for this release.'
+    fi
+
+    if ! apt_get install --dry-run --no-install-recommends \
+        "${ubuntu_docker_packages[@]}" >/dev/null; then
+        fail 'The Ubuntu Docker fallback package transaction cannot be resolved safely.'
+    fi
+
+    for package in "${official_docker_packages[@]}"; do
+        if package_is_installed "$package"; then
+            fail 'Refusing Ubuntu Docker fallback because Docker CE packages are already installed.'
+        fi
+    done
+
+    stage='ubuntu_fallback_package_download'
+    log 'Downloading Docker Engine, Buildx, and Docker Compose V2 from Ubuntu repositories.'
+    apt_get install -y --download-only --no-install-recommends \
+        "${ubuntu_docker_packages[@]}"
+
+    stage='ubuntu_fallback_package_install'
+    log 'Installing the downloaded Ubuntu Docker package set.'
+    apt_get install -y --no-download --no-install-recommends \
+        "${ubuntu_docker_packages[@]}"
+
+    verify_docker_stack
+
+    trap - ERR
+
+    log 'Docker installation completed successfully using Ubuntu repository fallback.'
+    exit 0
 }
 
 trap on_error ERR
@@ -82,17 +200,13 @@ fi
 log "Detected ${PRETTY_NAME:-${ID} ${VERSION_ID}}."
 
 if command -v docker >/dev/null 2>&1 \
-    && docker compose version >/dev/null 2>&1; then
-    log 'Docker Engine and Docker Compose V2 are already available.'
+    && docker compose version >/dev/null 2>&1 \
+    && docker buildx version >/dev/null 2>&1; then
+    log 'Docker Engine, Docker Compose V2, and Docker Buildx are already available.'
 
-    stage='enable_existing_docker'
-    systemctl enable --now docker
+    verify_docker_stack
 
-    stage='verify_existing_docker'
-    docker --version
-    docker compose version
-    docker buildx version
-    systemctl is-active --quiet docker
+    trap - ERR
 
     log 'Docker stack is ready.'
     exit 0
@@ -111,30 +225,79 @@ apt_get install -y --no-install-recommends \
 stage='docker_repository_key'
 log 'Configuring the official Docker APT repository.'
 install -m 0755 -d /etc/apt/keyrings
-curl \
+
+key_candidate="$(mktemp)"
+trap 'rm -f "$key_candidate"' EXIT
+
+if ! curl \
+    --ipv4 \
+    --http1.1 \
     --proto '=https' \
     --tlsv1.2 \
     --fail \
     --silent \
     --show-error \
     --location \
-    --retry 3 \
+    --retry 2 \
+    --retry-delay 2 \
     --retry-all-errors \
     --connect-timeout 10 \
-    --max-time 60 \
+    --max-time 30 \
     "https://download.docker.com/linux/${ID}/gpg" \
-    -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
+    -o "$key_candidate"; then
+    if [[ "$ID" == 'ubuntu' ]]; then
+        install_ubuntu_repository_fallback "$stage"
+    fi
+
+    fail 'Unable to download the official Docker repository signing key.'
+fi
+
+install -m 0644 \
+    "$key_candidate" \
+    "$XDEPLOY_DOCKER_KEYRING"
+rm -f "$key_candidate"
+trap - EXIT
 
 architecture="$(dpkg --print-architecture)"
 
-cat > /etc/apt/sources.list.d/docker.list <<EOF_REPOSITORY
-deb [arch=${architecture} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable
+cat > "$XDEPLOY_DOCKER_SOURCE" <<EOF_REPOSITORY
+deb [arch=${architecture} signed-by=${XDEPLOY_DOCKER_KEYRING}] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable
 EOF_REPOSITORY
 
 stage='docker_repository_update'
 log 'Refreshing Docker repository metadata.'
-apt_get update
+
+if ! apt_get update; then
+    if [[ "$ID" == 'ubuntu' ]]; then
+        install_ubuntu_repository_fallback "$stage"
+    fi
+
+    fail 'Unable to refresh the official Docker repository metadata.'
+fi
+
+stage='docker_ce_package_preflight'
+
+if ! all_packages_have_candidates "${official_docker_packages[@]}"; then
+    if [[ "$ID" == 'ubuntu' ]]; then
+        install_ubuntu_repository_fallback "$stage"
+    fi
+
+    fail 'The complete Docker CE package set is not available from the official repository.'
+fi
+
+if ! apt_get install --dry-run --no-install-recommends \
+    "${official_docker_packages[@]}" >/dev/null; then
+    if [[ "$ID" == 'ubuntu' ]]; then
+        install_ubuntu_repository_fallback "$stage"
+    fi
+
+    fail 'The Docker CE package transaction cannot be resolved safely.'
+fi
+
+stage='docker_ce_package_download'
+log 'Downloading Docker Engine, Buildx, and Docker Compose V2 from the official Docker repository.'
+apt_get install -y --download-only --no-install-recommends \
+    "${official_docker_packages[@]}"
 
 conflicting_packages=(
     docker.io
@@ -149,8 +312,7 @@ conflicting_packages=(
 installed_conflicts=()
 
 for package in "${conflicting_packages[@]}"; do
-    if dpkg-query -W -f='${Status}' -- "$package" 2>/dev/null \
-        | grep -q '^install ok installed$'; then
+    if package_is_installed "$package"; then
         installed_conflicts+=("$package")
     fi
 done
@@ -162,33 +324,11 @@ if (( ${#installed_conflicts[@]} > 0 )); then
 fi
 
 stage='install_docker_ce'
-log 'Installing Docker Engine, Buildx, and Docker Compose V2.'
-apt_get install -y --no-install-recommends \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
-    docker-buildx-plugin \
-    docker-compose-plugin
+log 'Installing the downloaded Docker CE package set.'
+apt_get install -y --no-download --no-install-recommends \
+    "${official_docker_packages[@]}"
 
-stage='enable_docker_service'
-log 'Enabling Docker service.'
-systemctl enable --now docker
-
-stage='verify_docker_cli'
-log 'Verifying Docker CLI.'
-docker --version
-
-stage='verify_docker_compose'
-log 'Verifying Docker Compose V2.'
-docker compose version
-
-stage='verify_docker_buildx'
-log 'Verifying Docker Buildx.'
-docker buildx version
-
-stage='verify_docker_service'
-log 'Verifying Docker service state.'
-systemctl is-active --quiet docker
+verify_docker_stack
 
 trap - ERR
 

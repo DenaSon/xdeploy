@@ -31,15 +31,7 @@ final class N8nInstallerAssetTest extends TestCase
 
     public function test_n8n_installer_keeps_the_service_private_and_persistent(): void
     {
-        $contents = file_get_contents(
-            public_path(
-                'assets/installers/n8n/docker.sh',
-            ),
-        );
-
-        $this->assertIsString(
-            $contents,
-        );
+        $contents = $this->installerContents();
 
         $this->assertStringContainsString(
             'docker.n8n.io/n8nio/n8n:2.32.6',
@@ -73,5 +65,68 @@ final class N8nInstallerAssetTest extends TestCase
             'caddy',
             strtolower($contents),
         );
+    }
+
+    public function test_n8n_installer_reports_structured_failure_stages_and_bounds_image_pull(): void
+    {
+        $contents = $this->installerContents();
+
+        foreach (
+            [
+                "stage='prerequisites'",
+                "stage='compose_config_write'",
+                "stage='environment_write'",
+                "stage='compose_validation'",
+                "stage='image_pull'",
+                "stage='compose_up'",
+                "stage='container_wait'",
+                "stage='container_verify'",
+            ] as $stage
+        ) {
+            $this->assertStringContainsString(
+                $stage,
+                $contents,
+            );
+        }
+
+        $this->assertStringContainsString(
+            "printf '[xDeploy][n8n][error] stage=%s exit_code=%s\\n'",
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'readonly IMAGE_PULL_TIMEOUT_SECONDS=300',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'readonly IMAGE_PULL_KILL_AFTER_SECONDS=10',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            '--signal=TERM',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            '--kill-after="${IMAGE_PULL_KILL_AFTER_SECONDS}s"',
+            $contents,
+        );
+        $this->assertStringNotContainsString(
+            '--foreground',
+            $contents,
+        );
+    }
+
+    private function installerContents(): string
+    {
+        $contents = file_get_contents(
+            public_path(
+                'assets/installers/n8n/docker.sh',
+            ),
+        );
+
+        $this->assertIsString(
+            $contents,
+        );
+
+        return $contents;
     }
 }

@@ -8,6 +8,7 @@ use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
 use App\Domain\Application\Shared\Exceptions\ApplicationUninstallException;
+use App\Support\Installers\InstallerFailureMarker;
 use App\Support\SSH\SSHTimeout;
 use RuntimeException;
 
@@ -53,11 +54,16 @@ abstract readonly class CommandApplication extends AbstractApplication
         );
 
         if (! $result->successful()) {
+            $failureMarker = InstallerFailureMarker::fromOutput(
+                $result->output,
+            );
+
             throw new ApplicationInstallationException(
-                sprintf(
+                message: sprintf(
                     'Application [%s] installation command failed.',
                     $this->type()->value,
                 ),
+                failureCode: $failureMarker?->failureCode(),
             );
         }
 
