@@ -19,14 +19,6 @@
         ?? ''
     );
 
-    $description = $application['description']
-        ?? null;
-
-    $description = is_string($description)
-        && trim($description) !== ''
-            ? trim($description)
-            : null;
-
     $icon = $application['icon']
         ?? null;
 
@@ -50,48 +42,43 @@
     );
 @endphp
 
-<article
+<a
+    href="{{ $showRoute }}"
+    wire:navigate
+    aria-label="مشاهده برنامه {{ $name }}"
     {{ $attributes->class([
-        'group relative flex h-full flex-col overflow-hidden',
-        'rounded-2xl border border-base-300 bg-base-100',
-        'shadow-[0_4px_18px_rgba(15,23,42,0.035)]',
+        'card group h-full overflow-hidden',
+        'border border-base-300 bg-base-100',
+        'shadow-sm',
         'transition-all duration-200',
         'hover:-translate-y-0.5',
-        'hover:border-primary/30',
-        'hover:shadow-[0_12px_30px_rgba(15,23,42,0.07)]',
+        'hover:border-primary/25',
+        'hover:shadow-md',
+        'focus-visible:outline-none',
+        'focus-visible:ring-2 focus-visible:ring-primary/30',
     ]) }}
-    x-data="{ expanded: false }"
 >
-    {{-- Top accent --}}
-    <div
-        class="absolute inset-x-0 top-0
-               h-1 bg-primary"
-    ></div>
+    <div class="card-body gap-4 p-5">
 
-    {{-- Application identity --}}
-    <div
-        class="relative border-b border-base-300
-               px-4 pb-3.5 pt-4.5"
-    >
-        <div
-            class="flex min-w-0
-                   items-center gap-3.5"
-        >
+        {{-- Application identity --}}
+        <div class="flex min-w-0 items-start gap-3.5">
+
             {{-- Application logo --}}
             <div
-                class="flex size-13 shrink-0
+                class="flex size-12 shrink-0
                        items-center justify-center
                        overflow-hidden rounded-xl
-                       border border-primary/15
-                       bg-primary/[0.06]
+                       border border-base-300
+                       bg-base-200/45
                        transition-colors duration-200
-                       group-hover:bg-primary/[0.09]"
+                       group-hover:border-primary/20
+                       group-hover:bg-primary/[0.06]"
             >
                 @if ($usesLucideIcon)
 
                     <x-icon
                         :name="$icon"
-                        class="size-6 text-primary"
+                        class="!size-5.5 text-primary"
                     />
 
                 @elseif ($icon !== null)
@@ -99,228 +86,89 @@
                     <img
                         src="{{ asset($icon) }}"
                         alt="{{ $name }}"
-                        class="size-9 object-contain"
+                        class="size-8 object-contain"
                     />
-
 
                 @else
 
                     <x-icon
                         name="lucide.package"
-                        class="size-6 text-primary/60"
+                        class="!size-5.5 text-primary/70"
                     />
 
                 @endif
             </div>
 
-            {{-- Name and support --}}
-            <div
-                class="min-w-0 flex-1
-                       text-right"
-            >
-                <h3
-                    class="truncate
-                           text-base font-semibold
-                           leading-6
-                           text-base-content"
-                >
-                    {{ $name }}
-                </h3>
+            {{-- Name and support state --}}
+            <div class="min-w-0 flex-1 text-right">
 
-                <div
-                    class="mt-1.5 flex
-                           items-center justify-start"
-                >
+                <div class="flex min-w-0 items-center gap-2">
+                    <h3
+                        class="min-w-0 flex-1 truncate
+                               text-base font-semibold
+                               leading-6 text-base-content"
+                    >
+                        {{ $name }}
+                    </h3>
+
                     <span
-                        class="inline-flex items-center
-                               gap-1.5 rounded-full
-                               bg-success/10
-                               px-1 py-1
-                               text-[11px] font-medium
-                               text-success"
+                        class="badge badge-success badge-soft badge-xs
+                               shrink-0 gap-1 px-1.5
+                               text-[10px] font-medium"
                     >
                         <x-icon
-                            name="lucide.badge-check"
-                            class="size-1.5"
+                            name="lucide.check"
+                            class="!size-2.5"
                         />
 
-
+                        پشتیبانی‌شده
                     </span>
                 </div>
-            </div>
 
-            {{-- Information --}}
-            @if ($description !== null)
-
-                <div
-                    class="tooltip tooltip-top
-           before:z-50 before:whitespace-nowrap before:text-xs
-           after:z-50"
-                    data-tip="اطلاعات"
-                >
-                    <button
-                        type="button"
-                        @click="expanded = ! expanded"
-                        x-bind:aria-expanded="expanded.toString()"
-                        x-bind:class="{
-            'border-primary/20 bg-primary/10 text-primary':
-                expanded,
-        }"
-                        aria-label="اطلاعات بیشتر درباره {{ $name }}"
-                        class="flex size-9 shrink-0
-               items-center justify-center
-               rounded-xl
-               border border-base-300
-               bg-base-100
-               text-base-content/40
-               transition-all duration-150
-               hover:border-primary/20
-               hover:bg-primary/5
-               hover:text-primary"
-                    >
-                        <x-icon
-                            name="lucide.info"
-                            class="size-4"
-                        />
-                    </button>
-                </div>
-
-            @endif
-        </div>
-    </div>
-
-    {{-- Application summary --}}
-    <div
-        class="flex flex-1 flex-col
-               px-4 py-3.5"
-    >
-        @if ($shortDescription !== '')
-
-            <p
-                class="line-clamp-2
-                       text-sm leading-6
-                       text-base-content/60"
-            >
-                {{ $shortDescription }}
-            </p>
-
-        @endif
-
-        {{-- Extended information --}}
-        @if ($description !== null)
-
-            <div
-                x-cloak
-                x-show="expanded"
-                x-collapse
-            >
-                <div
-                    class="mt-3
-                           border-r-2 border-primary/35
-                           pr-3"
-                >
-                    <div
-                        class="mb-1 flex items-center
-                               gap-1.5
-                               text-[11px] font-medium
-                               text-base-content/45"
-                    >
-                        <x-icon
-                            name="lucide.info"
-                            class="size-3.5"
-                        />
-
-                        <span>
-                            درباره برنامه
-                        </span>
-                    </div>
+                @if ($shortDescription !== '')
 
                     <p
-                        class="text-xs leading-6
+                        class="mt-2 line-clamp-2
+                               text-sm leading-6
                                text-base-content/55"
                     >
-                        {{ $description }}
+                        {{ $shortDescription }}
                     </p>
-                </div>
+
+                @endif
             </div>
+        </div>
 
-        @endif
-    </div>
-
-    {{-- Application action --}}
-    <a
-        href="{{ $showRoute }}"
-        wire:navigate
-        class="group/action
-               flex items-center
-               justify-between gap-4
-               border-t border-base-300
-               bg-base-200/30
-               px-4 py-3
-               transition-colors duration-150
-               hover:bg-primary/[0.06]"
-    >
-        {{-- Action information --}}
+        {{-- Application action --}}
         <div
-            class="flex min-w-0
-                   items-center gap-2.5"
+            class="card-actions mt-auto
+                   items-center justify-between
+                   border-t border-base-300/80
+                   pt-3.5"
         >
-            <div
-                class="flex size-8 shrink-0
-                       items-center justify-center
-                       rounded-lg
-                       bg-primary/8
-                       text-primary
-                       transition-colors duration-150
-                       group-hover/action:bg-primary/12"
+            <span
+                class="text-[11px]
+                       text-base-content/35"
             >
+                نصب، راه‌اندازی و مدیریت
+            </span>
+
+            <span
+                class="btn btn-ghost btn-sm
+                       pointer-events-none gap-1.5
+                       px-2 text-primary
+                       group-hover:bg-primary/8"
+            >
+                مشاهده برنامه
+
                 <x-icon
-                    name="lucide.sliders-horizontal"
-                    class="size-4"
+                    name="lucide.arrow-left"
+                    class="!size-3.5
+                           transition-transform duration-200
+                           group-hover:-translate-x-0.5"
                 />
-            </div>
-
-            <div class="min-w-0 text-right">
-
-                <p
-                    class="text-sm font-semibold
-                           text-base-content/80
-                           transition-colors duration-150
-                           group-hover/action:text-primary"
-                >
-                    مدیریت برنامه
-                </p>
-
-                <p
-                    class="mt-0.5 truncate
-                           text-[11px]
-                           text-base-content/40"
-                >
-                    نصب، تنظیمات و عملیات
-                </p>
-
-            </div>
+            </span>
         </div>
 
-        {{-- Arrow --}}
-        <div
-            class="flex size-8 shrink-0
-                   items-center justify-center
-                   rounded-lg
-                   border border-base-300
-                   bg-base-100
-                   text-base-content/40
-                   transition-all duration-200
-                   group-hover/action:border-primary/20
-                   group-hover/action:bg-primary
-                   group-hover/action:text-primary-content"
-        >
-            <x-icon
-                name="lucide.arrow-left"
-                class="size-3.5
-                       transition-transform duration-200
-                       group-hover/action:-translate-x-0.5"
-            />
-        </div>
-    </a>
-</article>
+    </div>
+</a>
