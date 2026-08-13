@@ -44,7 +44,7 @@ final readonly class DeactivatePeerController
 
         return back()->with(
             'status',
-            'AmneziaWG peer deactivated.',
+            'دسترسی دستگاه AmneziaWG با موفقیت لغو شد.',
         );
     }
 }

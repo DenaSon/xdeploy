@@ -36,8 +36,8 @@
                            text-sm leading-7
                            text-base-content/55"
                 >
-                    برای هر دستگاه یک Peer مستقل با IP اختصاصی ساخته می‌شود.
-                    تغییرات بدون راه‌اندازی مجدد کانتینر روی runtime اعمال می‌شوند.
+                    برای هر دستگاه یک Peer مستقل ساخته می‌شود. کانفیگ را دانلود کنید،
+                    داخل کلاینت AmneziaWG وارد کنید و دسترسی هر دستگاه را جداگانه مدیریت کنید.
                 </p>
             </div>
         </div>
@@ -50,6 +50,25 @@
             class="btn-ghost btn-sm rounded-xl"
         />
     </header>
+
+    @if (session('status'))
+        <div
+            class="flex items-start gap-3
+                   border-b border-base-300
+                   bg-success/[0.04]
+                   px-5 py-4
+                   sm:px-6"
+        >
+            <x-icon
+                name="lucide.circle-check"
+                class="mt-0.5 size-4 shrink-0 text-success"
+            />
+
+            <p class="text-sm leading-6 text-base-content/60">
+                {{ session('status') }}
+            </p>
+        </div>
+    @endif
 
     <div class="border-b border-base-300 px-5 py-5 sm:px-6">
         <x-form
@@ -119,9 +138,9 @@
             <article
                 class="flex flex-col gap-4
                        px-5 py-4
-                       sm:flex-row
-                       sm:items-center
-                       sm:justify-between
+                       lg:flex-row
+                       lg:items-center
+                       lg:justify-between
                        sm:px-6"
             >
                 <div class="flex min-w-0 items-center gap-3">
@@ -183,6 +202,36 @@
                             </span>
                         </div>
                     </div>
+                </div>
+
+                <div class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                    <x-button
+                        label="دانلود کانفیگ"
+                        icon="lucide.download"
+                        :link="route(
+                            'panel.servers.applications.amneziawg.peers.config',
+                            [$serverId, $peer['id']],
+                        )"
+                        class="btn-ghost btn-sm rounded-xl"
+                    />
+
+                    <form
+                        method="POST"
+                        action="{{ route(
+                            'panel.servers.applications.amneziawg.peers.deactivate',
+                            [$serverId, $peer['id']],
+                        ) }}"
+                        onsubmit="return confirm('دسترسی این دستگاه لغو شود؟ کانفیگ فعلی دیگر قابل استفاده نخواهد بود.')"
+                    >
+                        @csrf
+
+                        <x-button
+                            label="لغو دسترسی"
+                            icon="lucide.user-x"
+                            type="submit"
+                            class="btn-ghost btn-sm rounded-xl text-error hover:bg-error/10"
+                        />
+                    </form>
                 </div>
             </article>
         @empty
