@@ -1,20 +1,65 @@
+@php
+    $productName = config('app.name');
+@endphp
+
 <section
     id="how-it-works"
     class="
         relative
+        scroll-mt-24
+        overflow-hidden
+
         border-b border-base-300/60
-        bg-base-200/40
+        bg-base-200/35
     "
 >
+    {{-- Background atmosphere --}}
+    <div
+        aria-hidden="true"
+        class="
+            pointer-events-none
+            absolute inset-0
+            overflow-hidden
+        "
+    >
+        <div
+            class="
+                absolute
+                -start-40 top-20
+                size-[28rem]
+                rounded-full
+                bg-primary/[0.035]
+                blur-3xl
+            "
+        ></div>
+
+        <div
+            class="
+                absolute
+                -end-48 bottom-0
+                size-[32rem]
+                rounded-full
+                bg-accent/[0.025]
+                blur-3xl
+            "
+        ></div>
+    </div>
+
+
     <div
         class="
-            mx-auto w-full max-w-7xl
+            relative
+
+            mx-auto
+            w-full max-w-7xl
+
             px-4 py-20
+
             sm:px-6 sm:py-24
+
             lg:px-8 lg:py-28
         "
     >
-
         {{-- Section heading --}}
         <div
             class="
@@ -30,7 +75,7 @@
 
                     rounded-full
                     border border-primary/15
-                    bg-primary/[0.06]
+                    bg-primary/[0.055]
 
                     px-3 py-1.5
 
@@ -43,55 +88,61 @@
                     class="!size-3.5 stroke-[1.8]"
                 />
 
-                نحوه عملکرد xDeploy
+                نحوه عملکرد
             </span>
+
 
             <h2
                 class="
                     mt-5
 
-                    text-3xl font-semibold
-                    leading-[1.4]
+                    text-3xl
+                    font-semibold
+                    leading-[1.45]
                     tracking-tight
-
                     text-base-content
 
                     sm:text-4xl
                 "
             >
-                از اتصال تا راه‌اندازی برنامه،
+                از آماده‌سازی سرور تا اجرای برنامه،
 
                 <span class="text-primary">
-                    در یک فرآیند مشخص
+                    در یک مسیر مشخص و قابل مدیریت
                 </span>
             </h2>
+
 
             <p
                 class="
                     mx-auto mt-4
                     max-w-xl
 
-                    text-sm leading-7
+                    text-sm
+                    leading-7
                     text-base-content/55
 
-                    sm:text-base sm:leading-8
+                    sm:text-base
+                    sm:leading-8
                 "
             >
-                xDeploy مراحل اتصال، بررسی، آماده‌سازی و مدیریت سرور
-                را در یک فرآیند یکپارچه ارائه می‌کند تا راه‌اندازی
-                برنامه‌های پشتیبانی‌شده با کنترل و شفافیت بیشتری
-                انجام شود.
+                مراحل اتصال یا تهیه سرور، بررسی پیش‌نیازها،
+                نصب برنامه و مدیریت سرویس‌ها در یک فرآیند
+                یکپارچه انجام می‌شود.
             </p>
         </div>
 
 
         {{-- Steps --}}
         <div
+            x-data="{ visible: false }"
+            x-intersect.once="visible = true"
             class="
                 relative
                 mt-14
 
-                grid gap-4
+                grid
+                gap-4
 
                 md:grid-cols-2
 
@@ -100,20 +151,23 @@
                 lg:gap-5
             "
         >
-
             {{-- Desktop connector --}}
             <div
                 aria-hidden="true"
                 class="
                     pointer-events-none
-                    absolute
 
+                    absolute
                     start-[12.5%]
                     end-[12.5%]
                     top-7
 
                     hidden h-px
-                    bg-base-300
+
+                    bg-gradient-to-l
+                    from-base-300/30
+                    via-base-300
+                    to-base-300/30
 
                     lg:block
                 "
@@ -122,27 +176,41 @@
 
             {{-- Step 01 --}}
             <article
+                :class="visible
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-3'"
                 class="
+                    group
                     relative
 
                     rounded-2xl
 
-                    border border-base-300
-                    bg-base-100
+                    border border-base-300/80
+                    bg-base-100/85
 
                     p-5
 
-                    transition-colors duration-200
+                    shadow-sm
+                    shadow-base-content/[0.015]
 
+                    backdrop-blur-sm
+
+                    transition-all
+                    duration-500
+                    ease-out
+
+                    hover:-translate-y-0.5
                     hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.035]
                 "
             >
                 <div
                     class="
                         relative z-10
 
-                        flex items-center
-                        justify-between
+                        flex
+                        items-center justify-between
                     "
                 >
                     <span
@@ -152,10 +220,19 @@
 
                             rounded-2xl
 
-                            border border-base-300
+                            border border-base-300/80
                             bg-base-100
 
                             text-primary
+
+                            shadow-sm
+                            shadow-base-content/[0.025]
+
+                            transition-colors
+                            duration-200
+
+                            group-hover:border-primary/15
+                            group-hover:bg-primary/[0.05]
                         "
                     >
                         <x-icon
@@ -167,62 +244,84 @@
                     <span
                         dir="ltr"
                         class="
-                            text-xs font-medium
-                            text-base-content/30
+                            font-mono
+                            text-[11px]
+                            font-medium
+                            text-base-content/25
                         "
                     >
                         01
                     </span>
                 </div>
 
+
                 <h3
                     class="
                         mt-6
 
-                        text-base font-semibold
+                        text-base
+                        font-semibold
                         text-base-content
                     "
                 >
                     اتصال یا تهیه VPS
                 </h3>
 
+
                 <p
                     class="
                         mt-2
 
-                        text-sm leading-7
+                        text-sm
+                        leading-7
                         text-base-content/50
                     "
                 >
-                    VPS موجود خود را به xDeploy متصل کنید یا
-                    مستقیماً یک سرور جدید تهیه کنید.
+                    VPS موجود خود را متصل کنید یا از داخل
+                    سامانه، یک سرور جدید متناسب با نیاز خود
+                    تهیه کنید.
                 </p>
             </article>
 
 
             {{-- Step 02 --}}
             <article
+                :class="visible
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-3'"
                 class="
+                    group
                     relative
 
                     rounded-2xl
 
-                    border border-base-300
-                    bg-base-100
+                    border border-base-300/80
+                    bg-base-100/85
 
                     p-5
 
-                    transition-colors duration-200
+                    shadow-sm
+                    shadow-base-content/[0.015]
 
+                    backdrop-blur-sm
+
+                    transition-all
+                    delay-75
+                    duration-500
+                    ease-out
+
+                    hover:-translate-y-0.5
                     hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.035]
                 "
             >
                 <div
                     class="
                         relative z-10
 
-                        flex items-center
-                        justify-between
+                        flex
+                        items-center justify-between
                     "
                 >
                     <span
@@ -232,10 +331,19 @@
 
                             rounded-2xl
 
-                            border border-base-300
+                            border border-base-300/80
                             bg-base-100
 
                             text-primary
+
+                            shadow-sm
+                            shadow-base-content/[0.025]
+
+                            transition-colors
+                            duration-200
+
+                            group-hover:border-primary/15
+                            group-hover:bg-primary/[0.05]
                         "
                     >
                         <x-icon
@@ -247,63 +355,84 @@
                     <span
                         dir="ltr"
                         class="
-                            text-xs font-medium
-                            text-base-content/30
+                            font-mono
+                            text-[11px]
+                            font-medium
+                            text-base-content/25
                         "
                     >
                         02
                     </span>
                 </div>
 
+
                 <h3
                     class="
                         mt-6
 
-                        text-base font-semibold
+                        text-base
+                        font-semibold
                         text-base-content
                     "
                 >
                     بررسی و آماده‌سازی سرور
                 </h3>
 
+
                 <p
                     class="
                         mt-2
 
-                        text-sm leading-7
+                        text-sm
+                        leading-7
                         text-base-content/50
                     "
                 >
-                    اتصال SSH، سیستم‌عامل و سطح دسترسی سرور
-                    بررسی می‌شود تا محیط برای عملیات موردنیاز
-                    آماده باشد.
+                    اتصال SSH، سیستم‌عامل، سطح دسترسی و
+                    پیش‌نیازهای عملیاتی بررسی می‌شوند تا
+                    سرور برای ادامه فرآیند آماده باشد.
                 </p>
             </article>
 
 
             {{-- Step 03 --}}
             <article
+                :class="visible
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-3'"
                 class="
+                    group
                     relative
 
                     rounded-2xl
 
-                    border border-base-300
-                    bg-base-100
+                    border border-base-300/80
+                    bg-base-100/85
 
                     p-5
 
-                    transition-colors duration-200
+                    shadow-sm
+                    shadow-base-content/[0.015]
 
+                    backdrop-blur-sm
+
+                    transition-all
+                    delay-150
+                    duration-500
+                    ease-out
+
+                    hover:-translate-y-0.5
                     hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.035]
                 "
             >
                 <div
                     class="
                         relative z-10
 
-                        flex items-center
-                        justify-between
+                        flex
+                        items-center justify-between
                     "
                 >
                     <span
@@ -313,10 +442,19 @@
 
                             rounded-2xl
 
-                            border border-base-300
+                            border border-base-300/80
                             bg-base-100
 
                             text-primary
+
+                            shadow-sm
+                            shadow-base-content/[0.025]
+
+                            transition-colors
+                            duration-200
+
+                            group-hover:border-primary/15
+                            group-hover:bg-primary/[0.05]
                         "
                     >
                         <x-icon
@@ -328,44 +466,56 @@
                     <span
                         dir="ltr"
                         class="
-                            text-xs font-medium
-                            text-base-content/30
+                            font-mono
+                            text-[11px]
+                            font-medium
+                            text-base-content/25
                         "
                     >
                         03
                     </span>
                 </div>
 
+
                 <h3
                     class="
                         mt-6
 
-                        text-base font-semibold
+                        text-base
+                        font-semibold
                         text-base-content
                     "
                 >
                     نصب و راه‌اندازی برنامه
                 </h3>
 
+
                 <p
                     class="
                         mt-2
 
-                        text-sm leading-7
+                        text-sm
+                        leading-7
                         text-base-content/50
                     "
                 >
-                    برنامه موردنظر از میان گزینه‌های پشتیبانی‌شده
-                    انتخاب می‌شود و xDeploy مراحل نصب و آماده‌سازی
-                    آن را مدیریت می‌کند.
+                    برنامه موردنظر را از میان گزینه‌های
+                    پشتیبانی‌شده انتخاب کنید؛ نصب، پیش‌نیازها
+                    و بررسی نهایی به‌صورت کنترل‌شده انجام می‌شوند.
                 </p>
             </article>
 
 
             {{-- Step 04 --}}
             <article
+                :class="visible
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-3'"
                 class="
+                    group
                     relative
+
+                    overflow-hidden
 
                     rounded-2xl
 
@@ -374,17 +524,42 @@
 
                     p-5
 
-                    transition-colors duration-200
+                    shadow-sm
+                    shadow-primary/[0.03]
 
+                    transition-all
+                    delay-200
+                    duration-500
+                    ease-out
+
+                    hover:-translate-y-0.5
                     hover:border-primary/25
+                    hover:shadow-lg
+                    hover:shadow-primary/[0.06]
                 "
             >
+                {{-- Accent --}}
+                <div
+                    aria-hidden="true"
+                    class="
+                        absolute
+                        -end-14 -top-14
+
+                        size-32
+                        rounded-full
+
+                        bg-primary/[0.09]
+                        blur-2xl
+                    "
+                ></div>
+
+
                 <div
                     class="
                         relative z-10
 
-                        flex items-center
-                        justify-between
+                        flex
+                        items-center justify-between
                     "
                 >
                     <span
@@ -396,6 +571,9 @@
 
                             bg-primary
                             text-primary-content
+
+                            shadow-lg
+                            shadow-primary/15
                         "
                     >
                         <x-icon
@@ -407,81 +585,120 @@
                     <span
                         dir="ltr"
                         class="
-                            text-xs font-medium
-                            text-primary/50
+                            font-mono
+                            text-[11px]
+                            font-medium
+                            text-primary/45
                         "
                     >
                         04
                     </span>
                 </div>
 
+
                 <h3
                     class="
+                        relative
                         mt-6
 
-                        text-base font-semibold
+                        text-base
+                        font-semibold
                         text-base-content
                     "
                 >
-                    پایش و مدیریت مستمر
+                    پایش و مدیریت
                 </h3>
+
 
                 <p
                     class="
+                        relative
                         mt-2
 
-                        text-sm leading-7
+                        text-sm
+                        leading-7
                         text-base-content/50
                     "
                 >
                     وضعیت سرور، منابع، سرویس‌ها، کانتینرها و
-                    برنامه‌های نصب‌شده از یک محیط واحد قابل
+                    برنامه‌های نصب‌شده از یک پنل واحد قابل
                     مشاهده و مدیریت هستند.
                 </p>
             </article>
-
         </div>
 
 
         {{-- Journey summary --}}
         <div
             class="
-                mt-8
+                mx-auto
+                mt-9
 
-                flex flex-wrap
+                flex w-fit
+                max-w-full
+                flex-wrap
                 items-center justify-center
 
                 gap-x-3 gap-y-2
 
+                rounded-full
+                border border-base-300/70
+                bg-base-100/65
+
+                px-4 py-2.5
+
                 text-xs
                 text-base-content/40
+
+                backdrop-blur-sm
             "
         >
-            <span>VPS</span>
+            <span>
+                VPS
+            </span>
 
             <x-icon
                 name="lucide.chevron-left"
                 class="!size-3.5 stroke-[1.5]"
             />
 
-            <span>بررسی و آماده‌سازی</span>
+            <span>
+                آماده‌سازی
+            </span>
 
             <x-icon
                 name="lucide.chevron-left"
                 class="!size-3.5 stroke-[1.5]"
             />
 
-            <span>Application</span>
+            <span>
+                نصب برنامه
+            </span>
 
             <x-icon
                 name="lucide.chevron-left"
                 class="!size-3.5 stroke-[1.5]"
             />
 
-            <span class="font-medium text-success">
+            <span
+                class="
+                    inline-flex
+                    items-center gap-1.5
+
+                    font-medium
+                    text-success
+                "
+            >
+                <span
+                    class="
+                        size-1.5
+                        rounded-full
+                        bg-success
+                    "
+                ></span>
+
                 آماده مدیریت
             </span>
         </div>
-
     </div>
 </section>

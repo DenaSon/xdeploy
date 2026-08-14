@@ -322,13 +322,14 @@
 
 
                 {{-- Operational status --}}
+                {{-- Operational status --}}
                 <aside
                     class="
-                        min-w-0
-                        space-y-5
-                        xl:col-span-4
-                        xl:space-y-6
-                    "
+        min-w-0
+        space-y-4
+
+        xl:col-span-4
+    "
                 >
                     {{-- Services --}}
                     @if(isset($sectionErrors['services']))
@@ -337,6 +338,7 @@
                             :message="$sectionErrors['services']"
                             retry-action="reloadDashboard"
                         />
+
                     @elseif(
                         in_array(
                             'services',
@@ -347,6 +349,7 @@
                         <x-dashboard.services-card
                             :services="$services"
                         />
+
                     @else
                         <x-dashboard.placeholders.card
                             variant="services"
@@ -361,6 +364,7 @@
                             :message="$sectionErrors['docker']"
                             retry-action="reloadDashboard"
                         />
+
                     @elseif(
                         in_array(
                             'docker',
@@ -373,6 +377,7 @@
                                 :docker="$docker"
                             />
                         @endif
+
                     @else
                         <x-dashboard.placeholders.card
                             variant="docker"

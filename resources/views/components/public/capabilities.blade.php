@@ -2,33 +2,74 @@
     id="capabilities"
     class="
         relative
+        overflow-hidden
         border-b border-base-300/60
         bg-base-100
     "
 >
+    {{-- Background atmosphere --}}
+    <div
+        aria-hidden="true"
+        class="
+            pointer-events-none
+            absolute inset-0
+            overflow-hidden
+        "
+    >
+        <div
+            class="
+                absolute
+                -start-52 top-40
+                size-[34rem]
+                rounded-full
+                bg-primary/[0.035]
+                blur-3xl
+            "
+        ></div>
+
+        <div
+            class="
+                absolute
+                -end-52 bottom-32
+                size-[36rem]
+                rounded-full
+                bg-accent/[0.025]
+                blur-3xl
+            "
+        ></div>
+    </div>
+
+
     <div
         class="
-            mx-auto w-full max-w-7xl
+            relative
+
+            mx-auto
+            w-full max-w-7xl
+
             px-4 py-20
+
             sm:px-6 sm:py-24
+
             lg:px-8 lg:py-28
         "
     >
-
         {{-- Heading --}}
         <div
             class="
-                mx-auto max-w-2xl
+                mx-auto
+                max-w-2xl
                 text-center
             "
         >
             <span
                 class="
-                    inline-flex items-center gap-2
+                    inline-flex
+                    items-center gap-2
 
                     rounded-full
                     border border-primary/15
-                    bg-primary/[0.06]
+                    bg-primary/[0.055]
 
                     px-3 py-1.5
 
@@ -41,40 +82,48 @@
                     class="!size-3.5 stroke-[1.8]"
                 />
 
-                مدیریت یکپارچه
+                قابلیت‌های مدیریت سرور
             </span>
+
 
             <h2
                 class="
                     mt-5
-                    text-3xl font-semibold
-                    leading-[1.4]
+
+                    text-3xl
+                    font-semibold
+                    leading-[1.45]
                     tracking-tight
                     text-base-content
 
                     sm:text-4xl
                 "
             >
-                آنچه برای مدیریت سرور نیاز داری،
+                مدیریت سرور،
 
                 <span class="text-primary">
-                    در یک محیط
+                    فراتر از نصب یک برنامه
                 </span>
             </h2>
+
 
             <p
                 class="
                     mx-auto mt-4
                     max-w-xl
 
-                    text-sm leading-7
+                    text-sm
+                    leading-7
                     text-base-content/55
 
-                    sm:text-base sm:leading-8
+                    sm:text-base
+                    sm:leading-8
                 "
             >
-                از وضعیت و منابع سرور تا سرویس‌ها، کانتینرها و برنامه‌ها؛
-                xDeploy اطلاعات مهم را واضح و بدون پیچیدگی غیرضروری در اختیار تو قرار می‌دهد.
+                از بررسی وضعیت سرور و پایش منابع تا نصب برنامه،
+                اتصال دامنه، فعال‌سازی HTTPS، دسترسی به کنسول
+                و مدیریت چرخه عمر VPS؛ ابزارهای اصلی در یک محیط
+                یکپارچه در دسترس هستند.
             </p>
         </div>
 
@@ -83,14 +132,14 @@
         <div
             class="
                 mt-14
+
                 grid gap-4
 
                 lg:mt-16
                 lg:grid-cols-12
             "
         >
-
-            {{-- Server --}}
+            {{-- Server management --}}
             <article
                 class="
                     group
@@ -98,13 +147,18 @@
                     overflow-hidden
 
                     rounded-2xl
-                    border border-base-300
-                    bg-base-200/40
+
+                    border border-base-300/80
+                    bg-base-200/35
 
                     p-5
 
-                    transition-colors duration-200
+                    transition-all
+                    duration-200
+
                     hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.025]
 
                     sm:p-6
 
@@ -115,19 +169,20 @@
                     aria-hidden="true"
                     class="
                         pointer-events-none
+
                         absolute
                         -end-20 -top-20
 
                         size-56
                         rounded-full
-                        bg-primary/[0.06]
+
+                        bg-primary/[0.065]
                         blur-3xl
                     "
                 ></div>
 
 
                 <div class="relative">
-
                     <div
                         class="
                             flex size-10
@@ -144,25 +199,32 @@
                         />
                     </div>
 
+
                     <h3
                         class="
                             mt-5
+
                             text-lg font-semibold
                             text-base-content
                         "
                     >
-                        وضعیت سرور، واضح و قابل فهم
+                        مدیریت کامل وضعیت سرور
                     </h3>
+
 
                     <p
                         class="
-                            mt-2 max-w-md
-                            text-sm leading-7
+                            mt-2
+                            max-w-md
+
+                            text-sm
+                            leading-7
                             text-base-content/50
                         "
                     >
-                        اطلاعات اصلی سرور و آماده بودن آن برای مدیریت را
-                        بدون بررسی دستی چندین ابزار مختلف ببین.
+                        اطلاعات اصلی سرور، وضعیت اتصال، سیستم‌عامل،
+                        منابع و آمادگی عملیاتی را بدون نیاز به بررسی
+                        دستی در اختیار داشته باشید.
                     </p>
 
 
@@ -170,25 +232,34 @@
                     <div
                         class="
                             mt-7
+
                             rounded-2xl
 
-                            border border-base-300
-                            bg-base-100
+                            border border-base-300/80
+                            bg-base-100/90
 
                             p-4
+
+                            shadow-sm
+                            shadow-base-content/[0.02]
                         "
                     >
                         <div
                             class="
-                                flex flex-col gap-4
+                                flex
+                                flex-col gap-4
 
                                 sm:flex-row
                                 sm:items-center
                                 sm:justify-between
                             "
                         >
-                            <div class="flex min-w-0 items-center gap-3">
-
+                            <div
+                                class="
+                                    flex min-w-0
+                                    items-center gap-3
+                                "
+                            >
                                 <span
                                     class="
                                         flex size-10 shrink-0
@@ -205,8 +276,8 @@
                                     />
                                 </span>
 
-                                <div class="min-w-0">
 
+                                <div class="min-w-0">
                                     <div
                                         class="
                                             truncate
@@ -220,22 +291,22 @@
                                     <div
                                         dir="ltr"
                                         class="
-                                            technical-value
                                             mt-1
+
                                             text-[11px]
                                             text-base-content/40
                                         "
                                     >
-                                        185.000.000.24
+                                        Ubuntu 24.04 · 185.10.20.41
                                     </div>
-
                                 </div>
                             </div>
 
 
-                            <div
+                            <span
                                 class="
-                                    inline-flex w-fit
+                                    inline-flex
+                                    w-fit
                                     items-center gap-2
 
                                     rounded-full
@@ -256,66 +327,134 @@
                                 ></span>
 
                                 آماده مدیریت
-                            </div>
+                            </span>
                         </div>
 
 
                         <div
                             class="
                                 mt-4
+
                                 grid grid-cols-2 gap-2
 
                                 sm:grid-cols-4
                             "
                         >
-                            <div class="rounded-xl bg-base-200/60 p-3">
-                                <div class="text-[10px] text-base-content/40">
+                            <div
+                                class="
+                                    rounded-xl
+                                    bg-base-200/60
+                                    p-3
+                                "
+                            >
+                                <div
+                                    class="
+                                        text-[10px]
+                                        text-base-content/40
+                                    "
+                                >
                                     سیستم‌عامل
                                 </div>
 
-                                <div class="mt-1 text-xs font-medium text-base-content/75">
+                                <div
+                                    dir="ltr"
+                                    class="
+                                        mt-1
+                                        text-xs font-medium
+                                        text-base-content/75
+                                    "
+                                >
                                     Ubuntu 24.04
                                 </div>
                             </div>
 
-                            <div class="rounded-xl bg-base-200/60 p-3">
-                                <div class="text-[10px] text-base-content/40">
+
+                            <div
+                                class="
+                                    rounded-xl
+                                    bg-base-200/60
+                                    p-3
+                                "
+                            >
+                                <div
+                                    class="
+                                        text-[10px]
+                                        text-base-content/40
+                                    "
+                                >
                                     اتصال
                                 </div>
 
-                                <div class="mt-1 text-xs font-medium text-success">
-                                    متصل
+                                <div
+                                    class="
+                                        mt-1
+                                        text-xs font-medium
+                                        text-success
+                                    "
+                                >
+                                    برقرار
                                 </div>
                             </div>
 
-                            <div class="rounded-xl bg-base-200/60 p-3">
-                                <div class="text-[10px] text-base-content/40">
+
+                            <div
+                                class="
+                                    rounded-xl
+                                    bg-base-200/60
+                                    p-3
+                                "
+                            >
+                                <div
+                                    class="
+                                        text-[10px]
+                                        text-base-content/40
+                                    "
+                                >
                                     CPU
                                 </div>
 
                                 <div
                                     dir="ltr"
-                                    class="mt-1 text-xs font-medium text-base-content/75"
+                                    class="
+                                        mt-1
+                                        text-xs font-medium
+                                        text-base-content/75
+                                    "
                                 >
                                     2 Core
                                 </div>
                             </div>
 
-                            <div class="rounded-xl bg-base-200/60 p-3">
-                                <div class="text-[10px] text-base-content/40">
+
+                            <div
+                                class="
+                                    rounded-xl
+                                    bg-base-200/60
+                                    p-3
+                                "
+                            >
+                                <div
+                                    class="
+                                        text-[10px]
+                                        text-base-content/40
+                                    "
+                                >
                                     RAM
                                 </div>
 
                                 <div
                                     dir="ltr"
-                                    class="mt-1 text-xs font-medium text-base-content/75"
+                                    class="
+                                        mt-1
+                                        text-xs font-medium
+                                        text-base-content/75
+                                    "
                                 >
                                     4 GB
                                 </div>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </article>
 
@@ -324,13 +463,18 @@
             <article
                 class="
                     rounded-2xl
-                    border border-base-300
+
+                    border border-base-300/80
                     bg-base-100
 
                     p-5
 
-                    transition-colors duration-200
+                    transition-all
+                    duration-200
+
                     hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.025]
 
                     sm:p-6
 
@@ -353,31 +497,40 @@
                     />
                 </div>
 
+
                 <h3
                     class="
                         mt-5
+
                         text-lg font-semibold
                         text-base-content
                     "
                 >
-                    مانیتورینگ بدون شلوغی
+                    پایش منابع در یک نگاه
                 </h3>
+
 
                 <p
                     class="
                         mt-2
-                        text-sm leading-7
+
+                        text-sm
+                        leading-7
                         text-base-content/50
                     "
                 >
-                    مهم‌ترین منابع و شاخص‌های سرور را در یک نگاه ببین.
+                    مصرف پردازنده، حافظه، فضای ذخیره‌سازی و Load
+                    سرور را به‌صورت واضح و بدون پیچیدگی غیرضروری
+                    مشاهده کنید.
                 </p>
 
 
                 <div
                     class="
                         mt-7
-                        grid grid-cols-2 gap-3
+
+                        grid grid-cols-2
+                        gap-3
                     "
                 >
                     @foreach([
@@ -386,7 +539,6 @@
                         ['Disk', '31%', 31],
                         ['Load', '0.42', 18],
                     ] as [$label, $value, $progress])
-
                         <div
                             class="
                                 rounded-xl
@@ -396,8 +548,9 @@
                         >
                             <div
                                 class="
-                                    flex items-center
-                                    justify-between gap-2
+                                    flex
+                                    items-center justify-between
+                                    gap-2
                                 "
                             >
                                 <span
@@ -431,23 +584,27 @@
                                 max="100"
                             ></progress>
                         </div>
-
                     @endforeach
                 </div>
             </article>
 
 
-            {{-- Services & Containers --}}
+            {{-- Applications --}}
             <article
                 class="
                     rounded-2xl
-                    border border-base-300
+
+                    border border-base-300/80
                     bg-base-100
 
                     p-5
 
-                    transition-colors duration-200
+                    transition-all
+                    duration-200
+
                     hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.025]
 
                     sm:p-6
 
@@ -465,200 +622,137 @@
                     "
                 >
                     <x-icon
-                        name="lucide.layers"
+                        name="lucide.package-check"
                         class="!size-5 stroke-[1.8]"
                     />
                 </div>
 
+
                 <h3
                     class="
                         mt-5
+
                         text-lg font-semibold
                         text-base-content
                     "
                 >
-                    سرویس‌ها و کانتینرها، هرکدام در جای خود
+                    نصب و مدیریت برنامه‌ها
                 </h3>
+
 
                 <p
                     class="
                         mt-2
-                        text-sm leading-7
+
+                        text-sm
+                        leading-7
                         text-base-content/50
                     "
                 >
-                    سرویس‌های Linux و کانتینرهای Docker مستقل از یکدیگر
-                    نمایش داده می‌شوند تا وضعیت Runtime واضح باقی بماند.
+                    برنامه‌های پشتیبانی‌شده را نصب کنید و وضعیت اجرا
+                    و قابلیت‌های اختصاصی هر برنامه را از همان محیط
+                    مدیریت کنید.
                 </p>
 
 
                 <div class="mt-6 space-y-2">
-
-                    {{-- Linux service --}}
-                    <div
-                        class="
-                            flex items-center
-                            justify-between
-
-                            rounded-xl
-                            bg-base-200/60
-
-                            px-3.5 py-3
-                        "
-                    >
-                        <div class="flex items-center gap-2.5">
-
-                            <span
-                                class="
-                                    flex size-7
-                                    items-center justify-center
-
-                                    rounded-lg
-                                    bg-base-100
-                                    text-base-content/45
-                                "
-                            >
-                                <x-icon
-                                    name="lucide.settings-2"
-                                    class="!size-3.5 stroke-[1.7]"
-                                />
-                            </span>
-
-                            <div>
-                                <div
-                                    class="
-                                        text-[10px]
-                                        text-base-content/35
-                                    "
-                                >
-                                    Linux Service
-                                </div>
-
-                                <div
-                                    dir="ltr"
-                                    class="
-                                        mt-0.5
-                                        text-xs font-medium
-                                        text-base-content/70
-                                    "
-                                >
-                                    ssh.service
-                                </div>
-                            </div>
-                        </div>
-
-                        <span
+                    @foreach([
+                        ['Marzban', 'پنل مدیریت Xray', 'lucide.shield-check'],
+                        ['n8n', 'اتوماسیون گردش‌کار', 'lucide.workflow'],
+                        ['AmneziaWG', 'VPN و مدیریت دستگاه‌ها', 'lucide.network'],
+                    ] as [$name, $description, $icon])
+                        <div
                             class="
-                                inline-flex items-center gap-1.5
+                                flex
+                                items-center justify-between
+                                gap-3
 
-                                text-[10px] font-medium
-                                text-success
+                                rounded-xl
+                                bg-base-200/55
+
+                                px-3.5 py-3
                             "
                         >
+                            <div
+                                class="
+                                    flex min-w-0
+                                    items-center gap-2.5
+                                "
+                            >
+                                <span
+                                    class="
+                                        flex size-8 shrink-0
+                                        items-center justify-center
+
+                                        rounded-lg
+                                        bg-base-100
+                                        text-primary
+                                    "
+                                >
+                                    <x-icon
+                                        :name="$icon"
+                                        class="!size-4 stroke-[1.7]"
+                                    />
+                                </span>
+
+                                <div class="min-w-0">
+                                    <div
+                                        dir="ltr"
+                                        class="
+                                            text-xs font-medium
+                                            text-base-content/75
+                                        "
+                                    >
+                                        {{ $name }}
+                                    </div>
+
+                                    <div
+                                        class="
+                                            mt-0.5
+
+                                            truncate
+                                            text-[10px]
+                                            text-base-content/40
+                                        "
+                                    >
+                                        {{ $description }}
+                                    </div>
+                                </div>
+                            </div>
+
                             <span
                                 class="
-                                    size-1.5
+                                    size-1.5 shrink-0
                                     rounded-full
                                     bg-success
                                 "
                             ></span>
-
-                            Running
-                        </span>
-                    </div>
-
-
-                    {{-- Container --}}
-                    <div
-                        class="
-                            flex items-center
-                            justify-between
-
-                            rounded-xl
-                            bg-base-200/60
-
-                            px-3.5 py-3
-                        "
-                    >
-                        <div class="flex items-center gap-2.5">
-
-                            <span
-                                class="
-                                    flex size-7
-                                    items-center justify-center
-
-                                    rounded-lg
-                                    bg-base-100
-                                    text-base-content/45
-                                "
-                            >
-                                <x-icon
-                                    name="lucide.container"
-                                    class="!size-3.5 stroke-[1.7]"
-                                />
-                            </span>
-
-                            <div>
-                                <div
-                                    class="
-                                        text-[10px]
-                                        text-base-content/35
-                                    "
-                                >
-                                    Docker Container
-                                </div>
-
-                                <div
-                                    dir="ltr"
-                                    class="
-                                        mt-0.5
-                                        text-xs font-medium
-                                        text-base-content/70
-                                    "
-                                >
-                                    application
-                                </div>
-                            </div>
                         </div>
-
-                        <span
-                            class="
-                                inline-flex items-center gap-1.5
-
-                                text-[10px] font-medium
-                                text-success
-                            "
-                        >
-                            <span
-                                class="
-                                    size-1.5
-                                    rounded-full
-                                    bg-success
-                                "
-                            ></span>
-
-                            Running
-                        </span>
-                    </div>
-
+                    @endforeach
                 </div>
             </article>
 
 
-            {{-- Applications --}}
+            {{-- Domain + HTTPS --}}
             <article
                 class="
+                    group
                     relative
                     overflow-hidden
 
                     rounded-2xl
+
                     border border-primary/15
-                    bg-primary/[0.045]
+                    bg-primary/[0.04]
 
                     p-5
 
-                    transition-colors duration-200
+                    transition-all
+                    duration-200
+
                     hover:border-primary/25
+                    hover:shadow-lg
+                    hover:shadow-primary/[0.04]
 
                     sm:p-6
 
@@ -669,11 +763,13 @@
                     aria-hidden="true"
                     class="
                         pointer-events-none
+
                         absolute
                         -bottom-24 -end-20
 
                         size-64
                         rounded-full
+
                         bg-primary/[0.07]
                         blur-3xl
                     "
@@ -681,7 +777,6 @@
 
 
                 <div class="relative">
-
                     <div
                         class="
                             flex size-10
@@ -693,39 +788,48 @@
                         "
                     >
                         <x-icon
-                            name="lucide.package-check"
+                            name="lucide.globe"
                             class="!size-5 stroke-[1.8]"
                         />
                     </div>
 
+
                     <h3
                         class="
                             mt-5
+
                             text-lg font-semibold
                             text-base-content
                         "
                     >
-                        برنامه را از نصب تا آماده استفاده مدیریت کن
+                        اتصال دامنه و فعال‌سازی HTTPS
                     </h3>
+
 
                     <p
                         class="
-                            mt-2 max-w-xl
-                            text-sm leading-7
+                            mt-2
+                            max-w-xl
+
+                            text-sm
+                            leading-7
                             text-base-content/50
                         "
                     >
-                        برای برنامه‌های پشتیبانی‌شده، xDeploy فقط نصب را اجرا نمی‌کند؛
-                        وضعیت اجرا، مراحل آماده‌سازی و آماده بودن برنامه برای استفاده را نیز دنبال می‌کند.
+                        برای برنامه‌های دارای Public Endpoint،
+                        دامنه را متصل کنید و پس از بررسی پیش‌نیازها،
+                        دسترسی امن HTTPS را بدون پیکربندی دستی
+                        سرویس‌های زیرساختی فعال کنید.
                     </p>
 
 
-                    {{-- Application preview --}}
+                    {{-- Endpoint preview --}}
                     <div
                         class="
                             mt-7
 
                             rounded-2xl
+
                             border border-primary/10
                             bg-base-100/90
 
@@ -734,50 +838,56 @@
                     >
                         <div
                             class="
-                                flex flex-col gap-4
+                                flex
+                                flex-col gap-4
 
                                 sm:flex-row
                                 sm:items-center
                                 sm:justify-between
                             "
                         >
-                            <div class="flex items-center gap-3">
-
+                            <div
+                                class="
+                                    flex min-w-0
+                                    items-center gap-3
+                                "
+                            >
                                 <span
                                     class="
-                                        flex size-11 shrink-0
+                                        flex size-10 shrink-0
                                         items-center justify-center
 
                                         rounded-xl
-                                        bg-primary/10
-                                        text-primary
+                                        bg-success/10
+                                        text-success
                                     "
                                 >
                                     <x-icon
-                                        name="lucide.package"
-                                        class="!size-5 stroke-[1.8]"
+                                        name="lucide.lock-keyhole"
+                                        class="!size-[18px] stroke-[1.8]"
                                     />
                                 </span>
 
-
-                                <div>
+                                <div class="min-w-0">
                                     <div
+                                        dir="ltr"
                                         class="
-                                            text-sm font-semibold
+                                            truncate
+                                            text-sm font-medium
                                             text-base-content
                                         "
                                     >
-                                        برنامه
+                                        app.example.com
                                     </div>
 
                                     <div
                                         class="
                                             mt-1
-                                            text-[11px]
-                                            text-base-content/45
+                                            text-[10px]
+                                            text-base-content/40
                                         "
                                     >
-                                        نصب شده و آماده استفاده
+                                        دسترسی عمومی امن
                                     </div>
                                 </div>
                             </div>
@@ -785,7 +895,8 @@
 
                             <span
                                 class="
-                                    inline-flex w-fit
+                                    inline-flex
+                                    w-fit
                                     items-center gap-1.5
 
                                     rounded-full
@@ -802,7 +913,7 @@
                                     class="!size-3.5 stroke-[1.8]"
                                 />
 
-                                آماده
+                                HTTPS فعال
                             </span>
                         </div>
 
@@ -810,21 +921,21 @@
                         <div
                             class="
                                 mt-4
-                                grid grid-cols-2 gap-2
 
-                                sm:grid-cols-4
+                                grid gap-2
+
+                                sm:grid-cols-3
                             "
                         >
                             @foreach([
-                                'نصب',
-                                'اجرا',
-                                'پیکربندی',
-                                'آماده',
+                                'بررسی دامنه',
+                                'پیکربندی Endpoint',
+                                'فعال‌سازی HTTPS',
                             ] as $label)
-
                                 <div
                                     class="
-                                        flex items-center gap-2
+                                        flex
+                                        items-center gap-2
 
                                         rounded-xl
                                         bg-base-200/60
@@ -851,35 +962,715 @@
                                         {{ $label }}
                                     </span>
                                 </div>
-
                             @endforeach
                         </div>
                     </div>
-
                 </div>
             </article>
 
+
+            {{-- Console --}}
+            <article
+                class="
+                    rounded-2xl
+
+                    border border-base-300/80
+                    bg-base-200/35
+
+                    p-5
+
+                    transition-all
+                    duration-200
+
+                    hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.025]
+
+                    sm:p-6
+
+                    lg:col-span-5
+                "
+            >
+                <div
+                    class="
+                        flex size-10
+                        items-center justify-center
+
+                        rounded-xl
+                        bg-primary/10
+                        text-primary
+                    "
+                >
+                    <x-icon
+                        name="lucide.terminal"
+                        class="!size-5 stroke-[1.8]"
+                    />
+                </div>
+
+
+                <h3
+                    class="
+                        mt-5
+
+                        text-lg font-semibold
+                        text-base-content
+                    "
+                >
+                    کنسول مستقیم سرور
+                </h3>
+
+
+                <p
+                    class="
+                        mt-2
+
+                        text-sm
+                        leading-7
+                        text-base-content/50
+                    "
+                >
+                    در VPSهای تهیه‌شده از داخل سامانه، حتی در صورت
+                    اختلال SSH می‌توانید از کنسول مستقیم Provider
+                    برای بررسی و بازیابی سرور استفاده کنید.
+                </p>
+
+
+                {{-- Console preview --}}
+                <div
+                    dir="ltr"
+                    class="
+                        mt-7
+
+                        overflow-hidden
+                        rounded-2xl
+
+                        border border-base-300
+                        bg-base-content
+
+                        text-base-100
+                    "
+                >
+                    <div
+                        class="
+                            flex
+                            items-center justify-between
+
+                            border-b
+                            border-base-100/10
+
+                            px-3.5 py-2.5
+                        "
+                    >
+                        <div class="flex gap-1.5">
+                            <span
+                                class="
+                                    size-1.5
+                                    rounded-full
+                                    bg-error
+                                "
+                            ></span>
+
+                            <span
+                                class="
+                                    size-1.5
+                                    rounded-full
+                                    bg-warning
+                                "
+                            ></span>
+
+                            <span
+                                class="
+                                    size-1.5
+                                    rounded-full
+                                    bg-success
+                                "
+                            ></span>
+                        </div>
+
+                        <span
+                            class="
+                                text-[9px]
+                                text-base-100/35
+                            "
+                        >
+                            SERVER CONSOLE
+                        </span>
+                    </div>
+
+
+                    <div
+                        class="
+                            space-y-2
+
+                            px-4 py-5
+
+                            font-mono
+                            text-[10px]
+                            text-base-100/55
+                        "
+                    >
+                        <div>
+                            Ubuntu 24.04 LTS
+                        </div>
+
+                        <div>
+                            server login:
+                            <span class="text-base-100/80">
+                                _
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div
+                    class="
+                        mt-3
+
+                        text-[10px]
+                        leading-5
+                        text-base-content/35
+                    "
+                >
+                    این قابلیت برای VPSهای ابری واجد شرایط در دسترس است.
+                </div>
+            </article>
+
+
+            {{-- Lifecycle --}}
+            <article
+                class="
+                    relative
+                    overflow-hidden
+
+                    rounded-2xl
+
+                    border border-primary/15
+                    bg-primary/[0.04]
+
+                    p-5
+
+                    transition-all
+                    duration-200
+
+                    hover:border-primary/25
+                    hover:shadow-lg
+                    hover:shadow-primary/[0.04]
+
+                    sm:p-6
+
+                    lg:col-span-7
+                "
+            >
+                <div
+                    aria-hidden="true"
+                    class="
+                        pointer-events-none
+
+                        absolute
+                        -start-20 -top-24
+
+                        size-56
+                        rounded-full
+
+                        bg-primary/[0.055]
+                        blur-3xl
+                    "
+                ></div>
+
+
+                <div class="relative">
+                    <div
+                        class="
+                            flex size-10
+                            items-center justify-center
+
+                            rounded-xl
+                            bg-primary/10
+                            text-primary
+                        "
+                    >
+                        <x-icon
+                            name="lucide.refresh-cw"
+                            class="!size-5 stroke-[1.8]"
+                        />
+                    </div>
+
+
+                    <h3
+                        class="
+                            mt-5
+
+                            text-lg font-semibold
+                            text-base-content
+                        "
+                    >
+                        مدیریت چرخه عمر VPS ابری
+                    </h3>
+
+
+                    <p
+                        class="
+                            mt-2
+                            max-w-xl
+
+                            text-sm
+                            leading-7
+                            text-base-content/50
+                        "
+                    >
+                        زمان باقی‌مانده سرویس را مشاهده کنید،
+                        در صورت نیاز VPS را تمدید کنید و پیش از
+                        پایان سرویس از طریق اعلان‌های ضروری
+                        مطلع شوید.
+                    </p>
+
+
+                    <div
+                        class="
+                            mt-7
+
+                            rounded-2xl
+
+                            border border-primary/10
+                            bg-base-100/90
+
+                            p-4
+                        "
+                    >
+                        <div
+                            class="
+                                flex
+                                items-center justify-between
+                                gap-4
+                            "
+                        >
+                            <div>
+                                <div
+                                    class="
+                                        text-[10px]
+                                        text-base-content/40
+                                    "
+                                >
+                                    زمان باقی‌مانده سرویس
+                                </div>
+
+                                <div
+                                    class="
+                                        mt-1
+
+                                        text-base font-semibold
+                                        text-base-content
+                                    "
+                                >
+                                    ۲۳ روز
+                                </div>
+                            </div>
+
+                            <span
+                                class="
+                                    inline-flex
+                                    items-center gap-1.5
+
+                                    rounded-full
+                                    bg-success/10
+
+                                    px-3 py-1.5
+
+                                    text-xs font-medium
+                                    text-success
+                                "
+                            >
+                                <span
+                                    class="
+                                        size-1.5
+                                        rounded-full
+                                        bg-success
+                                    "
+                                ></span>
+
+                                فعال
+                            </span>
+                        </div>
+
+
+                        <div
+                            class="
+                                mt-4
+
+                                grid gap-2
+
+                                sm:grid-cols-3
+                            "
+                        >
+                            <div
+                                class="
+                                    flex items-center gap-2
+
+                                    rounded-xl
+                                    bg-base-200/60
+
+                                    px-3 py-2.5
+                                "
+                            >
+                                <x-icon
+                                    name="lucide.refresh-cw"
+                                    class="
+                                        !size-3.5
+                                        shrink-0
+                                        text-primary
+                                        stroke-[1.8]
+                                    "
+                                />
+
+                                <span
+                                    class="
+                                        text-[11px]
+                                        text-base-content/60
+                                    "
+                                >
+                                    تمدید دستی
+                                </span>
+                            </div>
+
+
+                            <div
+                                class="
+                                    flex items-center gap-2
+
+                                    rounded-xl
+                                    bg-base-200/60
+
+                                    px-3 py-2.5
+                                "
+                            >
+                                <x-icon
+                                    name="lucide.bell"
+                                    class="
+                                        !size-3.5
+                                        shrink-0
+                                        text-primary
+                                        stroke-[1.8]
+                                    "
+                                />
+
+                                <span
+                                    class="
+                                        text-[11px]
+                                        text-base-content/60
+                                    "
+                                >
+                                    هشدار انقضا
+                                </span>
+                            </div>
+
+
+                            <div
+                                class="
+                                    flex items-center gap-2
+
+                                    rounded-xl
+                                    bg-base-200/60
+
+                                    px-3 py-2.5
+                                "
+                            >
+                                <x-icon
+                                    name="lucide.shield-check"
+                                    class="
+                                        !size-3.5
+                                        shrink-0
+                                        text-primary
+                                        stroke-[1.8]
+                                    "
+                                />
+
+                                <span
+                                    class="
+                                        text-[11px]
+                                        text-base-content/60
+                                    "
+                                >
+                                    پایان امن سرویس
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+
+            {{-- Services & Containers --}}
+            <article
+                class="
+                    rounded-2xl
+
+                    border border-base-300/80
+                    bg-base-100
+
+                    p-5
+
+                    transition-all
+                    duration-200
+
+                    hover:border-primary/20
+                    hover:shadow-lg
+                    hover:shadow-base-content/[0.025]
+
+                    sm:p-6
+
+                    lg:col-span-12
+                "
+            >
+                <div
+                    class="
+                        grid gap-6
+
+                        lg:grid-cols-[0.75fr_1.25fr]
+                        lg:items-center
+                    "
+                >
+                    <div>
+                        <div
+                            class="
+                                flex size-10
+                                items-center justify-center
+
+                                rounded-xl
+                                bg-primary/10
+                                text-primary
+                            "
+                        >
+                            <x-icon
+                                name="lucide.layers"
+                                class="!size-5 stroke-[1.8]"
+                            />
+                        </div>
+
+
+                        <h3
+                            class="
+                                mt-5
+
+                                text-lg font-semibold
+                                text-base-content
+                            "
+                        >
+                            سرویس‌ها و کانتینرها، با تفکیک روشن
+                        </h3>
+
+
+                        <p
+                            class="
+                                mt-2
+
+                                max-w-md
+
+                                text-sm
+                                leading-7
+                                text-base-content/50
+                            "
+                        >
+                            سرویس‌های Linux و کانتینرهای Docker
+                            به‌عنوان دو مفهوم مستقل نمایش داده می‌شوند
+                            تا وضعیت Runtime سرور دقیق و قابل فهم باقی بماند.
+                        </p>
+                    </div>
+
+
+                    <div
+                        class="
+                            grid gap-3
+
+                            sm:grid-cols-2
+                        "
+                    >
+                        {{-- Linux service --}}
+                        <div
+                            class="
+                                flex
+                                items-center justify-between
+                                gap-3
+
+                                rounded-xl
+                                bg-base-200/60
+
+                                px-4 py-3.5
+                            "
+                        >
+                            <div
+                                class="
+                                    flex
+                                    items-center gap-2.5
+                                "
+                            >
+                                <span
+                                    class="
+                                        flex size-8
+                                        items-center justify-center
+
+                                        rounded-lg
+                                        bg-base-100
+                                        text-base-content/50
+                                    "
+                                >
+                                    <x-icon
+                                        name="lucide.settings-2"
+                                        class="!size-4 stroke-[1.7]"
+                                    />
+                                </span>
+
+                                <div>
+                                    <div
+                                        class="
+                                            text-[10px]
+                                            text-base-content/35
+                                        "
+                                    >
+                                        Linux Service
+                                    </div>
+
+                                    <div
+                                        dir="ltr"
+                                        class="
+                                            mt-0.5
+
+                                            text-xs font-medium
+                                            text-base-content/70
+                                        "
+                                    >
+                                        ssh.service
+                                    </div>
+                                </div>
+                            </div>
+
+                            <span
+                                class="
+                                    inline-flex
+                                    items-center gap-1.5
+
+                                    text-[10px] font-medium
+                                    text-success
+                                "
+                            >
+                                <span
+                                    class="
+                                        size-1.5
+                                        rounded-full
+                                        bg-success
+                                    "
+                                ></span>
+
+                                Running
+                            </span>
+                        </div>
+
+
+                        {{-- Docker container --}}
+                        <div
+                            class="
+                                flex
+                                items-center justify-between
+                                gap-3
+
+                                rounded-xl
+                                bg-base-200/60
+
+                                px-4 py-3.5
+                            "
+                        >
+                            <div
+                                class="
+                                    flex
+                                    items-center gap-2.5
+                                "
+                            >
+                                <span
+                                    class="
+                                        flex size-8
+                                        items-center justify-center
+
+                                        rounded-lg
+                                        bg-base-100
+                                        text-base-content/50
+                                    "
+                                >
+                                    <x-icon
+                                        name="lucide.container"
+                                        class="!size-4 stroke-[1.7]"
+                                    />
+                                </span>
+
+                                <div>
+                                    <div
+                                        class="
+                                            text-[10px]
+                                            text-base-content/35
+                                        "
+                                    >
+                                        Docker Container
+                                    </div>
+
+                                    <div
+                                        dir="ltr"
+                                        class="
+                                            mt-0.5
+
+                                            text-xs font-medium
+                                            text-base-content/70
+                                        "
+                                    >
+                                        application
+                                    </div>
+                                </div>
+                            </div>
+
+                            <span
+                                class="
+                                    inline-flex
+                                    items-center gap-1.5
+
+                                    text-[10px] font-medium
+                                    text-success
+                                "
+                            >
+                                <span
+                                    class="
+                                        size-1.5
+                                        rounded-full
+                                        bg-success
+                                    "
+                                ></span>
+
+                                Running
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </article>
         </div>
 
 
         {{-- Closing statement --}}
         <div
             class="
-                mx-auto mt-10
-                max-w-xl
+                mx-auto
+                mt-10
+                max-w-2xl
                 text-center
             "
         >
             <p
                 class="
-                    text-sm leading-7
+                    text-sm
+                    leading-7
                     text-base-content/45
                 "
             >
-                جزئیات فنی زمانی نمایش داده می‌شوند که به آن‌ها نیاز داری؛
-                نه قبل از آن.
+                جزئیات فنی در زمان مناسب نمایش داده می‌شوند؛
+                تمرکز اصلی بر وضعیت واقعی سرور و اقداماتی است
+                که برای مدیریت آن اهمیت دارند.
             </p>
         </div>
-
     </div>
 </section>

@@ -1,3 +1,7 @@
+@php
+    $productName = config('app.name');
+@endphp
+
 <footer
     class="
         border-t border-base-300/70
@@ -6,9 +10,12 @@
 >
     <div
         class="
-            mx-auto flex w-full max-w-7xl
-            flex-col items-center justify-between
-            gap-3
+            mx-auto
+            flex w-full max-w-7xl
+            flex-col
+            items-center justify-between
+            gap-4
+
             px-4 py-6
 
             sm:flex-row
@@ -21,40 +28,48 @@
         <a
             href="{{ url('/') }}"
             wire:navigate
-            aria-label="xDeploy"
+            aria-label="{{ $productName }}"
             class="
-                group flex
-                items-center gap-2
+                group
+                flex items-center gap-2.5
             "
         >
             <span
                 class="
-                    flex size-7 shrink-0
+                    flex size-8 shrink-0
                     items-center justify-center
 
                     rounded-lg
                     bg-primary/10
                     text-primary
+
+                    transition-colors
+                    duration-200
+
+                    group-hover:bg-primary/15
                 "
             >
                 <x-icon
                     name="lucide.server"
-                    class="!size-3.5 stroke-[1.8]"
+                    class="!size-4 stroke-[1.8]"
                 />
             </span>
 
             <span
                 dir="ltr"
                 class="
-                    text-sm font-semibold
+                    text-sm
+                    font-semibold
                     tracking-tight
                     text-base-content/75
 
-                    transition-colors duration-200
+                    transition-colors
+                    duration-200
+
                     group-hover:text-base-content
                 "
             >
-                xDeploy
+                {{ $productName }}
             </span>
         </a>
 
@@ -62,24 +77,41 @@
         {{-- Copyright --}}
         <div
             class="
+                flex flex-wrap
+                items-center justify-center
+                gap-x-1.5 gap-y-1
+
                 text-center
                 text-[11px]
                 text-base-content/40
 
+                sm:justify-end
                 sm:text-start
             "
         >
-            <span>
+            <span dir="ltr">
                 © {{ now()->year }}
             </span>
 
+            <span dir="ltr">
+                {{ $productName }}
+            </span>
+
             <span
-                dir="ltr"
-                class="ms-1"
+                aria-hidden="true"
+                class="
+                    hidden
+                    text-base-content/20
+
+                    sm:inline
+                "
             >
-                xDeploy by Lumixo
+                ·
+            </span>
+
+            <span>
+                محصولی از Lumixo
             </span>
         </div>
-
     </div>
 </footer>

@@ -4,20 +4,17 @@
 
 <div
     {{ $attributes->class([
-        'space-y-5',
+        'min-w-0 space-y-5',
     ]) }}
 >
-    <section
-        class="overflow-hidden rounded-2xl
-               border border-base-300
-               bg-base-100"
-    >
-        <x-servers.workspace-header
-            :server="$server"
-        />
-    </section>
+    {{-- Server workspace navigation --}}
+    <x-servers.workspace-header
+        :server="$server"
+    />
 
-    <div>
+
+    {{-- Page content --}}
+    <main class="min-w-0">
         {{ $slot }}
-    </div>
+    </main>
 </div>

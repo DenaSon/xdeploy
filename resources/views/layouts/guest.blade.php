@@ -19,8 +19,8 @@
 
     <title>
         {{ isset($title) && $title
-            ? $title . ' | xDeploy'
-            : 'xDeploy'
+            ? $title . ' | ' . config('app.name')
+            : config('app.name')
         }}
     </title>
 
@@ -41,7 +41,6 @@
         antialiased
     "
 >
-
 <div class="flex min-h-screen flex-col">
 
     {{-- Public Header --}}
@@ -51,84 +50,74 @@
     {{-- Main --}}
     <main
         class="
-            relative
-            flex flex-1
-            items-center justify-center
-            overflow-hidden
+                relative
 
-            px-4 py-10
-            sm:px-6 sm:py-12
-            lg:px-8
-        "
+                flex flex-1
+                items-center justify-center
+
+                overflow-hidden
+
+                px-4 py-10
+
+                sm:px-6 sm:py-12
+
+                lg:px-8
+            "
     >
-
-        {{-- Subtle brand atmosphere --}}
+        {{-- Subtle atmosphere --}}
         <div
             aria-hidden="true"
             class="
-                pointer-events-none
-                absolute inset-0
-                overflow-hidden
-            "
+                    pointer-events-none
+
+                    absolute inset-0
+                    overflow-hidden
+                "
         >
             <div
                 class="
-                    absolute
-                    start-1/2 top-[-12rem]
+                        absolute
+                        start-1/2 top-[-12rem]
 
-                    size-[34rem]
-                    -translate-x-1/2
+                        size-[34rem]
+                        -translate-x-1/2
 
-                    rounded-full
-                    bg-primary/[0.06]
-                    blur-3xl
-                "
+                        rounded-full
+                        bg-primary/[0.06]
+                        blur-3xl
+                    "
             ></div>
 
             <div
                 class="
-                    absolute
-                    bottom-[-16rem] end-[-10rem]
+                        absolute
+                        bottom-[-16rem] end-[-10rem]
 
-                    size-[28rem]
+                        size-[28rem]
 
-                    rounded-full
-                    bg-primary/[0.035]
-                    blur-3xl
-                "
+                        rounded-full
+                        bg-primary/[0.035]
+                        blur-3xl
+                    "
             ></div>
         </div>
 
 
-        {{-- Auth Content --}}
+        {{-- Public content --}}
         <div
             class="
-                relative z-10
-                w-full max-w-md
-            "
+                    relative z-10
+
+                    w-full max-w-md
+                "
         >
             {{ $slot }}
         </div>
-
     </main>
 
 
-    {{-- Footer --}}
-    <footer
-        class="
-            relative z-10
-
-            px-4 py-5
-
-            text-center
-            text-[11px]
-            text-base-content/40
-        "
-    >
-        <span dir="ltr">
-            xDeploy by Lumixo
-        </span>
-    </footer>
+    {{-- Public Footer --}}
+    <x-public.footer />
 
 </div>
 
@@ -138,6 +127,5 @@
 
 
 @livewireScripts
-
 </body>
 </html>

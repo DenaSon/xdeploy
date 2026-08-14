@@ -1,149 +1,405 @@
 <x-servers.workspace :server="$server">
 
-    <section class="space-y-5">
-
+    <section
+        @if(count($applications) > 3)
+            x-data="{ query: '' }"
+        @endif
+        class="space-y-6"
+    >
         {{-- Page header --}}
         <header
-            class="flex flex-col gap-4
-           sm:flex-row sm:items-center sm:justify-between"
+            class="
+                flex flex-col gap-5
+
+                sm:flex-row
+                sm:items-end
+                sm:justify-between
+            "
         >
-            {{-- Title --}}
+            {{-- Identity --}}
             <div
-                class="flex min-w-0 items-start gap-3.5"
+                class="
+                    flex min-w-0
+                    items-start gap-3.5
+                "
             >
-                <div
-                    class="flex size-10 shrink-0
-                   items-center justify-center
-                   rounded-xl
-                   border border-base-300
-                   bg-base-100"
+                <span
+                    class="
+                        flex size-10 shrink-0
+                        items-center justify-center
+
+                        rounded-xl
+
+                        bg-primary/10
+                        text-primary
+
+                        ring-1 ring-primary/10
+                    "
                 >
                     <x-icon
                         name="lucide.blocks"
-                        class="size-4.5 text-primary"
+                        class="!size-[18px] stroke-[1.8]"
                     />
-                </div>
+                </span>
+
 
                 <div class="min-w-0">
-
                     <div
-                        class="flex flex-wrap items-center gap-2"
+                        class="
+                            flex flex-wrap
+                            items-center gap-2.5
+                        "
                     >
-                        <h2
-                            class="text-lg font-semibold
-                           tracking-tight text-base-content"
+                        <h1
+                            class="
+                                text-xl
+                                font-semibold
+                                tracking-tight
+                                text-base-content
+
+                                sm:text-2xl
+                            "
                         >
                             برنامه‌ها
-                        </h2>
+                        </h1>
 
-                        <span
-                            class="text-xs font-medium
-                           text-base-content/35"
-                        >
-                    کاتالوگ xDeploy
-                </span>
+
+                        @if($applications !== [])
+                            <span
+                                class="
+                                    inline-flex
+                                    min-w-6
+                                    items-center justify-center
+
+                                    rounded-full
+                                    bg-base-200
+
+                                    px-2 py-0.5
+
+                                    text-[11px]
+                                    font-medium
+                                    text-base-content/45
+                                "
+                            >
+                                {{ count($applications) }}
+                            </span>
+                        @endif
                     </div>
 
 
+                    <p
+                        class="
+                            mt-1
+
+                            max-w-xl
+
+                            text-xs
+                            leading-6
+                            text-base-content/45
+
+                            sm:text-sm
+                        "
+                    >
+                        برنامه‌های پشتیبانی‌شده را روی این سرور
+                        نصب، راه‌اندازی و مدیریت کنید.
+                    </p>
                 </div>
             </div>
 
-            {{-- Catalog metadata --}}
-            @if ($applications !== [])
 
+            {{-- Catalog metadata --}}
+            @if($applications !== [])
                 <div
-                    class="inline-flex w-fit shrink-0
-                   items-center gap-2
-                   rounded-xl
-                   bg-base-200/55
-                   px-3 py-2"
+                    class="
+                        flex
+                        shrink-0
+                        items-center gap-2.5
+
+                        self-start
+
+                        rounded-xl
+                        border border-base-300/70
+                        bg-base-100
+
+                        px-3 py-2
+
+                        sm:self-auto
+                    "
                 >
-                    <div
-                        class="flex size-6 items-center
-                       justify-center rounded-lg
-                       bg-base-100"
+                    <span
+                        class="
+                            flex size-7
+                            items-center justify-center
+
+                            rounded-lg
+                            bg-success/[0.08]
+                            text-success
+                        "
                     >
                         <x-icon
                             name="lucide.package-check"
-                            class="size-3.5 text-base-content/45"
+                            class="!size-3.5 stroke-[1.8]"
                         />
-                    </div>
+                    </span>
 
-                    <div
-                        class="flex items-baseline gap-1"
-                    >
-                <span
-                    class="text-sm font-semibold
-                           text-base-content"
-                >
-                    {{ count($applications) }}
-                </span>
-
-                        <span
-                            class="text-xs
-                           text-base-content/45"
+                    <div>
+                        <div
+                            class="
+                                text-[10px]
+                                text-base-content/35
+                            "
                         >
-                    برنامه در دسترس
-                </span>
+                            کاتالوگ برنامه‌ها
+                        </div>
+
+                        <div
+                            class="
+                                mt-0.5
+
+                                text-xs
+                                font-medium
+                                text-base-content/65
+                            "
+                        >
+                            {{ count($applications) }}
+                            برنامه در دسترس
+                        </div>
                     </div>
                 </div>
-
             @endif
         </header>
-        <x-hr/>
+
+
+        {{-- Catalog toolbar --}}
+        @if(count($applications) > 3)
+            <div
+                class="
+                    flex
+                    items-center gap-3
+
+                    border-y border-base-300/60
+
+                    py-3
+                "
+            >
+                <label
+                    class="
+                        relative
+                        block
+                        w-full max-w-sm
+                    "
+                >
+                    <span
+                        class="
+                            pointer-events-none
+
+                            absolute
+                            inset-y-0 start-3
+
+                            flex items-center
+
+                            text-base-content/30
+                        "
+                    >
+                        <x-icon
+                            name="lucide.search"
+                            class="!size-4 stroke-[1.7]"
+                        />
+                    </span>
+
+                    <input
+                        type="search"
+                        x-model.debounce.150ms="query"
+                        placeholder="جستجو در برنامه‌ها"
+                        aria-label="جستجو در برنامه‌ها"
+                        class="
+                            input
+                            input-sm
+
+                            w-full
+
+                            rounded-xl
+
+                            border-base-300
+                            bg-base-100
+
+                            ps-9
+
+                            text-xs
+
+                            placeholder:text-base-content/30
+
+                            focus:border-primary/30
+                            focus:outline-none
+                        "
+                    />
+                </label>
+
+
+                <span
+                    class="
+                        hidden
+                        shrink-0
+
+                        text-[11px]
+                        text-base-content/30
+
+                        sm:inline
+                    "
+                >
+                    برنامه موردنظر را انتخاب کنید
+                </span>
+            </div>
+
+        @else
+            <div
+                class="
+                    h-px
+                    bg-base-300/60
+                "
+            ></div>
+        @endif
+
 
         {{-- Catalog --}}
         <div
-            class="grid grid-cols-1 gap-4
-                   md:grid-cols-2
-                   xl:grid-cols-3"
+            class="
+                grid grid-cols-1
+                gap-4
+
+                md:grid-cols-2
+
+                xl:grid-cols-3
+            "
         >
-            @forelse ($applications as $application)
+            @forelse($applications as $application)
 
-                <x-applications.card
-                    :application="$application"
-                    :server-id="$serverId"
-                    wire:key="application-catalog-{{ $application['slug'] }}"
-                />
-
-            @empty
+                @php
+                    $searchableApplicationText = mb_strtolower(
+                        implode(
+                            ' ',
+                            [
+                                $application['name'] ?? '',
+                                $application['short_description'] ?? '',
+                                $application['slug'] ?? '',
+                            ],
+                        ),
+                    );
+                @endphp
 
                 <div
-                    class="col-span-full rounded-2xl
-                           border border-base-300 bg-base-100
-                           px-6 py-10 text-center"
+                    @if(count($applications) > 3)
+                        x-show="
+                            query.trim() === ''
+                            || @js($searchableApplicationText)
+                                .includes(query.trim().toLocaleLowerCase('fa'))
+                        "
+                    x-transition.opacity.duration.150ms
+                    @endif
+                    wire:key="application-catalog-wrapper-{{ $application['slug'] }}"
                 >
-                    <div
-                        class="mx-auto flex size-10 items-center
-                               justify-center rounded-xl
-                               bg-base-200/60"
-                    >
-                        <x-icon
-                            name="lucide.package-open"
-                            class="size-4.5 text-base-content/35"
-                        />
-                    </div>
-
-                    <h3
-                        class="mt-3 text-sm font-semibold
-                               text-base-content"
-                    >
-                        برنامه‌ای برای نمایش وجود ندارد
-                    </h3>
-
-                    <p
-                        class="mx-auto mt-1.5 max-w-md
-                               text-sm leading-6
-                               text-base-content/50"
-                    >
-                        در حال حاضر برنامه منتشرشده‌ای
-                        در کاتالوگ xDeploy وجود ندارد.
-                    </p>
+                    <x-applications.card
+                        :application="$application"
+                        :server-id="$serverId"
+                        wire:key="application-catalog-{{ $application['slug'] }}"
+                    />
                 </div>
 
+            @empty
+                {{-- Empty state --}}
+                <div
+                    class="
+                        col-span-full
+
+                        relative
+                        overflow-hidden
+
+                        rounded-2xl
+
+                        border border-base-300/80
+                        bg-base-100
+
+                        px-6 py-12
+
+                        text-center
+                    "
+                >
+                    <div
+                        aria-hidden="true"
+                        class="
+                            pointer-events-none
+
+                            absolute
+                            start-1/2 top-6
+
+                            size-56
+                            -translate-x-1/2
+
+                            rounded-full
+                            bg-primary/[0.045]
+                            blur-3xl
+                        "
+                    ></div>
+
+
+                    <div
+                        class="
+                            relative
+
+                            mx-auto
+                            max-w-md
+                        "
+                    >
+                        <span
+                            class="
+                                mx-auto
+
+                                flex size-12
+                                items-center justify-center
+
+                                rounded-2xl
+
+                                bg-base-200/60
+                                text-base-content/35
+                            "
+                        >
+                            <x-icon
+                                name="lucide.package-open"
+                                class="!size-5 stroke-[1.7]"
+                            />
+                        </span>
+
+
+                        <h2
+                            class="
+                                mt-4
+
+                                text-sm
+                                font-semibold
+                                text-base-content
+                            "
+                        >
+                            برنامه‌ای برای نمایش وجود ندارد
+                        </h2>
+
+
+                        <p
+                            class="
+                                mx-auto mt-1.5
+                                max-w-sm
+
+                                text-sm
+                                leading-7
+                                text-base-content/45
+                            "
+                        >
+                            در حال حاضر برنامه منتشرشده‌ای
+                            در کاتالوگ در دسترس نیست.
+                        </p>
+                    </div>
+                </div>
             @endforelse
         </div>
-
     </section>
 
 </x-servers.workspace>
