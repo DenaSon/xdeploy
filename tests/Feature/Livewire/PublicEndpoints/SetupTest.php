@@ -20,6 +20,8 @@ use App\Domain\PublicEndpoint\DTOs\PublicEndpointServerPreflightResult;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Livewire\PublicEndpoints\Setup;
 use App\Models\ApplicationOperation;
 use App\Models\PublicEndpoint;
@@ -116,10 +118,18 @@ final class SetupTest extends TestCase
 
         $this->assertNull($endpoint->activated_at);
 
+        $ssh = $this->createMock(
+            SSHConnectionInterface::class,
+        );
+
+        $ssh->expects(self::once())
+            ->method('disconnect');
+
         (new RunPublicEndpointOperationJob(
             (int) $operation->getKey(),
         ))->handle(
             app(PublicEndpointDriverRegistry::class),
+            $ssh,
         );
 
         $endpoint->refresh();
@@ -145,6 +155,73 @@ final class SetupTest extends TestCase
             )
             ->assertDispatched(
                 "public-endpoints-updated.{$server->getKey()}",
+            );
+    }
+
+    public function test_queued_job_maps_ssh_failure_and_always_disconnects(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09173432405');
+        $server = $this->createServer($user);
+        $driver = new SetupFakePublicEndpointDriver(ApplicationType::N8n);
+        $driver->enableException = new SSHConnectionException(
+            'test connection closed',
+        );
+
+        $this->bindDriver($driver);
+
+        $component = Livewire::actingAs($user)
+            ->test(Setup::class, [
+                'serverId' => $server->getKey(),
+                'applicationType' => ApplicationType::N8n->value,
+                'applicationName' => 'n8n',
+            ])
+            ->set('domain', 'automation.example.com')
+            ->call('runPreflight')
+            ->call('activateEndpoint');
+
+        $endpoint = PublicEndpoint::query()->firstOrFail();
+        $operation = PublicEndpointOperation::query()->firstOrFail();
+        $ssh = $this->createMock(
+            SSHConnectionInterface::class,
+        );
+
+        $ssh->expects(self::once())
+            ->method('disconnect');
+
+        try {
+            (new RunPublicEndpointOperationJob(
+                (int) $operation->getKey(),
+            ))->handle(
+                app(PublicEndpointDriverRegistry::class),
+                $ssh,
+            );
+
+            self::fail('The SSH failure should be rethrown by the job.');
+        } catch (SSHConnectionException) {
+            // The queue worker records the rethrown exception.
+        }
+
+        $endpoint->refresh();
+        $operation->refresh();
+
+        $this->assertNull($endpoint->activated_at);
+        $this->assertSame(
+            PublicEndpointOperationStatus::Failed,
+            $operation->status,
+        );
+        $this->assertSame(
+            'environment_unavailable',
+            $operation->failure_code,
+        );
+
+        $component
+            ->call('pollOperation')
+            ->assertSet('operationActive', false)
+            ->assertSet(
+                'activationError',
+                'اتصال SSH یا ابزارهای لازم برای اعمال امن HTTPS در دسترس نیستند.',
             );
     }
 
@@ -250,6 +327,8 @@ final class SetupFakePublicEndpointDriver implements PublicEndpointDriverInterfa
 
     public int $enableCalls = 0;
 
+    public ?\Throwable $enableException = null;
+
     public function __construct(
         private readonly ApplicationType $applicationType,
     ) {}
@@ -336,6 +415,10 @@ final class SetupFakePublicEndpointDriver implements PublicEndpointDriverInterfa
         PublicEndpointDomain $domain,
     ): PublicEndpointApplicationStatus {
         $this->enableCalls++;
+
+        if ($this->enableException !== null) {
+            throw $this->enableException;
+        }
 
         return $this->statusResult(
             state: PublicEndpointRuntimeState::Enabled,

@@ -35,6 +35,10 @@ final class SSHConnection implements SSHConnectionInterface
 
     public function connect(Server $server): bool
     {
+        if ($this->isConnectedTo($server)) {
+            return true;
+        }
+
         $resolvedHost = $this->targetPolicy->resolve(
             $server->host,
         );
@@ -276,13 +280,13 @@ final class SSHConnection implements SSHConnectionInterface
         $ssh = $this->ssh;
 
         /*
-         * Clear all connection-scoped state first.
+         * Clear the transport first, but retain its server target.
          *
-         * Even if closing the underlying transport fails,
-         * this object must no longer represent a server session.
+         * A command timeout or closed transport may be followed by another
+         * command in the same request/job. Keeping the target allows that
+         * command to establish a fresh connection through reconnect().
          */
         $this->ssh = null;
-        $this->server = null;
 
         if ($ssh === null) {
             return;
@@ -296,6 +300,23 @@ final class SSHConnection implements SSHConnectionInterface
              * the original exception.
              */
         }
+    }
+
+    private function isConnectedTo(Server $server): bool
+    {
+        if (
+            $this->server === null
+            || ! $this->isConnected()
+            || ! $this->server->is($server)
+        ) {
+            return false;
+        }
+
+        return $this->server->host === $server->host
+            && $this->server->port === $server->port
+            && $this->server->username === $server->username
+            && $this->server->authentication_type
+                === $server->authentication_type;
     }
 
     private function configureAuthenticatedTransport(SSH2 $ssh): void

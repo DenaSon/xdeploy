@@ -20,6 +20,7 @@ use App\Domain\PublicEndpoint\DTOs\PublicEndpointServerPreflightResult;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Livewire\Domains\Index as DomainsIndex;
 use App\Models\ApplicationOperation;
 use App\Models\PublicEndpoint;
@@ -186,6 +187,7 @@ final class DomainIndexTest extends TestCase
             (int) $operation->getKey(),
         ))->handle(
             app(PublicEndpointDriverRegistry::class),
+            app(SSHConnectionInterface::class),
         );
 
         $operation->refresh();

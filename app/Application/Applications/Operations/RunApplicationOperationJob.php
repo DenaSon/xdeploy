@@ -7,6 +7,7 @@ namespace App\Application\Applications\Operations;
 use App\Application\Applications\Manager\ApplicationManager;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Models\ApplicationOperation;
 use App\Models\Server;
 use App\Models\User;
@@ -39,6 +40,7 @@ final class RunApplicationOperationJob implements ShouldQueue
 
     public function handle(
         ApplicationManager $applicationManager,
+        SSHConnectionInterface $ssh,
     ): void {
         $operation = ApplicationOperation::query()->find(
             $this->operationId,
@@ -126,6 +128,15 @@ final class RunApplicationOperationJob implements ShouldQueue
             ]);
 
             throw $exception;
+        } finally {
+            try {
+                $ssh->disconnect();
+            } catch (Throwable $exception) {
+                Log::warning('application.operation.ssh_cleanup_failed', [
+                    'operation_id' => (int) $operation->getKey(),
+                    'exception_type' => $exception::class,
+                ]);
+            }
         }
     }
 

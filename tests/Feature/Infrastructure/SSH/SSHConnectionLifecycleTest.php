@@ -149,7 +149,7 @@ final class SSHConnectionLifecycleTest extends TestCase
         );
     }
 
-    public function test_disconnect_clears_the_current_server_state(): void
+    public function test_repeated_connect_reuses_the_authenticated_transport_for_the_same_server(): void
     {
         $connection = app(
             SSHConnectionInterface::class,
@@ -165,18 +165,83 @@ final class SSHConnectionLifecycleTest extends TestCase
             'server',
         );
 
+        $sshProperty = new ReflectionProperty(
+            SSHConnection::class,
+            'ssh',
+        );
+
+        $server = new Server([
+            'host' => '192.0.2.20',
+            'port' => 22,
+            'username' => 'root',
+            'authentication_type' => 'password',
+        ]);
+
+        $server->setAttribute('id', 123);
+        $server->exists = true;
+
+        $ssh = $this->createMock(
+            SSH2::class,
+        );
+
+        $ssh->expects(self::once())
+            ->method('isAuthenticated')
+            ->willReturn(true);
+
+        $ssh->expects(self::never())
+            ->method('disconnect');
+
         $serverProperty->setValue(
             $connection,
-            new Server([
-                'host' => '192.0.2.20',
-                'port' => 22,
-                'username' => 'root',
-            ]),
+            $server,
+        );
+
+        $sshProperty->setValue(
+            $connection,
+            $ssh,
+        );
+
+        self::assertTrue(
+            $connection->connect(clone $server),
+        );
+
+        self::assertSame(
+            $ssh,
+            $sshProperty->getValue($connection),
+        );
+    }
+
+    public function test_disconnect_retains_the_current_server_for_reconnect(): void
+    {
+        $connection = app(
+            SSHConnectionInterface::class,
+        );
+
+        self::assertInstanceOf(
+            SSHConnection::class,
+            $connection,
+        );
+
+        $serverProperty = new ReflectionProperty(
+            SSHConnection::class,
+            'server',
+        );
+
+        $server = new Server([
+            'host' => '192.0.2.20',
+            'port' => 22,
+            'username' => 'root',
+        ]);
+
+        $serverProperty->setValue(
+            $connection,
+            $server,
         );
 
         $connection->disconnect();
 
-        self::assertNull(
+        self::assertSame(
+            $server,
             $serverProperty->getValue(
                 $connection,
             ),

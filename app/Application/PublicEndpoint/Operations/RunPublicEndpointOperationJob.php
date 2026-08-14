@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Application\PublicEndpoint\Operations;
 
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Domain\PublicEndpoint\Exceptions\PublicEndpointOperationException;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
+use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Models\PublicEndpoint;
 use App\Models\PublicEndpointOperation;
 use App\Models\Server;
@@ -39,6 +42,7 @@ final class RunPublicEndpointOperationJob implements ShouldQueue
 
     public function handle(
         PublicEndpointDriverRegistry $drivers,
+        SSHConnectionInterface $ssh,
     ): void {
         $operation = PublicEndpointOperation::query()->find(
             $this->operationId,
@@ -126,6 +130,15 @@ final class RunPublicEndpointOperationJob implements ShouldQueue
             ]);
 
             throw $exception;
+        } finally {
+            try {
+                $ssh->disconnect();
+            } catch (Throwable $exception) {
+                Log::warning('public_endpoint.operation.ssh_cleanup_failed', [
+                    'operation_id' => (int) $operation->getKey(),
+                    'exception_type' => $exception::class,
+                ]);
+            }
         }
     }
 
@@ -230,6 +243,10 @@ final class RunPublicEndpointOperationJob implements ShouldQueue
     ): string {
         if ($exception instanceof PublicEndpointOperationException) {
             return $exception->failure->value;
+        }
+
+        if ($exception instanceof SSHConnectionException) {
+            return PublicEndpointOperationFailure::EnvironmentUnavailable->value;
         }
 
         return $fallback;
