@@ -21,6 +21,7 @@ use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Livewire\Domains\Index as DomainsIndex;
 use App\Models\ApplicationOperation;
 use App\Models\PublicEndpoint;
@@ -81,6 +82,56 @@ final class DomainIndexTest extends TestCase
             ->call('continueDomainSetup')
             ->assertSet('showSetup', true)
             ->assertSee('برنامه مقصد');
+    }
+
+    public function test_server_wide_ssh_failure_stops_inspecting_remaining_applications(): void
+    {
+        $user = $this->createUser('09173432211');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+        $marzban->statusException = new SSHConnectionException(
+            'test connection closed',
+        );
+
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->assertSet('loaded', true)
+            ->assertSet('unavailable', true)
+            ->assertSet('statuses', [
+                ApplicationType::Marzban->value => ['unavailable' => true],
+                ApplicationType::N8n->value => ['unavailable' => true],
+            ]);
+
+        $this->assertSame(1, $marzban->statusCalls);
+        $this->assertSame(0, $n8n->statusCalls);
+    }
+
+    public function test_driver_specific_failure_does_not_stop_inspecting_remaining_applications(): void
+    {
+        $user = $this->createUser('09173432212');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+        $marzban->statusException = new \LogicException(
+            'test driver failure',
+        );
+
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->assertSet('loaded', true)
+            ->assertSet('unavailable', false)
+            ->assertSet(
+                'statuses.'.ApplicationType::Marzban->value,
+                ['unavailable' => true],
+            );
+
+        $this->assertSame(1, $marzban->statusCalls);
+        $this->assertSame(1, $n8n->statusCalls);
     }
 
     public function test_domains_workspace_adopts_existing_active_n8n_endpoint(): void
@@ -358,6 +409,10 @@ final class DomainIndexFakeDriver implements PublicEndpointDriverInterface
 
     public int $disableCalls = 0;
 
+    public int $statusCalls = 0;
+
+    public ?\Throwable $statusException = null;
+
     public function __construct(
         private readonly ApplicationType $applicationType,
         private readonly string $applicationName,
@@ -394,6 +449,12 @@ final class DomainIndexFakeDriver implements PublicEndpointDriverInterface
         User $user,
         Server $server,
     ): PublicEndpointApplicationStatus {
+        $this->statusCalls++;
+
+        if ($this->statusException !== null) {
+            throw $this->statusException;
+        }
+
         return $this->statusResult(
             state: $this->runtimeState,
             domain: $this->runtimeDomain,

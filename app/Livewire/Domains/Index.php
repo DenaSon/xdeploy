@@ -17,6 +17,7 @@ use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\Exceptions\InvalidPublicEndpointDomainException;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
+use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Models\PublicEndpoint;
 use App\Models\PublicEndpointOperation;
 use App\Models\Server;
@@ -313,6 +314,7 @@ final class Index extends Component
         $this->applications = [];
         $this->endpointError = null;
         $successful = 0;
+        $serverUnavailable = false;
 
         foreach ($drivers->all() as $driver) {
             $type = $driver->type();
@@ -323,6 +325,12 @@ final class Index extends Component
                 'icon' => $driver->icon(),
             ];
 
+            if ($serverUnavailable) {
+                $this->statuses[$type->value] = ['unavailable' => true];
+
+                continue;
+            }
+
             try {
                 $status = $driver->status(
                     user: $this->authenticatedUser(),
@@ -332,6 +340,10 @@ final class Index extends Component
                 $this->statuses[$type->value] = $presented;
                 $this->reconcileRuntimeEndpoint($type, $presented);
                 $successful++;
+            } catch (SSHConnectionException $exception) {
+                report($exception);
+                $this->statuses[$type->value] = ['unavailable' => true];
+                $serverUnavailable = true;
             } catch (Throwable $exception) {
                 report($exception);
                 $this->statuses[$type->value] = ['unavailable' => true];
