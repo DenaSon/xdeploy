@@ -1,5 +1,4 @@
 @php
-    $productName = config('app.name');
     $productHost = parse_url(config('app.url'), PHP_URL_HOST) ?: config('app.url');
 @endphp
 
@@ -14,7 +13,7 @@
         aria-hidden="true"
         class="
             pointer-events-none
-            absolute inset-0 -z-10
+            absolute inset-0 -z-20
             overflow-hidden
         "
     >
@@ -61,6 +60,99 @@
     </div>
 
 
+    {{-- Ambient Coreflare wordmark --}}
+    <div
+        aria-hidden="true"
+        x-data="{
+            text: 'Coreflare',
+            output: '',
+            index: 0,
+            timeout: null,
+
+            start() {
+                if (
+                    window.matchMedia(
+                        '(prefers-reduced-motion: reduce)'
+                    ).matches
+                ) {
+                    this.output = this.text;
+
+                    return;
+                }
+
+                this.output = '';
+                this.index = 0;
+
+                this.write();
+            },
+
+            write() {
+                if (this.index >= this.text.length) {
+                    this.timeout = setTimeout(() => {
+                        this.start();
+                    }, 24000);
+
+                    return;
+                }
+
+                this.output += this.text.charAt(this.index);
+
+                this.index++;
+
+                this.timeout = setTimeout(() => {
+                    this.write();
+                }, 88);
+            }
+        }"
+        x-init="
+            start();
+
+            $cleanup(() => {
+                if (timeout) {
+                    clearTimeout(timeout);
+                }
+            });
+        "
+        class="
+            pointer-events-none
+            absolute
+            inset-x-0
+            top-14
+            -z-10
+
+            hidden
+            select-none
+            overflow-hidden
+
+            lg:block
+        "
+    >
+        <div
+            dir="ltr"
+            class="
+                mx-auto
+                w-full max-w-7xl
+
+                px-8
+                text-center
+
+                text-[6.25rem]
+                font-semibold
+                leading-none
+                tracking-[-0.065em]
+
+                text-base-content/[0.045]
+
+                xl:text-[7.25rem]
+
+                dark:text-base-content/[0.055]
+            "
+        >
+            <span x-text="output"></span>
+        </div>
+    </div>
+
+
     <div
         class="
             mx-auto
@@ -76,7 +168,9 @@
 
             lg:grid-cols-[0.88fr_1.12fr]
             lg:gap-20
-            lg:px-8 lg:py-24
+            lg:px-8
+            lg:pb-24
+            lg:pt-28
         "
     >
         {{-- Copy --}}
@@ -90,7 +184,7 @@
                 lg:text-start
             "
         >
-            {{-- Eyebrow --}}
+            {{-- Brand --}}
             <div
                 class="
                     inline-flex
@@ -102,7 +196,8 @@
 
                     px-3 py-1.5
 
-                    text-xs font-medium
+                    text-xs
+                    font-medium
                     text-primary
                 "
             >
@@ -128,7 +223,17 @@
                     ></span>
                 </span>
 
-                مدیریت یکپارچه VPS و برنامه‌های Self-hosted
+                <span dir="ltr">
+                    Coreflare
+                </span>
+
+                <span class="text-base-content/25">
+                    |
+                </span>
+
+                <span>
+                    کورفلر
+                </span>
             </div>
 
 
@@ -149,10 +254,10 @@
                     lg:text-[3.55rem]
                 "
             >
-                از یک VPS خام،
+                زیرساخت،
 
                 <span class="text-primary">
-                    به یک سرویس آماده استفاده.
+                    یکپارچه و هوشمند
                 </span>
             </h1>
 
@@ -173,10 +278,9 @@
                     lg:mx-0
                 "
             >
-                VPS موجود خود را متصل کنید یا مستقیماً یک سرور جدید تهیه کنید.
-                {{ $productName }} آماده‌سازی سرور، نصب برنامه‌ها، پایش منابع
-                و مدیریت سرویس‌های پشتیبانی‌شده را در یک پنل یکپارچه
-                در اختیار شما قرار می‌دهد.
+                کورفلر زیرساخت را از مجموعه‌ای از ابزارها و فرایندهای پراکنده،
+                به یک تجربه یکپارچه برای راه‌اندازی، اجرا و مدیریت سرویس‌ها
+                تبدیل می‌کند.
             </p>
 
 
@@ -184,6 +288,7 @@
             <div
                 class="
                     mt-8
+
                     flex flex-col
                     items-stretch
                     justify-center
@@ -196,14 +301,16 @@
                 "
             >
                 <x-button
-                    label="شروع استفاده"
+                    label="شروع"
                     icon="lucide.arrow-left"
                     :link="route('login')"
                     wire:navigate
                     class="
                         btn-primary btn-lg
                         rounded-xl
+
                         px-6
+
                         font-medium
 
                         shadow-lg
@@ -227,6 +334,7 @@
                     class="
                         btn btn-ghost btn-lg
                         rounded-xl
+
                         px-5
 
                         font-normal
@@ -237,7 +345,7 @@
                     "
                 >
                     <span>
-                        نحوه عملکرد
+                        چطور کار می‌کند؟
                     </span>
 
                     <x-icon
@@ -252,9 +360,11 @@
             <div
                 class="
                     mt-8
+
                     flex flex-wrap
                     items-center
                     justify-center
+
                     gap-x-5 gap-y-3
 
                     text-xs
@@ -269,25 +379,16 @@
                         class="!size-3.5 stroke-[1.6]"
                     />
 
-                    اتصال VPS موجود
+                    مدیریت سرورها
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
                     <x-icon
-                        name="lucide.cloud"
+                        name="lucide.blocks"
                         class="!size-3.5 stroke-[1.6]"
                     />
 
-                    تهیه VPS جدید
-                </span>
-
-                <span class="inline-flex items-center gap-1.5">
-                    <x-icon
-                        name="lucide.package"
-                        class="!size-3.5 stroke-[1.6]"
-                    />
-
-                    نصب برنامه‌ها
+                    راه‌اندازی سرویس‌ها
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
@@ -296,1079 +397,673 @@
                         class="!size-3.5 stroke-[1.6]"
                     />
 
-                    پایش منابع سرور
+                    پایش زیرساخت
+                </span>
+
+                <span class="inline-flex items-center gap-1.5">
+                    <x-icon
+                        name="lucide.layers-3"
+                        class="!size-3.5 stroke-[1.6]"
+                    />
+
+                    مدیریت یکپارچه
                 </span>
             </div>
         </div>
 
-
-        {{-- Interactive product preview --}}
+        {{-- Product preview --}}
         <div
-            x-data="{ active: 'server' }"
             class="
-                relative
-                mx-auto
-                w-full max-w-xl
-
-                lg:max-w-none
-            "
+        relative
+        hidden
+        w-full
+        lg:block
+    "
         >
-            {{-- Product glow --}}
+            {{-- Ambient glow --}}
             <div
                 aria-hidden="true"
                 class="
-                    absolute
-                    inset-x-12
-                    top-10
-                    h-4/5
+            absolute
+            inset-x-16
+            top-10
+            h-4/5
 
-                    rounded-[3rem]
-                    bg-primary/[0.12]
-                    blur-3xl
-                "
+            rounded-[3rem]
+            bg-primary/[0.10]
+            blur-3xl
+        "
             ></div>
 
 
-            {{-- Main shell --}}
+            {{-- Preview shell --}}
             <div
                 class="
-                    relative
-                    overflow-hidden
+            relative
+            overflow-hidden
 
-                    rounded-[1.8rem]
+            rounded-[1.75rem]
 
-                    border border-base-300/80
-                    bg-base-100/85
+            border border-base-300/80
+            bg-base-100/90
 
-                    shadow-[0_30px_100px_rgba(15,23,42,0.09)]
+            shadow-[0_30px_90px_rgba(15,23,42,0.08)]
 
-                    backdrop-blur-2xl
-                "
+            backdrop-blur-xl
+        "
             >
                 {{-- Window header --}}
                 <div
                     class="
-                        flex
-                        items-center
-                        justify-between
+                flex
+                items-center
+                justify-between
 
-                        border-b border-base-300/70
+                border-b border-base-300/60
 
-                        px-4 py-3.5
-
-                        sm:px-5
-                    "
+                px-5 py-3.5
+            "
                 >
+                    {{-- Window controls --}}
                     <div
                         aria-hidden="true"
-                        class="flex items-center gap-2"
+                        class="
+                    flex
+                    items-center
+                    gap-2
+                "
                     >
-                        <span class="size-2 rounded-full bg-error/50"></span>
-                        <span class="size-2 rounded-full bg-warning/50"></span>
-                        <span class="size-2 rounded-full bg-success/50"></span>
+                <span
+                    class="
+                        size-2
+                        rounded-full
+                        bg-error/45
+                    "
+                ></span>
+
+                        <span
+                            class="
+                        size-2
+                        rounded-full
+                        bg-warning/45
+                    "
+                        ></span>
+
+                        <span
+                            class="
+                        size-2
+                        rounded-full
+                        bg-success/45
+                    "
+                        ></span>
                     </div>
 
+
+                    {{-- Host --}}
                     <div
                         dir="ltr"
                         class="
-                            flex
-                            items-center gap-2
+                    flex
+                    items-center
+                    gap-2
 
-                            rounded-lg
-                            border border-base-300/70
-                            bg-base-200/40
+                    rounded-lg
 
-                            px-3 py-1.5
+                    border border-base-300/60
+                    bg-base-200/35
 
-                            font-mono
-                            text-[10px]
-                            text-base-content/40
-                        "
+                    px-3 py-1.5
+
+                    font-mono
+                    text-[10px]
+                    text-base-content/35
+                "
                     >
-                        <span
-                            class="
-                                size-1.5
-                                rounded-full
-                                bg-success
-                            "
-                        ></span>
+                <span
+                    class="
+                        size-1.5
+                        rounded-full
+                        bg-success
+                    "
+                ></span>
 
                         {{ $productHost }}
                     </div>
 
+
+                    {{-- Brand mark --}}
                     <span
                         class="
-                            flex size-7
-                            items-center justify-center
+                    flex
+                    size-7
+                    items-center
+                    justify-center
 
-                            rounded-lg
+                    rounded-lg
+
+                    bg-primary/10
+                    text-primary
+                "
+                    >
+                <x-icon
+                    name="lucide.layers-3"
+                    class="!size-3.5 stroke-[1.8]"
+                />
+            </span>
+                </div>
+
+
+                {{-- Preview body --}}
+                <div class="p-5">
+                    {{-- Overview header --}}
+                    <div
+                        class="
+                    flex
+                    items-center
+                    justify-between
+                    gap-4
+                "
+                    >
+                        <div>
+                            <div
+                                class="
+                            text-sm
+                            font-semibold
+                            text-base-content
+                        "
+                            >
+                                نمای کلی زیرساخت
+                            </div>
+
+                            <div
+                                class="
+                            mt-1
+                            text-[11px]
+                            text-base-content/40
+                        "
+                            >
+                                وضعیت سرور و سرویس‌های فعال
+                            </div>
+                        </div>
+
+
+                        <div
+                            class="
+                        inline-flex
+                        items-center
+                        gap-1.5
+
+                        rounded-full
+                        bg-success/[0.08]
+
+                        px-2.5 py-1.5
+
+                        text-[10px]
+                        font-medium
+                        text-success
+                    "
+                        >
+                    <span
+                        class="
+                            size-1.5
+                            rounded-full
+                            bg-success
+                        "
+                    ></span>
+
+                            پایدار
+                        </div>
+                    </div>
+
+
+                    {{-- Server --}}
+                    <div
+                        class="
+                    mt-5
+
+                    flex
+                    items-center
+                    justify-between
+                    gap-4
+
+                    rounded-2xl
+
+                    border border-base-300/70
+                    bg-base-200/30
+
+                    p-4
+                "
+                    >
+                        <div
+                            class="
+                        flex
+                        min-w-0
+                        items-center
+                        gap-3
+                    "
+                        >
+                    <span
+                        class="
+                            flex
+                            size-10
+                            shrink-0
+                            items-center
+                            justify-center
+
+                            rounded-xl
+
                             bg-primary/10
                             text-primary
                         "
                     >
                         <x-icon
-                            name="lucide.layers-3"
-                            class="!size-3.5 stroke-[1.8]"
+                            name="lucide.server"
+                            class="!size-[18px] stroke-[1.7]"
                         />
                     </span>
-                </div>
 
 
-                {{-- Product navigation --}}
-                <div
-                    role="tablist"
-                    aria-label="پیش‌نمایش قابلیت‌ها"
-                    class="
-                        flex items-center gap-1
+                            <div class="min-w-0">
+                                <div
+                                    class="
+                                text-sm
+                                font-medium
+                                text-base-content
+                            "
+                                >
+                                    سرور اصلی
+                                </div>
 
-                        border-b border-base-300/60
+                                <div
+                                    dir="ltr"
+                                    class="
+                                mt-1
+                                text-[10px]
+                                text-base-content/40
+                            "
+                                >
+                                    Ubuntu 24.04 · 185.10.20.41
+                                </div>
+                            </div>
+                        </div>
 
-                        px-3 py-2.5
 
-                        sm:px-5
+                        <span
+                            class="
+                        inline-flex
+                        shrink-0
+                        items-center
+                        gap-1.5
+
+                        text-[10px]
+                        font-medium
+                        text-success
                     "
-                >
-                    <button
-                        type="button"
-                        role="tab"
-                        @click="active = 'server'"
-                        :aria-selected="active === 'server'"
-                        :class="active === 'server'
-                            ? 'bg-base-200 text-base-content'
-                            : 'text-base-content/45 hover:text-base-content/70'"
+                        >
+                    <span
                         class="
-                            inline-flex
-                            items-center gap-2
-
-                            rounded-lg
-
-                            px-3 py-2
-
-                            text-xs font-medium
-
-                            transition-colors
-                            duration-150
+                            size-1.5
+                            rounded-full
+                            bg-success
                         "
-                    >
-                        <x-icon
-                            name="lucide.server"
-                            class="!size-3.5 stroke-[1.7]"
-                        />
+                    ></span>
 
-                        سرور
-                    </button>
+                    فعال
+                </span>
+                    </div>
 
 
-                    <button
-                        type="button"
-                        role="tab"
-                        @click="active = 'applications'"
-                        :aria-selected="active === 'applications'"
-                        :class="active === 'applications'
-                            ? 'bg-base-200 text-base-content'
-                            : 'text-base-content/45 hover:text-base-content/70'"
+                    {{-- Resources --}}
+                    <div
                         class="
-                            inline-flex
-                            items-center gap-2
+                    mt-3
+                    grid
+                    grid-cols-3
+                    gap-2.5
+                "
+                    >
+                        {{-- CPU --}}
+                        <div
+                            class="
+                        rounded-xl
 
-                            rounded-lg
+                        border border-base-300/60
+                        bg-base-100
 
-                            px-3 py-2
+                        p-3
+                    "
+                        >
+                            <div
+                                class="
+                            flex
+                            items-center
+                            justify-between
+                        "
+                            >
+                        <span
+                            class="
+                                text-[10px]
+                                text-base-content/40
+                            "
+                        >
+                            CPU
+                        </span>
 
-                            text-xs font-medium
+                                <span
+                                    dir="ltr"
+                                    class="
+                                text-xs
+                                font-semibold
+                                text-base-content/75
+                            "
+                                >
+                            12%
+                        </span>
+                            </div>
 
-                            transition-colors
-                            duration-150
+                            <progress
+                                class="
+                            progress progress-primary
+
+                            mt-3
+                            h-1
+                            w-full
+                        "
+                                value="12"
+                                max="100"
+                            ></progress>
+                        </div>
+
+
+                        {{-- RAM --}}
+                        <div
+                            class="
+                        rounded-xl
+
+                        border border-base-300/60
+                        bg-base-100
+
+                        p-3
+                    "
+                        >
+                            <div
+                                class="
+                            flex
+                            items-center
+                            justify-between
+                        "
+                            >
+                        <span
+                            class="
+                                text-[10px]
+                                text-base-content/40
+                            "
+                        >
+                            RAM
+                        </span>
+
+                                <span
+                                    dir="ltr"
+                                    class="
+                                text-xs
+                                font-semibold
+                                text-base-content/75
+                            "
+                                >
+                            38%
+                        </span>
+                            </div>
+
+                            <progress
+                                class="
+                            progress progress-primary
+
+                            mt-3
+                            h-1
+                            w-full
+                        "
+                                value="38"
+                                max="100"
+                            ></progress>
+                        </div>
+
+
+                        {{-- Disk --}}
+                        <div
+                            class="
+                        rounded-xl
+
+                        border border-base-300/60
+                        bg-base-100
+
+                        p-3
+                    "
+                        >
+                            <div
+                                class="
+                            flex
+                            items-center
+                            justify-between
+                        "
+                            >
+                        <span
+                            class="
+                                text-[10px]
+                                text-base-content/40
+                            "
+                        >
+                            Disk
+                        </span>
+
+                                <span
+                                    dir="ltr"
+                                    class="
+                                text-xs
+                                font-semibold
+                                text-base-content/75
+                            "
+                                >
+                            24%
+                        </span>
+                            </div>
+
+                            <progress
+                                class="
+                            progress progress-primary
+
+                            mt-3
+                            h-1
+                            w-full
+                        "
+                                value="24"
+                                max="100"
+                            ></progress>
+                        </div>
+                    </div>
+
+
+                    {{-- Services --}}
+                    <div
+                        class="
+                    mt-3
+
+                    flex
+                    items-center
+                    justify-between
+                    gap-4
+
+                    rounded-2xl
+
+                    border border-base-300/60
+                    bg-base-100
+
+                    px-4 py-3.5
+                "
+                    >
+                        <div
+                            class="
+                        flex
+                        items-center
+                        gap-3
+                    "
+                        >
+                    <span
+                        class="
+                            flex
+                            size-9
+                            items-center
+                            justify-center
+
+                            rounded-xl
+
+                            bg-primary/[0.07]
+                            text-primary
                         "
                     >
                         <x-icon
                             name="lucide.blocks"
-                            class="!size-3.5 stroke-[1.7]"
+                            class="!size-4 stroke-[1.7]"
                         />
+                    </span>
 
-                        برنامه‌ها
-                    </button>
+                            <div>
+                                <div
+                                    class="
+                                text-xs
+                                font-medium
+                                text-base-content/75
+                            "
+                                >
+                                    سرویس‌ها
+                                </div>
+
+                                <div
+                                    class="
+                                mt-1
+                                text-[10px]
+                                text-base-content/40
+                            "
+                                >
+                                    Marzban و n8n در حال اجرا هستند
+                                </div>
+                            </div>
+                        </div>
 
 
-                    <button
-                        type="button"
-                        role="tab"
-                        @click="active = 'monitoring'"
-                        :aria-selected="active === 'monitoring'"
-                        :class="active === 'monitoring'
-                            ? 'bg-base-200 text-base-content'
-                            : 'text-base-content/45 hover:text-base-content/70'"
+                        <div
+                            class="
+                        flex
+                        -space-x-1.5
+                        space-x-reverse
+                    "
+                        >
+                    <span
                         class="
-                            inline-flex
-                            items-center gap-2
+                            flex
+                            size-7
+                            items-center
+                            justify-center
 
                             rounded-lg
 
-                            px-3 py-2
-
-                            text-xs font-medium
-
-                            transition-colors
-                            duration-150
+                            border-2 border-base-100
+                            bg-primary/10
+                            text-primary
                         "
                     >
                         <x-icon
-                            name="lucide.activity"
-                            class="!size-3.5 stroke-[1.7]"
+                            name="lucide.shield-check"
+                            class="!size-3 stroke-[1.8]"
                         />
+                    </span>
 
-                        پایش
-                    </button>
-                </div>
+                            <span
+                                class="
+                            flex
+                            size-7
+                            items-center
+                            justify-center
 
+                            rounded-lg
 
-                {{-- Stable preview viewport --}}
-                <div class="p-4 sm:p-5">
-                    <div
-                        class="
-                            relative
-                            h-[390px]
-                            overflow-hidden
+                            border-2 border-base-100
+                            bg-warning/10
+                            text-warning
                         "
-                    >
-                        {{-- Server --}}
-                        <div
-                            x-cloak
-                            x-show="active === 'server'"
-                            x-transition:enter="
-                                transition
-                                ease-out
-                                duration-200
-                            "
-                            x-transition:enter-start="
-                                opacity-0
-                                translate-y-1
-                            "
-                            x-transition:enter-end="
-                                opacity-100
-                                translate-y-0
-                            "
-                            x-transition:leave="
-                                transition
-                                ease-in
-                                duration-150
-                            "
-                            x-transition:leave-start="
-                                opacity-100
-                                translate-y-0
-                            "
-                            x-transition:leave-end="
-                                opacity-0
-                                -translate-y-1
-                            "
-                            class="absolute inset-0"
-                        >
-                            {{-- Server headline --}}
-                            <div
-                                class="
-                                    flex
-                                    items-start
-                                    justify-between
-                                    gap-4
-
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-200/35
-
-                                    p-4
-                                "
                             >
-                                <div
-                                    class="
-                                        flex min-w-0
-                                        items-center gap-3
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            flex size-11 shrink-0
-                                            items-center justify-center
-
-                                            rounded-xl
-                                            bg-primary/10
-                                            text-primary
-                                        "
-                                    >
-                                        <x-icon
-                                            name="lucide.server"
-                                            class="!size-5 stroke-[1.7]"
-                                        />
-                                    </span>
-
-                                    <div class="min-w-0">
-                                        <div
-                                            class="
-                                                text-sm font-semibold
-                                                text-base-content
-                                            "
-                                        >
-                                            سرور اصلی
-                                        </div>
-
-                                        <div
-                                            dir="ltr"
-                                            class="
-                                                mt-1
-                                                text-[11px]
-                                                text-base-content/40
-                                            "
-                                        >
-                                            Ubuntu 24.04 · 185.10.20.41
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <span
-                                    class="
-                                        inline-flex
-                                        shrink-0
-                                        items-center gap-1.5
-
-                                        rounded-full
-                                        bg-success/10
-
-                                        px-2.5 py-1.5
-
-                                        text-[10px] font-medium
-                                        text-success
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            size-1.5
-                                            rounded-full
-                                            bg-success
-                                        "
-                                    ></span>
-
-                                    فعال
-                                </span>
-                            </div>
-
-
-                            {{-- Stats --}}
-                            <div
-                                class="
-                                    mt-3
-                                    grid grid-cols-3
-                                    gap-2.5
-                                "
-                            >
-                                <div
-                                    class="
-                                        rounded-xl
-                                        border border-base-300/60
-                                        bg-base-100
-                                        p-3
-                                    "
-                                >
-                                    <div
-                                        class="
-                                            text-[10px]
-                                            text-base-content/40
-                                        "
-                                    >
-                                        CPU
-                                    </div>
-
-                                    <div
-                                        dir="ltr"
-                                        class="
-                                            mt-2
-                                            text-sm font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        12%
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="
-                                        rounded-xl
-                                        border border-base-300/60
-                                        bg-base-100
-                                        p-3
-                                    "
-                                >
-                                    <div
-                                        class="
-                                            text-[10px]
-                                            text-base-content/40
-                                        "
-                                    >
-                                        RAM
-                                    </div>
-
-                                    <div
-                                        dir="ltr"
-                                        class="
-                                            mt-2
-                                            text-sm font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        1.2 GB
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="
-                                        rounded-xl
-                                        border border-base-300/60
-                                        bg-base-100
-                                        p-3
-                                    "
-                                >
-                                    <div
-                                        class="
-                                            text-[10px]
-                                            text-base-content/40
-                                        "
-                                    >
-                                        Uptime
-                                    </div>
-
-                                    <div
-                                        dir="ltr"
-                                        class="
-                                            mt-2
-                                            text-sm font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        18d
-                                    </div>
-                                </div>
-                            </div>
-
-
-                            {{-- Readiness --}}
-                            <div
-                                class="
-                                    mt-3
-
-                                    rounded-2xl
-                                    border border-success/15
-                                    bg-success/[0.035]
-
-                                    p-4
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        items-center gap-3
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            flex size-9
-                                            items-center justify-center
-
-                                            rounded-xl
-                                            bg-success/10
-                                            text-success
-                                        "
-                                    >
-                                        <x-icon
-                                            name="lucide.circle-check"
-                                            class="!size-4 stroke-[1.8]"
-                                        />
-                                    </span>
-
-                                    <div>
-                                        <div
-                                            class="
-                                                text-xs font-medium
-                                                text-base-content/80
-                                            "
-                                        >
-                                            سرور آماده مدیریت است
-                                        </div>
-
-                                        <div
-                                            class="
-                                                mt-1
-                                                text-[10px]
-                                                text-base-content/40
-                                            "
-                                        >
-                                            اتصال SSH و دسترسی‌های موردنیاز
-                                            با موفقیت تأیید شده‌اند
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-
-                        {{-- Applications --}}
-                        <div
-                            x-cloak
-                            x-show="active === 'applications'"
-                            x-transition:enter="
-                                transition
-                                ease-out
-                                duration-200
-                            "
-                            x-transition:enter-start="
-                                opacity-0
-                                translate-y-1
-                            "
-                            x-transition:enter-end="
-                                opacity-100
-                                translate-y-0
-                            "
-                            x-transition:leave="
-                                transition
-                                ease-in
-                                duration-150
-                            "
-                            x-transition:leave-start="
-                                opacity-100
-                                translate-y-0
-                            "
-                            x-transition:leave-end="
-                                opacity-0
-                                -translate-y-1
-                            "
-                            class="
-                                absolute inset-0
-                                space-y-2.5
-                            "
-                        >
-                            {{-- Marzban --}}
-                            <div
-                                class="
-                                    flex
-                                    items-center justify-between
-                                    gap-3
-
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-100
-
-                                    p-3.5
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        min-w-0
-                                        items-center gap-3
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            flex size-10 shrink-0
-                                            items-center justify-center
-
-                                            rounded-xl
-                                            bg-primary/10
-                                            text-primary
-                                        "
-                                    >
-                                        <x-icon
-                                            name="lucide.shield-check"
-                                            class="!size-[18px] stroke-[1.7]"
-                                        />
-                                    </span>
-
-                                    <div class="min-w-0">
-                                        <div
-                                            dir="ltr"
-                                            class="
-                                                text-sm font-medium
-                                                text-base-content
-                                            "
-                                        >
-                                            Marzban
-                                        </div>
-
-                                        <div
-                                            class="
-                                                mt-1
-                                                text-[10px]
-                                                text-base-content/40
-                                            "
-                                        >
-                                            مدیریت کاربران و سرویس‌های مبتنی بر Xray
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <span
-                                    class="
-                                        shrink-0
-
-                                        rounded-full
-                                        bg-success/10
-
-                                        px-2.5 py-1
-
-                                        text-[10px] font-medium
-                                        text-success
-                                    "
-                                >
-                                    در حال اجرا
-                                </span>
-                            </div>
-
-
-                            {{-- n8n --}}
-                            <div
-                                class="
-                                    flex
-                                    items-center justify-between
-                                    gap-3
-
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-100
-
-                                    p-3.5
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        min-w-0
-                                        items-center gap-3
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            flex size-10 shrink-0
-                                            items-center justify-center
-
-                                            rounded-xl
-                                            bg-warning/10
-                                            text-warning
-                                        "
-                                    >
-                                        <x-icon
-                                            name="lucide.workflow"
-                                            class="!size-[18px] stroke-[1.7]"
-                                        />
-                                    </span>
-
-                                    <div class="min-w-0">
-                                        <div
-                                            dir="ltr"
-                                            class="
-                                                text-sm font-medium
-                                                text-base-content
-                                            "
-                                        >
-                                            n8n
-                                        </div>
-
-                                        <div
-                                            class="
-                                                mt-1
-                                                text-[10px]
-                                                text-base-content/40
-                                            "
-                                        >
-                                            اتوماسیون گردش‌کار و اتصال سرویس‌ها
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <span
-                                    class="
-                                        shrink-0
-
-                                        rounded-full
-                                        bg-success/10
-
-                                        px-2.5 py-1
-
-                                        text-[10px] font-medium
-                                        text-success
-                                    "
-                                >
-                                    در حال اجرا
-                                </span>
-                            </div>
-
-
-                            {{-- AmneziaWG --}}
-                            <div
-                                class="
-                                    flex
-                                    items-center justify-between
-                                    gap-3
-
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-100
-
-                                    p-3.5
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        min-w-0
-                                        items-center gap-3
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            flex size-10 shrink-0
-                                            items-center justify-center
-
-                                            rounded-xl
-                                            bg-info/10
-                                            text-info
-                                        "
-                                    >
-                                        <x-icon
-                                            name="lucide.network"
-                                            class="!size-[18px] stroke-[1.7]"
-                                        />
-                                    </span>
-
-                                    <div class="min-w-0">
-                                        <div
-                                            dir="ltr"
-                                            class="
-                                                text-sm font-medium
-                                                text-base-content
-                                            "
-                                        >
-                                            AmneziaWG
-                                        </div>
-
-                                        <div
-                                            class="
-                                                mt-1
-                                                text-[10px]
-                                                text-base-content/40
-                                            "
-                                        >
-                                            VPN شخصی و مدیریت دستگاه‌ها
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <span
-                                    class="
-                                        shrink-0
-
-                                        rounded-full
-                                        bg-primary/10
-
-                                        px-2.5 py-1
-
-                                        text-[10px] font-medium
-                                        text-primary
-                                    "
-                                >
-                                    نصب نشده
-                                </span>
-                            </div>
-                        </div>
-
-
-                        {{-- Monitoring --}}
-                        <div
-                            x-cloak
-                            x-show="active === 'monitoring'"
-                            x-transition:enter="
-                                transition
-                                ease-out
-                                duration-200
-                            "
-                            x-transition:enter-start="
-                                opacity-0
-                                translate-y-1
-                            "
-                            x-transition:enter-end="
-                                opacity-100
-                                translate-y-0
-                            "
-                            x-transition:leave="
-                                transition
-                                ease-in
-                                duration-150
-                            "
-                            x-transition:leave-start="
-                                opacity-100
-                                translate-y-0
-                            "
-                            x-transition:leave-end="
-                                opacity-0
-                                -translate-y-1
-                            "
-                            class="
-                                absolute inset-0
-                                space-y-3
-                            "
-                        >
-                            {{-- CPU --}}
-                            <div
-                                class="
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-100
-                                    p-4
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        items-center justify-between
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            text-xs font-medium
-                                            text-base-content/70
-                                        "
-                                    >
-                                        پردازنده
-                                    </span>
-
-                                    <span
-                                        dir="ltr"
-                                        class="
-                                            text-xs font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        12%
-                                    </span>
-                                </div>
-
-                                <progress
-                                    class="
-                                        progress progress-primary
-                                        mt-3 h-1.5
-                                        w-full
-                                    "
-                                    value="12"
-                                    max="100"
-                                ></progress>
-                            </div>
-
-
-                            {{-- RAM --}}
-                            <div
-                                class="
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-100
-                                    p-4
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        items-center justify-between
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            text-xs font-medium
-                                            text-base-content/70
-                                        "
-                                    >
-                                        حافظه
-                                    </span>
-
-                                    <span
-                                        dir="ltr"
-                                        class="
-                                            text-xs font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        38%
-                                    </span>
-                                </div>
-
-                                <progress
-                                    class="
-                                        progress progress-primary
-                                        mt-3 h-1.5
-                                        w-full
-                                    "
-                                    value="38"
-                                    max="100"
-                                ></progress>
-                            </div>
-
-
-                            {{-- Disk --}}
-                            <div
-                                class="
-                                    rounded-2xl
-                                    border border-base-300/70
-                                    bg-base-100
-                                    p-4
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        items-center justify-between
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            text-xs font-medium
-                                            text-base-content/70
-                                        "
-                                    >
-                                        فضای دیسک
-                                    </span>
-
-                                    <span
-                                        dir="ltr"
-                                        class="
-                                            text-xs font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        24%
-                                    </span>
-                                </div>
-
-                                <progress
-                                    class="
-                                        progress progress-primary
-                                        mt-3 h-1.5
-                                        w-full
-                                    "
-                                    value="24"
-                                    max="100"
-                                ></progress>
-                            </div>
-
-
-                            {{-- Services --}}
-                            <div
-                                class="
-                                    flex
-                                    items-center justify-between
-                                    gap-4
-
-                                    rounded-2xl
-                                    border border-success/15
-                                    bg-success/[0.035]
-
-                                    p-4
-                                "
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        items-center gap-2.5
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            size-2 shrink-0
-                                            rounded-full
-                                            bg-success
-                                        "
-                                    ></span>
-
-                                    <span
-                                        class="
-                                            text-xs font-medium
-                                            text-base-content/70
-                                        "
-                                    >
-                                        سرویس‌های اصلی فعال هستند
-                                    </span>
-                                </div>
-
-                                <span
-                                    class="
-                                        shrink-0
-                                        text-[10px]
-                                        text-base-content/35
-                                    "
-                                >
-                                    هم‌اکنون
-                                </span>
-                            </div>
+                        <x-icon
+                            name="lucide.workflow"
+                            class="!size-3 stroke-[1.8]"
+                        />
+                    </span>
                         </div>
                     </div>
-                </div>
-            </div>
 
 
-            {{-- Floating status --}}
-            <div
-                class="
-                    absolute
-                    -bottom-5 start-7
+                    {{-- System status --}}
+                    <div
+                        class="
+                    mt-3
 
-                    hidden
-                    items-center gap-2.5
+                    flex
+                    items-center
+                    gap-3
 
-                    rounded-xl
+                    rounded-2xl
 
-                    border border-base-300/80
-                    bg-base-100/90
+                    border border-success/15
+                    bg-success/[0.035]
 
-                    px-3 py-2.5
-
-                    shadow-xl
-                    shadow-base-content/[0.045]
-
-                    backdrop-blur-xl
-
-                    sm:flex
+                    px-4 py-3.5
                 "
-            >
+                    >
                 <span
                     class="
-                        flex size-8
-                        items-center justify-center
+                        flex
+                        size-8
+                        shrink-0
+                        items-center
+                        justify-center
 
                         rounded-lg
+
                         bg-success/10
                         text-success
                     "
                 >
                     <x-icon
-                        name="lucide.shield-check"
+                        name="lucide.circle-check"
                         class="!size-4 stroke-[1.8]"
                     />
                 </span>
 
-                <div>
-                    <div
-                        class="
+                        <div>
+                            <div
+                                class="
+                            text-xs
+                            font-medium
+                            text-base-content/75
+                        "
+                            >
+                                زیرساخت آماده است
+                            </div>
+
+                            <div
+                                class="
+                            mt-1
                             text-[10px]
                             text-base-content/40
                         "
-                    >
-                        وضعیت سیستم
-                    </div>
-
-                    <div
-                        class="
-                            mt-0.5
-                            text-xs font-medium
-                            text-base-content/75
-                        "
-                    >
-                        آماده استفاده
+                            >
+                                سرور و سرویس‌های اصلی بدون مشکل در حال اجرا هستند
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+
+
     </div>
 </section>

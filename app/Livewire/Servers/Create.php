@@ -77,7 +77,7 @@ final class Create extends Component
 
         $this->success(
             'سرور اضافه شد',
-            'سرور با موفقیت به xDeploy متصل شد.',
+            'سرور با موفقیت به Coreflare متصل شد.',
         );
 
         return $this->redirectRoute(

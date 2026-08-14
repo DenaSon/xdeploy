@@ -10,8 +10,8 @@
         'password_change_required' => [
             'icon' => 'o-key',
             'title' => 'تغییر رمز عبور SSH الزامی است',
-            'description' => 'اتصال SSH برقرار است، اما سیستم‌عامل تا زمان تغییر رمز عبور اجازه اجرای دستورات موردنیاز xDeploy را نمی‌دهد.',
-            'hint' => 'یک‌بار مستقیماً از طریق SSH وارد سرور شوید و رمز را تغییر دهید. سپس رمز جدید را در بخش ویرایش سرور xDeploy ذخیره کنید و بررسی مجدد را بزنید.',
+            'description' => 'اتصال SSH برقرار است، اما سیستم‌عامل تا زمان تغییر رمز عبور اجازه اجرای دستورات موردنیاز Coreflare را نمی‌دهد.',
+            'hint' => 'یک‌بار مستقیماً از طریق SSH وارد سرور شوید و رمز را تغییر دهید. سپس رمز جدید را در بخش ویرایش سرور Coreflare ذخیره کنید و بررسی مجدد را بزنید.',
             'alertClass' => 'border border-warning/25 bg-warning/5',
             'titleClass' => 'text-warning',
             'buttonClass' => 'btn-warning btn-outline',
@@ -22,9 +22,9 @@
             'icon' => 'o-exclamation-triangle',
             'title' => 'سیستم‌عامل پشتیبانی نمی‌شود',
             'description' => filled($operatingSystem)
-                ? "سیستم‌عامل شناسایی‌شده {$operatingSystem} است و در نسخه فعلی xDeploy پشتیبانی نمی‌شود."
-                : 'سیستم‌عامل این سرور در نسخه فعلی xDeploy پشتیبانی نمی‌شود.',
-            'hint' => 'در حال حاضر فقط Ubuntu و Debian برای داشبورد و عملیات مدیریتی xDeploy پشتیبانی می‌شوند.',
+                ? "سیستم‌عامل شناسایی‌شده {$operatingSystem} است و در نسخه فعلی Coreflare پشتیبانی نمی‌شود."
+                : 'سیستم‌عامل این سرور در نسخه فعلی Coreflare پشتیبانی نمی‌شود.',
+            'hint' => 'در حال حاضر فقط Ubuntu و Debian برای داشبورد و عملیات مدیریتی Coreflare پشتیبانی می‌شوند.',
             'alertClass' => 'border border-error/20 bg-error/5',
             'titleClass' => 'text-error',
             'buttonClass' => 'btn-error btn-outline',
@@ -34,7 +34,7 @@
         'command_unavailable' => [
             'icon' => 'o-command-line',
             'title' => 'امکان اجرای دستورات وجود ندارد',
-            'description' => 'اتصال SSH برقرار است، اما xDeploy نمی‌تواند دستورات موردنیاز برای دریافت اطلاعات داشبورد را اجرا کند.',
+            'description' => 'اتصال SSH برقرار است، اما Coreflare نمی‌تواند دستورات موردنیاز برای دریافت اطلاعات داشبورد را اجرا کند.',
             'hint' => 'وضعیت shell، محدودیت‌های حساب SSH و تنظیمات دسترسی کاربر روی سرور را بررسی کنید.',
             'alertClass' => 'border border-warning/25 bg-warning/5',
             'titleClass' => 'text-warning',
@@ -45,8 +45,8 @@
         'operating_system_inspection_failed' => [
             'icon' => 'o-exclamation-triangle',
             'title' => 'سیستم‌عامل قابل شناسایی نیست',
-            'description' => 'اتصال SSH و اجرای دستور برقرار است، اما xDeploy نتوانست اطلاعات استاندارد سیستم‌عامل را از سرور دریافت کند.',
-            'hint' => 'xDeploy برای ادامه باید بتواند اطلاعات /etc/os-release را بخواند. در حال حاضر فقط Ubuntu و Debian پشتیبانی می‌شوند.',
+            'description' => 'اتصال SSH و اجرای دستور برقرار است، اما Coreflare نتوانست اطلاعات استاندارد سیستم‌عامل را از سرور دریافت کند.',
+            'hint' => 'Coreflare برای ادامه باید بتواند اطلاعات /etc/os-release را بخواند. در حال حاضر فقط Ubuntu و Debian پشتیبانی می‌شوند.',
             'alertClass' => 'border border-warning/25 bg-warning/5',
             'titleClass' => 'text-warning',
             'buttonClass' => 'btn-warning btn-outline',
@@ -55,7 +55,7 @@
 
         default => [
             'icon' => 'o-exclamation-triangle',
-            'title' => 'سرور برای xDeploy آماده نیست',
+            'title' => 'سرور برای Coreflare آماده نیست',
             'description' => 'یکی از بررسی‌های آمادگی سرور ناموفق بود.',
             'hint' => 'وضعیت سرور را بررسی کرده و دوباره تلاش کنید.',
             'alertClass' => 'border border-warning/25 bg-warning/5',

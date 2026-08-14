@@ -529,7 +529,7 @@
                 $portConflict => [
                     'title' => 'تداخل پورت شناسایی شد',
                     'description' =>
-                        'یک سرویس خارجی پورت موردنیاز را اشغال کرده است. xDeploy آن سرویس را متوقف یا حذف نمی‌کند.',
+                        'یک سرویس خارجی پورت موردنیاز را اشغال کرده است. Coreflare آن سرویس را متوقف یا حذف نمی‌کند.',
                     'icon' => 'lucide.server-off',
                     'iconBackground' => 'bg-error/10',
                     'iconColor' => 'text-error',
@@ -555,7 +555,7 @@
 
             $ownerLabels = [
                 'none' => 'بدون مالک',
-                'xdeploy_caddy' => 'Caddy مدیریت‌شده xDeploy',
+                'Coreflare_caddy' => 'Caddy مدیریت‌شده Coreflare',
                 'nginx' => 'Nginx',
                 'apache' => 'Apache',
                 'haproxy' => 'HAProxy',
@@ -889,7 +889,7 @@
                                            text-xs leading-6
                                            text-base-content/50"
                                 >
-                                    xDeploy تنظیمات را اعتبارسنجی می‌کند،
+                                    Coreflare تنظیمات را اعتبارسنجی می‌کند،
                                     از فایل‌های فعلی نسخه پشتیبان می‌گیرد
                                     و پس از تأیید TLS عملیات را تکمیل می‌کند.
                                 </p>

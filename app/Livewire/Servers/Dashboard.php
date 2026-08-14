@@ -172,7 +172,7 @@ final class Dashboard extends Component
         ) {
             $this->setConnectionError(
                 title: 'امکان اجرای دستورات وجود ندارد',
-                message: 'اتصال SSH برقرار است، اما xDeploy نمی‌تواند دستورات موردنیاز داشبورد را روی سرور اجرا کند.',
+                message: 'اتصال SSH برقرار است، اما Coreflare نمی‌تواند دستورات موردنیاز داشبورد را روی سرور اجرا کند.',
             );
         } catch (
             UnsupportedOperatingSystemException $exception
@@ -180,7 +180,7 @@ final class Dashboard extends Component
             $this->setConnectionError(
                 title: 'سیستم‌عامل پشتیبانی نمی‌شود',
                 message: sprintf(
-                    'سیستم‌عامل شناسایی‌شده %s است. در حال حاضر xDeploy فقط Ubuntu و Debian را پشتیبانی می‌کند.',
+                    'سیستم‌عامل شناسایی‌شده %s است. در حال حاضر Coreflare فقط Ubuntu و Debian را پشتیبانی می‌کند.',
                     $exception
                         ->operatingSystem
                         ->displayName(),
@@ -191,7 +191,7 @@ final class Dashboard extends Component
         ) {
             $this->setConnectionError(
                 title: 'شناسایی سیستم‌عامل ناموفق بود',
-                message: 'xDeploy نتوانست اطلاعات سیستم‌عامل سرور را برای اجرای داشبورد بررسی کند.',
+                message: 'Coreflare نتوانست اطلاعات سیستم‌عامل سرور را برای اجرای داشبورد بررسی کند.',
             );
         } catch (
             SSHConnectionException

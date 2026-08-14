@@ -720,7 +720,7 @@ final class Buy extends Component
 
             if ($this->images === []) {
                 $this->catalogError =
-                    'در این منطقه سیستم‌عامل سازگار با xDeploy در دسترس نیست.';
+                    'در این منطقه سیستم‌عامل سازگار با Coreflare در دسترس نیست.';
 
                 return;
             }

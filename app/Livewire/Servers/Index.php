@@ -43,7 +43,7 @@ final class Index extends Component
         } catch (CloudServerDeletionNotAllowedException) {
             $this->warning(
                 'امکان حذف وجود ندارد',
-                'سرورهای خریداری‌شده از xDeploy از این بخش قابل حذف نیستند.',
+                'سرورهای خریداری‌شده از این بخش قابل حذف نیستند.',
             );
 
             return;
@@ -60,7 +60,7 @@ final class Index extends Component
 
         $this->success(
             'حذف شد',
-            'سرور با موفقیت از xDeploy حذف شد.',
+            'سرور با موفقیت حذف شد.',
         );
     }
 
