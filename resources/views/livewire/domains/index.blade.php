@@ -2,7 +2,13 @@
     :server="$server"
     wire:key="server-domains-workspace-{{ $server->getKey() }}"
 >
-    <div wire:init="loadDomains" class="space-y-5">
+    <div
+        wire:init="loadDomains"
+        @if ($removalOperationActive)
+            wire:poll.2s="pollRemovalOperation"
+        @endif
+        class="space-y-5"
+    >
         <header class="flex flex-col gap-4 px-1 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex min-w-0 items-start gap-3">
                 <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -55,6 +61,19 @@
 
                 <p class="text-sm leading-7 text-base-content/60">
                     {{ $endpointError }}
+                </p>
+            </div>
+        @endif
+
+        @if ($removalOperationActive)
+            <div
+                role="status"
+                class="flex items-start gap-3 rounded-2xl border border-info/20 bg-info/5 px-5 py-4"
+            >
+                <span class="loading loading-spinner loading-sm mt-0.5 text-info"></span>
+
+                <p class="text-sm leading-7 text-base-content/60">
+                    حذف دامنه روی سرور در پس‌زمینه در حال انجام است. تا پایان این عملیات، تغییر دیگری روی سرور شروع نمی‌شود.
                 </p>
             </div>
         @endif
@@ -162,6 +181,7 @@
                         :open-url="$endpoint['open_url']"
                         :application-url="$endpoint['application_url']"
                         :manage-endpoint-id="$endpoint['id']"
+                        :removing="$removalOperationActive && $removalEndpointId === $endpoint['id']"
                     />
                 @endforeach
             </div>

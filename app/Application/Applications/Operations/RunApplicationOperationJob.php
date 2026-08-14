@@ -78,6 +78,24 @@ final class RunApplicationOperationJob implements ShouldQueue
                     server: $server,
                     type: $operation->application_type,
                 ),
+
+                ApplicationOperationType::Start => $applicationManager->start(
+                    user: $user,
+                    server: $server,
+                    type: $operation->application_type,
+                ),
+
+                ApplicationOperationType::Stop => $applicationManager->stop(
+                    user: $user,
+                    server: $server,
+                    type: $operation->application_type,
+                ),
+
+                ApplicationOperationType::Restart => $applicationManager->restart(
+                    user: $user,
+                    server: $server,
+                    type: $operation->application_type,
+                ),
             };
 
             $operation->markSucceeded();

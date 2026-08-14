@@ -8,4 +8,7 @@ enum ApplicationOperationType: string
 {
     case Install = 'install';
     case Uninstall = 'uninstall';
+    case Start = 'start';
+    case Stop = 'stop';
+    case Restart = 'restart';
 }

@@ -29,6 +29,27 @@
         $operationType === 'uninstall'
             => 'در حال حذف',
 
+        $operationType === 'start'
+            && $operationStatus === 'pending'
+                => 'در انتظار اجرا',
+
+        $operationType === 'start'
+            => 'در حال اجرا',
+
+        $operationType === 'stop'
+            && $operationStatus === 'pending'
+                => 'در انتظار توقف',
+
+        $operationType === 'stop'
+            => 'در حال توقف',
+
+        $operationType === 'restart'
+            && $operationStatus === 'pending'
+                => 'در انتظار راه‌اندازی مجدد',
+
+        $operationType === 'restart'
+            => 'در حال راه‌اندازی مجدد',
+
         default
             => 'در حال پردازش',
     };
@@ -48,6 +69,27 @@
 
         $operationType === 'uninstall'
             => "حذف {$name} از سرور در حال انجام است.",
+
+        $operationType === 'start'
+            && $operationStatus === 'pending'
+                => "درخواست اجرای {$name} در صف قرار دارد.",
+
+        $operationType === 'start'
+            => "اجرای {$name} روی سرور در حال انجام است.",
+
+        $operationType === 'stop'
+            && $operationStatus === 'pending'
+                => "درخواست توقف {$name} در صف قرار دارد.",
+
+        $operationType === 'stop'
+            => "توقف {$name} روی سرور در حال انجام است.",
+
+        $operationType === 'restart'
+            && $operationStatus === 'pending'
+                => "درخواست راه‌اندازی مجدد {$name} در صف قرار دارد.",
+
+        $operationType === 'restart'
+            => "راه‌اندازی مجدد {$name} روی سرور در حال انجام است.",
 
         default
             => 'عملیات برنامه در حال پردازش است.',

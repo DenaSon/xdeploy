@@ -6,21 +6,28 @@ namespace Tests\Feature\Livewire\Domains;
 
 use App\Application\PublicEndpoint\Contracts\PublicEndpointDriverInterface;
 use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
+use App\Application\PublicEndpoint\Operations\RunPublicEndpointOperationJob;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
+use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
+use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointDnsPreflightResult;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointPreflightResult;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointRuntimeInfo;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointServerPreflightResult;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Livewire\Domains\Index as DomainsIndex;
+use App\Models\ApplicationOperation;
 use App\Models\PublicEndpoint;
+use App\Models\PublicEndpointOperation;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -131,8 +138,10 @@ final class DomainIndexTest extends TestCase
             ->assertSee('n8n');
     }
 
-    public function test_active_n8n_endpoint_is_removed_through_its_driver(): void
+    public function test_active_n8n_endpoint_removal_is_queued_and_polled(): void
     {
+        Queue::fake();
+
         $user = $this->createUser('09173432205');
         $server = $this->createServer($user);
         [$marzban, $n8n] = $this->drivers();
@@ -149,17 +158,98 @@ final class DomainIndexTest extends TestCase
 
         $this->bindDrivers($marzban, $n8n);
 
+        $component = Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->call('removeEndpoint', (int) $endpoint->getKey())
+            ->assertSet('removalOperationActive', true)
+            ->assertSet('endpointError', null);
+
+        $this->assertSame(0, $n8n->disableCalls);
+        $this->assertDatabaseHas('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
+
+        $operation = PublicEndpointOperation::query()->firstOrFail();
+
+        $this->assertSame(
+            PublicEndpointOperationStatus::Pending,
+            $operation->status,
+        );
+
+        Queue::assertPushed(
+            RunPublicEndpointOperationJob::class,
+            static fn (RunPublicEndpointOperationJob $job): bool => $job->operationId === $operation->getKey(),
+        );
+
+        (new RunPublicEndpointOperationJob(
+            (int) $operation->getKey(),
+        ))->handle(
+            app(PublicEndpointDriverRegistry::class),
+        );
+
+        $operation->refresh();
+        $endpoint->refresh();
+
+        $this->assertSame(1, $n8n->disableCalls);
+        $this->assertSame(
+            PublicEndpointOperationStatus::Succeeded,
+            $operation->status,
+        );
+        $this->assertNull($endpoint->activated_at);
+
+        $component
+            ->call('pollRemovalOperation')
+            ->assertSet('removalOperationActive', false)
+            ->assertSet('showDrawer', false)
+            ->assertSet('endpointError', null);
+
+        $this->assertDatabaseMissing('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
+    }
+
+    public function test_active_application_operation_blocks_endpoint_removal(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09173432210');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+            'activated_at' => now(),
+        ]);
+
+        ApplicationOperation::query()->create([
+            'user_id' => $user->getKey(),
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::Marzban,
+            'operation' => ApplicationOperationType::Install,
+            'status' => ApplicationOperationStatus::Running,
+        ]);
+
+        $n8n->runtimeState = PublicEndpointRuntimeState::Enabled;
+        $n8n->runtimeDomain = 'automation.example.com';
+
+        $this->bindDrivers($marzban, $n8n);
+
         Livewire::actingAs($user)
             ->test(DomainsIndex::class, ['server' => $server])
             ->call('loadDomains')
             ->call('removeEndpoint', (int) $endpoint->getKey())
-            ->assertSet('showDrawer', false)
-            ->assertSet('endpointError', null);
+            ->assertSet('removalOperationActive', false)
+            ->assertSet(
+                'endpointError',
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.',
+            );
 
-        $this->assertSame(1, $n8n->disableCalls);
-        $this->assertDatabaseMissing('public_endpoints', [
-            'id' => $endpoint->getKey(),
-        ]);
+        $this->assertSame(0, $n8n->disableCalls);
+        $this->assertDatabaseCount('public_endpoint_operations', 0);
+        Queue::assertNotPushed(RunPublicEndpointOperationJob::class);
     }
 
     public function test_pending_endpoint_can_be_cancelled_without_remote_mutation(): void

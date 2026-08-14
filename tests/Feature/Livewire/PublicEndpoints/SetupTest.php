@@ -9,6 +9,8 @@ use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
 use App\Application\PublicEndpoint\Operations\RunPublicEndpointOperationJob;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
+use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
+use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointDnsPreflightResult;
@@ -19,6 +21,7 @@ use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Livewire\PublicEndpoints\Setup;
+use App\Models\ApplicationOperation;
 use App\Models\PublicEndpoint;
 use App\Models\PublicEndpointOperation;
 use App\Models\Server;
@@ -179,6 +182,39 @@ final class SetupTest extends TestCase
             'domain' => 'current.example.com',
         ]);
         $this->assertSame(0, $driver->preflightCalls);
+    }
+
+    public function test_preflight_does_not_touch_the_server_while_an_application_operation_is_active(): void
+    {
+        $user = $this->createUser('09173432404');
+        $server = $this->createServer($user);
+        $driver = new SetupFakePublicEndpointDriver(ApplicationType::N8n);
+
+        $this->bindDriver($driver);
+
+        ApplicationOperation::query()->create([
+            'user_id' => $user->getKey(),
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::Marzban,
+            'operation' => ApplicationOperationType::Install,
+            'status' => ApplicationOperationStatus::Running,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(Setup::class, [
+                'serverId' => $server->getKey(),
+                'applicationType' => ApplicationType::N8n->value,
+                'applicationName' => 'n8n',
+            ])
+            ->set('domain', 'automation.example.com')
+            ->call('runPreflight')
+            ->assertSet(
+                'preflightError',
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.',
+            );
+
+        $this->assertSame(0, $driver->preflightCalls);
+        $this->assertDatabaseCount('public_endpoints', 0);
     }
 
     private function bindDriver(

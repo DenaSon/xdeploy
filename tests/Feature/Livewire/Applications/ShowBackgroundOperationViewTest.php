@@ -65,7 +65,7 @@ final class ShowBackgroundOperationViewTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'در صف نصب',
+            'در انتظار نصب',
             $html,
         );
 

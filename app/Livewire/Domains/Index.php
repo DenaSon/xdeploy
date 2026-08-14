@@ -6,15 +6,19 @@ namespace App\Livewire\Domains;
 
 use App\Application\PublicEndpoint\Contracts\PublicEndpointDriverInterface;
 use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
+use App\Application\PublicEndpoint\Operations\QueuePublicEndpointOperationAction;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
+use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\Exceptions\InvalidPublicEndpointDomainException;
-use App\Domain\PublicEndpoint\Exceptions\PublicEndpointOperationException;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Models\PublicEndpoint;
+use App\Models\PublicEndpointOperation;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -32,6 +36,14 @@ final class Index extends Component
 {
     #[Locked]
     public int $serverId;
+
+    #[Locked]
+    public ?int $removalOperationId = null;
+
+    #[Locked]
+    public ?int $removalEndpointId = null;
+
+    public bool $removalOperationActive = false;
 
     /** @var array<string, array<string, mixed>> */
     public array $statuses = [];
@@ -59,6 +71,9 @@ final class Index extends Component
             ->firstOrFail();
 
         $this->serverId = (int) $server->getKey();
+
+        $this->cleanupSucceededRemovals();
+        $this->syncActiveRemovalOperation();
     }
 
     public function loadDomains(PublicEndpointDriverRegistry $drivers): void
@@ -142,7 +157,7 @@ final class Index extends Component
 
     public function removeEndpoint(
         int $endpointId,
-        PublicEndpointDriverRegistry $drivers,
+        QueuePublicEndpointOperationAction $queueOperation,
     ): void {
         $endpoint = $this->endpoint($endpointId);
 
@@ -153,31 +168,85 @@ final class Index extends Component
         $this->endpointError = null;
 
         try {
-            $driver = $drivers->find($endpoint->application_type);
-            $domain = PublicEndpointDomain::from($endpoint->domain);
-            $status = $driver->disable(
+            $operation = $queueOperation->execute(
                 user: $this->authenticatedUser(),
                 server: $this->server(),
-                domain: $domain,
+                endpoint: $endpoint,
+                operationType: PublicEndpointOperationType::Disable,
             );
 
-            $endpoint->delete();
-            $this->statuses[$driver->type()->value] = $this->presentStatus($driver, $status);
-            $this->loaded = true;
-            $this->unavailable = false;
-            $this->selectedApplication = null;
-            $this->showSetup = false;
-            $this->showDrawer = false;
-            $this->endpointError = null;
-        } catch (InvalidPublicEndpointDomainException) {
-            $this->endpointError = 'دامنه ثبت‌شده معتبر نیست. پیش از حذف، وضعیت endpoint را بررسی کنید.';
-        } catch (PublicEndpointOperationException $exception) {
-            report($exception);
-            $this->endpointError = $this->removeErrorMessage($exception);
+            $this->removalOperationId = (int) $operation->getKey();
+            $this->removalEndpointId = (int) $endpoint->getKey();
+            $this->removalOperationActive = true;
+        } catch (ServerMutationInProgressException) {
+            $this->syncActiveRemovalOperation();
+            $this->endpointError =
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
         } catch (Throwable $exception) {
             report($exception);
-            $this->endpointError = 'حذف دامنه با خطای پیش‌بینی‌نشده متوقف شد. وضعیت سرور را بروزرسانی و دوباره بررسی کنید.';
+            $this->endpointError =
+                'شروع حذف دامنه با خطا مواجه شد. دوباره تلاش کنید.';
         }
+    }
+
+    public function pollRemovalOperation(): void
+    {
+        if (
+            ! $this->removalOperationActive
+            || $this->removalOperationId === null
+        ) {
+            return;
+        }
+
+        $operation = PublicEndpointOperation::query()
+            ->whereKey($this->removalOperationId)
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('operation', PublicEndpointOperationType::Disable->value)
+            ->first();
+
+        if (! $operation instanceof PublicEndpointOperation) {
+            $this->clearRemovalOperation();
+            $this->endpointError =
+                'وضعیت عملیات حذف دامنه در دسترس نیست. صفحه را بروزرسانی کنید.';
+
+            return;
+        }
+
+        if ($operation->isActive()) {
+            return;
+        }
+
+        $this->clearRemovalOperation();
+
+        if ($operation->status === PublicEndpointOperationStatus::Failed) {
+            $this->endpointError = $this->removeOperationFailureMessage(
+                $operation->failure_code,
+            );
+
+            return;
+        }
+
+        $applicationType = $operation->application_type;
+        $endpoint = PublicEndpoint::query()
+            ->whereKey($operation->public_endpoint_id)
+            ->where('server_id', $this->serverId)
+            ->first();
+
+        if ($endpoint?->isActive() === true) {
+            $this->endpointError =
+                'حذف دامنه کامل نشد. وضعیت دامنه و سرور را بروزرسانی کنید.';
+
+            return;
+        }
+
+        $endpoint?->delete();
+
+        $this->markEndpointDisabled($applicationType);
+        $this->selectedApplication = null;
+        $this->showSetup = false;
+        $this->showDrawer = false;
+        $this->endpointError = null;
     }
 
     #[On('public-endpoints-updated.{serverId}')]
@@ -473,17 +542,87 @@ final class Index extends Component
             : 'misconfigured';
     }
 
-    private function removeErrorMessage(PublicEndpointOperationException $exception): string
+    private function cleanupSucceededRemovals(): void
     {
-        if ($exception->recoveryAttempted()) {
-            if ($exception->recovered()) {
-                return 'حذف دامنه کامل نشد؛ تغییرات با موفقیت بازگردانده شدند و دامنه قبلی همچنان فعال است.';
-            }
+        $operations = PublicEndpointOperation::query()
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('operation', PublicEndpointOperationType::Disable->value)
+            ->where('status', PublicEndpointOperationStatus::Succeeded->value)
+            ->get();
 
-            return 'حذف دامنه شکست خورد و بازیابی کامل نشد. تا بررسی دستی وضعیت برنامه و Caddy دوباره تلاش نکنید.';
+        foreach ($operations as $operation) {
+            $endpoint = PublicEndpoint::query()
+                ->whereKey($operation->public_endpoint_id)
+                ->where('server_id', $this->serverId)
+                ->first();
+
+            if ($endpoint !== null && ! $endpoint->isActive()) {
+                $endpoint->delete();
+            }
+        }
+    }
+
+    private function syncActiveRemovalOperation(): void
+    {
+        $operation = PublicEndpointOperation::query()
+            ->where('user_id', $this->authenticatedUser()->getKey())
+            ->where('server_id', $this->serverId)
+            ->where('operation', PublicEndpointOperationType::Disable->value)
+            ->active()
+            ->latest('id')
+            ->first();
+
+        if (! $operation instanceof PublicEndpointOperation) {
+            $this->clearRemovalOperation();
+
+            return;
         }
 
-        return match ($exception->failure) {
+        $this->removalOperationId = (int) $operation->getKey();
+        $this->removalEndpointId = (int) $operation->public_endpoint_id;
+        $this->removalOperationActive = true;
+    }
+
+    private function clearRemovalOperation(): void
+    {
+        $this->removalOperationId = null;
+        $this->removalEndpointId = null;
+        $this->removalOperationActive = false;
+    }
+
+    private function markEndpointDisabled(ApplicationType $type): void
+    {
+        if (! isset($this->statuses[$type->value])) {
+            return;
+        }
+
+        data_set(
+            $this->statuses,
+            "{$type->value}.endpoint.state",
+            PublicEndpointRuntimeState::Disabled->value,
+        );
+
+        data_set(
+            $this->statuses,
+            "{$type->value}.endpoint.domain",
+            null,
+        );
+
+        data_set(
+            $this->statuses,
+            "{$type->value}.endpoint.open_url",
+            null,
+        );
+    }
+
+    private function removeOperationFailureMessage(?string $failureCode): string
+    {
+        $failure = $failureCode === null
+            ? null
+            : PublicEndpointOperationFailure::tryFrom($failureCode);
+
+        return match ($failure) {
             PublicEndpointOperationFailure::ExistingConfiguration => 'پیکربندی دامنه روی سرور با endpoint ثبت‌شده هم‌خوان نیست. برای جلوگیری از حذف تنظیمات ناشناخته عملیات متوقف شد.',
             PublicEndpointOperationFailure::OperationInProgress => 'یک عملیات دامنه دیگر روی سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
             PublicEndpointOperationFailure::EnvironmentUnavailable => 'ابزارها یا فایل‌های لازم برای حذف امن دامنه در دسترس نیستند.',
@@ -491,6 +630,7 @@ final class Index extends Component
             PublicEndpointOperationFailure::Mutation,
             PublicEndpointOperationFailure::Verification,
             PublicEndpointOperationFailure::Preflight => 'حذف دامنه کامل نشد. وضعیت برنامه و Caddy را بروزرسانی و دوباره بررسی کنید.',
+            null => 'حذف دامنه با خطا مواجه شد. وضعیت سرور را بروزرسانی و دوباره تلاش کنید.',
         };
     }
 

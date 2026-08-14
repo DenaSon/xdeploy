@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Application\Applications\Operations;
 
-use App\Application\Applications\Operations\Exceptions\ApplicationOperationInProgressException;
 use App\Application\Applications\Operations\QueueApplicationOperationAction;
 use App\Application\Applications\Operations\RunApplicationOperationJob;
+use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Models\ApplicationOperation;
+use App\Models\PublicEndpoint;
+use App\Models\PublicEndpointOperation;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -66,7 +70,7 @@ final class QueueApplicationOperationActionTest extends TestCase
         );
     }
 
-    public function test_it_rejects_a_second_active_operation_for_the_same_target(): void
+    public function test_it_rejects_a_second_active_operation_for_the_same_server(): void
     {
         Queue::fake();
 
@@ -82,7 +86,7 @@ final class QueueApplicationOperationActionTest extends TestCase
         );
 
         $this->expectException(
-            ApplicationOperationInProgressException::class,
+            ServerMutationInProgressException::class,
         );
 
         try {
@@ -102,6 +106,96 @@ final class QueueApplicationOperationActionTest extends TestCase
                     ->count(),
             );
         }
+    }
+
+    public function test_an_active_operation_blocks_a_different_application_on_the_same_server(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000006');
+        $server = $this->createServer($user, '192.0.2.16');
+        $action = app(QueueApplicationOperationAction::class);
+
+        $action->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Install,
+        );
+
+        $this->expectException(
+            ServerMutationInProgressException::class,
+        );
+
+        $action->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::Marzban,
+            operationType: ApplicationOperationType::Install,
+        );
+    }
+
+    public function test_an_active_public_endpoint_operation_blocks_an_application_operation(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000007');
+        $server = $this->createServer($user, '192.0.2.17');
+        $endpoint = $this->createEndpoint(
+            server: $server,
+            type: ApplicationType::Marzban,
+            domain: 'panel.example.com',
+        );
+
+        PublicEndpointOperation::query()->create([
+            'user_id' => $user->getKey(),
+            'server_id' => $server->getKey(),
+            'public_endpoint_id' => $endpoint->getKey(),
+            'application_type' => ApplicationType::Marzban,
+            'domain' => $endpoint->domain,
+            'operation' => PublicEndpointOperationType::Enable,
+            'status' => PublicEndpointOperationStatus::Running,
+        ]);
+
+        $this->expectException(
+            ServerMutationInProgressException::class,
+        );
+
+        app(QueueApplicationOperationAction::class)->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Install,
+        );
+    }
+
+    public function test_active_operations_on_another_server_do_not_block_the_target_server(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000008');
+        $busyServer = $this->createServer($user, '192.0.2.18');
+        $availableServer = $this->createServer($user, '192.0.2.19');
+        $action = app(QueueApplicationOperationAction::class);
+
+        $action->execute(
+            user: $user,
+            server: $busyServer,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Install,
+        );
+
+        $operation = $action->execute(
+            user: $user,
+            server: $availableServer,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Install,
+        );
+
+        self::assertSame(
+            $availableServer->getKey(),
+            $operation->server_id,
+        );
     }
 
     public function test_a_new_operation_is_allowed_after_the_previous_one_is_terminal(): void
@@ -180,6 +274,18 @@ final class QueueApplicationOperationActionTest extends TestCase
             'host' => $host,
             'port' => 22,
             'username' => 'root',
+        ]);
+    }
+
+    private function createEndpoint(
+        Server $server,
+        ApplicationType $type,
+        string $domain,
+    ): PublicEndpoint {
+        return PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => $type,
+            'domain' => $domain,
         ]);
     }
 }

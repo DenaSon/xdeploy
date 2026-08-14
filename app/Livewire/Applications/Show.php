@@ -6,8 +6,8 @@ namespace App\Livewire\Applications;
 
 use App\Application\Applications\Actions\GetApplicationCatalogItemAction;
 use App\Application\Applications\Manager\ApplicationManager;
-use App\Application\Applications\Operations\Exceptions\ApplicationOperationInProgressException;
 use App\Application\Applications\Operations\QueueApplicationOperationAction;
+use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
@@ -18,7 +18,6 @@ use App\Livewire\Concerns\HandlesSshAvailability;
 use App\Models\ApplicationOperation;
 use App\Models\Server;
 use App\Models\User;
-use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -330,6 +329,18 @@ final class Show extends Component
                         '%s با موفقیت حذف شد.',
                         $this->name,
                     ),
+                    ApplicationOperationType::Start => sprintf(
+                        '%s با موفقیت اجرا شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Stop => sprintf(
+                        '%s با موفقیت متوقف شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Restart => sprintf(
+                        '%s با موفقیت راه‌اندازی مجدد شد.',
+                        $this->name,
+                    ),
                 };
             }
 
@@ -346,95 +357,56 @@ final class Show extends Component
                     'حذف %s با خطا مواجه شد.',
                     $this->name,
                 ),
+                ApplicationOperationType::Start => sprintf(
+                    'اجرای %s با خطا مواجه شد.',
+                    $this->name,
+                ),
+                ApplicationOperationType::Stop => sprintf(
+                    'توقف %s با خطا مواجه شد.',
+                    $this->name,
+                ),
+                ApplicationOperationType::Restart => sprintf(
+                    'راه‌اندازی مجدد %s با خطا مواجه شد.',
+                    $this->name,
+                ),
             };
         }
     }
 
     public function start(
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
+        QueueApplicationOperationAction $queueOperation,
     ): void {
-        $this->performOperation(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            operation: static function (
-                ApplicationManager $manager,
-                User $user,
-                Server $server,
-                ApplicationType $type,
-            ): void {
-                $manager->start(
-                    user: $user,
-                    server: $server,
-                    type: $type,
-                );
-            },
-            successMessage: sprintf(
-                '%s با موفقیت اجرا شد.',
-                $this->name,
-            ),
+        $this->queueBackgroundOperation(
+            queueOperation: $queueOperation,
+            operationType: ApplicationOperationType::Start,
             failureMessage: sprintf(
-                'اجرای %s با خطا مواجه شد.',
+                'شروع اجرای %s با خطا مواجه شد.',
                 $this->name,
             ),
         );
     }
 
     public function stop(
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
+        QueueApplicationOperationAction $queueOperation,
     ): void {
-        $this->performOperation(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            operation: static function (
-                ApplicationManager $manager,
-                User $user,
-                Server $server,
-                ApplicationType $type,
-            ): void {
-                $manager->stop(
-                    user: $user,
-                    server: $server,
-                    type: $type,
-                );
-            },
-            successMessage: sprintf(
-                '%s با موفقیت متوقف شد.',
-                $this->name,
-            ),
+        $this->queueBackgroundOperation(
+            queueOperation: $queueOperation,
+            operationType: ApplicationOperationType::Stop,
             failureMessage: sprintf(
-                'توقف %s با خطا مواجه شد.',
+                'شروع توقف %s با خطا مواجه شد.',
                 $this->name,
             ),
         );
     }
 
     public function restart(
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
+        QueueApplicationOperationAction $queueOperation,
     ): void {
-        $this->performOperation(
-            applicationManager: $applicationManager,
-            circuitBreaker: $circuitBreaker,
-            operation: static function (
-                ApplicationManager $manager,
-                User $user,
-                Server $server,
-                ApplicationType $type,
-            ): void {
-                $manager->restart(
-                    user: $user,
-                    server: $server,
-                    type: $type,
-                );
-            },
-            successMessage: sprintf(
-                '%s با موفقیت راه‌اندازی مجدد شد.',
-                $this->name,
-            ),
+        $this->queueBackgroundOperation(
+            queueOperation: $queueOperation,
+            operationType: ApplicationOperationType::Restart,
             failureMessage: sprintf(
-                'راه‌اندازی مجدد %s با خطا مواجه شد.',
+                'شروع راه‌اندازی مجدد %s با خطا مواجه شد.',
                 $this->name,
             ),
         );
@@ -478,100 +450,18 @@ final class Show extends Component
             );
 
             $this->setOperationState($operation);
-        } catch (ApplicationOperationInProgressException) {
+        } catch (ServerMutationInProgressException) {
             $this->syncActiveOperation();
 
             if (! $this->operationActive) {
                 $this->processing = false;
-                $this->errorMessage = 'عملیات دیگری برای این برنامه در حال انجام است.';
+                $this->errorMessage = 'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
             }
         } catch (Throwable $exception) {
             report($exception);
 
             $this->processing = false;
             $this->errorMessage = $failureMessage;
-        }
-    }
-
-    /**
-     * @param Closure(
-     *     ApplicationManager,
-     *     User,
-     *     Server,
-     *     ApplicationType
-     * ): void $operation
-     */
-    private function performOperation(
-        ApplicationManager $applicationManager,
-        SSHConnectionCircuitBreaker $circuitBreaker,
-        Closure $operation,
-        string $successMessage,
-        string $failureMessage,
-    ): void {
-        if (
-            $this->processing
-            || $this->operationActive
-            || $this->sshUnavailable
-        ) {
-            return;
-        }
-
-        $server = $this->server();
-        $user = $this->authenticatedUser();
-
-        $this->processing = true;
-        $this->resetMessages();
-
-        try {
-            $operation(
-                $applicationManager,
-                $user,
-                $server,
-                $this->applicationType(),
-            );
-
-            $loaded = $this->loadApplication(
-                applicationManager: $applicationManager,
-                circuitBreaker: $circuitBreaker,
-                server: $server,
-                notifyOnSshFailure: true,
-            );
-
-            $this->runtimeLoaded = true;
-
-            if (! $loaded) {
-                if (
-                    ! $this->sshUnavailable
-                    && $this->errorMessage === null
-                ) {
-                    $this->errorMessage = $failureMessage;
-                }
-
-                return;
-            }
-
-            $this->successMessage = $successMessage;
-        } catch (Throwable $exception) {
-            if (
-                $this->handleSshFailure(
-                    exception: $exception,
-                    circuitBreaker: $circuitBreaker,
-                    server: $server,
-                    message: 'ارتباط SSH هنگام اجرای عملیات برنامه قطع شد.',
-                    notify: true,
-                )
-            ) {
-                $this->prepareUnavailableApplicationState();
-                $this->runtimeLoaded = true;
-
-                return;
-            }
-
-            report($exception);
-
-            $this->errorMessage = $failureMessage;
-        } finally {
-            $this->processing = false;
         }
     }
 

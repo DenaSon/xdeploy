@@ -5,6 +5,7 @@
     'openUrl' => null,
     'applicationUrl' => null,
     'manageEndpointId' => null,
+    'removing' => false,
 ])
 
 @php
@@ -177,10 +178,11 @@
 
                 @if ($manageEndpointId !== null && $state !== 'pending')
                     <x-button
-                        label="حذف دامنه"
+                        :label="$removing ? 'در حال حذف' : 'حذف دامنه'"
                         icon="lucide.unlink"
                         wire:click="removeEndpoint({{ (int) $manageEndpointId }})"
                         spinner="removeEndpoint"
+                        :disabled="$removing"
                         wire:confirm="دامنه {{ $domain }} از {{ $application }} حذف شود؟ برنامه روی سرور باقی می‌ماند اما دسترسی عمومی این دامنه و HTTPS آن غیرفعال می‌شود."
                         class="btn-error btn-outline btn-sm rounded-xl"
                     />

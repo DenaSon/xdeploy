@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\PublicEndpoint\Operations;
 
-use App\Application\PublicEndpoint\Operations\Exceptions\PublicEndpointOperationInProgressException;
+use App\Application\Server\Operations\ServerMutationGuard;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Models\PublicEndpoint;
@@ -17,6 +17,10 @@ use Throwable;
 
 final readonly class QueuePublicEndpointOperationAction
 {
+    public function __construct(
+        private ServerMutationGuard $serverMutationGuard,
+    ) {}
+
     public function execute(
         User $user,
         Server $server,
@@ -42,19 +46,9 @@ final readonly class QueuePublicEndpointOperationAction
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $activeOperationExists = PublicEndpointOperation::query()
-                    ->where('user_id', $user->getKey())
-                    ->where('server_id', $ownedServer->getKey())
-                    ->where(
-                        'application_type',
-                        $ownedEndpoint->application_type->value,
-                    )
-                    ->active()
-                    ->exists();
-
-                if ($activeOperationExists) {
-                    throw new PublicEndpointOperationInProgressException;
-                }
+                $this->serverMutationGuard->ensureAvailable(
+                    $ownedServer,
+                );
 
                 return PublicEndpointOperation::query()->create([
                     'user_id' => $user->getKey(),

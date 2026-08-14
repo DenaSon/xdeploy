@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\PublicEndpoints;
 
-use App\Application\PublicEndpoint\Operations\Exceptions\PublicEndpointOperationInProgressException;
 use App\Application\PublicEndpoint\Operations\QueuePublicEndpointOperationAction;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
+use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
+use App\Application\Server\Operations\ServerMutationGuard;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
@@ -121,6 +122,7 @@ final class Setup extends Component
 
     public function runPreflight(
         PublicEndpointDriverRegistry $drivers,
+        ServerMutationGuard $serverMutationGuard,
     ): void {
         if ($this->operationActive) {
             return;
@@ -135,6 +137,12 @@ final class Setup extends Component
         $this->activationSuccess = null;
 
         try {
+            $server = $this->ownedServer($this->serverId);
+
+            $serverMutationGuard->ensureAvailable(
+                $server,
+            );
+
             $domain = PublicEndpointDomain::from($this->domain);
 
             if (! $this->persistPendingEndpoint($domain)) {
@@ -145,7 +153,7 @@ final class Setup extends Component
                 ->find($this->type())
                 ->preflight(
                     user: $this->authenticatedUser(),
-                    server: $this->ownedServer($this->serverId),
+                    server: $server,
                     domain: $domain,
                 );
 
@@ -161,6 +169,9 @@ final class Setup extends Component
                 'domain',
                 'فقط دامنه یا ساب‌دامنه معتبر وارد کنید؛ بدون پروتکل، مسیر، پورت یا Wildcard.',
             );
+        } catch (ServerMutationInProgressException) {
+            $this->preflightError =
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
         } catch (PublicEndpointOperationException $exception) {
             report($exception);
             $this->preflightError = $this->preflightErrorMessage($exception);
@@ -215,10 +226,10 @@ final class Setup extends Component
                 'domain',
                 'فقط دامنه یا ساب‌دامنه معتبر وارد کنید؛ بدون پروتکل، مسیر، پورت یا Wildcard.',
             );
-        } catch (PublicEndpointOperationInProgressException) {
+        } catch (ServerMutationInProgressException) {
             $this->syncActiveOperation();
             $this->activationError =
-                'فعال‌سازی این دامنه از قبل در حال انجام است.';
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
         } catch (Throwable $exception) {
             report($exception);
             $this->activationError =

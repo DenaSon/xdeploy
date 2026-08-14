@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Applications\Operations;
 
-use App\Application\Applications\Operations\Exceptions\ApplicationOperationInProgressException;
+use App\Application\Server\Operations\ServerMutationGuard;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationType;
@@ -17,6 +17,10 @@ use Throwable;
 
 final readonly class QueueApplicationOperationAction
 {
+    public function __construct(
+        private ServerMutationGuard $serverMutationGuard,
+    ) {}
+
     public function execute(
         User $user,
         Server $server,
@@ -31,8 +35,9 @@ final readonly class QueueApplicationOperationAction
                 $operationType,
             ): ApplicationOperation {
                 /*
-                 * Lock the owning server row so two requests cannot create
-                 * competing mutations for the same application target.
+                 * Every queued runtime mutation locks the same server row.
+                 * The shared guard can then inspect both operation ledgers
+                 * without a cross-table enqueue race.
                  */
                 $ownedServer = Server::query()
                     ->ownedBy($user)
@@ -40,16 +45,9 @@ final readonly class QueueApplicationOperationAction
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $activeOperationExists = ApplicationOperation::query()
-                    ->where('user_id', $user->getKey())
-                    ->where('server_id', $ownedServer->getKey())
-                    ->where('application_type', $applicationType->value)
-                    ->active()
-                    ->exists();
-
-                if ($activeOperationExists) {
-                    throw new ApplicationOperationInProgressException;
-                }
+                $this->serverMutationGuard->ensureAvailable(
+                    $ownedServer,
+                );
 
                 return ApplicationOperation::query()->create([
                     'user_id' => $user->getKey(),
