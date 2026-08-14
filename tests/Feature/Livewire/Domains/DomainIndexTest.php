@@ -18,6 +18,7 @@ use App\Domain\PublicEndpoint\DTOs\PublicEndpointPreflightResult;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointRuntimeInfo;
 use App\Domain\PublicEndpoint\DTOs\PublicEndpointServerPreflightResult;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationStatus;
+use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointRuntimeState;
 use App\Domain\PublicEndpoint\ValueObjects\PublicEndpointDomain;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
@@ -303,6 +304,47 @@ final class DomainIndexTest extends TestCase
         $this->assertSame(0, $n8n->disableCalls);
         $this->assertDatabaseCount('public_endpoint_operations', 0);
         Queue::assertNotPushed(RunPublicEndpointOperationJob::class);
+    }
+
+    public function test_active_endpoint_operation_blocks_pending_endpoint_cancellation(): void
+    {
+        $user = $this->createUser('09173432213');
+        $server = $this->createServer($user);
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+        ]);
+
+        $operation = PublicEndpointOperation::query()->create([
+            'user_id' => $user->getKey(),
+            'server_id' => $server->getKey(),
+            'public_endpoint_id' => $endpoint->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => $endpoint->domain,
+            'operation' => PublicEndpointOperationType::Enable,
+            'status' => PublicEndpointOperationStatus::Running,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call(
+                'cancelPendingEndpoint',
+                (int) $endpoint->getKey(),
+            )
+            ->assertSet(
+                'endpointError',
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.',
+            );
+
+        $this->assertDatabaseHas('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
+
+        $this->assertDatabaseHas('public_endpoint_operations', [
+            'id' => $operation->getKey(),
+            'status' => PublicEndpointOperationStatus::Running->value,
+        ]);
     }
 
     public function test_pending_endpoint_can_be_cancelled_without_remote_mutation(): void

@@ -49,7 +49,7 @@ final class ApplicationShowRuntimeLoadingTest extends TestCase
             ->assertSee('n8n')
             ->assertSee('Workflow automation')
             ->assertSee('در حال بررسی')
-            ->assertSee('در حال دریافت وضعیت برنامه')
+            ->assertSee('در حال بررسی وضعیت برنامه')
             ->assertSee('wire:init="loadRuntime"', false)
             ->assertDontSee('wire:click="install"', false);
     }

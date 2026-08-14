@@ -113,7 +113,7 @@ final class RenewTest extends TestCase
             ->assertSet('quoteLoaded', false)
             ->assertSet('period', '14_days')
             ->assertSee('تمدید سرویس')
-            ->assertSee('مدت تمدید');
+            ->assertSee('دوره تمدید');
     }
 
     public function test_owner_can_load_authoritative_renewal_quote(): void
@@ -141,7 +141,7 @@ final class RenewTest extends TestCase
             ->assertSet('quote.duration_hours', 336)
             ->assertSet('quote.final_amount', 588_000)
             ->assertSee('تومان')
-            ->assertSee('پایان پس از تمدید');
+            ->assertSee('پایان جدید');
     }
 
     public function test_renew_action_creates_renewal_order_and_redirects_to_gateway(): void

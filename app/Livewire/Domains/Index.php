@@ -9,6 +9,7 @@ use App\Application\PublicEndpoint\DTOs\PublicEndpointApplicationStatus;
 use App\Application\PublicEndpoint\Operations\QueuePublicEndpointOperationAction;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
+use App\Application\Server\Operations\ServerMutationGuard;
 use App\Domain\Application\Shared\Enums\ApplicationState;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
@@ -26,6 +27,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -141,15 +143,56 @@ final class Index extends Component
         $this->showDrawer = true;
     }
 
-    public function cancelPendingEndpoint(int $endpointId): void
-    {
-        $endpoint = $this->endpoint($endpointId);
+    public function cancelPendingEndpoint(
+        int $endpointId,
+        ServerMutationGuard $serverMutationGuard,
+    ): void {
+        try {
+            $cancelled = DB::transaction(
+                function () use (
+                    $endpointId,
+                    $serverMutationGuard,
+                ): bool {
+                    /*
+                     * Cancellation follows the same server-first lock order
+                     * as queued mutations. This prevents deleting an endpoint
+                     * while its remote enable operation is pending or running.
+                     */
+                    $server = Server::query()
+                        ->ownedBy($this->authenticatedUser())
+                        ->whereKey($this->serverId)
+                        ->lockForUpdate()
+                        ->firstOrFail();
 
-        if ($endpoint->isActive()) {
+                    $endpoint = PublicEndpoint::query()
+                        ->where('server_id', $server->getKey())
+                        ->whereKey($endpointId)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    if ($endpoint->isActive()) {
+                        return false;
+                    }
+
+                    $serverMutationGuard->ensureAvailable(
+                        $server,
+                    );
+
+                    return (bool) $endpoint->delete();
+                },
+                attempts: 3,
+            );
+        } catch (ServerMutationInProgressException) {
+            $this->endpointError =
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
+
             return;
         }
 
-        $endpoint->delete();
+        if (! $cancelled) {
+            return;
+        }
+
         $this->selectedApplication = null;
         $this->showSetup = false;
         $this->showDrawer = false;

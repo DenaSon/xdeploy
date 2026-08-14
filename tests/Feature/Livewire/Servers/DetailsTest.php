@@ -85,7 +85,7 @@ final class DetailsTest extends TestCase
                 ),
             )
             ->assertOk()
-            ->assertSee('اطلاعات اتصال')
+            ->assertSee('اتصال SSH')
             ->assertSee('203.0.113.25')
             ->assertSee('ubuntu')
             ->assertSee('ssh ubuntu@203.0.113.25 -p 2222')
@@ -112,7 +112,7 @@ final class DetailsTest extends TestCase
             )
             ->assertOk()
             ->assertSee('مشخصات سرور')
-            ->assertSee('خرید از xDeploy')
+            ->assertSee('VPS ابری')
             ->assertSee('شروع سرویس')
             ->assertSee('پایان سرویس')
             ->assertDontSee('اطلاعات سرویس ابری')
