@@ -70,7 +70,7 @@ final class ShowBackgroundOperationViewTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'عملیات در پس‌زمینه ادامه پیدا می‌کند',
+            'فرآیند در پس‌زمینه ادامه خواهد یافت.',
             $html,
         );
 
