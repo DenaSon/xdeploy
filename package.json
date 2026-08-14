@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "test:js": "node --test tests/js/livewire-request-error-handler.test.js"
     },
     "dependencies": {
         "@laravel/passkeys": "^0.2.0",
