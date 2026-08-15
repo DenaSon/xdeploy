@@ -6,6 +6,7 @@ namespace Tests\Feature\Livewire\Servers;
 
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
@@ -17,6 +18,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Support\CloudProviderRegistryStub;
 use Tests\TestCase;
 
 final class BuyTest extends TestCase
@@ -158,6 +160,16 @@ final class BuyTest extends TestCase
         $this->app->instance(
             CloudServerResizeCatalogInterface::class,
             $resizeCatalog,
+        );
+
+        $this->app->instance(
+            CloudProviderRegistryInterface::class,
+            new CloudProviderRegistryStub(
+                provider: $cloud,
+                capabilities: [
+                    CloudServerResizeCatalogInterface::class => $resizeCatalog,
+                ],
+            ),
         );
 
         $this->actingAs(
