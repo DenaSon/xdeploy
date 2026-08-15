@@ -158,9 +158,9 @@ final class SSHConnection implements SSHConnectionInterface
             'server_id' => $this->server?->getKey(),
             'command_hash' => $commandHash,
             'command_length' => strlen($command),
-            'command' => app()->environment('local')
-                ? $command
-                : '[hidden]',
+            'command' => $sensitive || ! app()->environment('local')
+                ? '[hidden]'
+                : $command,
             'timeout_seconds' => $timeout,
             'sensitive' => $sensitive,
         ]);
