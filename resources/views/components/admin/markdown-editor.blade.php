@@ -10,6 +10,8 @@
         'spellChecker' => false,
         'status' => false,
         'uploadImage' => false,
+        'minHeight' => '22rem',
+        'maxHeight' => '62vh',
         'placeholder' => $placeholder,
         'toolbar' => [
             'undo',
