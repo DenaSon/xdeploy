@@ -32,6 +32,13 @@
         </div>
     @endif
 
+    @if ($securityError)
+        <div role="alert" class="alert alert-error alert-soft rounded-2xl text-sm">
+            <x-icon name="lucide.shield-alert" class="!size-5" />
+            <span>{{ $securityError }}</span>
+        </div>
+    @endif
+
     <section class="rounded-2xl border border-base-300 bg-base-100 p-5 sm:p-6">
         <div class="flex items-start gap-3">
             <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
@@ -183,6 +190,10 @@
 
                 <div class="divide-y divide-base-300 overflow-hidden rounded-2xl border border-base-300">
                     @forelse ($passkeys as $passkey)
+                        @php
+                            $isProtectedAdminPasskey = $user->isAdmin() && $passkeys->count() === 1;
+                        @endphp
+
                         <div
                             wire:key="passkey-{{ $passkey->id }}"
                             class="flex flex-col gap-4 bg-base-100 p-4 sm:flex-row sm:items-center sm:justify-between"
@@ -193,7 +204,13 @@
                                 </span>
 
                                 <div class="min-w-0">
-                                    <div class="truncate text-sm font-medium">{{ $passkey->name }}</div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <div class="truncate text-sm font-medium">{{ $passkey->name }}</div>
+
+                                        @if ($isProtectedAdminPasskey)
+                                            <span class="badge badge-warning badge-outline badge-xs">محافظت‌شده</span>
+                                        @endif
+                                    </div>
 
                                     <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/40">
                                         @if ($passkey->authenticator)
@@ -215,10 +232,12 @@
                                 wire:confirm="این Passkey حذف شود؟"
                                 wire:loading.attr="disabled"
                                 wire:target="deletePasskey({{ $passkey->id }})"
-                                class="btn btn-ghost btn-sm shrink-0 rounded-xl text-error"
+                                @disabled($isProtectedAdminPasskey)
+                                class="btn btn-ghost btn-sm shrink-0 rounded-xl text-error disabled:text-base-content/30"
+                                @if ($isProtectedAdminPasskey) title="برای حساب مدیر باید حداقل یک Passkey باقی بماند." @endif
                             >
-                                <x-icon name="lucide.trash-2" class="!size-4" />
-                                حذف
+                                <x-icon :name="$isProtectedAdminPasskey ? 'lucide.lock-keyhole' : 'lucide.trash-2'" class="!size-4" />
+                                {{ $isProtectedAdminPasskey ? 'آخرین Passkey' : 'حذف' }}
                             </button>
                         </div>
                     @empty
@@ -240,7 +259,7 @@
                 <p>
                     Passkey اکنون برای ورود بدون OTP فعال است. ورود با شماره موبایل و رمز یک‌بار مصرف همچنان به‌عنوان روش جایگزین باقی می‌ماند.
                     @if ($user->isAdmin())
-                        دسترسی به بخش مدیریت علاوه بر ورود حساب، به تأیید Passkey در session مدیریتی نیز نیاز دارد.
+                        دسترسی به بخش مدیریت علاوه بر ورود حساب، به تأیید Passkey در session مدیریتی نیز نیاز دارد و آخرین Passkey مدیر از حذف عادی محافظت می‌شود.
                     @endif
                 </p>
             </div>
