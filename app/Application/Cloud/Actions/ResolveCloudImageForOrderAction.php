@@ -9,13 +9,16 @@ use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use InvalidArgumentException;
 
 final readonly class ResolveCloudImageForOrderAction
 {
     public function __construct(
-        private CloudProviderRegistryInterface $providers,
-        private FilterSupportedCloudImagesAction $filter,
+        private ?CloudProviderRegistryInterface $providers = null,
+        private ?FilterSupportedCloudImagesAction $filter = null,
+        private ?CloudProviderInterface $cloud = null,
+        private ?ListSupportedCloudImagesAction $supportedImages = null,
     ) {}
 
     public function execute(
@@ -53,7 +56,7 @@ final readonly class ResolveCloudImageForOrderAction
             );
         }
 
-        $cloud = $this->providers->resolve(
+        $cloud = $this->provider(
             $provider,
         );
 
@@ -74,6 +77,7 @@ final readonly class ResolveCloudImageForOrderAction
 
         $image = $this->resolveImage(
             cloud: $cloud,
+            provider: $provider,
             region: $region,
             imageId: $imageId,
         );
@@ -109,6 +113,35 @@ final readonly class ResolveCloudImageForOrderAction
         return $image;
     }
 
+    private function provider(
+        CloudProviderType $provider,
+    ): CloudProviderInterface {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            return $this->providers->resolve(
+                $provider,
+            );
+        }
+
+        /*
+         * Transitional direct-construction seam for existing tests. Runtime
+         * container resolution supplies the registry and remains provider
+         * aware. A non-Arvan provider may never use this fallback.
+         */
+        if (
+            $provider !== CloudProviderType::Arvan
+            || ! $this->cloud instanceof CloudProviderInterface
+        ) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud image dependencies for provider [%s] are not configured.',
+                    $provider->value,
+                ),
+            );
+        }
+
+        return $this->cloud;
+    }
+
     private function resolveSize(
         CloudProviderInterface $cloud,
         string $region,
@@ -131,12 +164,37 @@ final readonly class ResolveCloudImageForOrderAction
 
     private function resolveImage(
         CloudProviderInterface $cloud,
+        CloudProviderType $provider,
         string $region,
         string $imageId,
     ): CloudImageData {
-        $images = $this->filter->execute(
-            $cloud->listImages($region),
-        );
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            if (! $this->filter instanceof FilterSupportedCloudImagesAction) {
+                throw new CloudConfigurationException(
+                    'Cloud image filter is not configured.',
+                );
+            }
+
+            $images = $this->filter->execute(
+                $cloud->listImages($region),
+            );
+        } else {
+            if (
+                $provider !== CloudProviderType::Arvan
+                || ! $this->supportedImages instanceof ListSupportedCloudImagesAction
+            ) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'Supported cloud image lookup for provider [%s] is not configured.',
+                        $provider->value,
+                    ),
+                );
+            }
+
+            $images = $this->supportedImages->execute(
+                $region,
+            );
+        }
 
         foreach ($images as $image) {
             if ($image->id === $imageId) {
