@@ -31,7 +31,7 @@ Route::middleware([
 
         Route::livewire('/servers', AdminServersIndex::class)
             ->name('servers.index');
-        Route::livewire('/servers/{server}', AdminServersShow::class)
+        Route::livewire('/servers/{adminServer}', AdminServersShow::class)
             ->name('servers.show');
 
         Route::livewire('/orders', AdminOrdersIndex::class)
