@@ -29,20 +29,22 @@ final class RevealSupportCredentialController
             403,
         );
 
-        $validated = $request->validate([
-            'reason' => [
-                'required',
-                'string',
-                'min:5',
-                'max:500',
-            ],
-        ]);
-
         abort_unless(
             $supportAccessSession->isGranted(
                 admin: $admin,
                 server: $adminServer,
             ),
+            403,
+        );
+
+        $reason = $supportAccessSession->reason(
+            admin: $admin,
+            server: $adminServer,
+        );
+
+        abort_unless(
+            is_string($reason)
+            && $reason !== '',
             403,
         );
 
@@ -54,7 +56,7 @@ final class RevealSupportCredentialController
                 recordSupportAccess: $recordSupportAccess,
                 admin: $admin,
                 server: $adminServer,
-                reason: $validated['reason'],
+                reason: $reason,
                 successful: false,
                 request: $request,
             );
@@ -69,7 +71,7 @@ final class RevealSupportCredentialController
                 recordSupportAccess: $recordSupportAccess,
                 admin: $admin,
                 server: $adminServer,
-                reason: $validated['reason'],
+                reason: $reason,
                 successful: false,
                 request: $request,
             );
@@ -81,7 +83,7 @@ final class RevealSupportCredentialController
             recordSupportAccess: $recordSupportAccess,
             admin: $admin,
             server: $adminServer,
-            reason: $validated['reason'],
+            reason: $reason,
             successful: true,
             request: $request,
         );
