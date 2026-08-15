@@ -10,21 +10,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('users', function (Blueprint $table) {
+        Schema::create('users', function (Blueprint $table): void {
             $table->engine = 'InnoDB';
 
             $table->id();
 
-            $table->string('name', 80)
-                ->nullable();
-
             $table->string('phone', 15)
                 ->unique();
+
+            $table->boolean('is_admin')
+                ->default(false);
 
             $table->timestamps();
         });
 
-        Schema::create('sessions', function (Blueprint $table) {
+        Schema::create('sessions', function (Blueprint $table): void {
             $table->engine = 'InnoDB';
 
             $table->string('id')

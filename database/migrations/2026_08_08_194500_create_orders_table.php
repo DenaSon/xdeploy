@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Billing\Enums\OrderStatus;
+use App\Domain\Billing\Enums\OrderType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -18,31 +19,25 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
-            /*
-             * A fulfilled Order may point to its provisioned xDeploy Server.
-             *
-             * The relation is nullable because the Server does not exist while
-             * the Order is awaiting payment/provisioning. nullOnDelete keeps the
-             * existing Server deletion workflow intact while the Order purchase
-             * snapshot remains available for billing/audit history.
-             *
-             * unique() guarantees that one Server cannot fulfill two Orders.
-             */
+            $table->string('type', 32)
+                ->default(OrderType::Provisioning->value);
+
             $table->foreignId('server_id')
-                ->nullable()
-                ->unique()
-                ->constrained('servers')
+                ->nullable();
+
+            $table->index(
+                'server_id',
+                'orders_server_id_index',
+            );
+
+            $table->foreign('server_id')
+                ->references('id')
+                ->on('servers')
                 ->nullOnDelete();
 
-            /*
-             * Snapshot of the selected cloud infrastructure.
-             */
             $table->string('region_id', 100);
             $table->string('size_id', 100);
 
-            /*
-             * Operating-system snapshot.
-             */
             $table->string('image_id', 191);
             $table->string('image_name', 191);
             $table->string('image_distribution', 32);
@@ -51,15 +46,9 @@ return new class extends Migration
             $table->unsignedInteger('default_disk_gib');
             $table->unsignedInteger('selected_disk_gib');
 
-            /*
-             * Snapshot of the xDeploy purchase period.
-             */
             $table->string('period', 32);
             $table->unsignedInteger('duration_hours');
 
-            /*
-             * Monetary values are stored in IRR.
-             */
             $table->unsignedBigInteger('provider_cost');
             $table->unsignedSmallInteger('markup_percent');
             $table->unsignedBigInteger('final_amount');
@@ -68,14 +57,18 @@ return new class extends Migration
                 ->default('IRR');
 
             $table->string('status', 32)
-                ->default(
-                    OrderStatus::PendingPayment->value,
-                );
+                ->default(OrderStatus::PendingPayment->value);
 
             $table->timestamp('quote_expires_at');
-            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('paid_at')
+                ->nullable();
 
             $table->timestamps();
+
+            $table->index(
+                'type',
+                'orders_type_index',
+            );
 
             $table->index([
                 'user_id',
