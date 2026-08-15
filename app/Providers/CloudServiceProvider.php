@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
@@ -20,6 +21,7 @@ use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
@@ -33,6 +35,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudClient();
         $this->registerArvanCloudMapper();
         $this->registerArvanCloudProvider();
+        $this->registerArvanCloudProvisioner();
 
         $this->registerCloudProviderRegistry();
         $this->registerCloudProviderContract();
@@ -154,17 +157,47 @@ final class CloudServiceProvider extends ServiceProvider
         );
     }
 
+    private function registerArvanCloudProvisioner(): void
+    {
+        $this->app->singleton(
+            ArvanCloudProvisioner::class,
+            static function (
+                Application $app,
+            ): ArvanCloudProvisioner {
+                $provider = $app->make(
+                    ArvanCloudProvider::class,
+                );
+
+                return new ArvanCloudProvisioner(
+                    provider: $provider,
+                    resolveInfrastructure: new ResolveCloudProvisioningInfrastructureAction(
+                        cloud: $provider,
+                    ),
+                );
+            },
+        );
+    }
+
     private function registerCloudProviderRegistry(): void
     {
         $this->app->singleton(
             CloudProviderRegistry::class,
             static fn (
                 Application $app,
-            ): CloudProviderRegistry => new CloudProviderRegistry([
-                CloudProviderType::Arvan->value => $app->make(
-                    ArvanCloudProvider::class,
-                ),
-            ]),
+            ): CloudProviderRegistry => new CloudProviderRegistry(
+                providers: [
+                    CloudProviderType::Arvan->value => $app->make(
+                        ArvanCloudProvider::class,
+                    ),
+                ],
+                capabilities: [
+                    CloudProviderType::Arvan->value => [
+                        CloudServerProvisionerInterface::class => $app->make(
+                            ArvanCloudProvisioner::class,
+                        ),
+                    ],
+                ],
+            ),
         );
 
         $this->app->singleton(

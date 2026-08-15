@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
-use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
@@ -13,23 +12,12 @@ use LogicException;
 
 final readonly class BuildCloudServerDataFromOrderAction
 {
-    public function __construct(
-        private ResolveCloudProvisioningInfrastructureAction $resolveInfrastructure,
-    ) {}
-
-    public function execute(
-        Order $order,
-    ): CreateCloudServerData {
-        $provider = $this->providerName(
-            $order,
-        );
-
+    public function execute(Order $order): CreateCloudServerData
+    {
+        $provider = $this->providerName($order);
         $prefix = "cloud.providers.{$provider}.defaults";
 
-        $initializationScript = config(
-            "{$prefix}.init_script",
-            '',
-        );
+        $initializationScript = config("{$prefix}.init_script", '');
 
         if (! is_string($initializationScript)) {
             throw new CloudConfigurationException(
@@ -38,31 +26,15 @@ final readonly class BuildCloudServerDataFromOrderAction
         }
 
         $highAvailability = filter_var(
-            config(
-                "{$prefix}.ha_enabled",
-                false,
-            ),
+            config("{$prefix}.ha_enabled", false),
             FILTER_VALIDATE_BOOL,
         );
 
-        /*
-         * Infrastructure resolution is still the current provider workflow.
-         * Provider-specific prerequisites are separated in the next
-         * multi-provider foundation step.
-         */
-        $infrastructure = $this->resolveInfrastructure->execute(
-            $order->region_id,
-        );
-
         return new CreateCloudServerData(
-            name: $this->serverName(
-                $order,
-            ),
+            name: $this->serverName($order),
             regionId: $order->region_id,
             sizeId: $order->size_id,
             imageId: $order->image_id,
-            networkId: $infrastructure->networkId,
-            securityGroupIds: $infrastructure->securityGroupIds,
             diskGiB: $order->selected_disk_gib,
             sshKeyName: null,
             initializationScript: $initializationScript,
@@ -70,18 +42,13 @@ final readonly class BuildCloudServerDataFromOrderAction
         );
     }
 
-    public function serverName(
-        Order $order,
-    ): string {
-        return sprintf(
-            'xdeploy-order-%d',
-            $order->getKey(),
-        );
+    public function serverName(Order $order): string
+    {
+        return sprintf('xdeploy-order-%d', $order->getKey());
     }
 
-    public function providerName(
-        Order $order,
-    ): string {
+    public function providerName(Order $order): string
+    {
         $provider = $order->cloud_provider;
 
         if (! $provider instanceof CloudProviderType) {
