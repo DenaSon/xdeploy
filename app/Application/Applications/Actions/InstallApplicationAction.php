@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Application\Applications\Actions;
 
+use App\Application\Applications\Operations\Contracts\ApplicationOperationProgressReporter;
 use App\Application\Server\Actions\EnsureServerOperationReadinessAction;
 use App\Application\Server\Actions\PrepareServerPackageRepositoriesAction;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Contracts\StartableInterface;
 use App\Domain\Application\Services\ApplicationInstallationService;
 use App\Domain\Application\Services\ApplicationLifecycleService;
+use App\Domain\Application\Shared\Enums\ApplicationOperationStage;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Platform\Services\PlatformInstallationService;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
@@ -33,6 +35,7 @@ final readonly class InstallApplicationAction
     public function execute(
         Server $server,
         ApplicationType $type,
+        ?ApplicationOperationProgressReporter $progressReporter = null,
     ): InstallReport {
         /*
          * ApplicationManager establishes the SSH session before invoking this
@@ -46,6 +49,10 @@ final readonly class InstallApplicationAction
 
         $application = $this->registry
             ->find($type);
+
+        $progressReporter?->report(
+            ApplicationOperationStage::PreparingServer,
+        );
 
         $this->preflight
             ->ensureRoot();
@@ -66,11 +73,21 @@ final readonly class InstallApplicationAction
 
         $report = new InstallReport;
 
+        $progressReporter?->report(
+            ApplicationOperationStage::InstallingDependencies,
+        );
+
         $report = $report->merge(
             $this->systemDependencies->ensure(
                 $requirements->systemPackages,
             ),
         );
+
+        if ($requirements->platforms !== []) {
+            $progressReporter?->report(
+                ApplicationOperationStage::PreparingPlatform,
+            );
+        }
 
         foreach (
             $requirements->platforms as $platformType
@@ -82,6 +99,10 @@ final readonly class InstallApplicationAction
             );
         }
 
+        $progressReporter?->report(
+            ApplicationOperationStage::InstallingApplication,
+        );
+
         $report = $report->merge(
             $this->installationService->install(
                 $type,
@@ -92,6 +113,10 @@ final readonly class InstallApplicationAction
             $application
             instanceof StartableInterface
         ) {
+            $progressReporter?->report(
+                ApplicationOperationStage::StartingApplication,
+            );
+
             $report = $report->merge(
                 $this->lifecycleService->start(
                     $type,
