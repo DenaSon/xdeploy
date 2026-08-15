@@ -45,8 +45,12 @@ final class AdminOperationalPagesTest extends TestCase
     {
         $admin = $this->admin();
         $customer = User::factory()->create([
-            'name' => 'مشتری تست',
             'phone' => '09120000001',
+        ]);
+
+        $customer->profile()->create([
+            'first_name' => 'مشتری',
+            'last_name' => 'تست',
         ]);
 
         $server = Server::query()->create([
@@ -113,6 +117,24 @@ final class AdminOperationalPagesTest extends TestCase
             ->get(route('admin.payments.show', $payment))
             ->assertOk()
             ->assertSee('TX-ADMIN-1');
+    }
+
+    public function test_admin_identity_search_uses_profile_names(): void
+    {
+        $admin = $this->admin();
+        $customer = User::factory()->create([
+            'phone' => '09120000009',
+        ]);
+
+        $customer->profile()->create([
+            'first_name' => 'سارا',
+            'last_name' => 'احمدی',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.index', ['q' => 'سارا احمدی']))
+            ->assertOk()
+            ->assertSee('09120000009');
     }
 
     private function admin(): User

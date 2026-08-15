@@ -55,6 +55,7 @@ final class Dashboard extends Component
                     'averageMarkupPercent' => (float) ($accounting?->average_markup_percent ?? 0),
                 ],
                 'recentUsers' => User::query()
+                    ->with('profile')
                     ->withCount('servers')
                     ->addSelect([
                         'orders_count' => Order::query()
@@ -65,12 +66,12 @@ final class Dashboard extends Component
                     ->limit(10)
                     ->get(),
                 'recentOrders' => Order::query()
-                    ->with('user')
+                    ->with('user.profile')
                     ->latest()
                     ->limit(10)
                     ->get(),
                 'recentServers' => Server::query()
-                    ->with('user')
+                    ->with('user.profile')
                     ->latest()
                     ->limit(10)
                     ->get(),

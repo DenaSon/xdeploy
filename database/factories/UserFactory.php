@@ -20,8 +20,6 @@ final class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-
             'phone' => fake()
                 ->unique()
                 ->numerify('09#########'),

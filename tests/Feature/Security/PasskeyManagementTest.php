@@ -136,7 +136,6 @@ final class PasskeyManagementTest extends TestCase
     public function test_user_implements_passkey_contract_without_exposing_full_phone_as_username(): void
     {
         $user = User::factory()->create([
-            'name' => null,
             'phone' => '09123456789',
         ]);
 

@@ -24,7 +24,9 @@ final class Show extends Component
 
     public function render(): View
     {
-        $user = $this->user->loadCount('servers');
+        $user = $this->user
+            ->load('profile')
+            ->loadCount('servers');
 
         return view(
             'livewire.admin.users.show',

@@ -22,11 +22,9 @@ final readonly class UserService
 
     public function create(
         PhoneNumber $phone,
-        ?string $name = null,
     ): User {
         return $this->users->create([
             'phone' => (string) $phone,
-            'name' => $name,
         ]);
     }
 

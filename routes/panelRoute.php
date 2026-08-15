@@ -8,6 +8,7 @@ use App\Livewire\Applications\Show as ApplicationShow;
 use App\Livewire\Domains\Index as DomainsIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Orders\Show as OrderShow;
+use App\Livewire\Profile\Edit as ProfileEdit;
 use App\Livewire\Security\Index as SecurityIndex;
 use App\Livewire\Servers\Buy as ServerBuy;
 use App\Livewire\Servers\Console as ServerConsole;
@@ -56,6 +57,11 @@ Route::middleware(['web', 'auth'])
             '/notifications',
             NotificationsIndex::class,
         )->name('notifications.index');
+
+        Route::livewire(
+            '/profile',
+            ProfileEdit::class,
+        )->name('profile');
 
         Route::livewire(
             '/security',

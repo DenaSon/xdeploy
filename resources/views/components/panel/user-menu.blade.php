@@ -16,7 +16,10 @@
             <div class="hidden text-right lg:block">
 
                 <div class="font-medium">
-                    {{ $user?->name }}
+                    {{ $user instanceof User
+                        ? ($user->displayName() ?? 'حساب کاربری')
+                        : ''
+                    }}
                 </div>
 
                 <div class="text-xs opacity-70">
@@ -45,7 +48,8 @@
         <x-menu-item
             title="پروفایل"
             icon="lucide.user"
-            link=""
+            :link="route('panel.profile')"
+            wire:navigate
         />
 
         <x-menu-separator />
