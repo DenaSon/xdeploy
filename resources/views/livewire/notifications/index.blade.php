@@ -1,11 +1,11 @@
 <div
     dir="rtl"
-    class="space-y-6"
+    class="mx-auto w-full max-w-6xl space-y-6"
 >
     {{-- Page header --}}
     <header
         class="
-            flex flex-col gap-5
+            flex flex-col gap-4
 
             sm:flex-row
             sm:items-end
@@ -23,8 +23,7 @@
                     flex size-10 shrink-0
                     items-center justify-center
 
-                    rounded-xl
-
+                    rounded-2xl
                     bg-primary/10
                     text-primary
 
@@ -64,7 +63,7 @@
                                 items-center gap-1.5
 
                                 rounded-full
-                                bg-primary/10
+                                bg-primary/[0.08]
 
                                 px-2.5 py-1
 
@@ -82,7 +81,7 @@
                             ></span>
 
                             {{ $unreadCount > 99 ? '99+' : $unreadCount }}
-                            خوانده‌نشده
+                            جدید
                         </span>
                     @endif
                 </div>
@@ -90,7 +89,6 @@
                 <p
                     class="
                         mt-1
-
                         max-w-xl
 
                         text-xs
@@ -100,66 +98,38 @@
                         sm:text-sm
                     "
                 >
-                    رویدادهای مهم سرورها، سرویس‌ها و وضعیت زیرساخت
-                    از این بخش قابل پیگیری هستند.
+                    رویدادهای مهم سرورها، سرویس‌ها و زیرساخت را از اینجا دنبال کنید.
                 </p>
             </div>
         </div>
-
-
-        @if($unreadCount > 0)
-            <x-button
-                label="علامت‌گذاری همه"
-                icon="lucide.check-check"
-                wire:click="markAllAsRead"
-                wire:target="markAllAsRead"
-                spinner
-                aria-label="علامت‌گذاری همه اعلان‌ها به‌عنوان خوانده‌شده"
-                class="
-                    btn-ghost
-                    btn-sm
-
-                    self-start
-                    rounded-xl
-
-                    border border-base-300/70
-
-                    px-3.5
-
-                    font-medium
-                    text-base-content/55
-
-                    hover:border-primary/20
-                    hover:bg-base-200/60
-                    hover:text-base-content
-
-                    sm:self-auto
-                "
-            />
-        @endif
     </header>
 
 
     {{-- Toolbar --}}
-    <div
+    <section
+        aria-label="فیلتر اعلان‌ها"
         class="
-            flex
-            items-center justify-between
-            gap-3
+            flex flex-col gap-3
 
-            border-y border-base-300/60
+            rounded-2xl
+            border border-base-300/65
+            bg-base-100/70
 
-            py-3
+            p-2.5
+
+            sm:flex-row
+            sm:items-center
+            sm:justify-between
         "
     >
         {{-- Filters --}}
         <div
             class="
-                inline-flex
+                inline-flex self-start
                 items-center gap-1
 
                 rounded-xl
-                bg-base-200/60
+                bg-base-200/55
 
                 p-1
             "
@@ -172,32 +142,23 @@
                 @class([
                     '
                         rounded-lg
-
-                        px-3 py-1.5
-
-                        text-xs
-                        font-medium
-
-                        transition-all
-                        duration-150
+                        px-3.5 py-1.5
+                        text-xs font-medium
+                        transition-all duration-150
                     ',
                     '
                         bg-base-100
                         text-base-content
-
-                        shadow-sm
-                        shadow-base-content/[0.03]
+                        shadow-sm shadow-base-content/[0.025]
                     ' => $filter === 'all',
                     '
                         text-base-content/45
-
                         hover:text-base-content/70
                     ' => $filter !== 'all',
                 ])
             >
                 همه
             </button>
-
 
             <button
                 type="button"
@@ -210,25 +171,18 @@
                         items-center gap-1.5
 
                         rounded-lg
+                        px-3.5 py-1.5
 
-                        px-3 py-1.5
-
-                        text-xs
-                        font-medium
-
-                        transition-all
-                        duration-150
+                        text-xs font-medium
+                        transition-all duration-150
                     ',
                     '
                         bg-base-100
                         text-base-content
-
-                        shadow-sm
-                        shadow-base-content/[0.03]
+                        shadow-sm shadow-base-content/[0.025]
                     ' => $filter === 'unread',
                     '
                         text-base-content/45
-
                         hover:text-base-content/70
                     ' => $filter !== 'unread',
                 ])
@@ -238,8 +192,7 @@
                 @if($unreadCount > 0)
                     <span
                         class="
-                            inline-flex
-                            min-w-4
+                            inline-flex min-w-4
                             items-center justify-center
 
                             rounded-full
@@ -259,47 +212,75 @@
         </div>
 
 
-        {{-- Filter loading --}}
         <div
-            wire:loading
-            wire:target="setFilter,markAllAsRead"
             class="
+                flex min-h-8
                 items-center gap-2
 
-                text-[10px]
-                text-base-content/35
+                sm:justify-end
             "
         >
-            <span
+            {{-- Loading --}}
+            <div
+                wire:loading
+                wire:target="setFilter,markAllAsRead"
                 class="
-                    loading
-                    loading-spinner
-                    loading-xs
-                    text-primary
+                    items-center gap-2
+                    text-[10px]
+                    text-base-content/35
                 "
-            ></span>
+            >
+                <span
+                    class="
+                        loading
+                        loading-spinner
+                        loading-xs
+                        text-primary
+                    "
+                ></span>
 
-            در حال به‌روزرسانی
+                در حال به‌روزرسانی
+            </div>
+
+            @if($unreadCount > 0)
+                <x-button
+                    label="همه را خواندم"
+                    icon="lucide.check-check"
+                    wire:click="markAllAsRead"
+                    wire:target="markAllAsRead"
+                    spinner
+                    aria-label="علامت‌گذاری همه اعلان‌ها به‌عنوان خوانده‌شده"
+                    class="
+                        btn-ghost
+                        btn-sm
+
+                        rounded-xl
+                        px-3.5
+
+                        font-medium
+                        text-base-content/55
+
+                        hover:bg-base-200/70
+                        hover:text-base-content
+                    "
+                />
+            @endif
         </div>
-    </div>
+    </section>
 
 
     {{-- Content --}}
     @if($notifications->isEmpty())
-
-        {{-- Empty state --}}
         <section
             class="
                 relative
                 overflow-hidden
 
                 rounded-2xl
-
-                border border-base-300/80
+                border border-base-300/70
                 bg-base-100
 
                 px-5 py-14
-
                 text-center
 
                 sm:px-8
@@ -310,9 +291,7 @@
                 aria-hidden="true"
                 class="
                     pointer-events-none
-
-                    absolute
-                    start-1/2 top-8
+                    absolute start-1/2 top-8
 
                     size-56
                     -translate-x-1/2
@@ -323,23 +302,18 @@
                 "
             ></div>
 
-
             <div
                 class="
                     relative
-
-                    mx-auto
-                    max-w-md
+                    mx-auto max-w-md
                 "
             >
                 <span
                     @class([
                         '
                             mx-auto
-
                             flex size-12
                             items-center justify-center
-
                             rounded-2xl
                         ',
                         '
@@ -360,13 +334,10 @@
                     />
                 </span>
 
-
                 <h2
                     class="
                         mt-4
-
-                        text-sm
-                        font-semibold
+                        text-sm font-semibold
                         text-base-content
                     "
                 >
@@ -376,30 +347,24 @@
                     }}
                 </h2>
 
-
                 <p
                     class="
                         mx-auto mt-1.5
                         max-w-sm
 
-                        text-xs
-                        leading-6
+                        text-xs leading-6
                         text-base-content/45
                     "
                 >
                     @if($filter === 'unread')
                         در حال حاضر اعلان خوانده‌نشده‌ای وجود ندارد.
                     @else
-                        رویدادهای مهم سرورها و سرویس‌ها پس از ثبت
-                        در این بخش نمایش داده خواهند شد.
+                        رویدادهای مهم سرورها و سرویس‌ها پس از ثبت در این بخش نمایش داده می‌شوند.
                     @endif
                 </p>
             </div>
         </section>
-
     @else
-
-        {{-- Notification list --}}
         <section
             aria-label="فهرست اعلان‌ها"
             class="space-y-2.5"
@@ -412,12 +377,10 @@
             @endforeach
         </section>
 
-
         @if($notifications->hasPages())
             <div class="pt-2">
                 {{ $notifications->links() }}
             </div>
         @endif
-
     @endif
 </div>
