@@ -6,7 +6,6 @@ namespace App\Livewire\Documentation;
 
 use App\Models\DocumentationCategory;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -21,10 +20,10 @@ final class Index extends Component
             ->published()
             ->whereHas(
                 'articles',
-                fn (Builder $query) => $query->published(),
+                fn ($query) => $query->published(),
             )
             ->with([
-                'articles' => fn (Builder $query) => $query
+                'articles' => fn ($query) => $query
                     ->published()
                     ->ordered(),
             ])
