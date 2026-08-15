@@ -22,4 +22,12 @@ interface CloudProviderRegistryInterface
         CloudProviderType $provider,
         string $capability,
     ): object;
+
+    /**
+     * @param  class-string  $capability
+     */
+    public function supportsCapability(
+        CloudProviderType $provider,
+        string $capability,
+    ): bool;
 }

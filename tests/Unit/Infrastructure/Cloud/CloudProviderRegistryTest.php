@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Infrastructure\Cloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudQuotaReaderInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
@@ -35,6 +36,18 @@ final class CloudProviderRegistryTest extends TestCase
             $registry->resolveCapability(
                 provider: CloudProviderType::Arvan,
                 capability: CloudServerProvisionerInterface::class,
+            ),
+        );
+        $this->assertTrue(
+            $registry->supportsCapability(
+                provider: CloudProviderType::Arvan,
+                capability: CloudServerProvisionerInterface::class,
+            ),
+        );
+        $this->assertFalse(
+            $registry->supportsCapability(
+                provider: CloudProviderType::Arvan,
+                capability: CloudQuotaReaderInterface::class,
             ),
         );
     }

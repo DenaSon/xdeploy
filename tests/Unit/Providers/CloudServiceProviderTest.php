@@ -6,6 +6,8 @@ namespace Tests\Unit\Providers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudQuotaReaderInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
@@ -15,8 +17,10 @@ use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\Contracts\CloudSshKeyCatalogInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudCatalogCapabilities;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
@@ -75,6 +79,24 @@ final class CloudServiceProviderTest extends TestCase
             $this->app->make(ArvanCloudProvisioner::class),
             $this->app->make(CloudServerProvisionerInterface::class),
         );
+    }
+
+    public function test_arvan_optional_catalog_capabilities_use_dedicated_adapter(): void
+    {
+        $capabilities = $this->app->make(
+            ArvanCloudCatalogCapabilities::class,
+        );
+
+        foreach ([
+            CloudProvisioningInfrastructureCatalogInterface::class,
+            CloudQuotaReaderInterface::class,
+            CloudSshKeyCatalogInterface::class,
+        ] as $contract) {
+            $this->assertSame(
+                $capabilities,
+                $this->app->make($contract),
+            );
+        }
     }
 
     public function test_registry_rejects_unregistered_provider(): void

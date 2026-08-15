@@ -8,6 +8,7 @@ use App\Application\Cloud\DTOs\ProvisionCloudServerResult;
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
@@ -89,6 +90,7 @@ final readonly class ProvisionCloudServerAction
         $this->validateSelection(
             data: $data,
             catalog: $catalog,
+            provider: $provider,
         );
 
         $createdServer = $provisioner->createServer($data);
@@ -307,6 +309,7 @@ final readonly class ProvisionCloudServerAction
     private function validateSelection(
         CreateCloudServerData $data,
         CloudProviderInterface $catalog,
+        CloudProviderType $provider,
     ): void {
         if ($data->usesSshKey()) {
             throw new CloudValidationException(
@@ -371,8 +374,13 @@ final readonly class ProvisionCloudServerAction
                 );
             }
 
+            $infrastructure = $this->infrastructureCatalogFor(
+                provider: $provider,
+                fallback: $catalog,
+            );
+
             $network = $this->findResource(
-                resources: $catalog->listNetworks($regionId),
+                resources: $infrastructure->listNetworks($regionId),
                 id: trim((string) $data->networkId),
             );
 
@@ -397,7 +405,7 @@ final readonly class ProvisionCloudServerAction
             $this->validateSecurityGroups(
                 data: $data,
                 regionId: $regionId,
-                catalog: $catalog,
+                catalog: $infrastructure,
             );
         }
 
@@ -428,7 +436,7 @@ final readonly class ProvisionCloudServerAction
     private function validateSecurityGroups(
         CreateCloudServerData $data,
         string $regionId,
-        CloudProviderInterface $catalog,
+        CloudProvisioningInfrastructureCatalogInterface $catalog,
     ): void {
         if ($data->securityGroupIds === []) {
             throw new CloudValidationException(
@@ -459,6 +467,32 @@ final readonly class ProvisionCloudServerAction
                 );
             }
         }
+    }
+
+    private function infrastructureCatalogFor(
+        CloudProviderType $provider,
+        CloudProviderInterface $fallback,
+    ): CloudProvisioningInfrastructureCatalogInterface {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            /** @var CloudProvisioningInfrastructureCatalogInterface $catalog */
+            $catalog = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudProvisioningInfrastructureCatalogInterface::class,
+            );
+
+            return $catalog;
+        }
+
+        if ($fallback instanceof CloudProvisioningInfrastructureCatalogInterface) {
+            return $fallback;
+        }
+
+        throw new CloudConfigurationException(
+            sprintf(
+                'Cloud provider [%s] cannot validate provisioning infrastructure without the infrastructure catalog capability.',
+                $provider->value,
+            ),
+        );
     }
 
     private function resolveProviderType(

@@ -43,4 +43,14 @@ final readonly class CloudProviderRegistryStub implements CloudProviderRegistryI
 
         return $resolved;
     }
+
+    public function supportsCapability(
+        CloudProviderType $provider,
+        string $capability,
+    ): bool {
+        $resolved = $this->capabilities[$capability]
+            ?? $this->provider;
+
+        return $resolved instanceof $capability;
+    }
 }

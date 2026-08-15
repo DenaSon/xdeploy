@@ -11,6 +11,7 @@ use App\Application\Cloud\Actions\ProvisionCloudServerAction;
 use App\Application\Cloud\Actions\VerifyCloudServerSshReadinessAction;
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
@@ -500,11 +501,16 @@ final class ProvisionCloudServerWorkflowTest extends TestCase
             );
     }
 
+    /**
+     * @return CloudProviderInterface&CloudProvisioningInfrastructureCatalogInterface&MockInterface
+     */
     private function catalog(): CloudProviderInterface
     {
-        /** @var CloudProviderInterface&MockInterface $catalog */
+        /** @var CloudProviderInterface&CloudProvisioningInfrastructureCatalogInterface&MockInterface $catalog */
         $catalog = Mockery::mock(
-            CloudProviderInterface::class,
+            CloudProviderInterface::class
+            .', '
+            .CloudProvisioningInfrastructureCatalogInterface::class,
         );
 
         $catalog

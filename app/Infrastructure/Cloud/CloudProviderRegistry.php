@@ -105,6 +105,17 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
         return $resolved;
     }
 
+    public function supportsCapability(
+        CloudProviderType $provider,
+        string $capability,
+    ): bool {
+        $resolved = $this->resolve($provider);
+        $override = $this->capabilities[$provider->value][$capability] ?? null;
+
+        return $override instanceof $capability
+            || $resolved instanceof $capability;
+    }
+
     private function normalizeProviderKey(mixed $key): string
     {
         $providerKey = strtolower(trim((string) $key));
