@@ -32,16 +32,11 @@ final class Index extends Component
         $search = trim($this->search);
 
         $users = User::query()
+            ->with('profile')
             ->withCount('servers')
             ->when(
                 $search !== '',
-                fn (Builder $query) => $query->where(
-                    function (Builder $query) use ($search): void {
-                        $query
-                            ->where('name', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%");
-                    },
-                ),
+                fn (Builder $query) => $query->matchesIdentity($search),
             )
             ->latest('id')
             ->paginate(20);

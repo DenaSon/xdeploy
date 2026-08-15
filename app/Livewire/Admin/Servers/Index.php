@@ -49,7 +49,7 @@ final class Index extends Component
         $search = trim($this->search);
 
         $servers = Server::query()
-            ->with('user')
+            ->with('user.profile')
             ->when(
                 $search !== '',
                 fn (Builder $query) => $query->where(
@@ -60,8 +60,7 @@ final class Index extends Component
                             ->orWhereHas(
                                 'user',
                                 fn (Builder $userQuery) => $userQuery
-                                    ->where('name', 'like', "%{$search}%")
-                                    ->orWhere('phone', 'like', "%{$search}%"),
+                                    ->matchesIdentity($search),
                             );
                     },
                 ),

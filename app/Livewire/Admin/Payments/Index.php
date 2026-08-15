@@ -50,7 +50,7 @@ final class Index extends Component
         $statuses = array_column(PaymentStatus::cases(), 'value');
 
         $payments = Payment::query()
-            ->with('order.user')
+            ->with('order.user.profile')
             ->when(
                 $search !== '',
                 function (Builder $query) use ($search): void {
@@ -66,8 +66,7 @@ final class Index extends Component
                                 ->orWhereHas(
                                     'order.user',
                                     fn (Builder $userQuery) => $userQuery
-                                        ->where('name', 'like', "%{$search}%")
-                                        ->orWhere('phone', 'like', "%{$search}%"),
+                                        ->matchesIdentity($search),
                                 );
                         },
                     );

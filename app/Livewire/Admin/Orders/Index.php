@@ -52,7 +52,7 @@ final class Index extends Component
         $types = array_column(OrderType::cases(), 'value');
 
         $orders = Order::query()
-            ->with(['user', 'historicalServer'])
+            ->with(['user.profile', 'historicalServer'])
             ->withCount('payments')
             ->when(
                 $search !== '',
@@ -67,8 +67,7 @@ final class Index extends Component
                                 ->orWhereHas(
                                     'user',
                                     fn (Builder $userQuery) => $userQuery
-                                        ->where('name', 'like', "%{$search}%")
-                                        ->orWhere('phone', 'like', "%{$search}%"),
+                                        ->matchesIdentity($search),
                                 )
                                 ->orWhereHas(
                                     'historicalServer',
