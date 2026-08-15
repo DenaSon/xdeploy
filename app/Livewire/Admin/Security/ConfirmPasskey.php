@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Admin\Security;
 
 use App\Models\User;
+use App\Support\Admin\AdminPasskeyVerificationSession;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -14,8 +15,9 @@ use Livewire\Component;
 #[Title('تأیید امنیتی')]
 final class ConfirmPasskey extends Component
 {
-    public function mount(): void
-    {
+    public function mount(
+        AdminPasskeyVerificationSession $verificationSession,
+    ): void {
         $user = auth()->user();
 
         abort_unless(
@@ -27,6 +29,15 @@ final class ConfirmPasskey extends Component
         if (! $user->passkeys()->exists()) {
             $this->redirectRoute(
                 name: 'panel.security',
+                navigate: true,
+            );
+
+            return;
+        }
+
+        if ($verificationSession->isGranted($user)) {
+            $this->redirectRoute(
+                name: 'admin.dashboard',
                 navigate: true,
             );
         }
