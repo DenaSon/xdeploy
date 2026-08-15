@@ -86,6 +86,7 @@ final readonly class CreateRenewalOrderAction
                     'user_id' => $user->getKey(),
                     'type' => OrderType::Renewal,
                     'server_id' => $lockedServer->getKey(),
+                    'cloud_provider' => $lockedSourceOrder->cloud_provider->value,
 
                     'region_id' => $price->regionId,
                     'size_id' => $price->sizeId,

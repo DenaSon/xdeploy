@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -34,6 +35,9 @@ return new class extends Migration
                 ->references('id')
                 ->on('servers')
                 ->nullOnDelete();
+
+            $table->string('cloud_provider', 50)
+                ->default(CloudProviderType::Arvan->value);
 
             $table->string('region_id', 100);
             $table->string('size_id', 100);

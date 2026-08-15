@@ -7,6 +7,7 @@ namespace App\Application\Billing\Actions;
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +65,7 @@ final readonly class CreateOrderAction
             static fn (): Order => Order::query()->create([
                 'user_id' => $user->getKey(),
                 'type' => OrderType::Provisioning,
+                'cloud_provider' => CloudProviderType::Arvan->value,
 
                 'region_id' => $price->regionId,
                 'size_id' => $price->sizeId,

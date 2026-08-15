@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,7 @@ final class Order extends Model
         'user_id',
         'type',
         'server_id',
+        'cloud_provider',
 
         'region_id',
         'size_id',
@@ -53,6 +55,7 @@ final class Order extends Model
         return [
             'type' => OrderType::class,
             'server_id' => 'integer',
+            'cloud_provider' => CloudProviderType::class,
 
             'default_disk_gib' => 'integer',
             'selected_disk_gib' => 'integer',
