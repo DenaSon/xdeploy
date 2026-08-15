@@ -65,14 +65,12 @@ final class SupportRequestAnsweredNotification extends Notification
 
             'action_label' => 'مشاهده درخواست',
 
-            /*
-             * The user-facing route is introduced in Phase 2. Keep the URL
-             * as a stable relative contract so backend notification behavior
-             * can be completed without coupling this phase to Presentation.
-             */
-            'action_url' => sprintf(
-                '/panel/support/%d',
-                $this->supportRequestId,
+            'action_url' => route(
+                'panel.support.show',
+                [
+                    'supportRequestId' => $this->supportRequestId,
+                ],
+                absolute: false,
             ),
         ];
     }

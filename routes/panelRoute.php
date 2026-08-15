@@ -18,6 +18,9 @@ use App\Livewire\Servers\Details as ServerDetails;
 use App\Livewire\Servers\Edit as ServerEdit;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\Renew as ServerRenew;
+use App\Livewire\Support\Create as SupportCreate;
+use App\Livewire\Support\Index as SupportIndex;
+use App\Livewire\Support\Show as SupportShow;
 use Illuminate\Support\Facades\Route;
 use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
 use Laravel\Passkeys\Http\Controllers\PasskeyRegistrationController;
@@ -57,6 +60,22 @@ Route::middleware(['web', 'auth'])
             '/notifications',
             NotificationsIndex::class,
         )->name('notifications.index');
+
+        Route::livewire(
+            '/support',
+            SupportIndex::class,
+        )->name('support.index');
+
+        Route::livewire(
+            '/support/create',
+            SupportCreate::class,
+        )->name('support.create');
+
+        Route::livewire(
+            '/support/{supportRequestId}',
+            SupportShow::class,
+        )->whereNumber('supportRequestId')
+            ->name('support.show');
 
         Route::livewire(
             '/profile',
