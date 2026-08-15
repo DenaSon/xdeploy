@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Application\Cloud\Actions;
 
 use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
-use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\Enums\CloudIpVersion;
@@ -358,17 +358,17 @@ final class ResolveCloudProvisioningInfrastructureActionTest extends TestCase
     }
 
     /**
-     * @return CloudProviderInterface&MockInterface
+     * @return CloudProvisioningInfrastructureCatalogInterface&MockInterface
      */
-    private function cloud(): CloudProviderInterface
+    private function cloud(): CloudProvisioningInfrastructureCatalogInterface
     {
         return Mockery::mock(
-            CloudProviderInterface::class,
+            CloudProvisioningInfrastructureCatalogInterface::class,
         );
     }
 
     private function action(
-        CloudProviderInterface $cloud,
+        CloudProvisioningInfrastructureCatalogInterface $cloud,
     ): ResolveCloudProvisioningInfrastructureAction {
         return new ResolveCloudProvisioningInfrastructureAction(
             cloud: $cloud,
