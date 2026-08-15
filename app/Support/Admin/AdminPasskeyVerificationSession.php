@@ -10,8 +10,6 @@ final class AdminPasskeyVerificationSession
 {
     public const string SESSION_KEY = 'admin.passkey_verification';
 
-    private const int WINDOW_SECONDS = 3_600;
-
     public function grant(User $admin): void
     {
         session()->put(
@@ -46,7 +44,7 @@ final class AdminPasskeyVerificationSession
             return false;
         }
 
-        if ((now()->timestamp - $verifiedAt) > self::WINDOW_SECONDS) {
+        if ((now()->timestamp - $verifiedAt) > $this->windowSeconds()) {
             $this->revoke();
 
             return false;
@@ -58,5 +56,16 @@ final class AdminPasskeyVerificationSession
     public function revoke(): void
     {
         session()->forget(self::SESSION_KEY);
+    }
+
+    private function windowSeconds(): int
+    {
+        return max(
+            60,
+            (int) config(
+                'passkeys.admin_verification_seconds',
+                3_600,
+            ),
+        );
     }
 }
