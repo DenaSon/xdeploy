@@ -24,6 +24,10 @@ final class Create extends Component
 
     public bool $isPublished = false;
 
+    public bool $showInFooter = false;
+
+    public int $sortOrder = 0;
+
     public function save()
     {
         $this->slug = Str::lower(trim($this->slug));
@@ -44,6 +48,8 @@ final class Create extends Component
                 'max:100000',
             ],
             'isPublished' => ['boolean'],
+            'showInFooter' => ['boolean'],
+            'sortOrder' => ['required', 'integer', 'min:0', 'max:65535'],
         ]);
 
         $page = Page::query()->create([
@@ -56,6 +62,8 @@ final class Create extends Component
             'published_at' => $validated['isPublished']
                 ? now()
                 : null,
+            'show_in_footer' => $validated['showInFooter'],
+            'sort_order' => $validated['sortOrder'],
         ]);
 
         return redirect()

@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App;
 use App\Application\Navigation\PublicDocumentationNavigation;
+use App\Application\Navigation\PublicFooterNavigation;
 use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
+use App\Models\Page;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
@@ -31,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
         App::setLocale('fa');
 
         $this->registerPublicDocumentationNavigationCacheInvalidation();
+        $this->registerPublicFooterNavigationCacheInvalidation();
 
         Livewire::addPersistentMiddleware([
             EnsureUserIsAdmin::class,
@@ -76,6 +79,21 @@ class AppServiceProvider extends ServiceProvider
         DocumentationArticle::deleted(
             static function (): void {
                 app(PublicDocumentationNavigation::class)->forget();
+            },
+        );
+    }
+
+    private function registerPublicFooterNavigationCacheInvalidation(): void
+    {
+        Page::saved(
+            static function (): void {
+                app(PublicFooterNavigation::class)->forget();
+            },
+        );
+
+        Page::deleted(
+            static function (): void {
+                app(PublicFooterNavigation::class)->forget();
             },
         );
     }

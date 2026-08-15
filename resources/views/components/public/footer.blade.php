@@ -1,5 +1,6 @@
 @php
     $productName = config('app.name');
+    $footerPages = app(App\Application\Navigation\PublicFooterNavigation::class)->pages();
 @endphp
 
 <footer
@@ -11,16 +12,15 @@
     <div
         class="
             mx-auto
-            flex w-full max-w-7xl
-            flex-col
-            items-center justify-between
-            gap-4
+            grid w-full max-w-7xl
+            gap-6
 
-            px-4 py-6
+            px-4 py-7
 
-            sm:flex-row
             sm:px-6
 
+            lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]
+            lg:items-center
             lg:px-8
         "
     >
@@ -31,7 +31,7 @@
             aria-label="{{ $productName }}"
             class="
                 group
-                flex items-center gap-2.5
+                flex w-fit items-center gap-2.5
             "
         >
             <span
@@ -74,12 +74,17 @@
         </a>
 
 
-        {{-- Public links --}}
+        {{-- Public navigation --}}
         <nav
             aria-label="پیوندهای عمومی"
             class="
-                flex items-center gap-3
-                text-xs text-base-content/45
+                flex flex-wrap
+                items-center gap-x-4 gap-y-2
+
+                text-xs
+                text-base-content/45
+
+                lg:justify-center
             "
         >
             <a
@@ -89,6 +94,16 @@
             >
                 مستندات
             </a>
+
+            @foreach($footerPages as $page)
+                <a
+                    href="{{ route('pages.show', $page['slug']) }}"
+                    wire:navigate
+                    class="transition-colors hover:text-primary"
+                >
+                    {{ $page['title'] }}
+                </a>
+            @endforeach
         </nav>
 
 
@@ -96,15 +111,14 @@
         <div
             class="
                 flex flex-wrap
-                items-center justify-center
+                items-center
                 gap-x-1.5 gap-y-1
 
-                text-center
                 text-[11px]
                 text-base-content/40
 
-                sm:justify-end
-                sm:text-start
+                lg:justify-end
+                lg:text-start
             "
         >
             <span dir="ltr">
@@ -117,12 +131,7 @@
 
             <span
                 aria-hidden="true"
-                class="
-                    hidden
-                    text-base-content/20
-
-                    sm:inline
-                "
+                class="text-base-content/20"
             >
                 ·
             </span>

@@ -45,6 +45,7 @@
                         <th>عنوان</th>
                         <th>Slug</th>
                         <th>وضعیت</th>
+                        <th>فوتر</th>
                         <th>انتشار</th>
                         <th>آخرین ویرایش</th>
                         <th></th>
@@ -60,6 +61,16 @@
                             </td>
                             <td>
                                 <x-admin.status-badge :status="$page->is_published ? 'published' : 'draft'" />
+                            </td>
+                            <td>
+                                @if($page->show_in_footer)
+                                    <span class="badge badge-ghost gap-1 text-xs">
+                                        <x-icon name="lucide.panel-bottom" class="!size-3.5 stroke-[1.7]" />
+                                        {{ $page->sort_order }}
+                                    </span>
+                                @else
+                                    <span class="text-sm text-base-content/30">—</span>
+                                @endif
                             </td>
                             <td class="text-sm text-base-content/55">
                                 {{ $page->published_at?->format('Y-m-d H:i') ?? '—' }}
@@ -93,7 +104,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="py-10 text-center text-sm text-base-content/45">
+                            <td colspan="7" class="py-10 text-center text-sm text-base-content/45">
                                 صفحه‌ای پیدا نشد.
                             </td>
                         </tr>
