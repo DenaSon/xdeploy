@@ -17,6 +17,12 @@
     border-color: var(--color-base-300);
 }
 
+.EasyMDEContainer .editor-toolbar:not(.fullscreen) {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
 .EasyMDEContainer .editor-toolbar button {
     color: color-mix(in srgb, var(--color-base-content) 72%, transparent);
 }
@@ -33,7 +39,7 @@
 }
 
 .EasyMDEContainer .CodeMirror {
-    min-height: 24rem;
+    min-height: 22rem;
 
     direction: rtl;
     text-align: right;
@@ -48,7 +54,8 @@
 }
 
 .EasyMDEContainer .CodeMirror-scroll {
-    min-height: 24rem;
+    min-height: 22rem;
+    overscroll-behavior: contain;
 }
 
 .EasyMDEContainer .CodeMirror-cursor {
