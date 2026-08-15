@@ -38,8 +38,6 @@
         },
 
         scrollToSection(id) {
-            this.closeGuideMenu()
-
             document.querySelector(`#${id}`)?.scrollIntoView({
                 behavior: window.matchMedia(
                     '(prefers-reduced-motion: reduce)'
@@ -100,7 +98,7 @@
             </span>
         </a>
 
-        {{-- Guidance trigger --}}
+        {{-- Public navigation --}}
         @if($showPublicNavigation)
             <div class="ms-6 hidden items-center lg:flex">
                 <span
@@ -110,29 +108,78 @@
                     |
                 </span>
 
-                <button
-                    type="button"
-                    popovertarget="{{ $guideMenuId }}"
-                    aria-label="بازکردن راهنما"
-                    class="
-                        btn btn-ghost btn-sm
-                        gap-2 rounded-xl border border-transparent px-3
-                        text-xs font-medium text-base-content/55
-                        hover:border-base-300/70 hover:bg-base-200/60 hover:text-base-content
-                    "
+                <nav
+                    aria-label="ناوبری عمومی"
+                    class="flex items-center gap-1"
                 >
-                    <x-icon
-                        name="lucide.book-open-text"
-                        class="!size-4 stroke-[1.8]"
-                    />
+                    <a
+                        href="{{ route('home') }}#how-it-works"
+                        @if($isLanding)
+                            @click.prevent="scrollToSection('how-it-works')"
+                        @endif
+                        class="
+                            rounded-lg px-3 py-2
+                            text-xs font-medium text-base-content/50
+                            transition-colors duration-150
+                            hover:bg-base-200/60 hover:text-base-content
+                        "
+                    >
+                        نحوه عملکرد
+                    </a>
 
-                    <span>راهنما</span>
+                    <span
+                        aria-hidden="true"
+                        class="mx-1 select-none text-xs font-light text-base-content/15"
+                    >
+                        |
+                    </span>
 
-                    <x-icon
-                        name="lucide.chevron-down"
-                        class="!size-3.5 stroke-[1.8] text-base-content/35"
-                    />
-                </button>
+                    <a
+                        href="{{ route('home') }}#capabilities"
+                        @if($isLanding)
+                            @click.prevent="scrollToSection('capabilities')"
+                        @endif
+                        class="
+                            rounded-lg px-3 py-2
+                            text-xs font-medium text-base-content/50
+                            transition-colors duration-150
+                            hover:bg-base-200/60 hover:text-base-content
+                        "
+                    >
+                        قابلیت‌ها
+                    </a>
+
+                    <span
+                        aria-hidden="true"
+                        class="mx-1 select-none text-xs font-light text-base-content/15"
+                    >
+                        |
+                    </span>
+
+                    <button
+                        type="button"
+                        popovertarget="{{ $guideMenuId }}"
+                        aria-label="بازکردن راهنما"
+                        class="
+                            btn btn-ghost btn-sm
+                            gap-2 rounded-xl border border-transparent px-3
+                            text-xs font-medium text-base-content/55
+                            hover:border-base-300/70 hover:bg-base-200/60 hover:text-base-content
+                        "
+                    >
+                        <x-icon
+                            name="lucide.book-open-text"
+                            class="!size-4 stroke-[1.8]"
+                        />
+
+                        <span>راهنما</span>
+
+                        <x-icon
+                            name="lucide.chevron-down"
+                            class="!size-3.5 stroke-[1.8] text-base-content/35"
+                        />
+                    </button>
+                </nav>
             </div>
         @endif
 
@@ -195,7 +242,7 @@
             popover
             class="
                 megamenu megamenu-wide max-lg:megamenu-vertical
-                w-[min(46rem,calc(100vw-2rem))]
+                w-[min(36rem,calc(100vw-2rem))]
                 overflow-hidden rounded-2xl
                 border border-base-300/80
                 bg-base-100/95 p-0
@@ -206,131 +253,9 @@
             <span class="megamenu-active"></span>
 
             <nav
-                aria-label="راهنمای {{ $productName }}"
-                class="grid min-w-0 lg:grid-cols-[15rem_minmax(0,1fr)]"
+                aria-label="آموزش‌های {{ $productName }}"
+                class="min-w-0"
             >
-                {{-- Product links --}}
-                <section
-                    class="
-                        border-b border-base-300/70 bg-base-200/35 p-4
-                        lg:border-b-0 lg:border-e lg:p-5
-                    "
-                >
-                    <div class="flex items-center gap-2">
-                        <span
-                            class="
-                                flex size-8 shrink-0 items-center justify-center
-                                rounded-lg bg-primary/10 text-primary
-                            "
-                        >
-                            <x-icon
-                                name="lucide.server-cog"
-                                class="!size-4 stroke-[1.8]"
-                            />
-                        </span>
-
-                        <div>
-                            <div class="text-[10px] font-medium text-base-content/35">
-                                درباره محصول
-                            </div>
-
-                            <div
-                                dir="ltr"
-                                class="mt-0.5 text-xs font-semibold text-base-content/75"
-                            >
-                                {{ $productName }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 space-y-1.5">
-                        <a
-                            href="{{ route('home') }}#how-it-works"
-                            @if($isLanding)
-                                @click.prevent="scrollToSection('how-it-works')"
-                            @else
-                                @click="closeGuideMenu()"
-                            @endif
-                            class="
-                                group flex items-start gap-3 rounded-xl px-3 py-2.5
-                                transition-colors duration-150 hover:bg-base-100
-                            "
-                        >
-                            <span
-                                class="
-                                    mt-0.5 flex size-7 shrink-0 items-center justify-center
-                                    rounded-lg bg-base-100 text-base-content/40
-                                    ring-1 ring-base-300/60
-                                    transition-colors group-hover:text-primary
-                                "
-                            >
-                                <x-icon
-                                    name="lucide.workflow"
-                                    class="!size-3.5 stroke-[1.8]"
-                                />
-                            </span>
-
-                            <span class="min-w-0">
-                                <span
-                                    class="
-                                        block text-xs font-semibold text-base-content/70
-                                        transition-colors group-hover:text-primary
-                                    "
-                                >
-                                    نحوه عملکرد
-                                </span>
-
-                                <span class="mt-0.5 block text-[10px] leading-5 text-base-content/40">
-                                    از سرور تا اجرای سرویس
-                                </span>
-                            </span>
-                        </a>
-
-                        <a
-                            href="{{ route('home') }}#capabilities"
-                            @if($isLanding)
-                                @click.prevent="scrollToSection('capabilities')"
-                            @else
-                                @click="closeGuideMenu()"
-                            @endif
-                            class="
-                                group flex items-start gap-3 rounded-xl px-3 py-2.5
-                                transition-colors duration-150 hover:bg-base-100
-                            "
-                        >
-                            <span
-                                class="
-                                    mt-0.5 flex size-7 shrink-0 items-center justify-center
-                                    rounded-lg bg-base-100 text-base-content/40
-                                    ring-1 ring-base-300/60
-                                    transition-colors group-hover:text-primary
-                                "
-                            >
-                                <x-icon
-                                    name="lucide.blocks"
-                                    class="!size-3.5 stroke-[1.8]"
-                                />
-                            </span>
-
-                            <span class="min-w-0">
-                                <span
-                                    class="
-                                        block text-xs font-semibold text-base-content/70
-                                        transition-colors group-hover:text-primary
-                                    "
-                                >
-                                    قابلیت‌ها
-                                </span>
-
-                                <span class="mt-0.5 block text-[10px] leading-5 text-base-content/40">
-                                    امکانات اصلی {{ $productName }}
-                                </span>
-                            </span>
-                        </a>
-                    </div>
-                </section>
-
-                {{-- Documentation categories --}}
                 <section class="min-w-0 p-4 lg:p-5">
                     <div class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2.5">
