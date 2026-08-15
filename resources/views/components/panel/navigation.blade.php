@@ -80,6 +80,34 @@
             />
         @endif
 
+        <x-menu-item
+            title="امنیت حساب"
+            icon="lucide.shield-check"
+            :link="route('panel.security')"
+            :active="request()->routeIs('panel.security*')"
+            wire:navigate
+
+            class="
+                rounded-xl
+                text-sm
+                text-base-content/65
+                transition-colors duration-200
+                hover:bg-base-200
+                hover:text-base-content
+            "
+
+            active-bg-color="
+                !bg-primary/10
+                !text-primary
+                !font-medium
+            "
+
+            icon-classes="
+                !size-[18px]
+                stroke-[1.7]
+            "
+        />
+
     </x-menu>
 
 </nav>
