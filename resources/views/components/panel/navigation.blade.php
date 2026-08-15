@@ -1,4 +1,5 @@
 @php
+    use App\Application\Navigation\PublicDocumentationNavigation;
     use App\Models\Server;
 
     $routeServer = request()->route('server');
@@ -6,6 +7,10 @@
     $contextServer = $routeServer instanceof Server
         ? $routeServer
         : null;
+
+    $documentationCategories = app(
+        PublicDocumentationNavigation::class,
+    )->categories();
 @endphp
 
 <nav class="flex-1 px-2 py-4">
@@ -107,6 +112,70 @@
                 stroke-[1.7]
             "
         />
+
+        <x-menu-sub
+            title="راهنما"
+            icon="lucide.book-open-text"
+            class="text-sm text-base-content/65"
+            icon-classes="!size-[18px] stroke-[1.7]"
+        >
+            <x-menu-item
+                title="همه آموزش‌ها"
+                icon="lucide.library-big"
+                :link="route('docs.index')"
+                wire:navigate
+
+                class="
+                    rounded-xl
+                    text-sm
+                    text-base-content/60
+                    transition-colors duration-200
+                    hover:bg-base-200
+                    hover:text-base-content
+                "
+
+                active-bg-color="
+                    !bg-primary/10
+                    !text-primary
+                    !font-medium
+                "
+
+                icon-classes="
+                    !size-4
+                    stroke-[1.7]
+                "
+            />
+
+            @foreach($documentationCategories as $category)
+                <x-menu-item
+                    :title="$category['title']"
+                    icon="lucide.folder-open"
+                    :link="route('docs.index').'#docs-category-'.$category['slug']"
+                    no-wire-navigate
+                    wire:key="panel-guide-category-{{ $category['slug'] }}"
+
+                    class="
+                        rounded-xl
+                        text-sm
+                        text-base-content/55
+                        transition-colors duration-200
+                        hover:bg-base-200
+                        hover:text-base-content
+                    "
+
+                    active-bg-color="
+                        !bg-primary/10
+                        !text-primary
+                        !font-medium
+                    "
+
+                    icon-classes="
+                        !size-4
+                        stroke-[1.7]
+                    "
+                />
+            @endforeach
+        </x-menu-sub>
 
         <x-menu-item
             title="امنیت حساب"
