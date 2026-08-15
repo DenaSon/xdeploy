@@ -68,6 +68,11 @@ final class PublicHeaderNavigationTest extends TestCase
                 route('docs.index').'#docs-category-server-management',
                 escape: false,
             )
+            ->assertSee('x-show="desktopGuideOpen"', escape: false)
+            ->assertSee('x-show="mobileGuideOpen"', escape: false)
+            ->assertSee('style="display: none;"', escape: false)
+            ->assertDontSee('popovertarget=', escape: false)
+            ->assertDontSee(' popover', escape: false)
             ->assertDontSee('دسته پیش‌نویس')
             ->assertDontSee('دسته بدون مقاله منتشرشده');
     }
