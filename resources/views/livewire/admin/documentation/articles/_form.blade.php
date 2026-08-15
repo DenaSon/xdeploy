@@ -55,21 +55,12 @@
         </label>
 
         <div class="mt-5">
-            <div class="mb-2 flex items-center justify-between gap-3">
-                <label for="documentation-content" class="text-sm font-medium">محتوا</label>
-                <span class="text-xs text-base-content/45">Markdown پشتیبانی می‌شود</span>
-            </div>
-
-            <textarea
-                id="documentation-content"
-                rows="22"
-                wire:model.blur="content"
-                class="textarea textarea-bordered min-h-96 w-full resize-y text-sm leading-8"
+            <x-admin.markdown-editor
+                wire:model="content"
+                label="محتوا"
+                hint="Markdown پشتیبانی می‌شود؛ پیش‌نمایش را قبل از انتشار بررسی کنید."
                 placeholder="محتوای راهنما را بنویسید..."
-            ></textarea>
-            @error('content')
-                <p class="mt-2 text-xs text-error">{{ $message }}</p>
-            @enderror
+            />
         </div>
     </section>
 

@@ -24,6 +24,13 @@
         }}
     </title>
 
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/easymde@2.21.0/dist/easymde.min.css"
+    >
+
+    <script src="https://unpkg.com/easymde@2.21.0/dist/easymde.min.js"></script>
+
     @vite([
         'resources/css/app.css',
         'resources/js/app.js',
