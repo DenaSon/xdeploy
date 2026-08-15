@@ -13,5 +13,12 @@ final readonly class LoginAction
         User $user,
     ): void {
         Auth::login($user);
+
+        /*
+         * Rotate the authenticated session identifier after a successful
+         * login so a pre-authentication session ID cannot survive the
+         * authentication boundary.
+         */
+        session()->regenerate();
     }
 }
