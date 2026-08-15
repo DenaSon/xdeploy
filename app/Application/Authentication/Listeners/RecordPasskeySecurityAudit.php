@@ -45,9 +45,9 @@ final readonly class RecordPasskeySecurityAudit
         $this->record(
             user: $event->user,
             action: SecurityAuditAction::PasskeyDeleted,
-            context: app()->runningInConsole()
-                ? 'admin_recovery'
-                : 'account_management',
+            context: $this->hasHttpRequest()
+                ? 'account_management'
+                : 'admin_recovery',
             passkeyId: (int) $event->passkey->getKey(),
             passkeyName: $event->passkey->name,
         );
@@ -70,18 +70,18 @@ final readonly class RecordPasskeySecurityAudit
             context: $context,
             passkeyId: $passkeyId,
             passkeyName: $passkeyName,
-            ipAddress: app()->runningInConsole()
-                ? null
-                : request()->ip(),
-            userAgent: app()->runningInConsole()
-                ? null
-                : request()->userAgent(),
+            ipAddress: $this->hasHttpRequest()
+                ? request()->ip()
+                : null,
+            userAgent: $this->hasHttpRequest()
+                ? request()->userAgent()
+                : null,
         );
     }
 
     private function verificationContext(): string
     {
-        if (app()->runningInConsole()) {
+        if (! $this->hasHttpRequest()) {
             return 'console';
         }
 
@@ -91,5 +91,11 @@ final readonly class RecordPasskeySecurityAudit
             'admin.servers.support.passkey.verify' => 'support_access',
             default => 'verification',
         };
+    }
+
+    private function hasHttpRequest(): bool
+    {
+        return app()->bound('request')
+            && request()->route() !== null;
     }
 }
