@@ -4,10 +4,14 @@
 
 <header
     {{ $attributes->class([
+        'relative z-40',
         'flex h-12 items-center justify-between',
-        'border-b border-base-300',
-        'bg-base-100',
+        'rounded-2xl',
+        'border border-base-300/60',
+        'bg-base-100/[0.92]',
         'px-3 sm:px-4 lg:px-5',
+        'shadow-sm shadow-base-content/[0.015]',
+        'backdrop-blur-xl',
     ]) }}
 >
     {{-- Mobile context --}}
@@ -18,11 +22,15 @@
             for="panel-drawer"
             aria-label="باز کردن منوی پنل"
             class="btn btn-square btn-ghost btn-sm
+                   rounded-xl
+                   text-base-content/55
+                   hover:bg-base-200/60
+                   hover:text-base-content
                    lg:hidden"
         >
             <x-icon
                 name="lucide.menu"
-                class="size-5"
+                class="!size-5 stroke-[1.8]"
             />
         </label>
 
@@ -53,13 +61,17 @@
             data-tip="تغییر پوسته"
         >
             <x-theme-toggle
-                class="btn btn-square btn-ghost btn-sm"
+                class="btn btn-square btn-ghost btn-sm
+                       rounded-xl
+                       text-base-content/50
+                       hover:bg-base-200/60
+                       hover:text-base-content"
             />
         </div>
 
         <div
             class="mx-1 hidden h-5 w-px
-                   bg-base-300 sm:block"
+                   bg-base-content/10 sm:block"
             aria-hidden="true"
         ></div>
 
