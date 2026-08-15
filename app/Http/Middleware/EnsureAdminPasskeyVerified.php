@@ -7,7 +7,6 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Support\Admin\AdminPasskeyVerificationSession;
 use Closure;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -20,7 +19,7 @@ final readonly class EnsureAdminPasskeyVerified
     public function handle(
         Request $request,
         Closure $next,
-    ): Response|RedirectResponse {
+    ): Response {
         $user = $request->user();
 
         abort_unless(
