@@ -782,7 +782,7 @@
                     "
                 >
                     <x-button
-                        label="اتصال VPS موجود"
+                        label="اتصال VPS"
                         icon="lucide.link-2"
                         :link="route('panel.servers.create')"
                         wire:navigate
