@@ -102,6 +102,11 @@ final class AdminPasskeyEnforcementTest extends TestCase
             ->assertForbidden();
     }
 
+    protected function automaticallyVerifyAdminPasskey(): bool
+    {
+        return false;
+    }
+
     private function adminWithPasskey(): User
     {
         $admin = User::factory()->create([
