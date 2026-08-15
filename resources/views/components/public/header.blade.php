@@ -25,19 +25,22 @@
     $primaryIcon = $isAuthenticated
         ? 'lucide.layout-dashboard'
         : 'lucide.arrow-left';
-
-    $guideMenuId = 'public-guidance-megamenu';
 @endphp
 
 <header
     x-data="{
         scrolled: {{ $isLanding ? 'window.scrollY > 12' : 'true' }},
+        desktopGuideOpen: false,
+        mobileGuideOpen: false,
 
-        closeGuideMenu() {
-            document.getElementById('{{ $guideMenuId }}')?.hidePopover()
+        closeGuideMenus() {
+            this.desktopGuideOpen = false
+            this.mobileGuideOpen = false
         },
 
         scrollToSection(id) {
+            this.closeGuideMenus()
+
             document.querySelector(`#${id}`)?.scrollIntoView({
                 behavior: window.matchMedia(
                     '(prefers-reduced-motion: reduce)'
@@ -46,6 +49,7 @@
             })
         },
     }"
+    @keydown.escape.window="closeGuideMenus()"
     @if($isLanding)
         @scroll.window="scrolled = window.scrollY > 12"
     @endif
@@ -156,29 +160,62 @@
                         |
                     </span>
 
-                    <button
-                        type="button"
-                        popovertarget="{{ $guideMenuId }}"
-                        aria-label="بازکردن راهنما"
-                        class="
-                            btn btn-ghost btn-sm
-                            gap-2 rounded-xl border border-transparent px-3
-                            text-xs font-medium text-base-content/55
-                            hover:border-base-300/70 hover:bg-base-200/60 hover:text-base-content
-                        "
+                    <div
+                        class="relative"
+                        @click.outside="desktopGuideOpen = false"
                     >
-                        <x-icon
-                            name="lucide.book-open-text"
-                            class="!size-4 stroke-[1.8]"
-                        />
+                        <button
+                            type="button"
+                            @click="desktopGuideOpen = ! desktopGuideOpen"
+                            :aria-expanded="desktopGuideOpen.toString()"
+                            aria-controls="desktop-guidance-menu"
+                            aria-haspopup="true"
+                            class="
+                                btn btn-ghost btn-sm
+                                gap-2 rounded-xl border border-transparent px-3
+                                text-xs font-medium text-base-content/55
+                                hover:border-base-300/70 hover:bg-base-200/60 hover:text-base-content
+                            "
+                        >
+                            <x-icon
+                                name="lucide.book-open-text"
+                                class="!size-4 stroke-[1.8]"
+                            />
 
-                        <span>راهنما</span>
+                            <span>راهنما</span>
 
-                        <x-icon
-                            name="lucide.chevron-down"
-                            class="!size-3.5 stroke-[1.8] text-base-content/35"
-                        />
-                    </button>
+                            <x-icon
+                                name="lucide.chevron-down"
+                                class="!size-3.5 stroke-[1.8] text-base-content/35 transition-transform duration-150"
+                                x-bind:class="desktopGuideOpen ? 'rotate-180' : ''"
+                            />
+                        </button>
+
+                        <div
+                            id="desktop-guidance-menu"
+                            x-show="desktopGuideOpen"
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
+                            style="display: none;"
+                            class="
+                                absolute right-0 top-full z-50 mt-2
+                                w-[min(36rem,calc(100vw-2rem))]
+                                origin-top-right overflow-hidden rounded-2xl
+                                border border-base-300/80
+                                bg-base-100/95
+                                shadow-xl shadow-base-content/[0.08]
+                                backdrop-blur-xl
+                            "
+                        >
+                            <x-public.guidance-menu
+                                :documentation-categories="$documentationCategories"
+                            />
+                        </div>
+                    </div>
                 </nav>
             </div>
         @endif
@@ -188,22 +225,53 @@
         {{-- Actions --}}
         <div class="flex shrink-0 items-center gap-2">
             @if($showPublicNavigation)
-                <button
-                    type="button"
-                    popovertarget="{{ $guideMenuId }}"
-                    aria-label="بازکردن راهنما"
-                    class="
-                        btn btn-square btn-ghost btn-sm
-                        rounded-xl text-base-content/50
-                        hover:bg-base-200/70 hover:text-base-content
-                        lg:hidden
-                    "
+                <div
+                    class="relative lg:hidden"
+                    @click.outside="mobileGuideOpen = false"
                 >
-                    <x-icon
-                        name="lucide.book-open-text"
-                        class="!size-4 stroke-[1.8]"
-                    />
-                </button>
+                    <button
+                        type="button"
+                        @click="mobileGuideOpen = ! mobileGuideOpen"
+                        :aria-expanded="mobileGuideOpen.toString()"
+                        aria-controls="mobile-guidance-menu"
+                        aria-haspopup="true"
+                        aria-label="بازکردن راهنما"
+                        class="
+                            btn btn-square btn-ghost btn-sm
+                            rounded-xl text-base-content/50
+                            hover:bg-base-200/70 hover:text-base-content
+                        "
+                    >
+                        <x-icon
+                            name="lucide.book-open-text"
+                            class="!size-4 stroke-[1.8]"
+                        />
+                    </button>
+
+                    <div
+                        id="mobile-guidance-menu"
+                        x-show="mobileGuideOpen"
+                        x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter-start="opacity-0 -translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 -translate-y-1"
+                        style="display: none;"
+                        class="
+                            fixed inset-x-4 top-[4.5rem] z-50
+                            max-h-[calc(100vh-5.5rem)] overflow-hidden rounded-2xl
+                            border border-base-300/80
+                            bg-base-100/95
+                            shadow-xl shadow-base-content/[0.08]
+                            backdrop-blur-xl
+                        "
+                    >
+                        <x-public.guidance-menu
+                            :documentation-categories="$documentationCategories"
+                        />
+                    </div>
+                </div>
             @endif
 
             <x-button
@@ -234,153 +302,4 @@
             />
         </div>
     </div>
-
-    {{-- Guidance mega menu --}}
-    @if($showPublicNavigation)
-        <div
-            id="{{ $guideMenuId }}"
-            popover
-            class="
-                megamenu megamenu-wide max-lg:megamenu-vertical
-                w-[min(36rem,calc(100vw-2rem))]
-                overflow-hidden rounded-2xl
-                border border-base-300/80
-                bg-base-100/95 p-0
-                shadow-xl shadow-base-content/[0.08]
-                backdrop-blur-xl
-            "
-        >
-            <span class="megamenu-active"></span>
-
-            <nav
-                aria-label="آموزش‌های {{ $productName }}"
-                class="min-w-0"
-            >
-                <section class="min-w-0 p-4 lg:p-5">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5">
-                            <span
-                                class="
-                                    flex size-8 shrink-0 items-center justify-center
-                                    rounded-lg bg-primary/10 text-primary
-                                "
-                            >
-                                <x-icon
-                                    name="lucide.graduation-cap"
-                                    class="!size-4 stroke-[1.8]"
-                                />
-                            </span>
-
-                            <div>
-                                <h2 class="text-sm font-semibold text-base-content/80">
-                                    آموزش‌ها
-                                </h2>
-
-                                <p class="mt-0.5 text-[10px] text-base-content/40">
-                                    راهنمای استفاده از {{ $productName }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <span class="hidden text-[10px] text-base-content/30 sm:inline">
-                            {{ count($documentationCategories) }} دسته
-                        </span>
-                    </div>
-
-                    @if($documentationCategories !== [])
-                        <div
-                            class="
-                                dashboard-scroll mt-4 grid max-h-64 gap-1.5
-                                overflow-y-auto pe-1 sm:grid-cols-2
-                            "
-                        >
-                            @foreach($documentationCategories as $category)
-                                <a
-                                    href="{{ route('docs.index') }}#docs-category-{{ $category['slug'] }}"
-                                    @click="closeGuideMenu()"
-                                    class="
-                                        group flex min-w-0 items-start gap-2.5
-                                        rounded-xl px-3 py-2.5
-                                        transition-colors duration-150
-                                        hover:bg-base-200/55
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            mt-0.5 flex size-7 shrink-0 items-center justify-center
-                                            rounded-lg bg-base-200/70 text-base-content/35
-                                            transition-colors
-                                            group-hover:bg-primary/10 group-hover:text-primary
-                                        "
-                                    >
-                                        <x-icon
-                                            name="lucide.folder-open"
-                                            class="!size-3.5 stroke-[1.8]"
-                                        />
-                                    </span>
-
-                                    <span class="min-w-0">
-                                        <span
-                                            class="
-                                                block truncate text-xs font-medium text-base-content/65
-                                                transition-colors group-hover:text-primary
-                                            "
-                                        >
-                                            {{ $category['title'] }}
-                                        </span>
-
-                                        @if($category['description'])
-                                            <span
-                                                class="
-                                                    mt-0.5 block line-clamp-1
-                                                    text-[10px] leading-5 text-base-content/35
-                                                "
-                                            >
-                                                {{ $category['description'] }}
-                                            </span>
-                                        @endif
-                                    </span>
-                                </a>
-                            @endforeach
-                        </div>
-                    @else
-                        <div
-                            class="
-                                mt-4 flex items-center gap-3 rounded-xl
-                                bg-base-200/45 px-3.5 py-3
-                            "
-                        >
-                            <x-icon
-                                name="lucide.book-dashed"
-                                class="!size-4 shrink-0 text-base-content/30"
-                            />
-
-                            <p class="text-[11px] leading-5 text-base-content/40">
-                                هنوز دسته آموزشی منتشرشده‌ای وجود ندارد.
-                            </p>
-                        </div>
-                    @endif
-
-                    <div class="mt-4 border-t border-base-300/60 pt-3">
-                        <a
-                            href="{{ route('docs.index') }}"
-                            wire:navigate
-                            @click="closeGuideMenu()"
-                            class="group inline-flex items-center gap-1.5 text-xs font-medium text-primary"
-                        >
-                            مشاهده همه آموزش‌ها
-
-                            <x-icon
-                                name="lucide.arrow-left"
-                                class="
-                                    !size-3.5 stroke-[1.8]
-                                    transition-transform group-hover:-translate-x-0.5
-                                "
-                            />
-                        </a>
-                    </div>
-                </section>
-            </nav>
-        </div>
-    @endif
 </header>
