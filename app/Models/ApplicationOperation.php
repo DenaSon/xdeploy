@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Application\Shared\Enums\ApplicationOperationStage;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationType;
@@ -19,9 +20,11 @@ class ApplicationOperation extends Model
         'application_type',
         'operation',
         'status',
+        'stage',
         'failure_code',
         'failure_message',
         'started_at',
+        'stage_updated_at',
         'finished_at',
     ];
 
@@ -29,7 +32,9 @@ class ApplicationOperation extends Model
         'application_type' => ApplicationType::class,
         'operation' => ApplicationOperationType::class,
         'status' => ApplicationOperationStatus::class,
+        'stage' => ApplicationOperationStage::class,
         'started_at' => 'immutable_datetime',
+        'stage_updated_at' => 'immutable_datetime',
         'finished_at' => 'immutable_datetime',
     ];
 
@@ -87,12 +92,19 @@ class ApplicationOperation extends Model
 
     public function markSucceeded(): void
     {
-        $this->forceFill([
+        $attributes = [
             'status' => ApplicationOperationStatus::Succeeded,
             'finished_at' => now(),
             'failure_code' => null,
             'failure_message' => null,
-        ])->save();
+        ];
+
+        if ($this->stage !== null) {
+            $attributes['stage'] = ApplicationOperationStage::Completed;
+            $attributes['stage_updated_at'] = now();
+        }
+
+        $this->forceFill($attributes)->save();
     }
 
     public function markFailed(
