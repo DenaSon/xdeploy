@@ -22,6 +22,8 @@ use App\Livewire\Admin\Payments\Show as AdminPaymentsShow;
 use App\Livewire\Admin\Security\ConfirmPasskey as AdminConfirmPasskey;
 use App\Livewire\Admin\Servers\Index as AdminServersIndex;
 use App\Livewire\Admin\Servers\Show as AdminServersShow;
+use App\Livewire\Admin\Support\Index as AdminSupportIndex;
+use App\Livewire\Admin\Support\Show as AdminSupportShow;
 use App\Livewire\Admin\Users\Index as AdminUsersIndex;
 use App\Livewire\Admin\Users\Show as AdminUsersShow;
 use Illuminate\Support\Facades\Route;
@@ -96,6 +98,12 @@ Route::middleware([
                     ->name('payments.index');
                 Route::livewire('/payments/{payment}', AdminPaymentsShow::class)
                     ->name('payments.show');
+
+                Route::livewire('/support', AdminSupportIndex::class)
+                    ->name('support.index');
+                Route::livewire('/support/{supportRequestId}', AdminSupportShow::class)
+                    ->whereNumber('supportRequestId')
+                    ->name('support.show');
 
                 Route::livewire('/documentation', AdminDocumentationArticlesIndex::class)
                     ->name('documentation.articles.index');
