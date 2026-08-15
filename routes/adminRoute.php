@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\Servers\ConfirmSupportPasskeyController;
 use App\Http\Controllers\Admin\Servers\RevealSupportCredentialController;
+use App\Http\Controllers\Admin\Servers\SupportPasskeyOptionsController;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Admin\Documentation\Articles\Create as AdminDocumentationArticlesCreate;
 use App\Livewire\Admin\Documentation\Articles\Edit as AdminDocumentationArticlesEdit;
@@ -64,10 +66,24 @@ Route::middleware([
 
                 Route::livewire('/servers', AdminServersIndex::class)
                     ->name('servers.index');
+                Route::get(
+                    '/servers/{adminServer}/support/passkey/options',
+                    SupportPasskeyOptionsController::class,
+                )
+                    ->middleware('throttle:6,1')
+                    ->name('servers.support.passkey.options');
+                Route::post(
+                    '/servers/{adminServer}/support/passkey/verify',
+                    ConfirmSupportPasskeyController::class,
+                )
+                    ->middleware('throttle:6,1')
+                    ->name('servers.support.passkey.verify');
                 Route::post(
                     '/servers/{adminServer}/support/reveal-credential',
                     RevealSupportCredentialController::class,
-                )->name('servers.support.reveal-credential');
+                )
+                    ->middleware('throttle:10,1')
+                    ->name('servers.support.reveal-credential');
                 Route::livewire('/servers/{adminServer}', AdminServersShow::class)
                     ->name('servers.show');
 
