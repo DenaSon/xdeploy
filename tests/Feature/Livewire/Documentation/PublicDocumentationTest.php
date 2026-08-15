@@ -51,6 +51,27 @@ final class PublicDocumentationTest extends TestCase
             ->assertDontSee('data-raw-doc', false);
     }
 
+    public function test_article_page_shows_public_navigation_and_adjacent_articles(): void
+    {
+        $category = $this->createCategory('شروع کار', 'getting-started', true, 10);
+        $draftCategory = $this->createCategory('مخفی', 'hidden', false, 20);
+
+        $previous = $this->createArticle($category, 'خرید سرور', 'buy-server', true, now(), 10);
+        $current = $this->createArticle($category, 'اتصال سرور', 'connect-server', true, now(), 20);
+        $next = $this->createArticle($category, 'نصب برنامه', 'install-app', true, now(), 30);
+        $hidden = $this->createArticle($draftCategory, 'راهنمای مخفی', 'hidden-guide', true, now(), 10);
+
+        $this->get(route('docs.show', [$category->slug, $current->slug]))
+            ->assertOk()
+            ->assertSee('فهرست مستندات')
+            ->assertSee('aria-current="page"', false)
+            ->assertSee('مستند قبلی')
+            ->assertSee($previous->title)
+            ->assertSee('مستند بعدی')
+            ->assertSee($next->title)
+            ->assertDontSee($hidden->title);
+    }
+
     public function test_article_under_draft_category_is_not_publicly_visible(): void
     {
         $category = $this->createCategory('مخفی', 'hidden', false, 10);
