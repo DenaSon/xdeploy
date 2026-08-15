@@ -12,56 +12,96 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('servers', function (Blueprint $table) {
+        Schema::create('servers', function (Blueprint $table): void {
             $table->engine = 'InnoDB';
-            $table->softDeletes();
 
             $table->id();
 
-            // Ownership
             $table->foreignId('user_id')
                 ->constrained()
                 ->cascadeOnDelete();
 
-            // Server Information
-            $table->string('name')->nullable();
-            $table->string('host');
+            $table->string('name')
+                ->nullable();
+
+            $table->string('host')
+                ->nullable();
 
             $table->unsignedSmallInteger('port')
                 ->default(22);
 
-            // Authentication
             $table->string('username');
 
             $table->enum('authentication_type', array_column(
                 AuthenticationType::cases(),
-                'value'
+                'value',
             ))->default(AuthenticationType::Password->value);
 
             $table->text('credential')
                 ->nullable();
 
-            $table
-                ->uuid('credential_context')
+            $table->uuid('credential_context')
                 ->nullable()
                 ->unique();
 
-            // Status
             $table->enum('status', array_column(
                 ServerStatus::cases(),
-                'value'
+                'value',
             ))->default(ServerStatus::Active->value);
+
+            $table->string('cloud_provider', 50)
+                ->nullable();
+
+            $table->string('cloud_server_id', 191)
+                ->nullable();
+
+            $table->string('cloud_region', 100)
+                ->nullable();
+
+            $table->timestamp('provisioned_at')
+                ->nullable();
+
+            $table->timestamp('expires_at')
+                ->nullable();
+
+            $table->timestamp('termination_started_at')
+                ->nullable();
+
+            $table->timestamp('termination_last_attempt_at')
+                ->nullable();
+
+            $table->unsignedInteger('termination_attempts')
+                ->default(0);
+
+            $table->text('termination_last_error')
+                ->nullable();
+
+            $table->timestamp('terminated_at')
+                ->nullable();
+
+            $table->timestamps();
+            $table->softDeletes();
 
             $table->index('status');
 
-            $table->timestamps();
+            $table->index(
+                'expires_at',
+                'servers_expires_at_index',
+            );
 
-            // Optional: prevent duplicate server registration per user
             $table->unique([
                 'user_id',
                 'host',
                 'port',
             ]);
+
+            $table->unique(
+                [
+                    'cloud_provider',
+                    'cloud_server_id',
+                ],
+                'servers_cloud_provider_server_unique',
+            );
         });
     }
 
