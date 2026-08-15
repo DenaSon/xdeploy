@@ -40,6 +40,29 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * Support requests opened by this user.
+     *
+     * @return HasMany<SupportRequest, $this>
+     */
+    public function supportRequests(): HasMany
+    {
+        return $this->hasMany(SupportRequest::class);
+    }
+
+    /**
+     * Support conversation messages authored by this account.
+     *
+     * @return HasMany<SupportMessage, $this>
+     */
+    public function supportMessages(): HasMany
+    {
+        return $this->hasMany(
+            SupportMessage::class,
+            'author_id',
+        );
+    }
+
+    /**
      * @return HasOne<Profile, $this>
      */
     public function profile(): HasOne
