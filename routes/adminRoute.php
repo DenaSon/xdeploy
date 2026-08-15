@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use App\Livewire\Admin\Dashboard as AdminDashboard;
+use App\Livewire\Admin\Documentation\Articles\Create as AdminDocumentationArticlesCreate;
+use App\Livewire\Admin\Documentation\Articles\Edit as AdminDocumentationArticlesEdit;
+use App\Livewire\Admin\Documentation\Articles\Index as AdminDocumentationArticlesIndex;
+use App\Livewire\Admin\Documentation\Categories\Create as AdminDocumentationCategoriesCreate;
+use App\Livewire\Admin\Documentation\Categories\Edit as AdminDocumentationCategoriesEdit;
+use App\Livewire\Admin\Documentation\Categories\Index as AdminDocumentationCategoriesIndex;
 use App\Livewire\Admin\Orders\Index as AdminOrdersIndex;
 use App\Livewire\Admin\Orders\Show as AdminOrdersShow;
 use App\Livewire\Admin\Pages\Create as AdminPagesCreate;
@@ -46,6 +52,19 @@ Route::middleware([
             ->name('payments.index');
         Route::livewire('/payments/{payment}', AdminPaymentsShow::class)
             ->name('payments.show');
+
+        Route::livewire('/documentation', AdminDocumentationArticlesIndex::class)
+            ->name('documentation.articles.index');
+        Route::livewire('/documentation/articles/create', AdminDocumentationArticlesCreate::class)
+            ->name('documentation.articles.create');
+        Route::livewire('/documentation/articles/{article}/edit', AdminDocumentationArticlesEdit::class)
+            ->name('documentation.articles.edit');
+        Route::livewire('/documentation/categories', AdminDocumentationCategoriesIndex::class)
+            ->name('documentation.categories.index');
+        Route::livewire('/documentation/categories/create', AdminDocumentationCategoriesCreate::class)
+            ->name('documentation.categories.create');
+        Route::livewire('/documentation/categories/{category}/edit', AdminDocumentationCategoriesEdit::class)
+            ->name('documentation.categories.edit');
 
         Route::livewire('/pages', AdminPagesIndex::class)
             ->name('pages.index');
