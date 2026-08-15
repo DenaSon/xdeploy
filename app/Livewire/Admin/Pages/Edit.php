@@ -6,7 +6,6 @@ namespace App\Livewire\Admin\Pages;
 
 use App\Models\Page;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -38,7 +37,7 @@ final class Edit extends Component
         $this->isPublished = $page->is_published;
     }
 
-    public function save(): RedirectResponse
+    public function save()
     {
         $page = Page::query()->findOrFail($this->pageId);
 

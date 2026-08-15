@@ -6,7 +6,6 @@ namespace App\Livewire\Admin\Pages;
 
 use App\Models\Page;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -25,7 +24,7 @@ final class Create extends Component
 
     public bool $isPublished = false;
 
-    public function save(): RedirectResponse
+    public function save()
     {
         $this->slug = Str::lower(trim($this->slug));
 
