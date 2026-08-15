@@ -84,6 +84,16 @@ class Server extends Model
         );
     }
 
+    /**
+     * Support requests optionally linked to this server.
+     *
+     * @return HasMany<SupportRequest, $this>
+     */
+    public function supportRequests(): HasMany
+    {
+        return $this->hasMany(SupportRequest::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status
