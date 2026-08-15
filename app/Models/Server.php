@@ -45,13 +45,9 @@ class Server extends Model
 
     protected $casts = [
         'port' => 'integer',
-
         'credential' => ServerCredentialCast::class,
-
         'status' => ServerStatus::class,
-
         'authentication_type' => AuthenticationType::class,
-
         'provisioned_at' => 'immutable_datetime',
         'expires_at' => 'immutable_datetime',
         'termination_started_at' => 'immutable_datetime',
@@ -60,11 +56,7 @@ class Server extends Model
         'terminated_at' => 'immutable_datetime',
     ];
 
-    /**
-     * Server owner.
-     *
-     * @return BelongsTo<User, $this>
-     */
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(
@@ -72,11 +64,7 @@ class Server extends Model
         );
     }
 
-    /**
-     * Public endpoints assigned to applications on this server.
-     *
-     * @return HasMany<PublicEndpoint, $this>
-     */
+    /** @return HasMany<PublicEndpoint, $this> */
     public function publicEndpoints(): HasMany
     {
         return $this->hasMany(
@@ -84,11 +72,7 @@ class Server extends Model
         );
     }
 
-    /**
-     * Support requests optionally linked to this server.
-     *
-     * @return HasMany<SupportRequest, $this>
-     */
+    /** @return HasMany<SupportRequest, $this> */
     public function supportRequests(): HasMany
     {
         return $this->hasMany(SupportRequest::class);
@@ -96,8 +80,7 @@ class Server extends Model
 
     public function isActive(): bool
     {
-        return $this->status
-            === ServerStatus::Active;
+        return $this->status === ServerStatus::Active;
     }
 
     public function isCloudProvisioned(): bool
@@ -116,6 +99,12 @@ class Server extends Model
     {
         return is_string($this->host)
             && trim($this->host) !== '';
+    }
+
+    public function hasCredential(): bool
+    {
+        return is_string($this->credential)
+            && trim($this->credential) !== '';
     }
 
     public function hasExpired(): bool

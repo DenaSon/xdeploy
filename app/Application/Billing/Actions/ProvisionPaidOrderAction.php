@@ -40,10 +40,6 @@ final readonly class ProvisionPaidOrderAction
             );
         }
 
-        /*
-         * A repeated invocation must never blindly submit a second
-         * provider create request.
-         */
         if (! $shouldCreateServer) {
             return $this->recoverExistingProvisioning(
                 order: $order,
@@ -118,9 +114,7 @@ final readonly class ProvisionPaidOrderAction
         }
     }
 
-    /**
-     * @return array{0: Order, 1: bool}
-     */
+    /** @return array{0: Order, 1: bool} */
     private function prepareOrder(
         int $orderId,
     ): array {
@@ -253,7 +247,8 @@ final readonly class ProvisionPaidOrderAction
 
         return $provider !== ''
             && $providerServerId !== ''
-            && $server->hasConnectionHost();
+            && $server->hasConnectionHost()
+            && $server->hasCredential();
     }
 
     private function markFulfilled(

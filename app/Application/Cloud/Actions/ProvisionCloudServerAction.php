@@ -94,8 +94,6 @@ final readonly class ProvisionCloudServerAction
         );
 
         $createdServer = $provisioner->createServer($data);
-
-        $password = $this->generatedPassword($createdServer);
         $username = $this->serverUsername($createdServer);
 
         $server = $this->persistProvisioningServer(
@@ -103,7 +101,7 @@ final readonly class ProvisionCloudServerAction
             data: $data,
             createdServer: $createdServer,
             username: $username,
-            password: $password,
+            password: $createdServer->generatedPassword(),
             provider: $provider,
         );
 
@@ -154,12 +152,17 @@ final readonly class ProvisionCloudServerAction
                 );
             }
 
-            if ($cloudServer->status->isReady() && $cloudServer->hasPublicIpv4()) {
-                $server = $this->saveConnectionInformation(
-                    server: $server,
-                    cloudServer: $cloudServer,
-                );
+            $server = $this->syncProviderAccessInformation(
+                server: $server,
+                cloudServer: $cloudServer,
+            );
 
+            if (
+                $cloudServer->status->isReady()
+                && $cloudServer->hasPublicIpv4()
+                && $server->hasConnectionHost()
+                && $server->hasCredential()
+            ) {
                 return new ProvisionCloudServerResult(
                     server: $server,
                     cloudServer: $cloudServer,
@@ -171,12 +174,23 @@ final readonly class ProvisionCloudServerAction
         }
 
         if ($lastCloudServer instanceof CloudServerData && $lastCloudServer->status->isReady()) {
-            throw new CloudServerNotReadyException(
-                sprintf(
-                    'Cloud server [%s] became active but has no usable public IPv4 address.',
-                    $providerServerId,
-                ),
-            );
+            if (! $lastCloudServer->hasPublicIpv4()) {
+                throw new CloudServerNotReadyException(
+                    sprintf(
+                        'Cloud server [%s] became active but has no usable public IPv4 address.',
+                        $providerServerId,
+                    ),
+                );
+            }
+
+            if (! $server->hasCredential()) {
+                throw new CloudServerNotReadyException(
+                    sprintf(
+                        'Cloud server [%s] became active but its generated credential is not available yet.',
+                        $providerServerId,
+                    ),
+                );
+            }
         }
 
         throw new CloudProvisioningTimeoutException(
@@ -193,7 +207,7 @@ final readonly class ProvisionCloudServerAction
         CreateCloudServerData $data,
         CreatedCloudServerData $createdServer,
         string $username,
-        string $password,
+        ?string $password,
         CloudProviderType $provider,
     ): Server {
         try {
@@ -224,57 +238,50 @@ final readonly class ProvisionCloudServerAction
         }
     }
 
-    private function saveConnectionInformation(
+    private function syncProviderAccessInformation(
         Server $server,
         CloudServerData $cloudServer,
     ): Server {
+        $attributes = [];
         $connectionIp = $cloudServer->firstPublicIpv4();
 
-        if ($connectionIp === null) {
-            throw new CloudServerNotReadyException(
-                sprintf(
-                    'Cloud server [%s] has no usable public IPv4 address.',
-                    $cloudServer->id,
-                ),
+        if ($connectionIp !== null && $connectionIp !== $server->host) {
+            $attributes['host'] = $connectionIp;
+        }
+
+        $providerUsername = trim((string) $cloudServer->username);
+
+        if ($providerUsername !== '' && $providerUsername !== $server->username) {
+            $attributes['username'] = $this->normalizedUsername(
+                $providerUsername,
             );
         }
 
+        if (
+            ! $server->hasCredential()
+            && $cloudServer->hasGeneratedPassword()
+        ) {
+            $attributes['credential'] = $cloudServer->generatedPassword();
+        }
+
+        if ($attributes === []) {
+            return $server;
+        }
+
         try {
-            $server->forceFill([
-                'host' => $connectionIp,
-                'username' => $this->normalizedUsername(
-                    $cloudServer->username ?? $server->username,
-                ),
-            ]);
+            $server->forceFill($attributes);
             $server->saveOrFail();
 
             return $server->refresh();
         } catch (Throwable $exception) {
             throw new CloudServerProvisioningException(
                 message: sprintf(
-                    'Connection information for cloud server [%s] could not be persisted.',
+                    'Provider access information for cloud server [%s] could not be persisted.',
                     $cloudServer->id,
                 ),
                 previous: $exception,
             );
         }
-    }
-
-    private function generatedPassword(
-        CreatedCloudServerData $createdServer,
-    ): string {
-        $password = $createdServer->generatedPassword();
-
-        if (! is_string($password) || $password === '') {
-            throw new CloudServerProvisioningException(
-                sprintf(
-                    'Cloud server [%s] has no generated password.',
-                    $createdServer->id,
-                ),
-            );
-        }
-
-        return $password;
     }
 
     private function serverUsername(
