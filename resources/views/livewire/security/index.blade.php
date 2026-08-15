@@ -1,0 +1,230 @@
+<div class="space-y-5">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <div class="flex items-center gap-2 text-sm font-medium text-primary">
+                <x-icon name="lucide.shield-check" class="!size-4 stroke-[1.8]" />
+                امنیت حساب
+            </div>
+
+            <h1 class="mt-2 text-2xl font-semibold tracking-tight">
+                روش‌های ورود و امنیت
+            </h1>
+
+            <p class="mt-2 max-w-2xl text-sm leading-7 text-base-content/55">
+                شماره موبایل هویت اصلی حساب شماست. می‌توانید پس از ورود، Passkeyهای دستگاه‌های مورداعتماد خود را برای ورود امن‌تر و سریع‌تر ثبت کنید.
+            </p>
+        </div>
+    </header>
+
+    @if ($statusMessage)
+        <div role="status" class="alert alert-success alert-soft rounded-2xl text-sm">
+            <x-icon name="lucide.circle-check" class="!size-5" />
+            <span>{{ $statusMessage }}</span>
+        </div>
+    @endif
+
+    <section class="rounded-2xl border border-base-300 bg-base-100 p-5 sm:p-6">
+        <div class="flex items-start gap-3">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
+                <x-icon name="lucide.smartphone" class="!size-5 stroke-[1.8]" />
+            </span>
+
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-sm font-semibold">شماره موبایل</h2>
+                    <span class="badge badge-success badge-sm">تأیید شده</span>
+                </div>
+
+                <div class="mt-2 font-mono text-sm text-base-content/75" dir="ltr">
+                    {{ $user->phone }}
+                </div>
+
+                <p class="mt-2 text-xs leading-6 text-base-content/45">
+                    ایجاد حساب و ورود اولیه در {{ config('app.name') }} همیشه با تأیید این شماره انجام می‌شود.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section
+        class="overflow-hidden rounded-2xl border border-base-300 bg-base-100"
+        x-data="{
+            supported: false,
+            name: '',
+            loading: false,
+            error: null,
+            success: null,
+            init() {
+                const refreshSupport = () => {
+                    this.supported = Boolean(window.CoreflarePasskeys?.isSupported());
+                };
+
+                refreshSupport();
+                window.addEventListener('passkeys:ready', refreshSupport, { once: true });
+            },
+            async register() {
+                this.error = null;
+                this.success = null;
+
+                const name = this.name.trim();
+
+                if (name.length < 2) {
+                    this.error = 'یک نام کوتاه برای این Passkey وارد کنید.';
+                    return;
+                }
+
+                if (! window.CoreflarePasskeys?.isSupported()) {
+                    this.error = 'مرورگر یا دستگاه شما از Passkey پشتیبانی نمی‌کند.';
+                    return;
+                }
+
+                this.loading = true;
+
+                try {
+                    await window.CoreflarePasskeys.register({
+                        name,
+                        optionsUrl: @js(route('panel.security.passkeys.options')),
+                        storeUrl: @js(route('panel.security.passkeys.store')),
+                    });
+
+                    this.name = '';
+                    this.success = 'Passkey با موفقیت به حساب شما اضافه شد.';
+                    await $wire.$refresh();
+                } catch (error) {
+                    this.error = window.CoreflarePasskeys.messageFor(error);
+                } finally {
+                    this.loading = false;
+                }
+            },
+        }"
+    >
+        <div class="flex flex-col gap-4 border-b border-base-300 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+            <div class="flex items-start gap-3">
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <x-icon name="lucide.key-round" class="!size-5 stroke-[1.8]" />
+                </span>
+
+                <div>
+                    <h2 class="text-base font-semibold">Passkeys</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-7 text-base-content/50">
+                        Passkey به دستگاه شما متصل است و می‌تواند با Windows Hello، اثر انگشت، تشخیص چهره، PIN دستگاه یا کلید امنیتی تأیید شود.
+                    </p>
+                </div>
+            </div>
+
+            <span class="badge badge-ghost shrink-0">
+                {{ $passkeys->count() }} Passkey
+            </span>
+        </div>
+
+        <div class="space-y-5 p-5 sm:p-6">
+            <div x-cloak x-show="! supported" class="alert alert-warning alert-soft rounded-xl text-sm">
+                <x-icon name="lucide.triangle-alert" class="!size-5" />
+                <span>مرورگر فعلی قابلیت Passkey را در دسترس قرار نمی‌دهد.</span>
+            </div>
+
+            <div class="rounded-2xl border border-base-300 bg-base-200/25 p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label class="form-control min-w-0 flex-1">
+                        <span class="mb-2 text-sm font-medium">نام Passkey</span>
+                        <input
+                            type="text"
+                            x-model="name"
+                            maxlength="80"
+                            autocomplete="off"
+                            class="input input-bordered w-full rounded-xl"
+                            placeholder="مثلاً لپ‌تاپ شخصی یا iPhone"
+                            x-on:keydown.enter.prevent="register()"
+                        >
+                    </label>
+
+                    <button
+                        type="button"
+                        class="btn btn-primary rounded-xl"
+                        x-on:click="register()"
+                        x-bind:disabled="loading || ! supported"
+                    >
+                        <span x-show="! loading" class="inline-flex items-center gap-2">
+                            <x-icon name="lucide.plus" class="!size-4" />
+                            افزودن Passkey
+                        </span>
+                        <span x-show="loading" class="loading loading-spinner loading-sm"></span>
+                    </button>
+                </div>
+
+                <p class="mt-2 text-xs leading-6 text-base-content/40">
+                    نام فقط برای تشخیص دستگاه در پنل استفاده می‌شود و می‌تواند چیزی مثل «لپ‌تاپ شخصی» باشد.
+                </p>
+
+                <div x-cloak x-show="error" class="mt-3 text-xs text-error" x-text="error"></div>
+                <div x-cloak x-show="success" class="mt-3 text-xs text-success" x-text="success"></div>
+            </div>
+
+            <div>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h3 class="text-sm font-semibold">Passkeyهای ثبت‌شده</h3>
+                </div>
+
+                <div class="divide-y divide-base-300 overflow-hidden rounded-2xl border border-base-300">
+                    @forelse ($passkeys as $passkey)
+                        <div
+                            wire:key="passkey-{{ $passkey->id }}"
+                            class="flex flex-col gap-4 bg-base-100 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-base-200 text-base-content/55">
+                                    <x-icon name="lucide.fingerprint" class="!size-4.5 stroke-[1.7]" />
+                                </span>
+
+                                <div class="min-w-0">
+                                    <div class="truncate text-sm font-medium">{{ $passkey->name }}</div>
+
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/40">
+                                        @if ($passkey->authenticator)
+                                            <span>{{ $passkey->authenticator }}</span>
+                                        @endif
+
+                                        <span>افزوده‌شده: {{ $passkey->created_at?->format('Y-m-d') }}</span>
+
+                                        @if ($passkey->last_used_at)
+                                            <span>آخرین استفاده: {{ $passkey->last_used_at->format('Y-m-d H:i') }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                wire:click="deletePasskey({{ $passkey->id }})"
+                                wire:confirm="این Passkey حذف شود؟"
+                                wire:loading.attr="disabled"
+                                wire:target="deletePasskey({{ $passkey->id }})"
+                                class="btn btn-ghost btn-sm shrink-0 rounded-xl text-error"
+                            >
+                                <x-icon name="lucide.trash-2" class="!size-4" />
+                                حذف
+                            </button>
+                        </div>
+                    @empty
+                        <div class="px-5 py-10 text-center">
+                            <span class="mx-auto flex size-11 items-center justify-center rounded-2xl bg-base-200 text-base-content/35">
+                                <x-icon name="lucide.key-round" class="!size-5 stroke-[1.7]" />
+                            </span>
+                            <p class="mt-3 text-sm font-medium">هنوز Passkey ثبت نشده است.</p>
+                            <p class="mt-1 text-xs leading-6 text-base-content/40">
+                                اولین Passkey را از همین دستگاه اضافه کنید.
+                            </p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="flex items-start gap-2 rounded-xl bg-info/[0.05] px-4 py-3 text-xs leading-6 text-base-content/55">
+                <x-icon name="lucide.info" class="mt-1 !size-3.5 shrink-0 text-info" />
+                <p>
+                    در این مرحله Passkey فقط برای مدیریت امنیت حساب ثبت می‌شود. ورود با Passkey در مرحله بعدی احراز هویت فعال خواهد شد و ورود با شماره موبایل و OTP همچنان باقی می‌ماند.
+                </p>
+            </div>
+        </div>
+    </section>
+</div>
