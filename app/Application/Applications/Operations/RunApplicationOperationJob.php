@@ -68,11 +68,18 @@ final class RunApplicationOperationJob implements ShouldQueue
                 $operation->server_id,
             );
 
+            $progressReporter = $operation->operation === ApplicationOperationType::Install
+                ? new DatabaseApplicationOperationProgressReporter(
+                    (int) $operation->getKey(),
+                )
+                : null;
+
             match ($operation->operation) {
                 ApplicationOperationType::Install => $applicationManager->install(
                     user: $user,
                     server: $server,
                     type: $operation->application_type,
+                    progressReporter: $progressReporter,
                 ),
 
                 ApplicationOperationType::Uninstall => $applicationManager->uninstall(
@@ -100,6 +107,7 @@ final class RunApplicationOperationJob implements ShouldQueue
                 ),
             };
 
+            $operation->refresh();
             $operation->markSucceeded();
 
             Log::info('application.operation.completed', [
@@ -113,6 +121,7 @@ final class RunApplicationOperationJob implements ShouldQueue
                 $exception,
             );
 
+            $operation->refresh();
             $operation->markFailed(
                 failureCode: $failureCode,
                 failureMessage: 'The queued application operation failed.',

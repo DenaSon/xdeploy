@@ -58,6 +58,12 @@ final class Show extends Component
 
     public ?string $operationStatus = null;
 
+    public ?string $operationStage = null;
+
+    public ?int $operationStartedAt = null;
+
+    public ?int $operationStageUpdatedAt = null;
+
     public bool $operationActive = false;
 
     public bool $runtimeLoaded = false;
@@ -490,6 +496,9 @@ final class Show extends Component
         $this->operationId = (int) $operation->getKey();
         $this->operationType = $operation->operation->value;
         $this->operationStatus = $operation->status->value;
+        $this->operationStage = $operation->stage?->value;
+        $this->operationStartedAt = $operation->started_at?->getTimestamp();
+        $this->operationStageUpdatedAt = $operation->stage_updated_at?->getTimestamp();
         $this->operationActive = $operation->isActive();
         $this->processing = $this->operationActive;
     }
@@ -499,6 +508,9 @@ final class Show extends Component
         $this->operationId = null;
         $this->operationType = null;
         $this->operationStatus = null;
+        $this->operationStage = null;
+        $this->operationStartedAt = null;
+        $this->operationStageUpdatedAt = null;
         $this->operationActive = false;
     }
 

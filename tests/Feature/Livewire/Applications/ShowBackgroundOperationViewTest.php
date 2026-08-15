@@ -12,10 +12,9 @@ final class ShowBackgroundOperationViewTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_active_install_operation_renders_polling_progress_without_lifecycle_actions(): void
+    public function test_active_install_operation_renders_stage_progress_without_lifecycle_actions(): void
     {
         $user = User::query()->create([
-            'name' => 'Background Operation View Test',
             'phone' => '09120000021',
         ]);
 
@@ -49,7 +48,10 @@ final class ShowBackgroundOperationViewTest extends TestCase
                     'is_unknown' => true,
                 ],
                 'operationType' => 'install',
-                'operationStatus' => 'pending',
+                'operationStatus' => 'running',
+                'operationStage' => 'preparing_platform',
+                'operationStartedAt' => now()->subMinutes(4)->timestamp,
+                'operationStageUpdatedAt' => now()->subMinute()->timestamp,
                 'operationActive' => true,
                 'sshUnavailable' => false,
                 'sshErrorMessage' => null,
@@ -65,11 +67,26 @@ final class ShowBackgroundOperationViewTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'در انتظار نصب',
+            'فرآیند نصب',
             $html,
         );
 
         self::assertStringContainsString(
+            'آماده‌سازی محیط اجرا',
+            $html,
+        );
+
+        self::assertStringContainsString(
+            'زیرساخت موردنیاز برنامه روی سرور آماده می‌شود.',
+            $html,
+        );
+
+        self::assertStringContainsString(
+            'progress progress-primary',
+            $html,
+        );
+
+        self::assertStringNotContainsString(
             'فرآیند در پس‌زمینه ادامه خواهد یافت.',
             $html,
         );

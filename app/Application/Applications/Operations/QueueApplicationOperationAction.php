@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Applications\Operations;
 
 use App\Application\Server\Operations\ServerMutationGuard;
+use App\Domain\Application\Shared\Enums\ApplicationOperationStage;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationType;
@@ -55,6 +56,12 @@ final readonly class QueueApplicationOperationAction
                     'application_type' => $applicationType,
                     'operation' => $operationType,
                     'status' => ApplicationOperationStatus::Pending,
+                    'stage' => $operationType === ApplicationOperationType::Install
+                        ? ApplicationOperationStage::Queued
+                        : null,
+                    'stage_updated_at' => $operationType === ApplicationOperationType::Install
+                        ? now()
+                        : null,
                 ]);
             },
             attempts: 3,
