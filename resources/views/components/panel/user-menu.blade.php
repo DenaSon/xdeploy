@@ -1,4 +1,6 @@
 @php
+    use App\Models\User;
+
     $user = auth()->user();
 @endphp
 
@@ -18,7 +20,7 @@
                 </div>
 
                 <div class="text-xs opacity-70">
-                    {{ $user?->mobile ?? $user?->email }}
+                    {{ $user?->phone }}
                 </div>
 
             </div>
@@ -29,6 +31,17 @@
 
     <x-menu>
 
+        @if ($user instanceof User && $user->isAdmin())
+            <x-menu-item
+                title="مدیریت سیستم"
+                icon="lucide.shield-check"
+                :link="route('admin.dashboard')"
+                wire:navigate
+            />
+
+            <x-menu-separator />
+        @endif
+
         <x-menu-item
             title="پروفایل"
             icon="lucide.user"
@@ -37,7 +50,7 @@
 
         <x-menu-separator />
 
-      <livewire:auth.logout/>
+        <livewire:auth.logout />
 
     </x-menu>
 

@@ -18,7 +18,10 @@
     >
 
     <title>
-        {{ $title ? $title . ' | ' : '' }}xDeploy
+        {{ isset($title) && $title
+            ? $title . ' | ' . config('app.name')
+            : config('app.name')
+        }}
     </title>
 
     @vite([

@@ -7,37 +7,26 @@
     "
 >
     <a
-        href="{{ route('panel.servers.index') }}"
+        href="{{ route('admin.dashboard') }}"
         wire:navigate
-        class="
-            group
-            flex min-w-0
-            items-center gap-3
-        "
+        class="group flex min-w-0 items-center gap-3"
     >
         <span
             class="
                 flex size-9 shrink-0
                 items-center justify-center
-
                 rounded-xl
-
                 bg-primary
                 text-primary-content
             "
         >
             <x-icon
-                name="lucide.server"
+                name="lucide.shield-check"
                 class="size-[18px] stroke-[1.8]"
             />
         </span>
 
-        <span
-            class="
-                mary-hideable
-                min-w-0
-            "
-        >
+        <span class="mary-hideable min-w-0">
             <span
                 class="
                     block truncate
@@ -55,9 +44,8 @@
                     text-base-content/40
                 "
             >
-                by Lumixo
+                مدیریت سیستم
             </span>
         </span>
-
     </a>
 </div>
