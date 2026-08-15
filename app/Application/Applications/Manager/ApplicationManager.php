@@ -9,9 +9,11 @@ use App\Application\Applications\Actions\RestartApplicationAction;
 use App\Application\Applications\Actions\StartApplicationAction;
 use App\Application\Applications\Actions\StopApplicationAction;
 use App\Application\Applications\Actions\UninstallApplicationAction;
+use App\Application\Applications\Operations\Contracts\ApplicationOperationProgressReporter;
 use App\Application\Server\Actions\ConnectServerAction;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
+use App\Domain\Application\Shared\Enums\ApplicationOperationStage;
 use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Shared\DTOs\InstallReport;
 use App\Models\Server;
@@ -48,15 +50,30 @@ final readonly class ApplicationManager
         User $user,
         Server $server,
         ApplicationType $type,
+        ?ApplicationOperationProgressReporter $progressReporter = null,
     ): InstallReport {
+        $progressReporter?->report(
+            ApplicationOperationStage::Connecting,
+        );
+
         return $this->onServer(
             user: $user,
             server: $server,
-            operation: fn (Server $ownedServer): InstallReport => $this->installApplicationAction
-                ->execute(
-                    server: $ownedServer,
-                    type: $type,
-                ),
+            operation: function (Server $ownedServer) use (
+                $type,
+                $progressReporter,
+            ): InstallReport {
+                $progressReporter?->report(
+                    ApplicationOperationStage::CheckingServer,
+                );
+
+                return $this->installApplicationAction
+                    ->execute(
+                        server: $ownedServer,
+                        type: $type,
+                        progressReporter: $progressReporter,
+                    );
+            },
         );
     }
 
