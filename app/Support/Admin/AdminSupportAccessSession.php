@@ -16,12 +16,14 @@ final class AdminSupportAccessSession
     public function grant(
         User $admin,
         Server $server,
+        string $reason,
     ): void {
         session()->put(
             self::SESSION_KEY,
             [
                 'admin_user_id' => (int) $admin->getKey(),
                 'server_id' => (int) $server->getKey(),
+                'reason' => trim($reason),
                 'confirmed_at' => now()->timestamp,
             ],
         );
@@ -31,10 +33,48 @@ final class AdminSupportAccessSession
         User $admin,
         Server $server,
     ): bool {
+        return $this->validState(
+            admin: $admin,
+            server: $server,
+        ) !== null;
+    }
+
+    public function reason(
+        User $admin,
+        Server $server,
+    ): ?string {
+        $state = $this->validState(
+            admin: $admin,
+            server: $server,
+        );
+
+        if ($state === null) {
+            return null;
+        }
+
+        $reason = $state['reason'] ?? null;
+
+        return is_string($reason) && trim($reason) !== ''
+            ? $reason
+            : null;
+    }
+
+    public function revoke(): void
+    {
+        session()->forget(self::SESSION_KEY);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function validState(
+        User $admin,
+        Server $server,
+    ): ?array {
         $state = session()->get(self::SESSION_KEY);
 
         if (! is_array($state)) {
-            return false;
+            return null;
         }
 
         $adminUserId = $state['admin_user_id'] ?? null;
@@ -48,27 +88,22 @@ final class AdminSupportAccessSession
         ) {
             $this->revoke();
 
-            return false;
+            return null;
         }
 
         if (
             $adminUserId !== (int) $admin->getKey()
             || $serverId !== (int) $server->getKey()
         ) {
-            return false;
+            return null;
         }
 
         if ((now()->timestamp - $confirmedAt) > self::WINDOW_SECONDS) {
             $this->revoke();
 
-            return false;
+            return null;
         }
 
-        return true;
-    }
-
-    public function revoke(): void
-    {
-        session()->forget(self::SESSION_KEY);
+        return $state;
     }
 }
