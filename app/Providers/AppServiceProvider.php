@@ -10,10 +10,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passkeys\Passkeys;
 
 class AppServiceProvider extends ServiceProvider
 {
-    public function register(): void {}
+    public function register(): void
+    {
+        Passkeys::ignoreRoutes();
+    }
 
     public function boot(): void
     {
@@ -34,6 +38,5 @@ class AppServiceProvider extends ServiceProvider
                     ->firstOrFail();
             },
         );
-
     }
 }
