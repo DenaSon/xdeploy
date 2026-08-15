@@ -41,7 +41,7 @@
 
 /*
 |--------------------------------------------------------------------------
-| xDeploy — Light Theme
+| Coreflare — Light Theme
 |--------------------------------------------------------------------------
 |
 | Visual direction:
@@ -74,15 +74,23 @@
     |--------------------------------------------------------------------------
     | Brand
     |--------------------------------------------------------------------------
+    |
+    | Primary:
+    | Deep security teal used for primary actions, navigation accents,
+    | focus states and the main Coreflare brand identity.
+    |
+    | Accent:
+    | Emerald companion color used sparingly for supporting emphasis.
+    |
     */
 
-    --color-primary: #3b5bdb;
+    --color-primary: #0f766e;
     --color-primary-content: #ffffff;
 
     --color-secondary: #64748b;
     --color-secondary-content: #ffffff;
 
-    --color-accent: #4f46e5;
+    --color-accent: #15803d;
     --color-accent-content: #ffffff;
 
     --color-neutral: #1f2937;
@@ -93,6 +101,11 @@
     |--------------------------------------------------------------------------
     | Semantic States
     |--------------------------------------------------------------------------
+    |
+    | Semantic colors intentionally remain distinct from the brand color.
+    | Primary communicates brand/action.
+    | Success communicates operational success.
+    |
     */
 
     --color-info: #2563eb;
@@ -134,7 +147,7 @@
     | Border & Effects
     |--------------------------------------------------------------------------
     |
-    | xDeploy principle:
+    | Coreflare principle:
     | Border before Shadow.
     |
     */
@@ -147,11 +160,14 @@
 
 /*
 |--------------------------------------------------------------------------
-| xDeploy — Dark Theme
+| Coreflare — Dark Theme
 |--------------------------------------------------------------------------
 |
 | Dark mode intentionally avoids pure black.
 | Surfaces retain visible hierarchy without becoming a hacker-style UI.
+|
+| The primary brand color becomes lighter in dark mode to preserve
+| contrast and accessibility against dark infrastructure surfaces.
 |
 */
 
@@ -181,14 +197,14 @@
     |--------------------------------------------------------------------------
     */
 
-    --color-primary: #7487f6;
-    --color-primary-content: #0b1020;
+    --color-primary: #5eead4;
+    --color-primary-content: #042f2e;
 
-    --color-secondary: #64748b;
-    --color-secondary-content: #ffffff;
+    --color-secondary: #94a3b8;
+    --color-secondary-content: #0f172a;
 
-    --color-accent: #818cf8;
-    --color-accent-content: #111827;
+    --color-accent: #4ade80;
+    --color-accent-content: #052e16;
 
     --color-neutral: #2b3340;
     --color-neutral-content: #f8fafc;
@@ -301,6 +317,8 @@
 [x-cloak] {
     display: none !important;
 }
+
+
 /*
 |--------------------------------------------------------------------------
 | Base
@@ -377,8 +395,10 @@ body {
 | Minimal Scrollbar
 |--------------------------------------------------------------------------
 */
+
 .dashboard-scroll {
     scrollbar-width: thin;
+
     scrollbar-color:
         color-mix(
             in srgb,
