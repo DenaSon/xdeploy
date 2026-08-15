@@ -75,6 +75,7 @@ final readonly class ConfirmSupportPasskeyController
         $supportAccessSession->grant(
             admin: $admin,
             server: $adminServer,
+            reason: $reason,
         );
 
         $recordSupportAccess->handle(
