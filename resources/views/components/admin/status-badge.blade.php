@@ -14,6 +14,8 @@
         'fulfilled' => ['تکمیل‌شده', 'badge-success'],
         'initiating' => ['در حال آغاز', 'badge-info'],
         'pending' => ['در انتظار', 'badge-warning'],
+        'published' => ['منتشرشده', 'badge-success'],
+        'draft' => ['پیش‌نویس', 'badge-ghost'],
         'failed' => ['ناموفق', 'badge-error'],
         'cancelled' => ['لغوشده', 'badge-ghost'],
         'expired' => ['منقضی', 'badge-ghost'],

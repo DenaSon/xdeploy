@@ -7,6 +7,7 @@
                 ['title' => 'سرورها', 'icon' => 'lucide.server', 'route' => 'admin.servers.index', 'active' => 'admin.servers.*'],
                 ['title' => 'سفارش‌ها', 'icon' => 'lucide.receipt-text', 'route' => 'admin.orders.index', 'active' => 'admin.orders.*'],
                 ['title' => 'پرداخت‌ها', 'icon' => 'lucide.credit-card', 'route' => 'admin.payments.index', 'active' => 'admin.payments.*'],
+                ['title' => 'صفحات', 'icon' => 'lucide.files', 'route' => 'admin.pages.index', 'active' => 'admin.pages.*'],
             ];
         @endphp
 
