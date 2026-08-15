@@ -5,8 +5,8 @@ const REQUEST_ERRORS = Object.freeze({
     network: Object.freeze({
         key: 'network',
         type: 'error',
-        title: 'ارتباط با xDeploy برقرار نشد',
-        description: 'پاسخی از xDeploy دریافت نشد. پیش از تکرار عملیات، وضعیت آن را بررسی کنید.',
+        title: 'ارتباط با Coreflare برقرار نشد',
+        description: 'پاسخی از Coreflare دریافت نشد. پیش از تکرار عملیات، وضعیت آن را بررسی کنید.',
         css: 'alert-error',
         progressClass: 'progress-error',
     }),
@@ -21,7 +21,7 @@ const REQUEST_ERRORS = Object.freeze({
     server: Object.freeze({
         key: 'server',
         type: 'error',
-        title: 'xDeploy نتوانست درخواست را کامل کند',
+        title: 'Coreflare نتوانست درخواست را کامل کند',
         description: 'خطای غیرمنتظره‌ای رخ داد. وضعیت عملیات را بررسی کرده و سپس دوباره تلاش کنید.',
         css: 'alert-error',
         progressClass: 'progress-error',

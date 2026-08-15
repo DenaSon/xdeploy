@@ -35,6 +35,11 @@ class User extends Authenticatable
         return $this->hasMany(Server::class);
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->is_admin === true;
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -42,6 +47,8 @@ class User extends Authenticatable
      */
     protected function casts(): array
     {
-        return [];
+        return [
+            'is_admin' => 'boolean',
+        ];
     }
 }

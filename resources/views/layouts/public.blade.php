@@ -19,8 +19,8 @@
 
     <title>
         {{ isset($title) && $title
-            ? $title . ' | xDeploy'
-            : 'xDeploy'
+            ? $title . ' | ' . config('app.name')
+            : config('app.name')
         }}
     </title>
 
