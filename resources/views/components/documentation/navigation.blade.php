@@ -7,18 +7,26 @@
 <nav aria-label="فهرست مستندات">
     <ul class="menu menu-sm w-full gap-0.5 p-0">
         @if($showOverview)
+            @php
+                $isOverview = request()->routeIs('docs.index');
+            @endphp
+
             <li>
                 <a
                     href="{{ route('docs.index') }}"
                     wire:navigate
+                    @if($isOverview) aria-current="page" @endif
                     @class([
-                        'rounded-xl',
-                        'menu-active' => request()->routeIs('docs.index'),
+                        'rounded-xl text-base-content/60 transition-colors',
+                        'bg-primary/10 font-medium !text-primary ring-1 ring-inset ring-primary/15' => $isOverview,
                     ])
                 >
                     <x-icon
                         name="lucide.layout-grid"
-                        class="!size-4 stroke-[1.7]"
+                        @class([
+                            '!size-4 stroke-[1.7]',
+                            'text-primary' => $isOverview,
+                        ])
                     />
 
                     <span>همه مستندات</span>
@@ -49,12 +57,16 @@
                         @if($isCurrent) aria-current="page" @endif
                         @class([
                             'min-w-0 rounded-xl text-base-content/60 transition-colors',
-                            'menu-active !text-base-content' => $isCurrent,
+                            'bg-primary/10 font-medium !text-primary ring-1 ring-inset ring-primary/15' => $isCurrent,
                         ])
                     >
                         <x-icon
                             name="lucide.file-text"
-                            class="!size-3.5 shrink-0 stroke-[1.7] opacity-65"
+                            @class([
+                                '!size-3.5 shrink-0 stroke-[1.7]',
+                                'opacity-65' => ! $isCurrent,
+                                'text-primary' => $isCurrent,
+                            ])
                         />
 
                         <span class="truncate">
