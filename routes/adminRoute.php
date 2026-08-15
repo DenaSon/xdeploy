@@ -17,11 +17,13 @@ use App\Livewire\Admin\Pages\Edit as AdminPagesEdit;
 use App\Livewire\Admin\Pages\Index as AdminPagesIndex;
 use App\Livewire\Admin\Payments\Index as AdminPaymentsIndex;
 use App\Livewire\Admin\Payments\Show as AdminPaymentsShow;
+use App\Livewire\Admin\Security\ConfirmPasskey as AdminConfirmPasskey;
 use App\Livewire\Admin\Servers\Index as AdminServersIndex;
 use App\Livewire\Admin\Servers\Show as AdminServersShow;
 use App\Livewire\Admin\Users\Index as AdminUsersIndex;
 use App\Livewire\Admin\Users\Show as AdminUsersShow;
 use Illuminate\Support\Facades\Route;
+use Laravel\Passkeys\Http\Controllers\PasskeyConfirmationController;
 
 Route::middleware([
     'web',
@@ -31,50 +33,72 @@ Route::middleware([
     ->prefix('admin')
     ->as('admin.')
     ->group(function (): void {
-        Route::livewire('/', AdminDashboard::class)
-            ->name('dashboard');
+        Route::livewire(
+            '/passkey/confirm',
+            AdminConfirmPasskey::class,
+        )->name('passkey.confirm');
 
-        Route::livewire('/users', AdminUsersIndex::class)
-            ->name('users.index');
-        Route::livewire('/users/{user}', AdminUsersShow::class)
-            ->name('users.show');
+        Route::get(
+            '/passkey/options',
+            [PasskeyConfirmationController::class, 'index'],
+        )
+            ->middleware('throttle:6,1')
+            ->name('passkey.options');
 
-        Route::livewire('/servers', AdminServersIndex::class)
-            ->name('servers.index');
         Route::post(
-            '/servers/{adminServer}/support/reveal-credential',
-            RevealSupportCredentialController::class,
-        )->name('servers.support.reveal-credential');
-        Route::livewire('/servers/{adminServer}', AdminServersShow::class)
-            ->name('servers.show');
+            '/passkey/verify',
+            [PasskeyConfirmationController::class, 'store'],
+        )
+            ->middleware('throttle:6,1')
+            ->name('passkey.verify');
 
-        Route::livewire('/orders', AdminOrdersIndex::class)
-            ->name('orders.index');
-        Route::livewire('/orders/{order}', AdminOrdersShow::class)
-            ->name('orders.show');
+        Route::middleware('admin.passkey')
+            ->group(function (): void {
+                Route::livewire('/', AdminDashboard::class)
+                    ->name('dashboard');
 
-        Route::livewire('/payments', AdminPaymentsIndex::class)
-            ->name('payments.index');
-        Route::livewire('/payments/{payment}', AdminPaymentsShow::class)
-            ->name('payments.show');
+                Route::livewire('/users', AdminUsersIndex::class)
+                    ->name('users.index');
+                Route::livewire('/users/{user}', AdminUsersShow::class)
+                    ->name('users.show');
 
-        Route::livewire('/documentation', AdminDocumentationArticlesIndex::class)
-            ->name('documentation.articles.index');
-        Route::livewire('/documentation/articles/create', AdminDocumentationArticlesCreate::class)
-            ->name('documentation.articles.create');
-        Route::livewire('/documentation/articles/{article}/edit', AdminDocumentationArticlesEdit::class)
-            ->name('documentation.articles.edit');
-        Route::livewire('/documentation/categories', AdminDocumentationCategoriesIndex::class)
-            ->name('documentation.categories.index');
-        Route::livewire('/documentation/categories/create', AdminDocumentationCategoriesCreate::class)
-            ->name('documentation.categories.create');
-        Route::livewire('/documentation/categories/{category}/edit', AdminDocumentationCategoriesEdit::class)
-            ->name('documentation.categories.edit');
+                Route::livewire('/servers', AdminServersIndex::class)
+                    ->name('servers.index');
+                Route::post(
+                    '/servers/{adminServer}/support/reveal-credential',
+                    RevealSupportCredentialController::class,
+                )->name('servers.support.reveal-credential');
+                Route::livewire('/servers/{adminServer}', AdminServersShow::class)
+                    ->name('servers.show');
 
-        Route::livewire('/pages', AdminPagesIndex::class)
-            ->name('pages.index');
-        Route::livewire('/pages/create', AdminPagesCreate::class)
-            ->name('pages.create');
-        Route::livewire('/pages/{page}/edit', AdminPagesEdit::class)
-            ->name('pages.edit');
+                Route::livewire('/orders', AdminOrdersIndex::class)
+                    ->name('orders.index');
+                Route::livewire('/orders/{order}', AdminOrdersShow::class)
+                    ->name('orders.show');
+
+                Route::livewire('/payments', AdminPaymentsIndex::class)
+                    ->name('payments.index');
+                Route::livewire('/payments/{payment}', AdminPaymentsShow::class)
+                    ->name('payments.show');
+
+                Route::livewire('/documentation', AdminDocumentationArticlesIndex::class)
+                    ->name('documentation.articles.index');
+                Route::livewire('/documentation/articles/create', AdminDocumentationArticlesCreate::class)
+                    ->name('documentation.articles.create');
+                Route::livewire('/documentation/articles/{article}/edit', AdminDocumentationArticlesEdit::class)
+                    ->name('documentation.articles.edit');
+                Route::livewire('/documentation/categories', AdminDocumentationCategoriesIndex::class)
+                    ->name('documentation.categories.index');
+                Route::livewire('/documentation/categories/create', AdminDocumentationCategoriesCreate::class)
+                    ->name('documentation.categories.create');
+                Route::livewire('/documentation/categories/{category}/edit', AdminDocumentationCategoriesEdit::class)
+                    ->name('documentation.categories.edit');
+
+                Route::livewire('/pages', AdminPagesIndex::class)
+                    ->name('pages.index');
+                Route::livewire('/pages/create', AdminPagesCreate::class)
+                    ->name('pages.create');
+                Route::livewire('/pages/{page}/edit', AdminPagesEdit::class)
+                    ->name('pages.edit');
+            });
     });
