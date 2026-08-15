@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Admin\Orders\Index as AdminOrdersIndex;
 use App\Livewire\Admin\Orders\Show as AdminOrdersShow;
+use App\Livewire\Admin\Pages\Create as AdminPagesCreate;
+use App\Livewire\Admin\Pages\Edit as AdminPagesEdit;
+use App\Livewire\Admin\Pages\Index as AdminPagesIndex;
 use App\Livewire\Admin\Payments\Index as AdminPaymentsIndex;
 use App\Livewire\Admin\Payments\Show as AdminPaymentsShow;
 use App\Livewire\Admin\Servers\Index as AdminServersIndex;
@@ -43,4 +46,11 @@ Route::middleware([
             ->name('payments.index');
         Route::livewire('/payments/{payment}', AdminPaymentsShow::class)
             ->name('payments.show');
+
+        Route::livewire('/pages', AdminPagesIndex::class)
+            ->name('pages.index');
+        Route::livewire('/pages/create', AdminPagesCreate::class)
+            ->name('pages.create');
+        Route::livewire('/pages/{page}/edit', AdminPagesEdit::class)
+            ->name('pages.edit');
     });
