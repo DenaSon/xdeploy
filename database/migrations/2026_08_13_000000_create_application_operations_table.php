@@ -24,11 +24,13 @@ return new class extends Migration
             $table->string('application_type', 64);
             $table->string('operation', 32);
             $table->string('status', 32);
+            $table->string('stage', 64)->nullable();
 
             $table->string('failure_code', 64)->nullable();
             $table->text('failure_message')->nullable();
 
             $table->timestamp('started_at')->nullable();
+            $table->timestamp('stage_updated_at')->nullable();
             $table->timestamp('finished_at')->nullable();
 
             $table->timestamps();
