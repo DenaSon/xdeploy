@@ -114,7 +114,34 @@
             credential: null,
             revealLoading: false,
             revealError: null,
+            supportVerifyLoading: false,
+            supportVerifyError: null,
             clearTimer: null,
+            async confirmSupportAccess() {
+                this.supportVerifyLoading = true;
+                this.supportVerifyError = null;
+                this.credential = null;
+
+                try {
+                    await $wire.prepareSupportPasskeyVerification();
+
+                    if (! window.CoreflarePasskeys?.isSupported()) {
+                        throw new Error('Passkey is not supported.');
+                    }
+
+                    await window.CoreflarePasskeys.verify({
+                        optionsUrl: @js(route('admin.servers.support.passkey.options', $server)),
+                        verifyUrl: @js(route('admin.servers.support.passkey.verify', $server)),
+                    });
+
+                    await $wire.set('supportAccessConfirmed', true);
+                } catch (error) {
+                    this.supportVerifyError = window.CoreflarePasskeys?.messageFor(error)
+                        ?? 'تأیید Passkey انجام نشد. دوباره تلاش کنید.';
+                } finally {
+                    this.supportVerifyLoading = false;
+                }
+            },
             async revealCredential() {
                 this.revealLoading = true;
                 this.revealError = null;
@@ -138,7 +165,7 @@
 
                     if (response.status === 403) {
                         this.credential = null;
-                        this.revealError = 'تأیید امنیتی منقضی شده است. دوباره کد تأیید دریافت کنید.';
+                        this.revealError = 'مجوز دسترسی حساس منقضی شده است. دوباره با Passkey تأیید کنید.';
                         $wire.set('supportAccessConfirmed', false);
                         return;
                     }
@@ -280,71 +307,39 @@
                         دسترسی حساس
                     </div>
                     <p class="mt-1 text-xs leading-6 text-base-content/50">
-                        برای Reveal رمز عبور، هویت مدیر با OTP دوباره تأیید می‌شود. مجوز پنج دقیقه اعتبار دارد و فقط به همین سرور محدود است.
+                        برای Reveal رمز عبور، مدیر با Passkey دوباره تأیید می‌شود. مجوز پنج دقیقه اعتبار دارد و فقط به همین سرور محدود است.
                     </p>
                 </div>
 
                 @if ($server->authentication_type === \App\Domain\Server\Enums\AuthenticationType::Password)
                     @if (! $supportAccessConfirmed)
-                        @if (! $supportOtpRequested)
-                            <button
-                                type="button"
-                                wire:click="requestSupportOtp"
-                                wire:loading.attr="disabled"
-                                wire:target="requestSupportOtp"
-                                class="btn btn-warning btn-sm w-full"
-                            >
-                                <span wire:loading.remove wire:target="requestSupportOtp">ارسال کد تأیید به مدیر</span>
-                                <span wire:loading wire:target="requestSupportOtp" class="loading loading-spinner loading-xs"></span>
-                            </button>
-                        @else
-                            <div class="rounded-xl border border-warning/20 bg-warning/5 p-3.5 text-xs leading-6 text-base-content/65">
-                                کد پنج‌رقمی به شماره مدیر ارسال شد. پس از تأیید، دسترسی موقت برای همین سرور فعال می‌شود.
-                            </div>
+                        <button
+                            type="button"
+                            class="btn btn-warning btn-sm w-full"
+                            x-on:click="confirmSupportAccess()"
+                            x-bind:disabled="supportVerifyLoading"
+                        >
+                            <span x-show="! supportVerifyLoading" class="inline-flex items-center gap-2">
+                                <x-icon name="lucide.fingerprint" class="!size-4" />
+                                تأیید با Passkey
+                            </span>
+                            <span x-show="supportVerifyLoading" class="loading loading-spinner loading-xs"></span>
+                        </button>
 
-                            <label class="form-control w-full">
-                                <span class="mb-2 text-sm font-medium">کد تأیید مدیر</span>
-                                <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    autocomplete="one-time-code"
-                                    wire:model="supportOtp"
-                                    class="input input-bordered w-full rounded-xl text-center font-mono tracking-[0.35em]"
-                                    maxlength="5"
-                                    dir="ltr"
-                                >
-                                @error('supportOtp')
-                                    <span class="mt-1.5 text-xs text-error">{{ $message }}</span>
-                                @enderror
-                            </label>
+                        <div
+                            x-cloak
+                            x-show="supportVerifyError"
+                            class="rounded-xl border border-error/20 bg-error/5 p-3 text-xs leading-6 text-error"
+                            x-text="supportVerifyError"
+                        ></div>
 
-                            <div class="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    wire:click="requestSupportOtp"
-                                    wire:loading.attr="disabled"
-                                    wire:target="requestSupportOtp"
-                                    class="btn btn-ghost btn-sm"
-                                >
-                                    ارسال مجدد
-                                </button>
-
-                                <button
-                                    type="button"
-                                    wire:click="confirmSupportOtp"
-                                    wire:loading.attr="disabled"
-                                    wire:target="confirmSupportOtp"
-                                    class="btn btn-warning btn-sm"
-                                >
-                                    <span wire:loading.remove wire:target="confirmSupportOtp">تأیید دسترسی</span>
-                                    <span wire:loading wire:target="confirmSupportOtp" class="loading loading-spinner loading-xs"></span>
-                                </button>
-                            </div>
-                        @endif
+                        <div class="rounded-xl border border-warning/15 bg-warning/5 p-3 text-xs leading-6 text-base-content/55">
+                            Passkey باید روی حساب مدیر ثبت شده باشد. Challenge این مرحله یک‌بارمصرف و مخصوص همین سرور است.
+                        </div>
                     @else
                         <div class="flex items-start gap-2 rounded-xl border border-success/20 bg-success/5 p-3.5 text-sm text-success">
                             <x-icon name="lucide.shield-check" class="mt-0.5 !size-4 shrink-0" />
-                            <span>هویت مدیر برای دسترسی حساس این سرور تأیید شده است.</span>
+                            <span>هویت مدیر برای دسترسی حساس این سرور با Passkey تأیید شده است.</span>
                         </div>
 
                         <button
@@ -436,6 +431,7 @@
                         <td class="text-sm">
                             {{ match ($accessLog->action) {
                                 \App\Domain\Server\Enums\SupportAccessAction::SshConnectionTest => 'تست اتصال SSH',
+                                \App\Domain\Server\Enums\SupportAccessAction::PasskeyConfirmed => 'تأیید Passkey',
                                 \App\Domain\Server\Enums\SupportAccessAction::CredentialRevealed => 'نمایش Credential',
                             } }}
                         </td>
