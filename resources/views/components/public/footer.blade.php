@@ -74,6 +74,24 @@
         </a>
 
 
+        {{-- Public links --}}
+        <nav
+            aria-label="پیوندهای عمومی"
+            class="
+                flex items-center gap-3
+                text-xs text-base-content/45
+            "
+        >
+            <a
+                href="{{ route('docs.index') }}"
+                wire:navigate
+                class="transition-colors hover:text-primary"
+            >
+                مستندات
+            </a>
+        </nav>
+
+
         {{-- Copyright --}}
         <div
             class="
