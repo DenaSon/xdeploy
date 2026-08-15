@@ -15,6 +15,8 @@ final class Page extends Model
         'content',
         'is_published',
         'published_at',
+        'show_in_footer',
+        'sort_order',
     ];
 
     protected function casts(): array
@@ -22,6 +24,8 @@ final class Page extends Model
         return [
             'is_published' => 'boolean',
             'published_at' => 'datetime',
+            'show_in_footer' => 'boolean',
+            'sort_order' => 'integer',
         ];
     }
 

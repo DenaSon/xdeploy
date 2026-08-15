@@ -35,7 +35,7 @@ final class AdminPagesTest extends TestCase
             ->assertSee($page->title);
     }
 
-    public function test_admin_can_create_a_draft_page(): void
+    public function test_admin_can_create_a_draft_page_with_footer_settings(): void
     {
         $this->actingAs($this->admin());
 
@@ -44,6 +44,8 @@ final class AdminPagesTest extends TestCase
             ->set('slug', 'privacy-policy')
             ->set('content', '')
             ->set('isPublished', false)
+            ->set('showInFooter', true)
+            ->set('sortOrder', 20)
             ->call('save')
             ->assertHasNoErrors();
 
@@ -55,6 +57,8 @@ final class AdminPagesTest extends TestCase
         $this->assertSame('privacy-policy', $page->slug);
         $this->assertFalse($page->is_published);
         $this->assertNull($page->published_at);
+        $this->assertTrue($page->show_in_footer);
+        $this->assertSame(20, $page->sort_order);
     }
 
     public function test_published_page_requires_content(): void
@@ -72,7 +76,21 @@ final class AdminPagesTest extends TestCase
         $this->assertDatabaseCount('pages', 0);
     }
 
-    public function test_admin_can_publish_and_unpublish_page(): void
+    public function test_footer_sort_order_must_be_within_supported_range(): void
+    {
+        $this->actingAs($this->admin());
+
+        Livewire::test(Create::class)
+            ->set('title', 'قوانین')
+            ->set('slug', 'rules')
+            ->set('sortOrder', -1)
+            ->call('save')
+            ->assertHasErrors(['sortOrder' => 'min']);
+
+        $this->assertDatabaseCount('pages', 0);
+    }
+
+    public function test_admin_can_publish_unpublish_and_update_footer_settings(): void
     {
         $page = $this->page();
 
@@ -81,6 +99,8 @@ final class AdminPagesTest extends TestCase
         Livewire::test(Edit::class, ['page' => $page])
             ->set('content', "## قوانین\n\nمتن صفحه")
             ->set('isPublished', true)
+            ->set('showInFooter', true)
+            ->set('sortOrder', 30)
             ->call('save')
             ->assertHasNoErrors();
 
@@ -88,9 +108,13 @@ final class AdminPagesTest extends TestCase
 
         $this->assertTrue($page->is_published);
         $this->assertNotNull($page->published_at);
+        $this->assertTrue($page->show_in_footer);
+        $this->assertSame(30, $page->sort_order);
 
         Livewire::test(Edit::class, ['page' => $page])
             ->set('isPublished', false)
+            ->set('showInFooter', false)
+            ->set('sortOrder', 5)
             ->call('save')
             ->assertHasNoErrors();
 
@@ -98,6 +122,8 @@ final class AdminPagesTest extends TestCase
 
         $this->assertFalse($page->is_published);
         $this->assertNull($page->published_at);
+        $this->assertFalse($page->show_in_footer);
+        $this->assertSame(5, $page->sort_order);
     }
 
     private function admin(): User
@@ -119,6 +145,8 @@ final class AdminPagesTest extends TestCase
             'content' => 'متن آزمایشی',
             'is_published' => false,
             'published_at' => null,
+            'show_in_footer' => false,
+            'sort_order' => 0,
         ]);
     }
 }

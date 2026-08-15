@@ -28,6 +28,10 @@ final class Edit extends Component
 
     public bool $isPublished = false;
 
+    public bool $showInFooter = false;
+
+    public int $sortOrder = 0;
+
     public function mount(Page $page): void
     {
         $this->pageId = (int) $page->getKey();
@@ -35,6 +39,8 @@ final class Edit extends Component
         $this->slug = $page->slug;
         $this->content = $page->content ?? '';
         $this->isPublished = $page->is_published;
+        $this->showInFooter = $page->show_in_footer;
+        $this->sortOrder = $page->sort_order;
     }
 
     public function save()
@@ -59,6 +65,8 @@ final class Edit extends Component
                 'max:100000',
             ],
             'isPublished' => ['boolean'],
+            'showInFooter' => ['boolean'],
+            'sortOrder' => ['required', 'integer', 'min:0', 'max:65535'],
         ]);
 
         $wasPublished = $page->is_published;
@@ -75,6 +83,8 @@ final class Edit extends Component
                     ? $page->published_at
                     : now())
                 : null,
+            'show_in_footer' => $validated['showInFooter'],
+            'sort_order' => $validated['sortOrder'],
         ]);
 
         return redirect()
