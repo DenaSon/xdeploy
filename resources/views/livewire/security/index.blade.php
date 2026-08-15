@@ -11,10 +11,19 @@
             </h1>
 
             <p class="mt-2 max-w-2xl text-sm leading-7 text-base-content/55">
-                شماره موبایل هویت اصلی حساب شماست. می‌توانید پس از ورود، Passkeyهای دستگاه‌های مورداعتماد خود را برای ورود امن‌تر و سریع‌تر ثبت کنید.
+                می‌توانید با Passkey بدون دریافت کد وارد شوید. شماره موبایل و OTP نیز برای ورود جایگزین و بازیابی دسترسی باقی می‌مانند.
             </p>
         </div>
     </header>
+
+    @if (session('admin_passkey_required'))
+        <div role="alert" class="alert alert-warning alert-soft rounded-2xl text-sm">
+            <x-icon name="lucide.shield-alert" class="!size-5" />
+            <span>
+                برای دسترسی به بخش مدیریت، ابتدا حداقل یک Passkey برای حساب مدیر ثبت کنید.
+            </span>
+        </div>
+    @endif
 
     @if ($statusMessage)
         <div role="status" class="alert alert-success alert-soft rounded-2xl text-sm">
@@ -40,7 +49,7 @@
                 </div>
 
                 <p class="mt-2 text-xs leading-6 text-base-content/45">
-                    ایجاد حساب و ورود اولیه در {{ config('app.name') }} همیشه با تأیید این شماره انجام می‌شود.
+                    این شماره برای ورود با رمز یک‌بار مصرف و بازیابی دسترسی حساب استفاده می‌شود.
                 </p>
             </div>
         </div>
@@ -105,9 +114,16 @@
                 </span>
 
                 <div>
-                    <h2 class="text-base font-semibold">Passkeys</h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-base font-semibold">Passkeys</h2>
+
+                        @if ($user->isAdmin())
+                            <span class="badge badge-warning badge-sm">برای مدیریت الزامی</span>
+                        @endif
+                    </div>
+
                     <p class="mt-1 max-w-2xl text-sm leading-7 text-base-content/50">
-                        Passkey به دستگاه شما متصل است و می‌تواند با Windows Hello، اثر انگشت، تشخیص چهره، PIN دستگاه یا کلید امنیتی تأیید شود.
+                        Passkey با Windows Hello، اثر انگشت، تشخیص چهره، PIN دستگاه یا کلید امنیتی تأیید می‌شود و برای ورود بدون OTP قابل استفاده است.
                     </p>
                 </div>
             </div>
@@ -222,7 +238,10 @@
             <div class="flex items-start gap-2 rounded-xl bg-info/[0.05] px-4 py-3 text-xs leading-6 text-base-content/55">
                 <x-icon name="lucide.info" class="mt-1 !size-3.5 shrink-0 text-info" />
                 <p>
-                    در این مرحله Passkey فقط برای مدیریت امنیت حساب ثبت می‌شود. ورود با Passkey در مرحله بعدی احراز هویت فعال خواهد شد و ورود با شماره موبایل و OTP همچنان باقی می‌ماند.
+                    Passkey اکنون برای ورود بدون OTP فعال است. ورود با شماره موبایل و رمز یک‌بار مصرف همچنان به‌عنوان روش جایگزین باقی می‌ماند.
+                    @if ($user->isAdmin())
+                        دسترسی به بخش مدیریت علاوه بر ورود حساب، به تأیید Passkey در session مدیریتی نیز نیاز دارد.
+                    @endif
                 </p>
             </div>
         </div>
