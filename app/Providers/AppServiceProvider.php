@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App;
+use App\Http\Middleware\EnsureAdminPasskeyVerified;
+use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
@@ -11,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passkeys\Passkeys;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +26,11 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         App::setLocale('fa');
+
+        Livewire::addPersistentMiddleware([
+            EnsureUserIsAdmin::class,
+            EnsureAdminPasskeyVerified::class,
+        ]);
 
         Route::bind(
             'server',

@@ -36,13 +36,23 @@ final class PasskeyManagementTest extends TestCase
             ->assertSee('Passkeys');
     }
 
-    public function test_passkey_login_routes_are_not_exposed_in_phase_one(): void
+    public function test_passkey_login_routes_are_exposed_in_phase_two(): void
     {
-        $this->get('/passkeys/login/options')
-            ->assertNotFound();
+        config([
+            'passkeys.relying_party_id' => 'localhost',
+            'passkeys.allowed_origins' => ['http://localhost:8000'],
+            'passkeys.user_handle_secret' => 'testing-passkey-user-handle-secret',
+        ]);
 
-        $this->postJson('/passkeys/login', [])
-            ->assertNotFound();
+        $this->getJson(route('passkey.login-options'))
+            ->assertOk()
+            ->assertJsonStructure([
+                'options' => [
+                    'challenge',
+                    'rpId',
+                    'userVerification',
+                ],
+            ]);
     }
 
     public function test_registration_options_are_available_only_to_authenticated_users(): void

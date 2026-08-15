@@ -29,13 +29,18 @@ return [
     'middleware' => ['web'],
 
     /*
-     * Coreflare is passwordless. Passkey management is exposed only inside
-     * the authenticated Panel routes during Phase 1, so password.confirm
-     * must not be applied here.
+     * Coreflare is passwordless. Passkey management is already protected by
+     * authenticated Panel routes, so Laravel's password.confirm middleware
+     * is intentionally not applicable here.
      */
     'management_middleware' => [],
 
     'throttle' => 'throttle:6,1',
 
     'redirect' => '/panel/servers',
+
+    'admin_verification_seconds' => (int) env(
+        'PASSKEYS_ADMIN_VERIFICATION_SECONDS',
+        3_600,
+    ),
 ];
