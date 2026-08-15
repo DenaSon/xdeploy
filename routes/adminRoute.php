@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\Servers\RevealSupportCredentialController;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Admin\Documentation\Articles\Create as AdminDocumentationArticlesCreate;
 use App\Livewire\Admin\Documentation\Articles\Edit as AdminDocumentationArticlesEdit;
@@ -40,6 +41,10 @@ Route::middleware([
 
         Route::livewire('/servers', AdminServersIndex::class)
             ->name('servers.index');
+        Route::post(
+            '/servers/{adminServer}/support/reveal-credential',
+            RevealSupportCredentialController::class,
+        )->name('servers.support.reveal-credential');
         Route::livewire('/servers/{adminServer}', AdminServersShow::class)
             ->name('servers.show');
 
