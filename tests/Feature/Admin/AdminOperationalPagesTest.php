@@ -99,6 +99,8 @@ final class AdminOperationalPagesTest extends TestCase
             ->assertOk()
             ->assertSee('مشتری تست');
 
+        $this->withoutExceptionHandling();
+
         $this->actingAs($admin)
             ->get(route('admin.servers.show', $server))
             ->assertOk()
