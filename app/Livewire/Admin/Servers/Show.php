@@ -4,24 +4,16 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin\Servers;
 
-use App\Application\Authentication\Actions\RequestOtpAction;
 use App\Application\Server\Actions\RecordSupportAccessAction;
 use App\Application\Server\Actions\TestSupportConnectionAction;
-use App\Domain\Authentication\DTOs\RequestOtpData;
-use App\Domain\Authentication\DTOs\VerifyOtpData;
-use App\Domain\Authentication\Exceptions\InvalidOtpException;
-use App\Domain\Authentication\Exceptions\OtpExpiredException;
-use App\Domain\Authentication\Exceptions\TooManyOtpAttemptsException;
-use App\Domain\Authentication\Exceptions\TooManyOtpRequestsException;
-use App\Domain\Authentication\Services\OtpService;
 use App\Domain\Server\Enums\SupportAccessAction;
 use App\Models\Order;
 use App\Models\Server;
 use App\Models\SupportAccessLog;
 use App\Models\User;
 use App\Support\Admin\AdminSupportAccessSession;
+use App\Support\Admin\PendingSupportPasskeyVerification;
 use Illuminate\Contracts\View\View;
-use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -34,10 +26,6 @@ final class Show extends Component
     public Server $server;
 
     public string $supportReason = '';
-
-    public string $supportOtp = '';
-
-    public bool $supportOtpRequested = false;
 
     public bool $supportAccessConfirmed = false;
 
@@ -57,102 +45,21 @@ final class Show extends Component
         );
     }
 
-    public function requestSupportOtp(
-        RequestOtpAction $requestOtp,
-    ): void {
-        $this->validateSupportReason();
-
-        $admin = $this->adminUser();
-
-        try {
-            $requestOtp->handle(
-                RequestOtpData::from(
-                    (string) $admin->phone,
-                ),
-            );
-
-            $this->supportOtpRequested = true;
-            $this->supportOtp = '';
-            $this->resetErrorBag('supportOtp');
-        } catch (TooManyOtpRequestsException) {
-            $this->addError(
-                'supportOtp',
-                'تعداد درخواست‌های کد بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.',
-            );
-        } catch (Throwable $exception) {
-            report($exception);
-
-            $this->addError(
-                'supportOtp',
-                'ارسال کد تأیید انجام نشد. دوباره تلاش کنید.',
-            );
-        }
-    }
-
-    public function confirmSupportOtp(
-        OtpService $otpService,
+    public function prepareSupportPasskeyVerification(
+        PendingSupportPasskeyVerification $pendingVerification,
         AdminSupportAccessSession $supportAccessSession,
     ): void {
-        $this->validateSupportReason();
-
-        $this->validate([
-            'supportOtp' => [
-                'required',
-                'digits:5',
-            ],
-        ]);
-
+        $reason = $this->validateSupportReason();
         $admin = $this->adminUser();
 
-        try {
-            $data = VerifyOtpData::from(
-                phone: (string) $admin->phone,
-                code: $this->supportOtp,
-            );
+        $supportAccessSession->revoke();
+        $pendingVerification->prepare(
+            admin: $admin,
+            server: $this->server,
+            reason: $reason,
+        );
 
-            $otpService->validate(
-                phone: $data->phone,
-                code: $data->code,
-            );
-
-            $supportAccessSession->grant(
-                admin: $admin,
-                server: $this->server,
-            );
-
-            $this->supportAccessConfirmed = true;
-            $this->supportOtpRequested = false;
-            $this->supportOtp = '';
-            $this->resetErrorBag('supportOtp');
-        } catch (TooManyOtpAttemptsException $exception) {
-            $seconds = max(
-                1,
-                $exception->retryAfterSeconds,
-            );
-
-            $this->addError(
-                'supportOtp',
-                sprintf(
-                    'تعداد تلاش‌ها بیش از حد مجاز است. %d ثانیه دیگر دوباره تلاش کنید.',
-                    $seconds,
-                ),
-            );
-        } catch (InvalidOtpException) {
-            $this->addError(
-                'supportOtp',
-                'کد تأیید صحیح نیست.',
-            );
-        } catch (OtpExpiredException) {
-            $this->addError(
-                'supportOtp',
-                'کد تأیید منقضی شده است. یک کد جدید درخواست کنید.',
-            );
-        } catch (InvalidArgumentException) {
-            $this->addError(
-                'supportOtp',
-                'کد تأیید معتبر نیست.',
-            );
-        }
+        $this->supportAccessConfirmed = false;
     }
 
     public function testSupportConnection(

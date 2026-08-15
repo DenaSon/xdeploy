@@ -7,13 +7,13 @@ namespace App\Support\Admin;
 use App\Models\Server;
 use App\Models\User;
 
-final class AdminSupportAccessSession
+final class PendingSupportPasskeyVerification
 {
-    public const string SESSION_KEY = 'admin.support_access';
+    public const string SESSION_KEY = 'admin.support_passkey_verification';
 
-    private const int WINDOW_SECONDS = 300;
+    private const int WINDOW_SECONDS = 120;
 
-    public function grant(
+    public function prepare(
         User $admin,
         Server $server,
         string $reason,
@@ -24,12 +24,75 @@ final class AdminSupportAccessSession
                 'admin_user_id' => (int) $admin->getKey(),
                 'server_id' => (int) $server->getKey(),
                 'reason' => trim($reason),
-                'confirmed_at' => now()->timestamp,
+                'prepared_at' => now()->timestamp,
+                'options' => null,
             ],
         );
     }
 
-    public function isGranted(
+    public function attachOptions(
+        User $admin,
+        Server $server,
+        string $serializedOptions,
+    ): bool {
+        $state = $this->validState(
+            admin: $admin,
+            server: $server,
+        );
+
+        if ($state === null) {
+            $this->revoke();
+
+            return false;
+        }
+
+        $state['options'] = $serializedOptions;
+
+        session()->put(
+            self::SESSION_KEY,
+            $state,
+        );
+
+        return true;
+    }
+
+    /**
+     * @return array{reason: string, options: string}|null
+     */
+    public function consume(
+        User $admin,
+        Server $server,
+    ): ?array {
+        $state = $this->validState(
+            admin: $admin,
+            server: $server,
+        );
+
+        $this->revoke();
+
+        if ($state === null) {
+            return null;
+        }
+
+        $reason = $state['reason'] ?? null;
+        $options = $state['options'] ?? null;
+
+        if (
+            ! is_string($reason)
+            || trim($reason) === ''
+            || ! is_string($options)
+            || $options === ''
+        ) {
+            return null;
+        }
+
+        return [
+            'reason' => $reason,
+            'options' => $options,
+        ];
+    }
+
+    public function isPrepared(
         User $admin,
         Server $server,
     ): bool {
@@ -37,26 +100,6 @@ final class AdminSupportAccessSession
             admin: $admin,
             server: $server,
         ) !== null;
-    }
-
-    public function reason(
-        User $admin,
-        Server $server,
-    ): ?string {
-        $state = $this->validState(
-            admin: $admin,
-            server: $server,
-        );
-
-        if ($state === null) {
-            return null;
-        }
-
-        $reason = $state['reason'] ?? null;
-
-        return is_string($reason) && trim($reason) !== ''
-            ? $reason
-            : null;
     }
 
     public function revoke(): void
@@ -79,15 +122,13 @@ final class AdminSupportAccessSession
 
         $adminUserId = $state['admin_user_id'] ?? null;
         $serverId = $state['server_id'] ?? null;
-        $confirmedAt = $state['confirmed_at'] ?? null;
+        $preparedAt = $state['prepared_at'] ?? null;
 
         if (
             ! is_int($adminUserId)
             || ! is_int($serverId)
-            || ! is_int($confirmedAt)
+            || ! is_int($preparedAt)
         ) {
-            $this->revoke();
-
             return null;
         }
 
@@ -98,9 +139,7 @@ final class AdminSupportAccessSession
             return null;
         }
 
-        if ((now()->timestamp - $confirmedAt) > self::WINDOW_SECONDS) {
-            $this->revoke();
-
+        if ((now()->timestamp - $preparedAt) > self::WINDOW_SECONDS) {
             return null;
         }
 

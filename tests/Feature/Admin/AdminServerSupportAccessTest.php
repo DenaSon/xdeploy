@@ -13,8 +13,8 @@ use App\Models\Server;
 use App\Models\SupportAccessLog;
 use App\Models\User;
 use App\Support\Admin\AdminSupportAccessSession;
+use App\Support\Admin\PendingSupportPasskeyVerification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Mockery;
 use Tests\TestCase;
@@ -23,7 +23,7 @@ final class AdminServerSupportAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_server_page_shows_support_access_without_rendering_credential(): void
+    public function test_admin_server_page_shows_passkey_support_access_without_rendering_credential(): void
     {
         $admin = $this->admin();
         $server = $this->server(
@@ -34,6 +34,7 @@ final class AdminServerSupportAccessTest extends TestCase
             ->get(route('admin.servers.show', $server))
             ->assertOk()
             ->assertSee('دسترسی پشتیبانی')
+            ->assertSee('تأیید با Passkey')
             ->assertSee('تست اتصال SSH')
             ->assertDontSee('support-secret-password');
     }
@@ -46,7 +47,7 @@ final class AdminServerSupportAccessTest extends TestCase
         $this->actingAs($admin)
             ->postJson(
                 route('admin.servers.support.reveal-credential', $server),
-                ['reason' => 'بررسی مشکل اتصال کاربر'],
+                [],
             )
             ->assertForbidden();
 
@@ -60,34 +61,39 @@ final class AdminServerSupportAccessTest extends TestCase
                 AdminSupportAccessSession::SESSION_KEY => [
                     'admin_user_id' => $admin->id,
                     'server_id' => $otherServer->id,
+                    'reason' => 'بررسی سرور دیگر',
                     'confirmed_at' => now()->timestamp,
                 ],
             ])
             ->postJson(
                 route('admin.servers.support.reveal-credential', $server),
-                ['reason' => 'بررسی مشکل اتصال کاربر'],
+                [],
             )
             ->assertForbidden();
     }
 
-    public function test_confirmed_admin_can_reveal_password_with_no_store_headers_and_audit(): void
+    public function test_confirmed_admin_can_reveal_password_with_bound_reason_no_store_headers_and_audit(): void
     {
         $admin = $this->admin();
         $server = $this->server(
             credential: 'support-secret-password',
         );
+        $confirmedReason = 'رفع خطای نصب گزارش شده توسط کاربر';
 
         $response = $this->actingAs($admin)
             ->withSession([
                 AdminSupportAccessSession::SESSION_KEY => [
                     'admin_user_id' => $admin->id,
                     'server_id' => $server->id,
+                    'reason' => $confirmedReason,
                     'confirmed_at' => now()->timestamp,
                 ],
             ])
             ->postJson(
                 route('admin.servers.support.reveal-credential', $server),
-                ['reason' => 'رفع خطای نصب گزارش شده توسط کاربر'],
+                [
+                    'reason' => 'این دلیل نباید جایگزین دلیل تأییدشده شود',
+                ],
             );
 
         $response
@@ -129,55 +135,126 @@ final class AdminServerSupportAccessTest extends TestCase
             $log->action,
         );
         $this->assertTrue($log->successful);
-        $this->assertSame(
-            'رفع خطای نصب گزارش شده توسط کاربر',
-            $log->reason,
-        );
+        $this->assertSame($confirmedReason, $log->reason);
         $this->assertArrayNotHasKey(
             'credential',
             $log->getAttributes(),
         );
     }
 
-    public function test_admin_can_confirm_sensitive_support_access_with_existing_otp_service(): void
+    public function test_admin_can_prepare_server_bound_support_passkey_challenge(): void
     {
-        $admin = $this->admin(
-            phone: '09120000009',
-        );
+        $admin = $this->admin();
         $server = $this->server();
+        $reason = 'بررسی خطای سرویس گزارش شده توسط کاربر';
 
-        DB::table('otps')->insert([
-            'phone' => $admin->phone,
-            'code' => password_hash(
-                '12345',
-                PASSWORD_DEFAULT,
-            ),
-            'expires_at' => now()->addMinutes(2),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $this->actingAs($admin);
 
-        Livewire::actingAs($admin)
-            ->test(
-                Show::class,
-                ['adminServer' => $server],
-            )
-            ->set(
-                'supportReason',
-                'بررسی خطای سرویس کاربر',
-            )
-            ->set('supportOtp', '12345')
-            ->call('confirmSupportOtp')
-            ->assertSet('supportAccessConfirmed', true)
-            ->assertHasNoErrors('supportOtp');
+        Livewire::test(
+            Show::class,
+            ['adminServer' => $server],
+        )
+            ->set('supportReason', $reason)
+            ->call('prepareSupportPasskeyVerification')
+            ->assertHasNoErrors('supportReason')
+            ->assertSet('supportAccessConfirmed', false);
 
         $state = session()->get(
-            AdminSupportAccessSession::SESSION_KEY,
+            PendingSupportPasskeyVerification::SESSION_KEY,
         );
 
         $this->assertIsArray($state);
         $this->assertSame($admin->id, $state['admin_user_id']);
         $this->assertSame($server->id, $state['server_id']);
+        $this->assertSame($reason, $state['reason']);
+        $this->assertNull($state['options']);
+
+        $this->getJson(
+            route('admin.servers.support.passkey.options', $server),
+        )
+            ->assertOk()
+            ->assertJsonPath(
+                'options.userVerification',
+                'required',
+            )
+            ->assertJsonCount(
+                1,
+                'options.allowCredentials',
+            )
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        $state = session()->get(
+            PendingSupportPasskeyVerification::SESSION_KEY,
+        );
+
+        $this->assertIsArray($state);
+        $this->assertIsString($state['options']);
+        $this->assertNotSame('', $state['options']);
+    }
+
+    public function test_support_passkey_preparation_cannot_be_reused_for_another_server(): void
+    {
+        $admin = $this->admin();
+        $server = $this->server();
+        $otherServer = $this->server(
+            name: 'Other VPS',
+            host: '192.0.2.12',
+        );
+
+        $this->actingAs($admin);
+
+        app(PendingSupportPasskeyVerification::class)->prepare(
+            admin: $admin,
+            server: $server,
+            reason: 'بررسی دسترسی سرور اول',
+        );
+
+        $this->getJson(
+            route('admin.servers.support.passkey.options', $otherServer),
+        )->assertStatus(409);
+    }
+
+    public function test_pending_support_passkey_challenge_is_consumed_once(): void
+    {
+        $admin = $this->admin();
+        $server = $this->server();
+        $pending = app(
+            PendingSupportPasskeyVerification::class,
+        );
+
+        $this->actingAs($admin);
+
+        $pending->prepare(
+            admin: $admin,
+            server: $server,
+            reason: 'بررسی خطای سرویس',
+        );
+
+        $this->assertTrue(
+            $pending->attachOptions(
+                admin: $admin,
+                server: $server,
+                serializedOptions: '{"challenge":"one-time"}',
+            ),
+        );
+
+        $first = $pending->consume(
+            admin: $admin,
+            server: $server,
+        );
+        $second = $pending->consume(
+            admin: $admin,
+            server: $server,
+        );
+
+        $this->assertSame(
+            [
+                'reason' => 'بررسی خطای سرویس',
+                'options' => '{"challenge":"one-time"}',
+            ],
+            $first,
+        );
+        $this->assertNull($second);
     }
 
     public function test_support_connection_test_is_audited_without_revealing_credential(): void
@@ -206,11 +283,12 @@ final class AdminServerSupportAccessTest extends TestCase
             $ssh,
         );
 
-        Livewire::actingAs($admin)
-            ->test(
-                Show::class,
-                ['adminServer' => $server],
-            )
+        $this->actingAs($admin);
+
+        Livewire::test(
+            Show::class,
+            ['adminServer' => $server],
+        )
             ->set(
                 'supportReason',
                 'تست اتصال برای بررسی مشکل پشتیبانی',
