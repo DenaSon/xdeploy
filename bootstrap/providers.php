@@ -6,6 +6,7 @@ use App\Providers\AppServiceProvider;
 use App\Providers\CloudServiceProvider;
 use App\Providers\CloudSnapshotServiceProvider;
 use App\Providers\CredentialSecurityServiceProvider;
+use App\Providers\PasskeySecurityServiceProvider;
 use App\Providers\PaymentServiceProvider;
 use App\Providers\PlatformServiceProvider;
 use App\Providers\ServerServiceProvider;
@@ -14,6 +15,7 @@ use App\Providers\UserServiceProvider;
 
 return [
     AppServiceProvider::class,
+    PasskeySecurityServiceProvider::class,
     ServerServiceProvider::class,
     ApplicationServiceProvider::class,
     AmneziaWgServiceProvider::class,
