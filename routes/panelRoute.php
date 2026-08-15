@@ -8,6 +8,7 @@ use App\Livewire\Applications\Show as ApplicationShow;
 use App\Livewire\Domains\Index as DomainsIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Orders\Show as OrderShow;
+use App\Livewire\Security\Index as SecurityIndex;
 use App\Livewire\Servers\Buy as ServerBuy;
 use App\Livewire\Servers\Console as ServerConsole;
 use App\Livewire\Servers\Create as ServerCreate;
@@ -17,6 +18,7 @@ use App\Livewire\Servers\Edit as ServerEdit;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\Renew as ServerRenew;
 use Illuminate\Support\Facades\Route;
+use Laravel\Passkeys\Http\Controllers\PasskeyRegistrationController;
 
 Route::middleware(['web', 'guest'])
     ->group(function (): void {
@@ -39,6 +41,25 @@ Route::middleware(['web', 'auth'])
             '/notifications',
             NotificationsIndex::class,
         )->name('notifications.index');
+
+        Route::livewire(
+            '/security',
+            SecurityIndex::class,
+        )->name('security');
+
+        Route::get(
+            '/security/passkeys/options',
+            [PasskeyRegistrationController::class, 'index'],
+        )
+            ->middleware('throttle:6,1')
+            ->name('security.passkeys.options');
+
+        Route::post(
+            '/security/passkeys',
+            [PasskeyRegistrationController::class, 'store'],
+        )
+            ->middleware('throttle:6,1')
+            ->name('security.passkeys.store');
 
         Route::livewire(
             '/servers',
