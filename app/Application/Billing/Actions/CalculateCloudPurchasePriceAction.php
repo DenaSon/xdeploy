@@ -6,16 +6,20 @@ namespace App\Application\Billing\Actions;
 
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Services\CloudPricingCalculator;
+use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use InvalidArgumentException;
 
 final readonly class CalculateCloudPurchasePriceAction
 {
     public function __construct(
-        private CloudProviderRegistryInterface $providers,
         private CloudPricingCalculator $calculator,
+        private ?CloudProviderRegistryInterface $providers = null,
+        private ?CloudProviderInterface $cloud = null,
+        private ?CloudServerResizeCatalogInterface $pricing = null,
     ) {}
 
     public function execute(
@@ -25,14 +29,11 @@ final readonly class CalculateCloudPurchasePriceAction
         string $period,
         CloudProviderType $provider = CloudProviderType::Arvan,
     ): PurchasePriceData {
-        $cloud = $this->providers->resolve(
+        [
+            $cloud,
+            $pricing,
+        ] = $this->providerDependencies(
             $provider,
-        );
-
-        /** @var CloudServerResizeCatalogInterface $pricing */
-        $pricing = $this->providers->resolveCapability(
-            provider: $provider,
-            capability: CloudServerResizeCatalogInterface::class,
         );
 
         $sizes = $cloud->listSizes($region);
@@ -112,5 +113,60 @@ final readonly class CalculateCloudPurchasePriceAction
             finalAmount: $result['final_amount'],
             currency: $result['currency'],
         );
+    }
+
+    /**
+     * @return array{0: CloudProviderInterface, 1: CloudServerResizeCatalogInterface}
+     */
+    private function providerDependencies(
+        CloudProviderType $provider,
+    ): array {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            $cloud = $this->providers->resolve(
+                $provider,
+            );
+
+            $pricing = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerResizeCatalogInterface::class,
+            );
+
+            if (! $pricing instanceof CloudServerResizeCatalogInterface) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'The cloud provider [%s] has no resize pricing capability.',
+                        $provider->value,
+                    ),
+                );
+            }
+
+            return [
+                $cloud,
+                $pricing,
+            ];
+        }
+
+        /*
+         * Transitional direct-construction seam for existing unit/feature
+         * tests. Production container resolution supplies the registry and
+         * therefore always routes by the explicit provider identity.
+         */
+        if (
+            $provider !== CloudProviderType::Arvan
+            || ! $this->cloud instanceof CloudProviderInterface
+            || ! $this->pricing instanceof CloudServerResizeCatalogInterface
+        ) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud pricing dependencies for provider [%s] are not configured.',
+                    $provider->value,
+                ),
+            );
+        }
+
+        return [
+            $this->cloud,
+            $this->pricing,
+        ];
     }
 }
