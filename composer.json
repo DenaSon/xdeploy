@@ -14,6 +14,7 @@
         "ipe/smsir-php": "^1.0",
         "laravel/chisel": "^0.1.0",
         "laravel/framework": "^13.7",
+        "laravel/passkeys": "^0.2.1",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "livewire/livewire": "*",
