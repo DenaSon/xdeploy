@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Actions;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use InvalidArgumentException;
 
 final readonly class ResolveCloudImageForOrderAction
 {
     public function __construct(
-        private CloudProviderInterface $cloud,
-        private ListSupportedCloudImagesAction $supportedImages,
+        private CloudProviderRegistryInterface $providers,
+        private FilterSupportedCloudImagesAction $filter,
     ) {}
 
     public function execute(
@@ -21,6 +23,7 @@ final readonly class ResolveCloudImageForOrderAction
         string $sizeId,
         string $imageId,
         int $selectedDiskGiB,
+        CloudProviderType $provider = CloudProviderType::Arvan,
     ): CloudImageData {
         $region = trim($region);
         $sizeId = trim($sizeId);
@@ -50,15 +53,17 @@ final readonly class ResolveCloudImageForOrderAction
             );
         }
 
+        $cloud = $this->providers->resolve(
+            $provider,
+        );
+
         $size = $this->resolveSize(
+            cloud: $cloud,
             region: $region,
             sizeId: $sizeId,
         );
 
-        if (
-            $selectedDiskGiB
-            < $size->diskGiB
-        ) {
+        if ($selectedDiskGiB < $size->diskGiB) {
             throw new InvalidArgumentException(
                 sprintf(
                     'Selected disk cannot be smaller than the size default of [%d] GiB.',
@@ -68,6 +73,7 @@ final readonly class ResolveCloudImageForOrderAction
         }
 
         $image = $this->resolveImage(
+            cloud: $cloud,
             region: $region,
             imageId: $imageId,
         );
@@ -77,10 +83,7 @@ final readonly class ResolveCloudImageForOrderAction
             $image->minDiskGiB ?? 0,
         );
 
-        if (
-            $selectedDiskGiB
-            < $minimumDiskGiB
-        ) {
+        if ($selectedDiskGiB < $minimumDiskGiB) {
             throw new InvalidArgumentException(
                 sprintf(
                     'Selected image [%s] requires at least [%d] GiB of disk.',
@@ -92,8 +95,7 @@ final readonly class ResolveCloudImageForOrderAction
 
         if (
             $image->minMemoryMiB !== null
-            && $size->memoryMiB
-            < $image->minMemoryMiB
+            && $size->memoryMiB < $image->minMemoryMiB
         ) {
             throw new InvalidArgumentException(
                 sprintf(
@@ -108,14 +110,11 @@ final readonly class ResolveCloudImageForOrderAction
     }
 
     private function resolveSize(
+        CloudProviderInterface $cloud,
         string $region,
         string $sizeId,
     ): CloudSizeData {
-        foreach (
-            $this->cloud->listSizes(
-                $region,
-            ) as $size
-        ) {
+        foreach ($cloud->listSizes($region) as $size) {
             if ($size->id === $sizeId) {
                 return $size;
             }
@@ -131,14 +130,15 @@ final readonly class ResolveCloudImageForOrderAction
     }
 
     private function resolveImage(
+        CloudProviderInterface $cloud,
         string $region,
         string $imageId,
     ): CloudImageData {
-        foreach (
-            $this->supportedImages->execute(
-                $region,
-            ) as $image
-        ) {
+        $images = $this->filter->execute(
+            $cloud->listImages($region),
+        );
+
+        foreach ($images as $image) {
             if ($image->id === $imageId) {
                 return $image;
             }

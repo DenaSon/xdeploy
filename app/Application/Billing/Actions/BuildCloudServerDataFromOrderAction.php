@@ -6,8 +6,10 @@ namespace App\Application\Billing\Actions;
 
 use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Models\Order;
+use LogicException;
 
 final readonly class BuildCloudServerDataFromOrderAction
 {
@@ -18,10 +20,11 @@ final readonly class BuildCloudServerDataFromOrderAction
     public function execute(
         Order $order,
     ): CreateCloudServerData {
-        $provider = $this->providerName();
+        $provider = $this->providerName(
+            $order,
+        );
 
-        $prefix =
-            "cloud.providers.{$provider}.defaults";
+        $prefix = "cloud.providers.{$provider}.defaults";
 
         $initializationScript = config(
             "{$prefix}.init_script",
@@ -43,44 +46,26 @@ final readonly class BuildCloudServerDataFromOrderAction
         );
 
         /*
-         * Network and security-group selection must follow the Order region.
-         *
-         * They are xDeploy infrastructure decisions rather than customer
-         * purchase fields, but they still must be resolved from the same
-         * provider region that the customer purchased.
+         * Infrastructure resolution is still the current provider workflow.
+         * Provider-specific prerequisites are separated in the next
+         * multi-provider foundation step.
          */
-        $infrastructure =
-            $this->resolveInfrastructure->execute(
-                $order->region_id,
-            );
+        $infrastructure = $this->resolveInfrastructure->execute(
+            $order->region_id,
+        );
 
         return new CreateCloudServerData(
             name: $this->serverName(
                 $order,
             ),
-
-            /*
-             * Commercial selections always come from the immutable
-             * Order snapshot. Never fall back to provider defaults.
-             */
             regionId: $order->region_id,
             sizeId: $order->size_id,
             imageId: $order->image_id,
-
-            /*
-             * Provider infrastructure is resolved dynamically inside
-             * the selected Order region.
-             */
             networkId: $infrastructure->networkId,
-
             securityGroupIds: $infrastructure->securityGroupIds,
-
             diskGiB: $order->selected_disk_gib,
-
             sshKeyName: null,
-
             initializationScript: $initializationScript,
-
             highAvailability: $highAvailability,
         );
     }
@@ -94,34 +79,20 @@ final readonly class BuildCloudServerDataFromOrderAction
         );
     }
 
-    public function providerName(): string
-    {
-        return $this->requiredConfigString(
-            'cloud.default',
-        );
-    }
-
-    private function requiredConfigString(
-        string $key,
+    public function providerName(
+        Order $order,
     ): string {
-        $value = config(
-            $key,
-        );
+        $provider = $order->cloud_provider;
 
-        if (
-            ! is_string($value)
-            || trim($value) === ''
-        ) {
-            throw new CloudConfigurationException(
+        if (! $provider instanceof CloudProviderType) {
+            throw new LogicException(
                 sprintf(
-                    'Required cloud configuration [%s] is missing.',
-                    $key,
+                    'Order [%d] has no valid cloud provider.',
+                    $order->getKey(),
                 ),
             );
         }
 
-        return trim(
-            $value,
-        );
+        return $provider->value;
     }
 }

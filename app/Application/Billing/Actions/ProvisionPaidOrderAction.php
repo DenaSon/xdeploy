@@ -7,6 +7,7 @@ namespace App\Application\Billing\Actions;
 use App\Application\Cloud\Actions\ProvisionCloudServerAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Exceptions\OrderNotProvisionableException;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Order;
 use App\Models\Server;
 use App\Models\User;
@@ -24,13 +25,20 @@ final readonly class ProvisionPaidOrderAction
     public function execute(
         int $orderId,
     ): Server {
-        $provider = $this->buildCloudServerData
-            ->providerName();
+        [$order, $shouldCreateServer] = $this->prepareOrder(
+            $orderId,
+        );
 
-        [$order, $shouldCreateServer] =
-            $this->prepareOrder(
-                $orderId,
+        $provider = $order->cloud_provider;
+
+        if (! $provider instanceof CloudProviderType) {
+            throw new LogicException(
+                sprintf(
+                    'Order [%d] has no valid cloud provider.',
+                    $order->getKey(),
+                ),
             );
+        }
 
         /*
          * A repeated invocation must never blindly submit a second
@@ -43,16 +51,14 @@ final readonly class ProvisionPaidOrderAction
             );
         }
 
-        $serverName = $this->buildCloudServerData
-            ->serverName(
-                $order,
-            );
+        $serverName = $this->buildCloudServerData->serverName(
+            $order,
+        );
 
         try {
-            $data = $this->buildCloudServerData
-                ->execute(
-                    $order,
-                );
+            $data = $this->buildCloudServerData->execute(
+                $order,
+            );
 
             $user = $order->user;
 
@@ -65,28 +71,22 @@ final readonly class ProvisionPaidOrderAction
                 );
             }
 
-            $result = $this->provisionCloudServer
-                ->provisionProviderResource(
-                    user: $user,
-                    data: $data,
-                );
+            $result = $this->provisionCloudServer->provisionProviderResource(
+                user: $user,
+                data: $data,
+                provider: $provider,
+            );
 
             return $this->markFulfilled(
                 orderId: $order->getKey(),
                 server: $result->server,
             );
         } catch (Throwable $exception) {
-            /*
-             * ProvisionCloudServerAction deliberately persists an
-             * inactive Server as soon as the provider resource exists.
-             * Recover that record before marking the Order failed.
-             */
-            $recoveredServer =
-                $this->findRecoverableServer(
-                    order: $order,
-                    provider: $provider,
-                    serverName: $serverName,
-                );
+            $recoveredServer = $this->findRecoverableServer(
+                order: $order,
+                provider: $provider,
+                serverName: $serverName,
+            );
 
             if ($recoveredServer instanceof Server) {
                 if (
@@ -101,12 +101,6 @@ final readonly class ProvisionPaidOrderAction
                     );
                 }
 
-                /*
-                 * A provider resource already exists, so this is no longer
-                 * a safe state for automatic create/retry. Preserve the
-                 * correlation and keep the Order in Provisioning for
-                 * reconciliation instead of declaring a commercial failure.
-                 */
                 $this->attachServerWithoutChangingStatus(
                     orderId: $order->getKey(),
                     server: $recoveredServer,
@@ -115,10 +109,6 @@ final readonly class ProvisionPaidOrderAction
                 throw $exception;
             }
 
-            /*
-             * Only failures without a recoverable provider resource may
-             * transition the commercial Order to Failed.
-             */
             $this->markFailed(
                 orderId: $order->getKey(),
                 server: null,
@@ -135,70 +125,35 @@ final readonly class ProvisionPaidOrderAction
         int $orderId,
     ): array {
         return DB::transaction(
-            function () use (
-                $orderId,
-            ): array {
+            function () use ($orderId): array {
                 /** @var Order $order */
                 $order = Order::query()
                     ->with([
                         'user',
                         'server',
                     ])
-                    ->whereKey(
-                        $orderId,
-                    )
+                    ->whereKey($orderId)
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if (
-                    $order->status
-                    === OrderStatus::Fulfilled
-                ) {
-                    if (
-                        ! $order->server
-                        instanceof Server
-                    ) {
+                if ($order->status === OrderStatus::Fulfilled) {
+                    if (! $order->server instanceof Server) {
                         throw OrderNotProvisionableException::fulfilledWithoutServer(
                             $order->getKey(),
                         );
                     }
 
-                    return [
-                        $order,
-                        false,
-                    ];
+                    return [$order, false];
                 }
 
                 if (
-                    $order->status
-                    === OrderStatus::Provisioning
+                    $order->status === OrderStatus::Provisioning
+                    || $order->status === OrderStatus::Failed
                 ) {
-                    return [
-                        $order,
-                        false,
-                    ];
+                    return [$order, false];
                 }
 
-                /*
-                 * Failed Orders are recovery-only. They may never start a
-                 * fresh provider create request. This allows historical
-                 * Orders that were incorrectly failed only because SSH was
-                 * unreachable to be repaired safely.
-                 */
-                if (
-                    $order->status
-                    === OrderStatus::Failed
-                ) {
-                    return [
-                        $order,
-                        false,
-                    ];
-                }
-
-                if (
-                    $order->status
-                    !== OrderStatus::Paid
-                ) {
+                if ($order->status !== OrderStatus::Paid) {
                     throw OrderNotProvisionableException::forStatus(
                         orderId: $order->getKey(),
                         status: $order->status,
@@ -214,22 +169,16 @@ final readonly class ProvisionPaidOrderAction
                     'server',
                 ]);
 
-                return [
-                    $order,
-                    true,
-                ];
+                return [$order, true];
             },
         );
     }
 
     private function recoverExistingProvisioning(
         Order $order,
-        string $provider,
+        CloudProviderType $provider,
     ): Server {
-        if (
-            $order->status
-            === OrderStatus::Fulfilled
-        ) {
+        if ($order->status === OrderStatus::Fulfilled) {
             $server = $order->server;
 
             if ($server instanceof Server) {
@@ -247,19 +196,16 @@ final readonly class ProvisionPaidOrderAction
             $server = $this->findRecoverableServer(
                 order: $order,
                 provider: $provider,
-                serverName: $this->buildCloudServerData
-                    ->serverName(
-                        $order,
-                    ),
+                serverName: $this->buildCloudServerData->serverName(
+                    $order,
+                ),
             );
         }
 
         if ($server instanceof Server) {
             if (
                 $server->isActive()
-                || $this->hasProviderDeliveryEvidence(
-                    $server,
-                )
+                || $this->hasProviderDeliveryEvidence($server)
             ) {
                 return $this->markFulfilled(
                     orderId: $order->getKey(),
@@ -267,11 +213,6 @@ final readonly class ProvisionPaidOrderAction
                 );
             }
 
-            /*
-             * Persist the correlation if a provider resource exists but is
-             * not yet delivered with a usable public host. Automatic provider
-             * creation remains forbidden.
-             */
             $this->attachServerWithoutChangingStatus(
                 orderId: $order->getKey(),
                 server: $server,
@@ -292,26 +233,14 @@ final readonly class ProvisionPaidOrderAction
 
     private function findRecoverableServer(
         Order $order,
-        string $provider,
+        CloudProviderType $provider,
         string $serverName,
     ): ?Server {
         return Server::query()
-            ->where(
-                'user_id',
-                $order->user_id,
-            )
-            ->where(
-                'name',
-                $serverName,
-            )
-            ->where(
-                'cloud_provider',
-                $provider,
-            )
-            ->where(
-                'cloud_region',
-                $order->region_id,
-            )
+            ->where('user_id', $order->user_id)
+            ->where('name', $serverName)
+            ->where('cloud_provider', $provider->value)
+            ->where('cloud_region', $order->region_id)
             ->latest('id')
             ->first();
     }
@@ -319,13 +248,8 @@ final readonly class ProvisionPaidOrderAction
     private function hasProviderDeliveryEvidence(
         Server $server,
     ): bool {
-        $provider = trim(
-            (string) $server->cloud_provider,
-        );
-
-        $providerServerId = trim(
-            (string) $server->cloud_server_id,
-        );
+        $provider = trim((string) $server->cloud_provider);
+        $providerServerId = trim((string) $server->cloud_server_id);
 
         return $provider !== ''
             && $providerServerId !== ''
@@ -337,34 +261,19 @@ final readonly class ProvisionPaidOrderAction
         Server $server,
     ): Server {
         DB::transaction(
-            function () use (
-                $orderId,
-                $server,
-            ): void {
+            function () use ($orderId, $server): void {
                 /** @var Order $order */
                 $order = Order::query()
-                    ->whereKey(
-                        $orderId,
-                    )
+                    ->whereKey($orderId)
                     ->lockForUpdate()
                     ->firstOrFail();
 
                 /** @var Server $lockedServer */
                 $lockedServer = Server::query()
-                    ->whereKey(
-                        $server->getKey(),
-                    )
+                    ->whereKey($server->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                /*
-                 * The commercial lifetime starts when the provider resource
-                 * starts existing, not when payment or SSH verification
-                 * completes.
-                 *
-                 * Never reset an already-established expiration timestamp
-                 * during provisioning recovery or repeated invocations.
-                 */
                 if ($lockedServer->expires_at === null) {
                     if ($lockedServer->provisioned_at === null) {
                         throw new LogicException(
@@ -387,15 +296,12 @@ final readonly class ProvisionPaidOrderAction
                     $lockedServer->forceFill([
                         'expires_at' => $lockedServer
                             ->provisioned_at
-                            ->addHours(
-                                $order->duration_hours,
-                            ),
+                            ->addHours($order->duration_hours),
                     ])->saveOrFail();
                 }
 
                 $order->forceFill([
                     'server_id' => $lockedServer->getKey(),
-
                     'status' => OrderStatus::Fulfilled,
                 ])->save();
             },
@@ -409,26 +315,14 @@ final readonly class ProvisionPaidOrderAction
         ?Server $server,
     ): void {
         DB::transaction(
-            function () use (
-                $orderId,
-                $server,
-            ): void {
+            function () use ($orderId, $server): void {
                 /** @var Order $order */
                 $order = Order::query()
-                    ->whereKey(
-                        $orderId,
-                    )
+                    ->whereKey($orderId)
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                /*
-                 * Never downgrade an Order that another concurrent
-                 * process already completed successfully.
-                 */
-                if (
-                    $order->status
-                    === OrderStatus::Fulfilled
-                ) {
+                if ($order->status === OrderStatus::Fulfilled) {
                     return;
                 }
 
@@ -437,13 +331,10 @@ final readonly class ProvisionPaidOrderAction
                 ];
 
                 if ($server instanceof Server) {
-                    $attributes['server_id'] =
-                        $server->getKey();
+                    $attributes['server_id'] = $server->getKey();
                 }
 
-                $order->forceFill(
-                    $attributes,
-                )->save();
+                $order->forceFill($attributes)->save();
             },
         );
     }
@@ -453,15 +344,10 @@ final readonly class ProvisionPaidOrderAction
         Server $server,
     ): void {
         DB::transaction(
-            function () use (
-                $orderId,
-                $server,
-            ): void {
+            function () use ($orderId, $server): void {
                 /** @var Order $order */
                 $order = Order::query()
-                    ->whereKey(
-                        $orderId,
-                    )
+                    ->whereKey($orderId)
                     ->lockForUpdate()
                     ->firstOrFail();
 

@@ -7,6 +7,7 @@ namespace App\Application\Cloud\Actions;
 use App\Application\Cloud\DTOs\ProvisionCloudServerResult;
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
@@ -17,6 +18,8 @@ use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudIpVersion;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Domain\Cloud\Exceptions\CloudProvisioningTimeoutException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudServerNotReadyException;
@@ -39,6 +42,7 @@ final readonly class ProvisionCloudServerAction
         private string $providerName = 'arvan',
         private int $maxAttempts = 20,
         private int $pollDelaySeconds = 3,
+        private ?CloudProviderRegistryInterface $providers = null,
     ) {
         if ($this->maxAttempts < 1) {
             throw new InvalidArgumentException(
@@ -60,16 +64,18 @@ final readonly class ProvisionCloudServerAction
     }
 
     /**
-     * Full server workflow retained for existing callers that require an
-     * xDeploy-ready SSH connection before the Server becomes Active.
+     * Full server workflow retained for existing callers that require a
+     * Coreflare-ready SSH connection before the Server becomes Active.
      */
     public function handle(
         User $user,
         CreateCloudServerData $data,
+        ?CloudProviderType $provider = null,
     ): ProvisionCloudServerResult {
         $result = $this->provisionProviderResource(
             user: $user,
             data: $data,
+            provider: $provider,
         );
 
         $this->verifySshReadiness->handle(
@@ -84,21 +90,35 @@ final readonly class ProvisionCloudServerAction
     }
 
     /**
-     * Provider-delivery boundary.
-     *
-     * This method stops once the provider resource is ready and its public
-     * connection information is persisted. SSH reachability is intentionally
-     * NOT part of this boundary because an otherwise valid public IP may be
-     * unreachable from the xDeploy host/network.
+     * Provider-delivery boundary. The selected provider is explicit when the
+     * workflow originates from an Order and falls back to the legacy default
+     * only for existing direct callers.
      */
     public function provisionProviderResource(
         User $user,
         CreateCloudServerData $data,
+        ?CloudProviderType $provider = null,
     ): ProvisionCloudServerResult {
-        $this->validateSelection($data);
+        $provider = $this->resolveProviderType(
+            $provider,
+        );
 
-        $createdServer = $this->provisioner
-            ->createServer($data);
+        $catalog = $this->catalogFor(
+            $provider,
+        );
+
+        $provisioner = $this->provisionerFor(
+            $provider,
+        );
+
+        $this->validateSelection(
+            data: $data,
+            catalog: $catalog,
+        );
+
+        $createdServer = $provisioner->createServer(
+            $data,
+        );
 
         $password = $this->generatedPassword(
             $createdServer,
@@ -114,6 +134,7 @@ final readonly class ProvisionCloudServerAction
             createdServer: $createdServer,
             username: $username,
             password: $password,
+            provider: $provider,
         );
 
         if ($createdServer->status->isFailed()) {
@@ -129,6 +150,7 @@ final readonly class ProvisionCloudServerAction
             server: $server,
             regionId: $data->regionId,
             providerServerId: $createdServer->id,
+            provisioner: $provisioner,
         );
     }
 
@@ -136,6 +158,7 @@ final readonly class ProvisionCloudServerAction
         Server $server,
         string $regionId,
         string $providerServerId,
+        CloudServerProvisionerInterface $provisioner,
     ): ProvisionCloudServerResult {
         $lastCloudServer = null;
 
@@ -145,16 +168,11 @@ final readonly class ProvisionCloudServerAction
             $attempt++
         ) {
             try {
-                $cloudServer = $this->provisioner
-                    ->findServer(
-                        $regionId,
-                        $providerServerId,
-                    );
+                $cloudServer = $provisioner->findServer(
+                    $regionId,
+                    $providerServerId,
+                );
             } catch (CloudResourceNotFoundException) {
-                /*
-                 * Immediately after creation, the List endpoint may not
-                 * expose the server yet. Treat this as eventual consistency.
-                 */
                 $this->waitBeforeNextAttempt(
                     $attempt,
                 );
@@ -221,41 +239,26 @@ final readonly class ProvisionCloudServerAction
         CreatedCloudServerData $createdServer,
         string $username,
         string $password,
+        CloudProviderType $provider,
     ): Server {
         try {
             return $this->createServer->handle(
                 user: $user,
-
                 attributes: [
                     'name' => $createdServer->name,
-
                     'host' => null,
-
                     'port' => 22,
-
                     'username' => $username,
-
                     'authentication_type' => AuthenticationType::Password,
-
                     'credential' => $password,
-
-                    'cloud_provider' => trim($this->providerName),
-
+                    'cloud_provider' => $provider->value,
                     'cloud_server_id' => $createdServer->id,
-
                     'cloud_region' => trim($data->regionId),
-
                     'provisioned_at' => $createdServer->createdAt ?? now(),
                 ],
-
                 status: ServerStatus::Inactive,
             );
         } catch (Throwable $exception) {
-            /*
-             * The provider resource already exists at this point.
-             * Delete API is outside this Sprint, so keep its ID in
-             * the exception for manual recovery.
-             */
             throw new CloudServerProvisioningException(
                 message: sprintf(
                     'Cloud server [%s] was created but could not be persisted.',
@@ -270,8 +273,7 @@ final readonly class ProvisionCloudServerAction
         Server $server,
         CloudServerData $cloudServer,
     ): Server {
-        $connectionIp = $cloudServer
-            ->firstPublicIpv4();
+        $connectionIp = $cloudServer->firstPublicIpv4();
 
         if ($connectionIp === null) {
             throw new CloudServerNotReadyException(
@@ -285,7 +287,6 @@ final readonly class ProvisionCloudServerAction
         try {
             $server->forceFill([
                 'host' => $connectionIp,
-
                 'username' => $this->normalizedUsername(
                     $cloudServer->username
                     ?? $server->username,
@@ -309,13 +310,9 @@ final readonly class ProvisionCloudServerAction
     private function generatedPassword(
         CreatedCloudServerData $createdServer,
     ): string {
-        $password = $createdServer
-            ->generatedPassword();
+        $password = $createdServer->generatedPassword();
 
-        if (
-            ! is_string($password)
-            || $password === ''
-        ) {
+        if (! is_string($password) || $password === '') {
             throw new CloudServerProvisioningException(
                 sprintf(
                     'Cloud server [%s] has no generated password.',
@@ -338,9 +335,7 @@ final readonly class ProvisionCloudServerAction
     private function normalizedUsername(
         ?string $username,
     ): string {
-        $username = trim(
-            (string) $username,
-        );
+        $username = trim((string) $username);
 
         if (
             $username === ''
@@ -374,6 +369,7 @@ final readonly class ProvisionCloudServerAction
 
     private function validateSelection(
         CreateCloudServerData $data,
+        CloudProviderInterface $catalog,
     ): void {
         if ($data->usesSshKey()) {
             throw new CloudValidationException(
@@ -381,12 +377,10 @@ final readonly class ProvisionCloudServerAction
             );
         }
 
-        $regionId = trim(
-            $data->regionId,
-        );
+        $regionId = trim($data->regionId);
 
         $region = $this->findResource(
-            resources: $this->catalog->listRegions(),
+            resources: $catalog->listRegions(),
             id: $regionId,
         );
 
@@ -409,9 +403,7 @@ final readonly class ProvisionCloudServerAction
         }
 
         $size = $this->findResource(
-            resources: $this->catalog->listSizes(
-                $regionId,
-            ),
+            resources: $catalog->listSizes($regionId),
             id: trim($data->sizeId),
         );
 
@@ -425,9 +417,7 @@ final readonly class ProvisionCloudServerAction
         }
 
         $image = $this->findResource(
-            resources: $this->catalog->listImages(
-                $regionId,
-            ),
+            resources: $catalog->listImages($regionId),
             id: trim($data->imageId),
         );
 
@@ -450,9 +440,7 @@ final readonly class ProvisionCloudServerAction
         }
 
         $network = $this->findResource(
-            resources: $this->catalog->listNetworks(
-                $regionId,
-            ),
+            resources: $catalog->listNetworks($regionId),
             id: trim($data->networkId),
         );
 
@@ -474,10 +462,7 @@ final readonly class ProvisionCloudServerAction
             );
         }
 
-        if (
-            $network->ipVersion
-            !== CloudIpVersion::IPv4
-        ) {
+        if ($network->ipVersion !== CloudIpVersion::IPv4) {
             throw new CloudValidationException(
                 'Sprint 11 provisioning requires an IPv4 network.',
             );
@@ -486,6 +471,7 @@ final readonly class ProvisionCloudServerAction
         $this->validateSecurityGroups(
             data: $data,
             regionId: $regionId,
+            catalog: $catalog,
         );
 
         $minimumDiskGiB = max(
@@ -504,8 +490,7 @@ final readonly class ProvisionCloudServerAction
 
         if (
             $image->minMemoryMiB !== null
-            && $size->memoryMiB
-            < $image->minMemoryMiB
+            && $size->memoryMiB < $image->minMemoryMiB
         ) {
             throw new CloudValidationException(
                 sprintf(
@@ -519,6 +504,7 @@ final readonly class ProvisionCloudServerAction
     private function validateSecurityGroups(
         CreateCloudServerData $data,
         string $regionId,
+        CloudProviderInterface $catalog,
     ): void {
         if ($data->securityGroupIds === []) {
             throw new CloudValidationException(
@@ -526,17 +512,11 @@ final readonly class ProvisionCloudServerAction
             );
         }
 
-        $availableGroups =
-            $this->catalog
-                ->listSecurityGroups(
-                    $regionId,
-                );
+        $availableGroups = $catalog->listSecurityGroups(
+            $regionId,
+        );
 
-        foreach (
-            array_unique(
-                $data->securityGroupIds,
-            ) as $securityGroupId
-        ) {
+        foreach (array_unique($data->securityGroupIds) as $securityGroupId) {
             if (! is_string($securityGroupId)) {
                 throw new CloudValidationException(
                     'Cloud security group identifier must be a string.',
@@ -548,9 +528,7 @@ final readonly class ProvisionCloudServerAction
                 id: trim($securityGroupId),
             );
 
-            if (
-                ! $group instanceof CloudSecurityGroupData
-            ) {
+            if (! $group instanceof CloudSecurityGroupData) {
                 throw new CloudValidationException(
                     sprintf(
                         'Cloud security group [%s] is unavailable.',
@@ -558,6 +536,85 @@ final readonly class ProvisionCloudServerAction
                     ),
                 );
             }
+        }
+    }
+
+    private function resolveProviderType(
+        ?CloudProviderType $provider,
+    ): CloudProviderType {
+        if ($provider instanceof CloudProviderType) {
+            return $provider;
+        }
+
+        $normalized = strtolower(
+            trim($this->providerName),
+        );
+
+        $resolved = CloudProviderType::tryFrom(
+            $normalized,
+        );
+
+        if (! $resolved instanceof CloudProviderType) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'The cloud provider [%s] is not supported.',
+                    $normalized,
+                ),
+            );
+        }
+
+        return $resolved;
+    }
+
+    private function catalogFor(
+        CloudProviderType $provider,
+    ): CloudProviderInterface {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            return $this->providers->resolve(
+                $provider,
+            );
+        }
+
+        $this->assertLegacyProviderMatches(
+            $provider,
+        );
+
+        return $this->catalog;
+    }
+
+    private function provisionerFor(
+        CloudProviderType $provider,
+    ): CloudServerProvisionerInterface {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            /** @var CloudServerProvisionerInterface $provisioner */
+            $provisioner = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerProvisionerInterface::class,
+            );
+
+            return $provisioner;
+        }
+
+        $this->assertLegacyProviderMatches(
+            $provider,
+        );
+
+        return $this->provisioner;
+    }
+
+    private function assertLegacyProviderMatches(
+        CloudProviderType $provider,
+    ): void {
+        if (
+            strtolower(trim($this->providerName))
+            !== $provider->value
+        ) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud provider [%s] cannot be resolved without the provider registry.',
+                    $provider->value,
+                ),
+            );
         }
     }
 
@@ -570,10 +627,7 @@ final readonly class ProvisionCloudServerAction
     ): ?object {
         foreach ($resources as $resource) {
             if (
-                property_exists(
-                    $resource,
-                    'id',
-                )
+                property_exists($resource, 'id')
                 && $resource->id === $id
             ) {
                 return $resource;

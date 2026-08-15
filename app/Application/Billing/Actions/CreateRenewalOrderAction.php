@@ -8,6 +8,7 @@ use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
 use App\Domain\Billing\Exceptions\CloudServerRenewalException;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Order;
 use App\Models\Server;
 use App\Models\User;
@@ -53,12 +54,9 @@ final readonly class CreateRenewalOrderAction
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                /*
-                 * Pricing was fetched outside the transaction. Revalidate the
-                 * service lifetime after taking the Server row lock so expiry
-                 * or termination cannot race quote creation.
-                 */
-                $this->assertCanStartRenewal($lockedServer);
+                $this->assertCanStartRenewal(
+                    $lockedServer,
+                );
 
                 /** @var Order|null $lockedSourceOrder */
                 $lockedSourceOrder = Order::query()
@@ -82,19 +80,26 @@ final readonly class CreateRenewalOrderAction
                     price: $price,
                 );
 
+                $provider = $lockedSourceOrder->cloud_provider;
+
+                if (! $provider instanceof CloudProviderType) {
+                    throw new LogicException(
+                        sprintf(
+                            'Provisioning Order [%d] has no valid cloud provider.',
+                            $lockedSourceOrder->getKey(),
+                        ),
+                    );
+                }
+
                 return Order::query()->create([
                     'user_id' => $user->getKey(),
                     'type' => OrderType::Renewal,
                     'server_id' => $lockedServer->getKey(),
-                    'cloud_provider' => $lockedSourceOrder->cloud_provider->value,
+                    'cloud_provider' => $provider->value,
 
                     'region_id' => $price->regionId,
                     'size_id' => $price->sizeId,
 
-                    /*
-                     * Renewal does not reprovision the OS. Preserve the
-                     * original provisioning snapshot for billing/history.
-                     */
                     'image_id' => $lockedSourceOrder->image_id,
                     'image_name' => $lockedSourceOrder->image_name,
                     'image_distribution' => $lockedSourceOrder->image_distribution,
@@ -112,11 +117,9 @@ final readonly class CreateRenewalOrderAction
                     'currency' => $price->currency,
 
                     'status' => OrderStatus::PendingPayment,
-
                     'quote_expires_at' => now()->addMinutes(
                         $quoteTtlMinutes,
                     ),
-
                     'paid_at' => null,
                 ]);
             },
@@ -142,12 +145,6 @@ final readonly class CreateRenewalOrderAction
             );
         }
 
-        /*
-         * MVP rule: a new payment may only start while the service is still
-         * alive. A payment verified just after expiry is handled separately
-         * by FulfillPaidRenewalOrderAction as long as termination has not won
-         * the row-lock race yet.
-         */
         if ($server->hasExpired()) {
             throw CloudServerRenewalException::serverExpired(
                 (int) $server->getKey(),
@@ -159,19 +156,38 @@ final readonly class CreateRenewalOrderAction
         Server $server,
         Order $sourceOrder,
     ): void {
-        $serverRegion = trim(
-            (string) $server->cloud_region,
-        );
+        $serverRegion = trim((string) $server->cloud_region);
+        $serverProvider = trim((string) $server->cloud_provider);
+        $provider = $sourceOrder->cloud_provider;
+
+        if (! $provider instanceof CloudProviderType) {
+            throw new LogicException(
+                sprintf(
+                    'Provisioning Order [%d] has no valid cloud provider.',
+                    $sourceOrder->getKey(),
+                ),
+            );
+        }
 
         if (
             $serverRegion === ''
-            || $serverRegion !== trim(
-                (string) $sourceOrder->region_id,
-            )
+            || $serverRegion !== trim((string) $sourceOrder->region_id)
         ) {
             throw new LogicException(
                 sprintf(
                     'Cloud Server [%d] region does not match its provisioning Order.',
+                    $server->getKey(),
+                ),
+            );
+        }
+
+        if (
+            $serverProvider === ''
+            || $serverProvider !== $provider->value
+        ) {
+            throw new LogicException(
+                sprintf(
+                    'Cloud Server [%d] provider does not match its provisioning Order.',
                     $server->getKey(),
                 ),
             );

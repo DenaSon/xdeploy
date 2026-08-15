@@ -6,15 +6,15 @@ namespace App\Application\Billing\Actions;
 
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Services\CloudPricingCalculator;
-use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use InvalidArgumentException;
 
 final readonly class CalculateCloudPurchasePriceAction
 {
     public function __construct(
-        private CloudProviderInterface $cloud,
-        private CloudServerResizeCatalogInterface $pricing,
+        private CloudProviderRegistryInterface $providers,
         private CloudPricingCalculator $calculator,
     ) {}
 
@@ -23,8 +23,19 @@ final readonly class CalculateCloudPurchasePriceAction
         string $sizeId,
         int $selectedDiskGiB,
         string $period,
+        CloudProviderType $provider = CloudProviderType::Arvan,
     ): PurchasePriceData {
-        $sizes = $this->cloud->listSizes($region);
+        $cloud = $this->providers->resolve(
+            $provider,
+        );
+
+        /** @var CloudServerResizeCatalogInterface $pricing */
+        $pricing = $this->providers->resolveCapability(
+            provider: $provider,
+            capability: CloudServerResizeCatalogInterface::class,
+        );
+
+        $sizes = $cloud->listSizes($region);
 
         $size = null;
 
@@ -52,9 +63,7 @@ final readonly class CalculateCloudPurchasePriceAction
 
         /*
          * Default disk is already included in the catalog price.
-         *
-         * We only use calculateDiskPrice() to determine the delta
-         * when the customer requests a larger root disk.
+         * Only the requested root-disk delta is added to the quote.
          */
         if ($selectedDiskGiB === $defaultDiskGiB) {
             $defaultDiskHourly = '0';
@@ -62,13 +71,13 @@ final readonly class CalculateCloudPurchasePriceAction
             $selectedDiskHourly = '0';
             $selectedDiskMonthly = '0';
         } else {
-            $defaultDiskPrice = $this->pricing->calculateDiskPrice(
+            $defaultDiskPrice = $pricing->calculateDiskPrice(
                 region: $region,
                 sizeId: $sizeId,
                 diskGiB: $defaultDiskGiB,
             );
 
-            $selectedDiskPrice = $this->pricing->calculateDiskPrice(
+            $selectedDiskPrice = $pricing->calculateDiskPrice(
                 region: $region,
                 sizeId: $sizeId,
                 diskGiB: $selectedDiskGiB,
