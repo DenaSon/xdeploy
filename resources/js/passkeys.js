@@ -21,9 +21,19 @@ export const coreflarePasskeys = {
         });
     },
 
+    async verify({ optionsUrl, verifyUrl, remember = false }) {
+        return Passkeys.verify({
+            remember,
+            routes: {
+                options: optionsUrl,
+                submit: verifyUrl,
+            },
+        });
+    },
+
     messageFor(error) {
         if (error instanceof UserCancelledError) {
-            return 'ثبت Passkey لغو شد.';
+            return 'عملیات Passkey لغو شد.';
         }
 
         if (error instanceof PasskeyExistsError) {
@@ -38,7 +48,7 @@ export const coreflarePasskeys = {
             return 'مرورگر یا دستگاه شما از Passkey پشتیبانی نمی‌کند.';
         }
 
-        return 'ثبت Passkey انجام نشد. دوباره تلاش کنید.';
+        return 'تأیید Passkey انجام نشد. دوباره تلاش کنید.';
     },
 };
 
