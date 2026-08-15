@@ -17,9 +17,9 @@ final class Show extends Component
 {
     public Server $server;
 
-    public function mount(Server $server): void
+    public function mount(Server $adminServer): void
     {
-        $this->server = $server;
+        $this->server = $adminServer;
     }
 
     public function render(): View
