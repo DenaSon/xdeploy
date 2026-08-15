@@ -1,3 +1,5 @@
+import '../css/admin-markdown.css';
+
 import {
     registerLivewireRequestErrorHandler,
 } from './livewire/request-error-handler.js';
