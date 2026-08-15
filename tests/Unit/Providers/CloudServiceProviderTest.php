@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Providers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
@@ -14,6 +15,7 @@ use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
@@ -67,6 +69,41 @@ final class CloudServiceProviderTest extends TestCase
         $this->assertInstanceOf(
             ArvanCloudProvider::class,
             $provider,
+        );
+    }
+
+    public function test_registry_resolves_registered_arvan_provider(): void
+    {
+        $registry = $this->app->make(
+            CloudProviderRegistryInterface::class,
+        );
+
+        $this->assertSame(
+            $this->app->make(
+                ArvanCloudProvider::class,
+            ),
+            $registry->resolve(
+                CloudProviderType::Arvan,
+            ),
+        );
+    }
+
+    public function test_registry_rejects_unregistered_provider(): void
+    {
+        $registry = $this->app->make(
+            CloudProviderRegistryInterface::class,
+        );
+
+        $this->expectException(
+            CloudConfigurationException::class,
+        );
+
+        $this->expectExceptionMessage(
+            'The cloud provider [liara] is not registered.',
+        );
+
+        $registry->resolve(
+            CloudProviderType::Liara,
         );
     }
 

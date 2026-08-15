@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
@@ -15,11 +16,13 @@ use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
+use App\Infrastructure\Cloud\CloudProviderRegistry;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +34,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudMapper();
         $this->registerArvanCloudProvider();
 
+        $this->registerCloudProviderRegistry();
         $this->registerCloudProviderContract();
         $this->registerCloudCatalogReader();
         $this->registerCloudCapabilityContracts();
@@ -150,6 +154,29 @@ final class CloudServiceProvider extends ServiceProvider
         );
     }
 
+    private function registerCloudProviderRegistry(): void
+    {
+        $this->app->singleton(
+            CloudProviderRegistry::class,
+            static fn (
+                Application $app,
+            ): CloudProviderRegistry => new CloudProviderRegistry([
+                CloudProviderType::Arvan->value => $app->make(
+                    ArvanCloudProvider::class,
+                ),
+            ]),
+        );
+
+        $this->app->singleton(
+            CloudProviderRegistryInterface::class,
+            static fn (
+                Application $app,
+            ): CloudProviderRegistryInterface => $app->make(
+                CloudProviderRegistry::class,
+            ),
+        );
+    }
+
     private function registerCloudProviderContract(): void
     {
         $this->app->singleton(
@@ -157,8 +184,10 @@ final class CloudServiceProvider extends ServiceProvider
             function (
                 Application $app,
             ): CloudProviderInterface {
-                return $this->resolveDefaultCloudProvider(
-                    $app,
+                return $app->make(
+                    CloudProviderRegistryInterface::class,
+                )->resolve(
+                    $this->defaultCloudProvider(),
                 );
             },
         );
@@ -208,50 +237,23 @@ final class CloudServiceProvider extends ServiceProvider
         foreach ($contracts as $contract) {
             $this->app->singleton(
                 $contract,
-                static function (
+                function (
                     Application $app,
                 ) use (
                     $contract,
                 ): object {
-                    $provider = $app->make(
-                        CloudProviderInterface::class,
+                    return $app->make(
+                        CloudProviderRegistryInterface::class,
+                    )->resolveCapability(
+                        provider: $this->defaultCloudProvider(),
+                        capability: $contract,
                     );
-
-                    if (! $provider instanceof $contract) {
-                        throw new CloudConfigurationException(
-                            sprintf(
-                                'The default cloud provider does not support contract [%s].',
-                                $contract,
-                            ),
-                        );
-                    }
-
-                    return $provider;
                 },
             );
         }
     }
 
-    private function resolveDefaultCloudProvider(
-        Application $app,
-    ): CloudProviderInterface {
-        $provider = $this->defaultCloudProvider();
-
-        return match ($provider) {
-            'arvan' => $app->make(
-                ArvanCloudProvider::class,
-            ),
-
-            default => throw new CloudConfigurationException(
-                sprintf(
-                    'The cloud provider [%s] is not supported.',
-                    $provider,
-                ),
-            ),
-        };
-    }
-
-    private function defaultCloudProvider(): string
+    private function defaultCloudProvider(): CloudProviderType
     {
         $provider = config(
             'cloud.default',
@@ -266,8 +268,23 @@ final class CloudServiceProvider extends ServiceProvider
             );
         }
 
-        return strtolower(
+        $normalized = strtolower(
             trim($provider),
         );
+
+        $providerType = CloudProviderType::tryFrom(
+            $normalized,
+        );
+
+        if (! $providerType instanceof CloudProviderType) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'The cloud provider [%s] is not supported.',
+                    $normalized,
+                ),
+            );
+        }
+
+        return $providerType;
     }
 }
