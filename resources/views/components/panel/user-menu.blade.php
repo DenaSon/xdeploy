@@ -52,13 +52,6 @@
             wire:navigate
         />
 
-        <x-menu-item
-            title="امنیت حساب"
-            icon="lucide.shield-check"
-            :link="route('panel.security')"
-            wire:navigate
-        />
-
         <x-menu-separator />
 
         <livewire:auth.logout />
