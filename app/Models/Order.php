@@ -16,6 +16,10 @@ final class Order extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'cloud_provider' => CloudProviderType::Arvan->value,
+    ];
+
     protected $fillable = [
         'user_id',
         'type',
