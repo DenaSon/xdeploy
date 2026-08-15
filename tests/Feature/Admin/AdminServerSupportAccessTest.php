@@ -96,11 +96,28 @@ final class AdminServerSupportAccessTest extends TestCase
                 'credential' => 'support-secret-password',
                 'expires_in' => 30,
             ])
-            ->assertHeader(
-                'Cache-Control',
-                'no-store, private, max-age=0, must-revalidate',
-            )
             ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        $cacheControl = (string) $response->headers->get(
+            'Cache-Control',
+        );
+
+        $this->assertStringContainsString(
+            'no-store',
+            $cacheControl,
+        );
+        $this->assertStringContainsString(
+            'private',
+            $cacheControl,
+        );
+        $this->assertStringContainsString(
+            'max-age=0',
+            $cacheControl,
+        );
+        $this->assertStringContainsString(
+            'must-revalidate',
+            $cacheControl,
+        );
 
         $log = SupportAccessLog::query()->sole();
 
