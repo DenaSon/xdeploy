@@ -56,6 +56,11 @@
     };
 
     $unread = $notification->read_at === null;
+
+    $actionLabel = isset($data['action_label'])
+        && is_string($data['action_label'])
+            ? $data['action_label']
+            : null;
 @endphp
 
 <button
@@ -65,35 +70,59 @@
         '
             group/notification
             flex w-full
-            items-start gap-3
+            items-start
             text-right
-            transition-colors duration-150
+            transition-all duration-150
         ',
-        'px-3.5 py-3' => $compact,
-        'rounded-xl border border-base-300 bg-base-100 px-4 py-4' => ! $compact,
+        'gap-3 px-3.5 py-3' => $compact,
+        '
+            gap-3.5
+            rounded-2xl
+            border border-base-300/70
+            bg-base-100
+            px-4 py-4
+            hover:-translate-y-px
+            hover:border-primary/20
+            hover:shadow-md
+            hover:shadow-base-content/[0.025]
+            sm:px-5
+        ' => ! $compact,
         'bg-primary/[0.035]' => $unread && $compact,
-        'hover:bg-base-200/60',
+        'bg-primary/[0.018] ring-1 ring-primary/[0.05]' => $unread && ! $compact,
+        'hover:bg-base-200/60' => $compact,
     ]) }}
 >
     <div
-        class="
-            relative
-            flex size-9 shrink-0
-            items-center justify-center
-            rounded-xl
-            {{ $toneClasses['icon'] }}
-        "
+        @class([
+            '
+                relative
+                flex shrink-0
+                items-center justify-center
+                rounded-xl
+            ',
+            'size-9' => $compact,
+            'size-10' => ! $compact,
+            $toneClasses['icon'],
+        ])
     >
         <x-icon
             :name="$icon"
-            class="!size-4 stroke-[1.8]"
+            @class([
+                'stroke-[1.8]',
+                '!size-4' => $compact,
+                '!size-[17px]' => ! $compact,
+            ])
         />
 
         @if($unread)
             <span
                 class="
-                    absolute -start-0.5 -top-0.5
-                    size-2 rounded-full
+                    absolute
+                    -start-0.5 -top-0.5
+
+                    size-2
+                    rounded-full
+
                     ring-2 ring-base-100
                     {{ $toneClasses['dot'] }}
                 "
@@ -102,70 +131,148 @@
         @endif
     </div>
 
+
     <div class="min-w-0 flex-1">
-        <div
-            class="
-                flex items-start
-                justify-between gap-3
-            "
-        >
-            <p
-                @class([
-                    'min-w-0 truncate text-sm text-base-content',
-                    'font-semibold' => $unread,
-                    'font-medium' => ! $unread,
-                ])
-            >
-                {{ $title }}
-            </p>
-
-            <span
-                class="
-                    shrink-0
-                    text-[10px]
-                    text-base-content/30
-                "
-            >
-                {{ $notification->created_at?->diffForHumans() }}
-            </span>
-        </div>
-
-        @if($message !== '')
-            <p
-                @class([
-                    '
-                        mt-1
-                        text-xs leading-6
-                        text-base-content/50
-                    ',
-                    'line-clamp-2' => $compact,
-                ])
-            >
-                {{ $message }}
-            </p>
-        @endif
-
-        @if(
-            ! $compact
-            && isset($data['action_label'])
-            && is_string($data['action_label'])
-        )
+        @if($compact)
             <div
                 class="
-                    mt-2
-                    inline-flex items-center gap-1
-                    text-xs font-medium
-                    text-primary
+                    flex items-start
+                    justify-between gap-3
                 "
             >
-                <span>
-                    {{ $data['action_label'] }}
-                </span>
+                <p
+                    @class([
+                        'min-w-0 truncate text-sm text-base-content',
+                        'font-semibold' => $unread,
+                        'font-medium' => ! $unread,
+                    ])
+                >
+                    {{ $title }}
+                </p>
 
-                <x-icon
-                    name="lucide.arrow-left"
-                    class="!size-3.5"
-                />
+                <span
+                    class="
+                        shrink-0
+                        text-[10px]
+                        text-base-content/30
+                    "
+                >
+                    {{ $notification->created_at?->diffForHumans() }}
+                </span>
+            </div>
+
+            @if($message !== '')
+                <p
+                    class="
+                        mt-1
+                        line-clamp-2
+                        text-xs leading-6
+                        text-base-content/50
+                    "
+                >
+                    {{ $message }}
+                </p>
+            @endif
+        @else
+            <div
+                class="
+                    flex min-w-0
+                    items-start gap-2
+                "
+            >
+                <p
+                    @class([
+                        '
+                            min-w-0
+                            text-sm
+                            text-base-content
+                            sm:text-[15px]
+                        ',
+                        'font-semibold' => $unread,
+                        'font-medium' => ! $unread,
+                    ])
+                >
+                    {{ $title }}
+                </p>
+
+                @if($unread)
+                    <span
+                        class="
+                            mt-2
+                            size-1.5 shrink-0
+                            rounded-full
+                            bg-primary
+                        "
+                        aria-hidden="true"
+                    ></span>
+                @endif
+            </div>
+
+            @if($message !== '')
+                <p
+                    class="
+                        mt-1.5
+                        max-w-3xl
+
+                        text-xs leading-6
+                        text-base-content/50
+
+                        sm:text-[13px]
+                    "
+                >
+                    {{ $message }}
+                </p>
+            @endif
+
+            <div
+                class="
+                    mt-3
+                    flex flex-wrap
+                    items-center justify-between
+                    gap-x-4 gap-y-2
+                "
+            >
+                @if($actionLabel !== null)
+                    <span
+                        class="
+                            inline-flex
+                            items-center gap-1.5
+
+                            text-xs
+                            font-medium
+                            text-primary
+
+                            transition-colors
+                            group-hover/notification:text-primary/80
+                        "
+                    >
+                        {{ $actionLabel }}
+
+                        <x-icon
+                            name="lucide.arrow-left"
+                            class="!size-3.5 stroke-[1.8]"
+                        />
+                    </span>
+                @else
+                    <span></span>
+                @endif
+
+                <span
+                    class="
+                        inline-flex shrink-0
+                        items-center gap-1.5
+
+                        text-[10px]
+                        text-base-content/30
+                    "
+                >
+                    <x-icon
+                        name="lucide.clock-3"
+                        class="!size-3 stroke-[1.6]"
+                    />
+
+                    {{ $notification->created_at?->diffForHumans() }}
+                </span>
             </div>
         @endif
     </div>
