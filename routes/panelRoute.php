@@ -18,6 +18,7 @@ use App\Livewire\Servers\Edit as ServerEdit;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\Renew as ServerRenew;
 use Illuminate\Support\Facades\Route;
+use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
 use Laravel\Passkeys\Http\Controllers\PasskeyRegistrationController;
 
 Route::middleware(['web', 'guest'])
@@ -31,6 +32,20 @@ Route::middleware(['web', 'guest'])
             '/verify',
             'auth.verify-otp-page',
         )->name('verify');
+
+        Route::get(
+            '/passkeys/login/options',
+            [PasskeyLoginController::class, 'index'],
+        )
+            ->middleware('throttle:6,1')
+            ->name('passkey.login-options');
+
+        Route::post(
+            '/passkeys/login',
+            [PasskeyLoginController::class, 'store'],
+        )
+            ->middleware('throttle:6,1')
+            ->name('passkey.login');
     });
 
 Route::middleware(['web', 'auth'])
