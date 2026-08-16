@@ -40,11 +40,8 @@ final readonly class DeleteCloudServerAction
             attribute: 'cloud_server_id',
         );
 
-        $provider = $this->providerType(
-            $this->requiredCloudMetadata(
-                server: $server,
-                attribute: 'cloud_provider',
-            ),
+        $provider = $this->requiredCloudProvider(
+            $server,
         );
 
         $lifecycle = $this->lifecycleFor(
@@ -99,27 +96,18 @@ final readonly class DeleteCloudServerAction
         return $this->lifecycle;
     }
 
-    private function providerType(
-        string $provider,
+    private function requiredCloudProvider(
+        Server $server,
     ): CloudProviderType {
-        $normalized = strtolower(
-            trim($provider),
-        );
+        $provider = $server->cloud_provider;
 
-        $resolved = CloudProviderType::tryFrom(
-            $normalized,
-        );
-
-        if (! $resolved instanceof CloudProviderType) {
+        if (! $provider instanceof CloudProviderType) {
             throw new CloudValidationException(
-                sprintf(
-                    'Cloud provider metadata [%s] is unsupported.',
-                    $normalized,
-                ),
+                'Cloud server metadata is incomplete.',
             );
         }
 
-        return $resolved;
+        return $provider;
     }
 
     private function ownedServer(
