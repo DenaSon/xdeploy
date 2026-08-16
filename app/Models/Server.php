@@ -25,6 +25,8 @@ class Server extends Model
         'username',
         'authentication_type',
         'credential',
+        'pending_credential',
+        'bootstrap_credential_rotated_at',
         'status',
         'cloud_provider',
         'cloud_server_id',
@@ -41,13 +43,17 @@ class Server extends Model
     protected $hidden = [
         'credential',
         'credential_context',
+        'pending_credential',
+        'pending_credential_context',
     ];
 
     protected $casts = [
         'port' => 'integer',
         'credential' => ServerCredentialCast::class,
+        'pending_credential' => ServerCredentialCast::class,
         'status' => ServerStatus::class,
         'authentication_type' => AuthenticationType::class,
+        'bootstrap_credential_rotated_at' => 'immutable_datetime',
         'provisioned_at' => 'immutable_datetime',
         'expires_at' => 'immutable_datetime',
         'termination_started_at' => 'immutable_datetime',
@@ -105,6 +111,12 @@ class Server extends Model
     {
         return is_string($this->credential)
             && trim($this->credential) !== '';
+    }
+
+    public function hasPendingCredential(): bool
+    {
+        return is_string($this->pending_credential)
+            && trim($this->pending_credential) !== '';
     }
 
     public function hasExpired(): bool
