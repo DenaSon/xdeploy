@@ -34,6 +34,8 @@ final class LiaraCloudClient
 
     private const string METHOD_DELETE = 'DELETE';
 
+    private const int MAX_PROVIDER_ERROR_LENGTH = 300;
+
     private readonly string $baseUrl;
 
     private readonly string $apiToken;
@@ -372,8 +374,15 @@ final class LiaraCloudClient
         $status = $response->status();
 
         if (in_array($status, [400, 409, 412, 419, 422, 428], true)) {
+            $providerMessage = $this->providerErrorMessage($response);
+
             throw new CloudValidationException(
-                message: 'Cloud provider rejected the request.',
+                message: $providerMessage === null
+                    ? 'Cloud provider rejected the request.'
+                    : sprintf(
+                        'Cloud provider rejected the request: %s',
+                        $providerMessage,
+                    ),
                 code: $status,
             );
         }
@@ -430,6 +439,39 @@ final class LiaraCloudClient
         );
     }
 
+    private function providerErrorMessage(Response $response): ?string
+    {
+        $payload = $response->json();
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        foreach (['message', 'error'] as $field) {
+            $value = $payload[$field] ?? null;
+
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $value = trim($value);
+
+            if ($value === '') {
+                continue;
+            }
+
+            $normalized = preg_replace('/\s+/', ' ', $value);
+
+            if (! is_string($normalized) || $normalized === '') {
+                continue;
+            }
+
+            return substr($normalized, 0, self::MAX_PROVIDER_ERROR_LENGTH);
+        }
+
+        return null;
+    }
+
     private function retryAfterSeconds(Response $response): ?int
     {
         $retryAfter = trim((string) $response->header('Retry-After'));
@@ -480,6 +522,14 @@ final class LiaraCloudClient
             'status' => $response->status(),
             'duration_ms' => $this->durationMilliseconds($startedAt),
         ];
+
+        if (! $response->successful()) {
+            $providerMessage = $this->providerErrorMessage($response);
+
+            if ($providerMessage !== null) {
+                $context['provider_error'] = $providerMessage;
+            }
+        }
 
         $requestId = trim((string) $response->header('X-Request-ID'));
 
