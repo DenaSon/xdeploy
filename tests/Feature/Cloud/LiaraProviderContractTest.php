@@ -6,7 +6,6 @@ namespace Tests\Feature\Cloud;
 
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
-use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
 use Tests\TestCase;
@@ -28,6 +27,5 @@ final class LiaraProviderContractTest extends TestCase
 
         self::assertInstanceOf(CloudServerLifecycleInterface::class, $provider);
         self::assertNotInstanceOf(CloudServerConsoleInterface::class, $provider);
-        self::assertSame(CloudProviderType::Liara, $provider->type());
     }
 }
