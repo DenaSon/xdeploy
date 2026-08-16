@@ -47,7 +47,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Fulfilled);
         $server = $this->server(
             user: $order->user,
-            name: "xdeploy-order-{$order->id}",
+            name: $this->serverName($order),
             status: ServerStatus::Active,
         );
 
@@ -66,7 +66,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Provisioning);
         $server = $this->server(
             user: $order->user,
-            name: "xdeploy-order-{$order->id}",
+            name: $this->serverName($order),
             status: ServerStatus::Inactive,
         );
 
@@ -87,7 +87,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Failed);
         $server = $this->server(
             user: $order->user,
-            name: "xdeploy-order-{$order->id}",
+            name: $this->serverName($order),
             status: ServerStatus::Inactive,
         );
 
@@ -109,7 +109,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Failed);
         $server = $this->server(
             user: $order->user,
-            name: "xdeploy-order-{$order->id}",
+            name: $this->serverName($order),
             status: ServerStatus::Inactive,
             credential: null,
         );
@@ -147,6 +147,14 @@ final class ProvisionPaidOrderActionTest extends TestCase
     private function action(): ProvisionPaidOrderAction
     {
         return app(ProvisionPaidOrderAction::class);
+    }
+
+    private function serverName(Order $order): string
+    {
+        return sprintf(
+            'cf-%s',
+            base_convert((string) $order->id, 10, 36),
+        );
     }
 
     private function order(OrderStatus $status): Order
