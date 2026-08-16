@@ -46,17 +46,23 @@ final class ServerCredentialCast implements CastsAttributes
             return $cipher->decrypt(
                 encryptedValue: $value,
                 context: $this->existingContext(
-                    $attributes,
+                    key: $key,
+                    attributes: $attributes,
                 ),
             );
         }
 
         /*
-         * Legacy Laravel encrypted cast.
-         *
-         * This fallback should remain until all legacy credentials
-         * have been migrated.
+         * Legacy Laravel encrypted cast. Only the active credential can have
+         * legacy ciphertext; pending credentials were introduced after the
+         * xDeploy envelope became canonical.
          */
+        if ($key !== 'credential') {
+            throw new CredentialEncryptionException(
+                'The pending server credential is not stored in the expected encrypted envelope.',
+            );
+        }
+
         return Crypt::decryptString(
             $value,
         );
@@ -72,9 +78,12 @@ final class ServerCredentialCast implements CastsAttributes
         mixed $value,
         array $attributes,
     ): array {
+        $contextAttribute = $this->contextAttribute($key);
+
         if ($value === null) {
             return [
                 $key => null,
+                $contextAttribute => null,
             ];
         }
 
@@ -96,7 +105,8 @@ final class ServerCredentialCast implements CastsAttributes
         }
 
         $context = $this->contextForWriting(
-            $attributes,
+            key: $key,
+            attributes: $attributes,
         );
 
         return [
@@ -104,8 +114,7 @@ final class ServerCredentialCast implements CastsAttributes
                 plaintext: $plaintext,
                 context: $context,
             ),
-
-            'credential_context' => $context,
+            $contextAttribute => $context,
         ];
     }
 
@@ -113,9 +122,10 @@ final class ServerCredentialCast implements CastsAttributes
      * @param  array<string, mixed>  $attributes
      */
     private function existingContext(
+        string $key,
         array $attributes,
     ): string {
-        $context = $attributes['credential_context']
+        $context = $attributes[$this->contextAttribute($key)]
             ?? null;
 
         if (! is_string($context) || $context === '') {
@@ -131,9 +141,10 @@ final class ServerCredentialCast implements CastsAttributes
      * @param  array<string, mixed>  $attributes
      */
     private function contextForWriting(
+        string $key,
         array $attributes,
     ): string {
-        $existingContext = $attributes['credential_context']
+        $existingContext = $attributes[$this->contextAttribute($key)]
             ?? null;
 
         if (
@@ -144,6 +155,20 @@ final class ServerCredentialCast implements CastsAttributes
         }
 
         return (string) Str::uuid();
+    }
+
+    private function contextAttribute(string $key): string
+    {
+        return match ($key) {
+            'credential' => 'credential_context',
+            'pending_credential' => 'pending_credential_context',
+            default => throw new InvalidArgumentException(
+                sprintf(
+                    'Unsupported server credential attribute [%s].',
+                    $key,
+                ),
+            ),
+        };
     }
 
     private function cipher(): ServerCredentialCipher
