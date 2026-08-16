@@ -7,6 +7,7 @@ namespace App\Infrastructure\Cloud\Catalog;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
@@ -18,6 +19,7 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
 
     public function __construct(
         private CloudProviderInterface $cloud,
+        private ?CloudProviderType $provider = null,
     ) {}
 
     public function listRegions(): array
@@ -223,14 +225,15 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
     private function cacheKey(
         string $suffix,
     ): string {
-        $provider = strtolower(
-            trim(
-                (string) config(
-                    'cloud.default',
-                    'default',
+        $provider = $this->provider?->value
+            ?? strtolower(
+                trim(
+                    (string) config(
+                        'cloud.default',
+                        'default',
+                    ),
                 ),
-            ),
-        );
+            );
 
         if ($provider === '') {
             $provider = 'default';

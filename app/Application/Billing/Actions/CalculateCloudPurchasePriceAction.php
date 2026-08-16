@@ -7,15 +7,19 @@ namespace App\Application\Billing\Actions;
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Services\CloudPricingCalculator;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use InvalidArgumentException;
 
 final readonly class CalculateCloudPurchasePriceAction
 {
     public function __construct(
-        private CloudProviderInterface $cloud,
-        private CloudServerResizeCatalogInterface $pricing,
         private CloudPricingCalculator $calculator,
+        private ?CloudProviderRegistryInterface $providers = null,
+        private ?CloudProviderInterface $cloud = null,
+        private ?CloudServerResizeCatalogInterface $pricing = null,
     ) {}
 
     public function execute(
@@ -23,8 +27,16 @@ final readonly class CalculateCloudPurchasePriceAction
         string $sizeId,
         int $selectedDiskGiB,
         string $period,
+        CloudProviderType $provider = CloudProviderType::Arvan,
     ): PurchasePriceData {
-        $sizes = $this->cloud->listSizes($region);
+        [
+            $cloud,
+            $pricing,
+        ] = $this->providerDependencies(
+            $provider,
+        );
+
+        $sizes = $cloud->listSizes($region);
 
         $size = null;
 
@@ -52,9 +64,7 @@ final readonly class CalculateCloudPurchasePriceAction
 
         /*
          * Default disk is already included in the catalog price.
-         *
-         * We only use calculateDiskPrice() to determine the delta
-         * when the customer requests a larger root disk.
+         * Only the requested root-disk delta is added to the quote.
          */
         if ($selectedDiskGiB === $defaultDiskGiB) {
             $defaultDiskHourly = '0';
@@ -62,13 +72,13 @@ final readonly class CalculateCloudPurchasePriceAction
             $selectedDiskHourly = '0';
             $selectedDiskMonthly = '0';
         } else {
-            $defaultDiskPrice = $this->pricing->calculateDiskPrice(
+            $defaultDiskPrice = $pricing->calculateDiskPrice(
                 region: $region,
                 sizeId: $sizeId,
                 diskGiB: $defaultDiskGiB,
             );
 
-            $selectedDiskPrice = $this->pricing->calculateDiskPrice(
+            $selectedDiskPrice = $pricing->calculateDiskPrice(
                 region: $region,
                 sizeId: $sizeId,
                 diskGiB: $selectedDiskGiB,
@@ -103,5 +113,60 @@ final readonly class CalculateCloudPurchasePriceAction
             finalAmount: $result['final_amount'],
             currency: $result['currency'],
         );
+    }
+
+    /**
+     * @return array{0: CloudProviderInterface, 1: CloudServerResizeCatalogInterface}
+     */
+    private function providerDependencies(
+        CloudProviderType $provider,
+    ): array {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            $cloud = $this->providers->resolve(
+                $provider,
+            );
+
+            $pricing = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerResizeCatalogInterface::class,
+            );
+
+            if (! $pricing instanceof CloudServerResizeCatalogInterface) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'The cloud provider [%s] has no resize pricing capability.',
+                        $provider->value,
+                    ),
+                );
+            }
+
+            return [
+                $cloud,
+                $pricing,
+            ];
+        }
+
+        /*
+         * Transitional direct-construction seam for existing unit/feature
+         * tests. Production container resolution supplies the registry and
+         * therefore always routes by the explicit provider identity.
+         */
+        if (
+            $provider !== CloudProviderType::Arvan
+            || ! $this->cloud instanceof CloudProviderInterface
+            || ! $this->pricing instanceof CloudServerResizeCatalogInterface
+        ) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud pricing dependencies for provider [%s] are not configured.',
+                    $provider->value,
+                ),
+            );
+        }
+
+        return [
+            $this->cloud,
+            $this->pricing,
+        ];
     }
 }

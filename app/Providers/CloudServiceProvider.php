@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
+use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
+use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudQuotaReaderInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
@@ -15,11 +21,19 @@ use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
+use App\Domain\Cloud\Contracts\CloudSshKeyCatalogInterface;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudCatalogCapabilities;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
-use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
+use App\Infrastructure\Cloud\Catalog\CloudCatalogReaderResolver;
+use App\Infrastructure\Cloud\CloudProviderRegistry;
+use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
+use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
+use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,7 +44,16 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudClient();
         $this->registerArvanCloudMapper();
         $this->registerArvanCloudProvider();
+        $this->registerArvanCloudCatalogCapabilities();
+        $this->registerArvanCloudProvisioner();
 
+        $this->registerLiaraCloudClient();
+        $this->registerLiaraCloudMapper();
+        $this->registerLiaraCloudProvider();
+
+        $this->app->bind(FilterSupportedCloudImagesAction::class);
+
+        $this->registerCloudProviderRegistry();
         $this->registerCloudProviderContract();
         $this->registerCloudCatalogReader();
         $this->registerCloudCapabilityContracts();
@@ -41,55 +64,30 @@ final class CloudServiceProvider extends ServiceProvider
         $this->app->singleton(
             ArvanCloudClient::class,
             static function (): ArvanCloudClient {
-                $baseUrl = config(
-                    'cloud.providers.arvan.base_url',
-                );
+                $baseUrl = config('cloud.providers.arvan.base_url');
+                $apiKey = config('cloud.providers.arvan.api_key');
+                $connectTimeout = config('cloud.providers.arvan.timeouts.connect', 10);
+                $requestTimeout = config('cloud.providers.arvan.timeouts.request', 90);
 
-                $apiKey = config(
-                    'cloud.providers.arvan.api_key',
-                );
-
-                $connectTimeout = config(
-                    'cloud.providers.arvan.timeouts.connect',
-                    10,
-                );
-
-                $requestTimeout = config(
-                    'cloud.providers.arvan.timeouts.request',
-                    90,
-                );
-
-                if (
-                    ! is_string($baseUrl)
-                    || trim($baseUrl) === ''
-                ) {
+                if (! is_string($baseUrl) || trim($baseUrl) === '') {
                     throw new CloudConfigurationException(
                         'ArvanCloud base URL is not configured.',
                     );
                 }
 
-                if (
-                    ! is_string($apiKey)
-                    || trim($apiKey) === ''
-                ) {
+                if (! is_string($apiKey) || trim($apiKey) === '') {
                     throw new CloudConfigurationException(
                         'ArvanCloud API key is not configured.',
                     );
                 }
 
-                if (
-                    ! is_int($connectTimeout)
-                    && ! is_numeric($connectTimeout)
-                ) {
+                if (! is_int($connectTimeout) && ! is_numeric($connectTimeout)) {
                     throw new CloudConfigurationException(
                         'ArvanCloud connect timeout must be an integer.',
                     );
                 }
 
-                if (
-                    ! is_int($requestTimeout)
-                    && ! is_numeric($requestTimeout)
-                ) {
+                if (! is_int($requestTimeout) && ! is_numeric($requestTimeout)) {
                     throw new CloudConfigurationException(
                         'ArvanCloud request timeout must be an integer.',
                     );
@@ -107,46 +105,170 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function registerArvanCloudMapper(): void
     {
-        $this->app->singleton(
-            ArvanCloudResponseMapper::class,
-        );
+        $this->app->singleton(ArvanCloudResponseMapper::class);
     }
 
     private function registerArvanCloudProvider(): void
     {
         $this->app->singleton(
             ArvanCloudProvider::class,
-            static function (
-                Application $app,
-            ): ArvanCloudProvider {
+            static function (Application $app): ArvanCloudProvider {
                 $createType = config(
                     'cloud.providers.arvan.defaults.create_type',
                     'cinder',
                 );
 
-                if (
-                    ! is_string($createType)
-                    || trim($createType) === ''
-                ) {
+                if (! is_string($createType) || trim($createType) === '') {
                     throw new CloudConfigurationException(
                         'ArvanCloud default create type is not configured.',
                     );
                 }
 
                 return new ArvanCloudProvider(
-                    client: $app->make(
-                        ArvanCloudClient::class,
-                    ),
-
-                    mapper: $app->make(
-                        ArvanCloudResponseMapper::class,
-                    ),
-
+                    client: $app->make(ArvanCloudClient::class),
+                    mapper: $app->make(ArvanCloudResponseMapper::class),
                     createType: trim($createType),
-
                     defaultUsername: 'ubuntu',
                 );
             },
+        );
+    }
+
+    private function registerArvanCloudCatalogCapabilities(): void
+    {
+        $this->app->singleton(
+            ArvanCloudCatalogCapabilities::class,
+            static fn (Application $app): ArvanCloudCatalogCapabilities => new ArvanCloudCatalogCapabilities(
+                provider: $app->make(ArvanCloudProvider::class),
+            ),
+        );
+    }
+
+    private function registerArvanCloudProvisioner(): void
+    {
+        $this->app->singleton(
+            ArvanCloudProvisioner::class,
+            static fn (Application $app): ArvanCloudProvisioner => new ArvanCloudProvisioner(
+                provider: $app->make(ArvanCloudProvider::class),
+                resolveInfrastructure: new ResolveCloudProvisioningInfrastructureAction(
+                    cloud: $app->make(ArvanCloudCatalogCapabilities::class),
+                ),
+            ),
+        );
+    }
+
+    private function registerLiaraCloudClient(): void
+    {
+        $this->app->singleton(
+            LiaraCloudClient::class,
+            static function (): LiaraCloudClient {
+                $baseUrl = config('cloud.providers.liara.base_url');
+                $apiToken = config('cloud.providers.liara.api_token');
+                $connectTimeout = config('cloud.providers.liara.timeouts.connect', 10);
+                $requestTimeout = config('cloud.providers.liara.timeouts.request', 90);
+
+                if (! is_string($baseUrl) || trim($baseUrl) === '') {
+                    throw new CloudConfigurationException(
+                        'Liara base URL is not configured.',
+                    );
+                }
+
+                if (! is_string($apiToken) || trim($apiToken) === '') {
+                    throw new CloudConfigurationException(
+                        'Liara API token is not configured.',
+                    );
+                }
+
+                if (! is_int($connectTimeout) && ! is_numeric($connectTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Liara connect timeout must be an integer.',
+                    );
+                }
+
+                if (! is_int($requestTimeout) && ! is_numeric($requestTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Liara request timeout must be an integer.',
+                    );
+                }
+
+                return new LiaraCloudClient(
+                    baseUrl: trim($baseUrl),
+                    apiToken: trim($apiToken),
+                    connectTimeout: (int) $connectTimeout,
+                    requestTimeout: (int) $requestTimeout,
+                );
+            },
+        );
+    }
+
+    private function registerLiaraCloudMapper(): void
+    {
+        $this->app->singleton(LiaraCloudResponseMapper::class);
+    }
+
+    private function registerLiaraCloudProvider(): void
+    {
+        $this->app->singleton(
+            LiaraCloudProvider::class,
+            static fn (Application $app): LiaraCloudProvider => new LiaraCloudProvider(
+                client: $app->make(LiaraCloudClient::class),
+                mapper: $app->make(LiaraCloudResponseMapper::class),
+            ),
+        );
+    }
+
+    private function registerCloudProviderRegistry(): void
+    {
+        $this->app->singleton(
+            CloudProviderRegistry::class,
+            function (Application $app): CloudProviderRegistry {
+                $providers = [];
+                $capabilities = [];
+
+                $arvanApiKey = config('cloud.providers.arvan.api_key');
+
+                if (is_string($arvanApiKey) && trim($arvanApiKey) !== '') {
+                    $arvanCapabilities = $app->make(
+                        ArvanCloudCatalogCapabilities::class,
+                    );
+
+                    $providers[CloudProviderType::Arvan->value] = $app->make(
+                        ArvanCloudProvider::class,
+                    );
+                    $capabilities[CloudProviderType::Arvan->value] = [
+                        CloudServerProvisionerInterface::class => $app->make(
+                            ArvanCloudProvisioner::class,
+                        ),
+                        CloudProvisioningInfrastructureCatalogInterface::class => $arvanCapabilities,
+                        CloudQuotaReaderInterface::class => $arvanCapabilities,
+                        CloudSshKeyCatalogInterface::class => $arvanCapabilities,
+                    ];
+                }
+
+                $liaraToken = config('cloud.providers.liara.api_token');
+
+                if (is_string($liaraToken) && trim($liaraToken) !== '') {
+                    $providers[CloudProviderType::Liara->value] = $app->make(
+                        LiaraCloudProvider::class,
+                    );
+                }
+
+                $registry = new CloudProviderRegistry(
+                    providers: $providers,
+                    capabilities: $capabilities,
+                );
+
+                $registry->resolve($this->defaultCloudProvider());
+
+                return $registry;
+            },
+        );
+
+        $this->app->singleton(
+            CloudProviderRegistryInterface::class,
+            static fn (Application $app): CloudProviderRegistryInterface => $app->make(
+                CloudProviderRegistry::class,
+            ),
         );
     }
 
@@ -154,12 +276,9 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             CloudProviderInterface::class,
-            function (
-                Application $app,
-            ): CloudProviderInterface {
-                return $this->resolveDefaultCloudProvider(
-                    $app,
-                );
+            function (Application $app): CloudProviderInterface {
+                return $app->make(CloudProviderRegistryInterface::class)
+                    ->resolve($this->defaultCloudProvider());
             },
         );
     }
@@ -167,26 +286,24 @@ final class CloudServiceProvider extends ServiceProvider
     private function registerCloudCatalogReader(): void
     {
         $this->app->singleton(
-            CachedCloudCatalogReader::class,
-            static function (
-                Application $app,
-            ): CachedCloudCatalogReader {
-                return new CachedCloudCatalogReader(
-                    cloud: $app->make(
-                        CloudProviderInterface::class,
-                    ),
-                );
-            },
+            CloudCatalogReaderResolver::class,
+            static fn (Application $app): CloudCatalogReaderResolver => new CloudCatalogReaderResolver(
+                providers: $app->make(CloudProviderRegistryInterface::class),
+            ),
+        );
+
+        $this->app->singleton(
+            CloudCatalogReaderResolverInterface::class,
+            static fn (Application $app): CloudCatalogReaderResolverInterface => $app->make(
+                CloudCatalogReaderResolver::class,
+            ),
         );
 
         $this->app->singleton(
             CloudCatalogReaderInterface::class,
-            static function (
-                Application $app,
-            ): CloudCatalogReaderInterface {
-                return $app->make(
-                    CachedCloudCatalogReader::class,
-                );
+            function (Application $app): CloudCatalogReaderInterface {
+                return $app->make(CloudCatalogReaderResolverInterface::class)
+                    ->resolve($this->defaultCloudProvider());
             },
         );
     }
@@ -194,6 +311,9 @@ final class CloudServiceProvider extends ServiceProvider
     private function registerCloudCapabilityContracts(): void
     {
         $contracts = [
+            CloudProvisioningInfrastructureCatalogInterface::class,
+            CloudQuotaReaderInterface::class,
+            CloudSshKeyCatalogInterface::class,
             CloudServerConsoleInterface::class,
             CloudServerCredentialManagerInterface::class,
             CloudServerInventoryInterface::class,
@@ -208,66 +328,39 @@ final class CloudServiceProvider extends ServiceProvider
         foreach ($contracts as $contract) {
             $this->app->singleton(
                 $contract,
-                static function (
-                    Application $app,
-                ) use (
-                    $contract,
-                ): object {
-                    $provider = $app->make(
-                        CloudProviderInterface::class,
-                    );
-
-                    if (! $provider instanceof $contract) {
-                        throw new CloudConfigurationException(
-                            sprintf(
-                                'The default cloud provider does not support contract [%s].',
-                                $contract,
-                            ),
+                function (Application $app) use ($contract): object {
+                    return $app->make(CloudProviderRegistryInterface::class)
+                        ->resolveCapability(
+                            provider: $this->defaultCloudProvider(),
+                            capability: $contract,
                         );
-                    }
-
-                    return $provider;
                 },
             );
         }
     }
 
-    private function resolveDefaultCloudProvider(
-        Application $app,
-    ): CloudProviderInterface {
-        $provider = $this->defaultCloudProvider();
-
-        return match ($provider) {
-            'arvan' => $app->make(
-                ArvanCloudProvider::class,
-            ),
-
-            default => throw new CloudConfigurationException(
-                sprintf(
-                    'The cloud provider [%s] is not supported.',
-                    $provider,
-                ),
-            ),
-        };
-    }
-
-    private function defaultCloudProvider(): string
+    private function defaultCloudProvider(): CloudProviderType
     {
-        $provider = config(
-            'cloud.default',
-        );
+        $provider = config('cloud.default');
 
-        if (
-            ! is_string($provider)
-            || trim($provider) === ''
-        ) {
+        if (! is_string($provider) || trim($provider) === '') {
             throw new CloudConfigurationException(
                 'The default cloud provider is not configured.',
             );
         }
 
-        return strtolower(
-            trim($provider),
-        );
+        $normalized = strtolower(trim($provider));
+        $providerType = CloudProviderType::tryFrom($normalized);
+
+        if (! $providerType instanceof CloudProviderType) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'The cloud provider [%s] is not supported.',
+                    $normalized,
+                ),
+            );
+        }
+
+        return $providerType;
     }
 }

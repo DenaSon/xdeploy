@@ -6,6 +6,7 @@ namespace App\Application\Cloud\Networking;
 
 use App\Domain\Cloud\Contracts\CloudServerNetworkingInterface;
 use App\Domain\Cloud\DTOs\CloudPortData;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Models\Server;
@@ -37,9 +38,8 @@ final readonly class DeleteCloudServerPortAction
             attribute: 'cloud_server_id',
         );
 
-        $this->requiredCloudMetadata(
-            server: $server,
-            attribute: 'cloud_provider',
+        $this->requiredCloudProvider(
+            $server,
         );
 
         $ports = $this->networking->listServerPorts(
@@ -87,6 +87,20 @@ final readonly class DeleteCloudServerPortAction
             ->servers()
             ->whereKey($serverId)
             ->firstOrFail();
+    }
+
+    private function requiredCloudProvider(
+        Server $server,
+    ): CloudProviderType {
+        $provider = $server->cloud_provider;
+
+        if (! $provider instanceof CloudProviderType) {
+            throw new CloudValidationException(
+                'Cloud server metadata is incomplete.',
+            );
+        }
+
+        return $provider;
     }
 
     private function requiredCloudMetadata(

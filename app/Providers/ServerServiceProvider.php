@@ -11,9 +11,11 @@ use App\Infrastructure\Linux\Distributions\DebianFamilyDistribution;
 use App\Infrastructure\Linux\Packages\AptPackageManager;
 use App\Infrastructure\SSH\Authentication\AuthenticationStrategyFactory;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
+use App\Infrastructure\SSH\Contracts\SSHCredentialVerifierInterface;
 use App\Infrastructure\SSH\Contracts\SSHHostResolverInterface;
 use App\Infrastructure\SSH\Contracts\SSHPortReadinessProbeInterface;
 use App\Infrastructure\SSH\Services\SSHConnection;
+use App\Infrastructure\SSH\Services\SSHPasswordRotationService;
 use App\Infrastructure\SSH\Services\SSHPortReadinessProbe;
 use App\Infrastructure\SSH\Services\SystemSSHHostResolver;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +37,11 @@ final class ServerServiceProvider extends ServiceProvider
         $this->app->singleton(
             SSHHostResolverInterface::class,
             SystemSSHHostResolver::class,
+        );
+
+        $this->app->bind(
+            SSHCredentialVerifierInterface::class,
+            SSHPasswordRotationService::class,
         );
 
         $this->app->scoped(

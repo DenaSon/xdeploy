@@ -7,9 +7,12 @@ namespace App\Domain\Cloud\DTOs;
 use App\Domain\Cloud\Enums\CloudServerPowerState;
 use App\Domain\Cloud\Enums\CloudServerStatus;
 use DateTimeImmutable;
+use SensitiveParameter;
 
 final readonly class CloudServerData
 {
+    private ?string $generatedPassword;
+
     /**
      * @param  list<CloudServerAddressData>  $addresses
      * @param  list<string>  $networkIds
@@ -29,13 +32,6 @@ final readonly class CloudServerData
         public array $securityGroupIds = [],
         public bool $volumeBacked = false,
         public bool $highAvailability = false,
-
-        /*
-         * Fields added for resize discovery, polling, and verification.
-         *
-         * They are optional and appended to preserve compatibility with
-         * all existing constructor calls.
-         */
         public ?string $sizeName = null,
         public ?int $vCpu = null,
         public ?int $memoryMiB = null,
@@ -44,7 +40,22 @@ final readonly class CloudServerData
         public ?string $providerError = null,
         public CloudServerPowerState $powerState =
         CloudServerPowerState::Unknown,
-    ) {}
+        #[SensitiveParameter]
+        ?string $generatedPassword = null,
+    ) {
+        $this->generatedPassword = $generatedPassword;
+    }
+
+    public function generatedPassword(): ?string
+    {
+        return $this->generatedPassword;
+    }
+
+    public function hasGeneratedPassword(): bool
+    {
+        return is_string($this->generatedPassword)
+            && $this->generatedPassword !== '';
+    }
 
     /**
      * @return list<string>
@@ -132,12 +143,6 @@ final readonly class CloudServerData
             ) !== '';
     }
 
-    /**
-     * Unknown is temporarily accepted for backward compatibility.
-     *
-     * Once every provider mapper supplies an explicit power state,
-     * active SSH operations will only use Running servers.
-     */
     private function powerStateAllowsSshCheck(): bool
     {
         return in_array(
@@ -162,7 +167,6 @@ final readonly class CloudServerData
             'status' => $this->status->value,
             'power_state' => $this->powerState->value,
             'username' => $this->username,
-
             'size' => [
                 'id' => $this->sizeId,
                 'name' => $this->sizeName,
@@ -170,26 +174,35 @@ final readonly class CloudServerData
                 'memory_mib' => $this->memoryMiB,
                 'disk_gib' => $this->diskGiB,
             ],
-
             'image_id' => $this->imageId,
-
             'created_at' => $this->createdAt?->format(
                 DATE_ATOM,
             ),
-
             'addresses' => array_map(
                 static fn (
                     CloudServerAddressData $address,
                 ): array => $address->toArray(),
                 $this->addresses,
             ),
-
             'network_ids' => $this->networkIds,
             'security_group_ids' => $this->securityGroupIds,
             'volume_backed' => $this->volumeBacked,
             'high_availability' => $this->highAvailability,
             'task_state' => $this->taskState,
             'provider_error' => $this->providerError,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function __debugInfo(): array
+    {
+        return [
+            ...$this->toArray(),
+            'generated_password' => $this->hasGeneratedPassword()
+                ? '[REDACTED]'
+                : null,
         ];
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Infrastructure\Security\Casts\ServerCredentialCast;
@@ -25,6 +26,8 @@ class Server extends Model
         'username',
         'authentication_type',
         'credential',
+        'pending_credential',
+        'bootstrap_credential_rotated_at',
         'status',
         'cloud_provider',
         'cloud_server_id',
@@ -41,17 +44,18 @@ class Server extends Model
     protected $hidden = [
         'credential',
         'credential_context',
+        'pending_credential',
+        'pending_credential_context',
     ];
 
     protected $casts = [
         'port' => 'integer',
-
         'credential' => ServerCredentialCast::class,
-
+        'pending_credential' => ServerCredentialCast::class,
         'status' => ServerStatus::class,
-
         'authentication_type' => AuthenticationType::class,
-
+        'cloud_provider' => CloudProviderType::class,
+        'bootstrap_credential_rotated_at' => 'immutable_datetime',
         'provisioned_at' => 'immutable_datetime',
         'expires_at' => 'immutable_datetime',
         'termination_started_at' => 'immutable_datetime',
@@ -60,11 +64,7 @@ class Server extends Model
         'terminated_at' => 'immutable_datetime',
     ];
 
-    /**
-     * Server owner.
-     *
-     * @return BelongsTo<User, $this>
-     */
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(
@@ -72,11 +72,7 @@ class Server extends Model
         );
     }
 
-    /**
-     * Public endpoints assigned to applications on this server.
-     *
-     * @return HasMany<PublicEndpoint, $this>
-     */
+    /** @return HasMany<PublicEndpoint, $this> */
     public function publicEndpoints(): HasMany
     {
         return $this->hasMany(
@@ -84,11 +80,7 @@ class Server extends Model
         );
     }
 
-    /**
-     * Support requests optionally linked to this server.
-     *
-     * @return HasMany<SupportRequest, $this>
-     */
+    /** @return HasMany<SupportRequest, $this> */
     public function supportRequests(): HasMany
     {
         return $this->hasMany(SupportRequest::class);
@@ -96,8 +88,7 @@ class Server extends Model
 
     public function isActive(): bool
     {
-        return $this->status
-            === ServerStatus::Active;
+        return $this->status === ServerStatus::Active;
     }
 
     public function isCloudProvisioned(): bool
@@ -116,6 +107,18 @@ class Server extends Model
     {
         return is_string($this->host)
             && trim($this->host) !== '';
+    }
+
+    public function hasCredential(): bool
+    {
+        return is_string($this->credential)
+            && trim($this->credential) !== '';
+    }
+
+    public function hasPendingCredential(): bool
+    {
+        return is_string($this->pending_credential)
+            && trim($this->pending_credential) !== '';
     }
 
     public function hasExpired(): bool

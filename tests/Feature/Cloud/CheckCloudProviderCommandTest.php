@@ -17,6 +17,10 @@ final class CheckCloudProviderCommandTest extends TestCase
 
     private const API_KEY = 'private-test-api-key';
 
+    private const LIARA_BASE_URL = 'https://iaas-api.example.test';
+
+    private const LIARA_TOKEN = 'private-test-liara-token';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -66,7 +70,7 @@ final class CheckCloudProviderCommandTest extends TestCase
         );
     }
 
-    public function test_it_checks_cloud_catalog_and_defaults(): void
+    public function test_it_checks_cloud_catalog_defaults_and_inventory(): void
     {
         $this->fakeSuccessfulCatalog();
 
@@ -109,11 +113,16 @@ final class CheckCloudProviderCommandTest extends TestCase
         );
 
         $this->assertStringContainsString(
+            'Server inventory: 0',
+            $output,
+        );
+
+        $this->assertStringContainsString(
             'SSH keys: skipped',
             $output,
         );
 
-        Http::assertSentCount(6);
+        Http::assertSentCount(7);
     }
 
     public function test_it_uses_the_region_selected_in_configuration(): void
@@ -139,6 +148,134 @@ final class CheckCloudProviderCommandTest extends TestCase
             fn (Request $request): bool => $request->url() ===
                 self::BASE_URL
                 .'/regions/eu-west1-a/securities',
+        );
+
+        Http::assertSent(
+            fn (Request $request): bool => $request->url() ===
+                self::BASE_URL
+                .'/regions/eu-west1-a/servers',
+        );
+    }
+
+    public function test_provider_option_runs_read_only_liara_smoke_without_changing_default_provider(): void
+    {
+        config()->set(
+            'cloud.providers.liara.base_url',
+            self::LIARA_BASE_URL,
+        );
+        config()->set(
+            'cloud.providers.liara.api_token',
+            self::LIARA_TOKEN,
+        );
+        config()->set(
+            'cloud.providers.liara.region',
+            'iran',
+        );
+        config()->set(
+            'cloud.providers.liara.defaults.size_id',
+            'standard-base-g2',
+        );
+        config()->set(
+            'cloud.providers.liara.defaults.image_id',
+            'ubuntu-24.04',
+        );
+
+        Http::fake([
+            self::LIARA_BASE_URL.'/plans' => Http::response([
+                'plans' => [
+                    'standard-base-g2' => [
+                        'available' => true,
+                        'region' => 'iran',
+                        'monthlyPrice' => 1_050_000,
+                        'hourlyPrice' => 1458.33,
+                        'volume' => 20,
+                        'RAM' => [
+                            'amount' => 2,
+                        ],
+                        'CPU' => [
+                            'amount' => 1,
+                        ],
+                        'IPv4MonthlyPrice' => [
+                            200_000,
+                            350_000,
+                        ],
+                        'IPv4HourlyPrice' => [
+                            277.77,
+                            486.11,
+                        ],
+                    ],
+                ],
+            ]),
+            self::LIARA_BASE_URL.'/oss' => Http::response([
+                'ubuntu' => [
+                    '24.04',
+                    '22.04',
+                ],
+            ]),
+            self::LIARA_BASE_URL.'/vm' => Http::response([
+                'vms' => [],
+            ]),
+        ]);
+
+        $exitCode = Artisan::call(
+            'cloud:check',
+            [
+                '--provider' => 'liara',
+            ],
+        );
+        $output = Artisan::output();
+
+        $this->assertSame(Command::SUCCESS, $exitCode);
+        $this->assertSame('arvan', config('cloud.default'));
+
+        $this->assertStringContainsString(
+            'Provider: liara',
+            $output,
+        );
+        $this->assertStringContainsString(
+            'Region: iran',
+            $output,
+        );
+        $this->assertStringContainsString(
+            'Default: standard-base-g2',
+            $output,
+        );
+        $this->assertStringContainsString(
+            'Default: ubuntu-24.04',
+            $output,
+        );
+        $this->assertStringContainsString(
+            'Networks and security groups: skipped',
+            $output,
+        );
+        $this->assertStringContainsString(
+            'Quota: skipped',
+            $output,
+        );
+        $this->assertStringContainsString(
+            'Server inventory: 0',
+            $output,
+        );
+        $this->assertStringNotContainsString(
+            self::LIARA_TOKEN,
+            $output,
+        );
+
+        Http::assertSentCount(4);
+        Http::assertSent(
+            static fn (Request $request): bool => $request->method() === 'GET'
+                && $request->url() === self::LIARA_BASE_URL.'/plans',
+        );
+        Http::assertSent(
+            static fn (Request $request): bool => $request->method() === 'GET'
+                && $request->url() === self::LIARA_BASE_URL.'/oss',
+        );
+        Http::assertSent(
+            static fn (Request $request): bool => $request->method() === 'GET'
+                && $request->url() === self::LIARA_BASE_URL.'/vm',
+        );
+        Http::assertNotSent(
+            static fn (Request $request): bool => $request->method() !== 'GET',
         );
     }
 
@@ -265,6 +402,11 @@ final class CheckCloudProviderCommandTest extends TestCase
             .'/regions/eu-west1-a/quota' => Http::response(
                 $this->fixture('quota.json'),
             ),
+
+            self::BASE_URL
+            .'/regions/eu-west1-a/servers' => Http::response([
+                'data' => [],
+            ]),
         ]);
     }
 

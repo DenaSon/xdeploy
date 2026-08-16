@@ -5,90 +5,51 @@ declare(strict_types=1);
 namespace Tests\Unit\Application\Cloud\ServerResize\Actions;
 
 use App\Application\Cloud\ServerResize\Actions\ListAvailableServerResizePlansAction;
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
-use App\Domain\Cloud\DTOs\CloudSizeData;
-use Tests\TestCase;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Models\Server;
+use PHPUnit\Framework\TestCase;
 
 final class ListAvailableServerResizePlansActionTest extends TestCase
 {
-    public function test_it_returns_available_resize_plans_from_catalog(): void
-    {
-        $size = $this->cloudSize();
-
-        $catalog = $this->createMock(
-            CloudServerResizeCatalogInterface::class,
-        );
-
-        $catalog
-            ->expects($this->once())
-            ->method('listServerResizePlans')
-            ->with(
-                'eu-west1-a',
-                'server-123',
-            )
-            ->willReturn([
-                $size,
-            ]);
-
-        $action = new ListAvailableServerResizePlansAction(
-            catalog: $catalog,
-        );
-
-        $result = $action->handle(
-            region: 'eu-west1-a',
-            serverId: 'server-123',
-        );
-
-        $this->assertSame(
-            [
-                $size,
-            ],
-            $result,
-        );
-    }
-
-    public function test_it_preserves_an_empty_resize_plan_list(): void
+    public function test_it_routes_resize_catalog_to_the_servers_owning_provider(): void
     {
         $catalog = $this->createMock(
             CloudServerResizeCatalogInterface::class,
         );
 
-        $catalog
-            ->expects($this->once())
+        $catalog->expects($this->once())
             ->method('listServerResizePlans')
-            ->with(
-                'eu-west1-a',
-                'server-123',
-            )
+            ->with('iran', 'liara-vm-123')
             ->willReturn([]);
 
-        $action = new ListAvailableServerResizePlansAction(
-            catalog: $catalog,
+        $providers = $this->createMock(
+            CloudProviderRegistryInterface::class,
         );
 
-        $result = $action->handle(
-            region: 'eu-west1-a',
-            serverId: 'server-123',
-        );
+        $providers->expects($this->once())
+            ->method('resolveCapability')
+            ->with(
+                CloudProviderType::Liara,
+                CloudServerResizeCatalogInterface::class,
+            )
+            ->willReturn($catalog);
 
-        $this->assertSame(
-            [],
-            $result,
-        );
-    }
+        $server = new Server();
+        $server->forceFill([
+            'cloud_provider' => 'liara',
+            'cloud_region' => 'iran',
+            'cloud_server_id' => 'liara-vm-123',
+        ]);
 
-    private function cloudSize(): CloudSizeData
-    {
-        return new CloudSizeData(
-            id: 'eco-4-8-0',
-            name: 'eco-large',
-            regionId: 'eu-west1-a',
-            vCpu: 4,
-            memoryMiB: 8192,
-            diskGiB: 100,
-            category: 'economic',
-            hourlyPrice: null,
-            monthlyPrice: null,
-        );
+        $result = (new ListAvailableServerResizePlansAction(
+            capabilities: new CloudServerCapabilityResolver(
+                providers: $providers,
+            ),
+        ))->handle($server);
+
+        $this->assertSame([], $result);
     }
 }

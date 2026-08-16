@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\ServerResize\Actions;
 
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Models\Server;
 
 final readonly class CalculateCloudSizeAction
 {
     public function __construct(
-        private CloudServerResizeCatalogInterface $catalog,
+        private CloudServerCapabilityResolver $capabilities,
     ) {}
 
     public function handle(
-        string $region,
+        Server $server,
         string $sizeId,
         int $diskGiB,
     ): CloudSizeData {
-        return $this->catalog->calculateSize(
-            region: $region,
+        [$target, $catalog] = $this->capabilities->resolve(
+            server: $server,
+            capability: CloudServerResizeCatalogInterface::class,
+        );
+
+        return $catalog->calculateSize(
+            region: $target->region,
             sizeId: $sizeId,
             diskGiB: $diskGiB,
         );

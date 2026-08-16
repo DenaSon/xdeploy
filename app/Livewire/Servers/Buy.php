@@ -11,9 +11,13 @@ use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Exceptions\OrderQuoteExpiredException;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
+use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Models\User;
 use App\Support\Cloud\CloudRegionLabel;
 use App\Support\Money\MoneyFormatter;
@@ -34,6 +38,15 @@ final class Buy extends Component
     private const int MAX_VISIBLE_PLANS = 10;
 
     private const string REGION_GROUP_INTERNATIONAL = 'international';
+
+    /**
+     * @var list<array{
+     *     id: string,
+     *     label: string,
+     *     description: string
+     * }>
+     */
+    public array $providers = [];
 
     /**
      * @var list<array{
@@ -93,6 +106,8 @@ final class Buy extends Component
 
     public bool $catalogLoaded = false;
 
+    public string $provider = '';
+
     public string $regionGroup = self::REGION_GROUP_IRAN;
 
     public string $regionId = '';
@@ -114,9 +129,11 @@ final class Buy extends Component
     public function mount(): void
     {
         /*
-         * Do not block the initial page render on the Cloud Provider.
-         * The catalog is fetched after first paint through wire:init.
+         * Provider discovery is local container state only. No provider API
+         * call happens during the first render; catalog I/O remains deferred
+         * until wire:init.
          */
+        $this->loadProviders();
         $this->loadPeriods();
     }
 
@@ -160,6 +177,29 @@ final class Buy extends Component
         $this->catalogError = null;
         $this->quoteError = null;
         $this->pendingOrderId = null;
+
+        $this->fetchCatalog();
+    }
+
+    public function selectProvider(string $provider): void
+    {
+        if (
+            $this->findById(
+                $this->providers,
+                $provider,
+            ) === null
+        ) {
+            return;
+        }
+
+        if ($this->provider === $provider) {
+            return;
+        }
+
+        $this->provider = $provider;
+        $this->pendingOrderId = null;
+        $this->catalogLoaded = false;
+        $this->resetCatalogSelection();
 
         $this->fetchCatalog();
     }
@@ -335,7 +375,10 @@ final class Buy extends Component
 
     public function increaseDisk(): void
     {
-        if ($this->sizeId === '') {
+        if (
+            $this->sizeId === ''
+            || ! $this->customDiskEnabled()
+        ) {
             return;
         }
 
@@ -347,7 +390,10 @@ final class Buy extends Component
 
     public function decreaseDisk(): void
     {
-        if ($this->sizeId === '') {
+        if (
+            $this->sizeId === ''
+            || ! $this->customDiskEnabled()
+        ) {
             return;
         }
 
@@ -373,7 +419,7 @@ final class Buy extends Component
         if (! $this->selectionIsValid()) {
             $this->error(
                 'اطلاعات خرید کامل نیست',
-                'لطفاً منطقه، پلن، سیستم‌عامل و دوره پرداخت را انتخاب کنید.',
+                'لطفاً ارائه‌دهنده، منطقه، پلن، سیستم‌عامل و دوره پرداخت را انتخاب کنید.',
             );
 
             return null;
@@ -393,6 +439,7 @@ final class Buy extends Component
         }
 
         $user = $this->authenticatedUser();
+        $provider = $this->providerType();
 
         try {
             if ($this->pendingOrderId === null) {
@@ -403,6 +450,7 @@ final class Buy extends Component
                     imageId: $this->imageId,
                     selectedDiskGiB: $this->selectedDiskGiB,
                     period: $this->period,
+                    provider: $provider,
                 );
 
                 $this->pendingOrderId =
@@ -447,7 +495,7 @@ final class Buy extends Component
     public function render(): View
     {
         return view(
-            'livewire.servers.buy',
+            'livewire.servers.buy-page',
             [
                 'visibleRegions' => $this->regionsForGroup(
                     $this->regionGroup,
@@ -466,6 +514,11 @@ final class Buy extends Component
                         ),
                     ),
                 ],
+
+                'selectedProvider' => $this->findById(
+                    $this->providers,
+                    $this->provider,
+                ),
 
                 'selectedRegion' => $this->findById(
                     $this->regions,
@@ -489,6 +542,8 @@ final class Buy extends Component
 
                 'minimumDiskGiB' => $this->minimumDiskGiB(),
 
+                'customDiskEnabled' => $this->customDiskEnabled(),
+
                 'providerLabel' => $this->providerLabel(),
 
                 'quoteTtlMinutes' => max(
@@ -509,10 +564,16 @@ final class Buy extends Component
         $this->catalogError = null;
         $this->quoteError = null;
 
+        if ($this->provider === '') {
+            $this->catalogLoaded = true;
+            $this->catalogError =
+                'در حال حاضر هیچ ارائه‌دهنده ابری برای خرید فعال نیست.';
+
+            return;
+        }
+
         try {
-            $catalog = app(
-                CloudCatalogReaderInterface::class,
-            );
+            $catalog = $this->catalog();
 
             $regions = array_values(
                 array_filter(
@@ -569,15 +630,53 @@ final class Buy extends Component
                 $exception,
             );
 
-            $this->regions = [];
-            $this->sizes = [];
-            $this->images = [];
-            $this->quote = [];
+            $this->resetCatalogSelection();
             $this->catalogLoaded = true;
 
             $this->catalogError =
                 'دریافت اطلاعات سرورهای ابری ناموفق بود. دوباره تلاش کنید.';
         }
+    }
+
+    private function loadProviders(): void
+    {
+        $registered = app(
+            CloudProviderRegistryInterface::class,
+        )->registeredProviders();
+
+        $this->providers = array_map(
+            fn (CloudProviderType $provider): array => [
+                'id' => $provider->value,
+                'label' => $this->providerLabelFor($provider),
+                'description' => $this->providerDescriptionFor($provider),
+            ],
+            $registered,
+        );
+
+        $configuredDefault = CloudProviderType::tryFrom(
+            strtolower(
+                trim(
+                    (string) config(
+                        'cloud.default',
+                        '',
+                    ),
+                ),
+            ),
+        );
+
+        if (
+            $configuredDefault instanceof CloudProviderType
+            && $this->findById(
+                $this->providers,
+                $configuredDefault->value,
+            ) !== null
+        ) {
+            $this->provider = $configuredDefault->value;
+
+            return;
+        }
+
+        $this->provider = $this->providers[0]['id'] ?? '';
     }
 
     private function loadPeriods(): void
@@ -640,9 +739,7 @@ final class Buy extends Component
         $this->quote = [];
 
         try {
-            $catalog = app(
-                CloudCatalogReaderInterface::class,
-            );
+            $catalog = $this->catalog();
 
             $purchasableSizes = array_values(
                 array_filter(
@@ -774,6 +871,7 @@ final class Buy extends Component
                 sizeId: $this->sizeId,
                 selectedDiskGiB: $this->selectedDiskGiB,
                 period: $this->period,
+                provider: $this->providerType(),
             );
 
             $this->quote =
@@ -834,6 +932,10 @@ final class Buy extends Component
     {
         return
             $this->findById(
+                $this->providers,
+                $this->provider,
+            ) !== null
+            && $this->findById(
                 $this->regions,
                 $this->regionId,
             ) !== null
@@ -851,6 +953,52 @@ final class Buy extends Component
             ) !== null
             && $this->selectedDiskGiB
             >= $this->minimumDiskGiB();
+    }
+
+    private function catalog(): CloudCatalogReaderInterface
+    {
+        return app(
+            CloudCatalogReaderResolverInterface::class,
+        )->resolve(
+            $this->providerType(),
+        );
+    }
+
+    private function providerType(): CloudProviderType
+    {
+        $provider = CloudProviderType::tryFrom(
+            strtolower(
+                trim(
+                    $this->provider,
+                ),
+            ),
+        );
+
+        if (! $provider instanceof CloudProviderType) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Selected cloud provider [%s] is invalid.',
+                    $this->provider,
+                ),
+            );
+        }
+
+        return $provider;
+    }
+
+    private function resetCatalogSelection(): void
+    {
+        $this->regions = [];
+        $this->sizes = [];
+        $this->images = [];
+        $this->quote = [];
+        $this->regionGroup = self::REGION_GROUP_IRAN;
+        $this->regionId = '';
+        $this->sizeId = '';
+        $this->imageId = '';
+        $this->selectedDiskGiB = 0;
+        $this->catalogError = null;
+        $this->quoteError = null;
     }
 
     /**
@@ -914,10 +1062,12 @@ final class Buy extends Component
         );
 
         if (
-            str_starts_with(
+            $id === 'iran'
+            || str_starts_with(
                 $id,
                 'ir-',
             )
+            || $country === 'ir'
             || str_contains(
                 $country,
                 'iran',
@@ -957,16 +1107,38 @@ final class Buy extends Component
 
     private function providerLabel(): string
     {
-        return match (
-            (string) config(
-                'cloud.default',
-                '',
-            )
-        ) {
-            'arvan' => 'ابر آروان',
+        $provider = CloudProviderType::tryFrom(
+            $this->provider,
+        );
 
-            default => 'Cloud Provider',
+        return $provider instanceof CloudProviderType
+            ? $this->providerLabelFor($provider)
+            : 'ارائه‌دهنده ابری';
+    }
+
+    private function providerLabelFor(
+        CloudProviderType $provider,
+    ): string {
+        return match ($provider) {
+            CloudProviderType::Arvan => 'ابر آروان',
+            CloudProviderType::Liara => 'لیارا',
         };
+    }
+
+    private function providerDescriptionFor(
+        CloudProviderType $provider,
+    ): string {
+        return match ($provider) {
+            CloudProviderType::Arvan => 'زیرساخت ابری آروان',
+            CloudProviderType::Liara => 'سرور ابری لیارا',
+        };
+    }
+
+    private function customDiskEnabled(): bool
+    {
+        return CloudProviderType::tryFrom(
+            $this->provider,
+        ) === CloudProviderType::Arvan;
     }
 
     private function memoryLabel(

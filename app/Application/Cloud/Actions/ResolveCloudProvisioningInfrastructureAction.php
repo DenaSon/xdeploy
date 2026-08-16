@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Actions;
 
 use App\Application\Cloud\DTOs\CloudProvisioningInfrastructureData;
-use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
 use App\Domain\Cloud\Enums\CloudIpVersion;
@@ -17,15 +17,13 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
     private const string DEFAULT_NETWORK_NAME = 'default network';
 
     public function __construct(
-        private CloudProviderInterface $cloud,
+        private CloudProvisioningInfrastructureCatalogInterface $cloud,
     ) {}
 
     public function execute(
         string $regionId,
     ): CloudProvisioningInfrastructureData {
-        $regionId = trim(
-            $regionId,
-        );
+        $regionId = trim($regionId);
 
         if ($regionId === '') {
             throw new InvalidArgumentException(
@@ -33,13 +31,8 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
             );
         }
 
-        $network = $this->resolveNetwork(
-            $regionId,
-        );
-
-        $securityGroup = $this->resolveSecurityGroup(
-            $regionId,
-        );
+        $network = $this->resolveNetwork($regionId);
+        $securityGroup = $this->resolveSecurityGroup($regionId);
 
         return new CloudProvisioningInfrastructureData(
             networkId: $network->id,
@@ -54,12 +47,8 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
     ): CloudNetworkData {
         $eligibleNetworks = array_values(
             array_filter(
-                $this->cloud->listNetworks(
-                    $regionId,
-                ),
-                static fn (
-                    CloudNetworkData $network,
-                ): bool => $network->regionId === $regionId
+                $this->cloud->listNetworks($regionId),
+                static fn (CloudNetworkData $network): bool => $network->regionId === $regionId
                     && $network->isActive
                     && $network->dhcpEnabled
                     && $network->ipVersion === CloudIpVersion::IPv4,
@@ -75,22 +64,10 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
             );
         }
 
-        /*
-         * ArvanCloud exposes several public IPv4 pools in most regions, while
-         * exactly one provider-managed network is returned as "Default network".
-         *
-         * xDeploy must not choose an arbitrary public pool merely because it
-         * happens to appear first in the API response. Prefer the provider's
-         * explicit default network semantic.
-         */
         $defaultNetworks = array_values(
             array_filter(
                 $eligibleNetworks,
-                fn (
-                    CloudNetworkData $network,
-                ): bool => $this->isDefaultNetwork(
-                    $network,
-                ),
+                fn (CloudNetworkData $network): bool => $this->isDefaultNetwork($network),
             ),
         );
 
@@ -107,10 +84,6 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
             );
         }
 
-        /*
-         * Keep a conservative provider-neutral fallback for regions/providers
-         * that expose only one eligible network but do not label it.
-         */
         if (count($eligibleNetworks) === 1) {
             return $eligibleNetworks[0];
         }
@@ -128,12 +101,8 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
     ): CloudSecurityGroupData {
         $defaults = array_values(
             array_filter(
-                $this->cloud->listSecurityGroups(
-                    $regionId,
-                ),
-                static fn (
-                    CloudSecurityGroupData $group,
-                ): bool => $group->regionId === $regionId
+                $this->cloud->listSecurityGroups($regionId),
+                static fn (CloudSecurityGroupData $group): bool => $group->regionId === $regionId
                     && $group->isDefault,
             ),
         );
@@ -162,10 +131,6 @@ final readonly class ResolveCloudProvisioningInfrastructureAction
     private function isDefaultNetwork(
         CloudNetworkData $network,
     ): bool {
-        return mb_strtolower(
-            trim(
-                $network->name,
-            ),
-        ) === self::DEFAULT_NETWORK_NAME;
+        return mb_strtolower(trim($network->name)) === self::DEFAULT_NETWORK_NAME;
     }
 }

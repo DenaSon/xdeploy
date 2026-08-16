@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Servers;
 
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\DTOs\CloudServerConsoleData;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Livewire\Servers\Console;
@@ -58,6 +60,69 @@ final class ConsoleTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_provider_without_console_capability_cannot_open_console_page(): void
+    {
+        $user = User::factory()->create();
+        $server = $this->cloudServer(
+            user: $user,
+            provider: CloudProviderType::Liara,
+            region: 'iran',
+            serverId: 'liara-vm-123',
+        );
+
+        $this->bindConsoleCapability(
+            provider: CloudProviderType::Liara,
+            supported: false,
+        );
+
+        $this->actingAs($user)
+            ->get(
+                route('panel.servers.console', $server),
+            )
+            ->assertNotFound();
+    }
+
+    public function test_workspace_hides_console_navigation_for_unsupported_provider(): void
+    {
+        $user = User::factory()->create();
+        $server = $this->cloudServer(
+            user: $user,
+            provider: CloudProviderType::Liara,
+            region: 'iran',
+            serverId: 'liara-vm-123',
+        );
+
+        $this->bindConsoleCapability(
+            provider: CloudProviderType::Liara,
+            supported: false,
+        );
+
+        $this->actingAs($user)
+            ->get(
+                route('panel.servers.details', $server),
+            )
+            ->assertOk()
+            ->assertDontSee('کنسول');
+    }
+
+    public function test_workspace_shows_console_navigation_for_supported_provider(): void
+    {
+        $user = User::factory()->create();
+        $server = $this->cloudServer($user);
+
+        $this->bindConsoleCapability(
+            provider: CloudProviderType::Arvan,
+            supported: true,
+        );
+
+        $this->actingAs($user)
+            ->get(
+                route('panel.servers.details', $server),
+            )
+            ->assertOk()
+            ->assertSee('کنسول');
+    }
+
     public function test_owner_can_load_cloud_server_console(): void
     {
         $user = User::factory()->create();
@@ -81,9 +146,10 @@ final class ConsoleTest extends TestCase
                 ),
             );
 
-        $this->app->instance(
-            CloudServerConsoleInterface::class,
-            $console,
+        $this->bindConsoleCapability(
+            provider: CloudProviderType::Arvan,
+            supported: true,
+            console: $console,
         );
 
         $this->actingAs($user);
@@ -116,9 +182,10 @@ final class ConsoleTest extends TestCase
                 ),
             );
 
-        $this->app->instance(
-            CloudServerConsoleInterface::class,
-            $console,
+        $this->bindConsoleCapability(
+            provider: CloudProviderType::Arvan,
+            supported: true,
+            console: $console,
         );
 
         $this->actingAs($user);
@@ -137,8 +204,45 @@ final class ConsoleTest extends TestCase
             ->assertSee('تلاش مجدد');
     }
 
-    private function cloudServer(User $user): Server
-    {
+    private function bindConsoleCapability(
+        CloudProviderType $provider,
+        bool $supported,
+        ?CloudServerConsoleInterface $console = null,
+    ): void {
+        $registry = Mockery::mock(
+            CloudProviderRegistryInterface::class,
+        );
+
+        $registry
+            ->shouldReceive('supportsCapability')
+            ->with(
+                $provider,
+                CloudServerConsoleInterface::class,
+            )
+            ->andReturn($supported);
+
+        if ($console instanceof CloudServerConsoleInterface) {
+            $registry
+                ->shouldReceive('resolveCapability')
+                ->with(
+                    $provider,
+                    CloudServerConsoleInterface::class,
+                )
+                ->andReturn($console);
+        }
+
+        $this->app->instance(
+            CloudProviderRegistryInterface::class,
+            $registry,
+        );
+    }
+
+    private function cloudServer(
+        User $user,
+        CloudProviderType $provider = CloudProviderType::Arvan,
+        string $region = 'ir-thr-ba1',
+        string $serverId = 'cloud-server-123',
+    ): Server {
         return Server::query()->create([
             'user_id' => $user->id,
             'name' => 'cloud-vps',
@@ -148,9 +252,9 @@ final class ConsoleTest extends TestCase
             'authentication_type' => AuthenticationType::Password,
             'credential' => null,
             'status' => ServerStatus::Active,
-            'cloud_provider' => 'arvan',
-            'cloud_server_id' => 'cloud-server-123',
-            'cloud_region' => 'ir-thr-ba1',
+            'cloud_provider' => $provider->value,
+            'cloud_server_id' => $serverId,
+            'cloud_region' => $region,
         ]);
     }
 

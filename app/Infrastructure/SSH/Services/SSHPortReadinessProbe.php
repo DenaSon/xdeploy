@@ -11,7 +11,7 @@ use InvalidArgumentException;
 
 final readonly class SSHPortReadinessProbe implements SSHPortReadinessProbeInterface
 {
-    private const int MAX_WAIT_SECONDS = 90;
+    private const int MAX_WAIT_SECONDS = 120;
 
     private const int POLL_INTERVAL_SECONDS = 5;
 

@@ -205,12 +205,6 @@ return [
                 'eu-west1-a',
             ),
 
-            /*
-            |--------------------------------------------------------------------------
-            | HTTP Timeouts
-            |--------------------------------------------------------------------------
-            */
-
             'timeouts' => [
                 'connect' => (int) env(
                     'ARVAN_CLOUD_CONNECT_TIMEOUT',
@@ -223,28 +217,12 @@ return [
                 ),
             ],
 
-            /*
-            |--------------------------------------------------------------------------
-            | Package Repositories
-            |--------------------------------------------------------------------------
-            |
-            | Arvan-provisioned Ubuntu servers use the provider-local HTTPS mirror
-            | before xDeploy performs package-based application provisioning.
-            |
-            */
-
             'package_repositories' => [
                 'ubuntu_mirror' => env(
                     'ARVAN_CLOUD_UBUNTU_MIRROR',
                     'https://mirror.arvancloud.ir/ubuntu',
                 ),
             ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | Provisioning Defaults
-            |--------------------------------------------------------------------------
-            */
 
             'defaults' => [
                 'size_id' => env(
@@ -262,10 +240,6 @@ return [
                     'c72ea6b9-e1c1-4b72-80eb-adc6fc1941a2',
                 ),
 
-                /*
-                 * ArvanCloud شناسه Security Group را داخل
-                 * security_groups[].name دریافت می‌کند.
-                 */
                 'security_group_id' => env(
                     'ARVAN_CLOUD_DEFAULT_SECURITY_GROUP_ID',
                     '8449a4f5-5709-4017-9e63-45496bfe5cc9',
@@ -299,6 +273,83 @@ return [
                 'ha_enabled' => filter_var(
                     env(
                         'ARVAN_CLOUD_DEFAULT_HA_ENABLED',
+                        false,
+                    ),
+                    FILTER_VALIDATE_BOOL,
+                ),
+            ],
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Liara IaaS
+        |--------------------------------------------------------------------------
+        |
+        | Liara API prices are returned in Tomans. The Liara provider adapter
+        | normalizes them to IRR before they enter Coreflare billing logic.
+        |
+        */
+
+        'liara' => [
+            'base_url' => env(
+                'LIARA_CLOUD_BASE_URL',
+                'https://iaas-api.liara.ir',
+            ),
+
+            /*
+             * Environment contains only the JWT/token value.
+             * LiaraCloudClient adds the Bearer scheme.
+             */
+            'api_token' => env(
+                'LIARA_CLOUD_API_TOKEN',
+            ),
+
+            'region' => env(
+                'LIARA_CLOUD_REGION',
+                'iran',
+            ),
+
+            'timeouts' => [
+                'connect' => (int) env(
+                    'LIARA_CLOUD_CONNECT_TIMEOUT',
+                    10,
+                ),
+
+                'request' => (int) env(
+                    'LIARA_CLOUD_TIMEOUT',
+                    90,
+                ),
+            ],
+
+            'defaults' => [
+                'size_id' => env(
+                    'LIARA_CLOUD_DEFAULT_SIZE_ID',
+                    'standard-base-g2',
+                ),
+
+                'image_id' => env(
+                    'LIARA_CLOUD_DEFAULT_IMAGE_ID',
+                    'ubuntu-24.04',
+                ),
+
+                'username' => env(
+                    'LIARA_CLOUD_DEFAULT_USERNAME',
+                    'root',
+                ),
+
+                'disk_size' => (int) env(
+                    'LIARA_CLOUD_DEFAULT_DISK_SIZE',
+                    20,
+                ),
+
+                'init_script' => env(
+                    'LIARA_CLOUD_DEFAULT_INIT_SCRIPT',
+                    '',
+                ),
+
+                'ha_enabled' => filter_var(
+                    env(
+                        'LIARA_CLOUD_DEFAULT_HA_ENABLED',
                         false,
                     ),
                     FILTER_VALIDATE_BOOL,

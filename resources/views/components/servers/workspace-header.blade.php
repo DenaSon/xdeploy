@@ -2,6 +2,8 @@
     'server',
 ])
 
+@inject('cloudServerCapabilities', 'App\Application\Cloud\Servers\CloudServerCapabilityResolver')
+
 @php
     $isActive = $server->isActive();
 
@@ -69,7 +71,13 @@
     ];
 
 
-    if ($server->isCloudProvisioned()) {
+    $canUseConsole = $server->isCloudProvisioned()
+        && $cloudServerCapabilities->supports(
+            server: $server,
+            capability: \App\Domain\Cloud\Contracts\CloudServerConsoleInterface::class,
+        );
+
+    if ($canUseConsole) {
         $navigationItems[] = [
             'label' => 'کنسول',
             'icon' => 'lucide.monitor',
