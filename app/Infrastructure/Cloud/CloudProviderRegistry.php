@@ -22,12 +22,12 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
 
     /**
      * @param  array<string, CloudProviderInterface>  $providers
-     * @param  list<string>|null  $purchasableProviders
+     * @param  list<string>  $purchasableProviders
      * @param  array<string, array<class-string, object>>  $capabilities
      */
     public function __construct(
         array $providers,
-        ?array $purchasableProviders = null,
+        array $purchasableProviders,
         array $capabilities = [],
     ) {
         $normalizedProviders = [];
@@ -36,7 +36,6 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
             $normalizedProviders[$this->normalizeProviderKey($key)] = $provider;
         }
 
-        $purchasableProviders ??= array_keys($normalizedProviders);
         $normalizedPurchasableProviders = [];
 
         foreach ($purchasableProviders as $key) {
