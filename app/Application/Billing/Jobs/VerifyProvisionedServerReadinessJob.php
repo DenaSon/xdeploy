@@ -21,18 +21,24 @@ final class VerifyProvisionedServerReadinessJob implements ShouldBeUnique, Shoul
     use Queueable;
     use SerializesModels;
 
+    private const array RETRY_DELAYS_SECONDS = [
+        60,
+        120,
+        180,
+    ];
+
     /**
-     * This job never creates a provider resource. A single automatic
-     * attempt is sufficient for MVP; readiness can be checked again later
-     * without any risk of duplicate billing.
+     * Readiness retries are safe because this job never creates or mutates
+     * provider resources. Each attempt only verifies SSH readiness and can
+     * activate the already-delivered local Server.
      */
-    public int $tries = 1;
+    public int $tries = 4;
 
     public int $timeout = 180;
 
     public bool $failOnTimeout = true;
 
-    public int $uniqueFor = 300;
+    public int $uniqueFor = 900;
 
     public function __construct(
         public readonly int $serverId,
@@ -68,13 +74,8 @@ final class VerifyProvisionedServerReadinessJob implements ShouldBeUnique, Shoul
                 $server,
             );
         } catch (CloudServerSshUnavailableException $exception) {
-            /*
-             * SSH unreachability is a connectivity/readiness condition,
-             * not a commercial fulfillment failure. In particular, public
-             * IP filtering can make a valid provider VPS unreachable from
-             * the xDeploy host. Keep the Server inactive and finish this Job
-             * successfully so the Order remains fulfilled.
-             */
+            $attempt = $this->attempts();
+
             logger()->warning(
                 'server.readiness.ssh_unavailable',
                 [
@@ -82,8 +83,44 @@ final class VerifyProvisionedServerReadinessJob implements ShouldBeUnique, Shoul
                     'cloud_provider' => $server->cloud_provider,
                     'cloud_server_id' => $server->cloud_server_id,
                     'host' => $server->host,
+                    'attempt' => $attempt,
+                    'max_attempts' => $this->tries,
                     'message' => $exception->getMessage(),
                 ],
+            );
+
+            if ($attempt >= $this->tries) {
+                logger()->warning(
+                    'server.readiness.retries_exhausted',
+                    [
+                        'server_id' => $server->getKey(),
+                        'cloud_provider' => $server->cloud_provider,
+                        'cloud_server_id' => $server->cloud_server_id,
+                        'attempts' => $attempt,
+                    ],
+                );
+
+                return;
+            }
+
+            $delay = self::RETRY_DELAYS_SECONDS[
+                min(
+                    $attempt - 1,
+                    count(self::RETRY_DELAYS_SECONDS) - 1,
+                )
+            ];
+
+            logger()->info(
+                'server.readiness.retry_scheduled',
+                [
+                    'server_id' => $server->getKey(),
+                    'attempt' => $attempt,
+                    'delay_seconds' => $delay,
+                ],
+            );
+
+            $this->release(
+                $delay,
             );
         }
     }
