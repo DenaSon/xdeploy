@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Cloud;
 
 use App\Application\Server\Actions\CreateServerAction;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Models\User;
@@ -39,7 +40,7 @@ final class CloudServerPersistenceTest extends TestCase
 
                 'credential' => 'temporary-generated-password',
 
-                'cloud_provider' => 'arvan',
+                'cloud_provider' => CloudProviderType::Arvan,
 
                 'cloud_server_id' => 'ff83466c-c0fe-4dc4-9d1d-bde29efd0b45',
 
@@ -54,6 +55,16 @@ final class CloudServerPersistenceTest extends TestCase
         $this->assertSame(
             ServerStatus::Inactive,
             $server->status,
+        );
+
+        $this->assertSame(
+            CloudProviderType::Arvan,
+            $server->cloud_provider,
+        );
+
+        $this->assertSame(
+            CloudProviderType::Arvan,
+            $server->fresh()->cloud_provider,
         );
 
         $this->assertNull(
@@ -105,7 +116,7 @@ final class CloudServerPersistenceTest extends TestCase
 
                 'credential' => 'temporary-generated-password',
 
-                'cloud_provider' => 'arvan',
+                'cloud_provider' => CloudProviderType::Arvan,
 
                 'cloud_server_id' => 'provider-server-id',
 
@@ -155,7 +166,7 @@ final class CloudServerPersistenceTest extends TestCase
 
             'credential' => 'temporary-generated-password',
 
-            'cloud_provider' => 'arvan',
+            'cloud_provider' => CloudProviderType::Arvan,
 
             'cloud_server_id' => 'duplicate-provider-id',
 
