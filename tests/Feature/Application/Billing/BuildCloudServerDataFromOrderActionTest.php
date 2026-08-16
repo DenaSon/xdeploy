@@ -28,9 +28,18 @@ final class BuildCloudServerDataFromOrderActionTest extends TestCase
 
         $order = $this->paidOrder();
 
-        $data = (new BuildCloudServerDataFromOrderAction)->execute($order);
+        $action = new BuildCloudServerDataFromOrderAction;
+        $data = $action->execute($order);
 
-        $this->assertSame("xdeploy-order-{$order->id}", $data->name);
+        $this->assertSame(
+            sprintf(
+                'cf-%s',
+                base_convert((string) $order->id, 10, 36),
+            ),
+            $data->name,
+        );
+        $this->assertLessThanOrEqual(19, strlen($data->name));
+        $this->assertMatchesRegularExpression('/\A[a-z][a-z0-9-]+\z/', $data->name);
         $this->assertSame('eu-west1-a', $data->regionId);
         $this->assertSame('eco-2-2-0', $data->sizeId);
         $this->assertSame('ubuntu-24-image', $data->imageId);
