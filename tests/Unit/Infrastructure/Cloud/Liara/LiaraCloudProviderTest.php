@@ -32,9 +32,35 @@ final class LiaraCloudProviderTest extends TestCase
                 $this->plansResponse(),
             ),
             self::BASE_URL.'/oss' => Http::response([
+                'one-click-apps' => [
+                    'docker' => [
+                        '29.1.2',
+                    ],
+                    'gitlabce' => [
+                        '18.6.1',
+                    ],
+                    'appwrite' => [
+                        '1.8.0',
+                    ],
+                    'supabase' => [
+                        '2025.12.17',
+                    ],
+                    'sentry' => [
+                        '25.12.0',
+                    ],
+                    'jitsi' => [
+                        'stable-11146',
+                    ],
+                ],
                 'ubuntu' => [
                     '24.04',
                     '22.04',
+                ],
+                'debian' => [
+                    '12.9',
+                ],
+                'windowsserver' => [
+                    '2025',
                 ],
             ]),
         ]);
@@ -44,10 +70,18 @@ final class LiaraCloudProviderTest extends TestCase
         $regions = $provider->listRegions();
         $sizes = $provider->listSizes('iran');
         $images = $provider->listImages('iran');
+        $imageIds = array_map(
+            static fn ($image): string => $image->id,
+            $images,
+        );
 
         $this->assertSame('iran', $regions[0]->id);
         $this->assertSame('standard-base-g2', $sizes[0]->id);
-        $this->assertSame('ubuntu-24.04', $images[0]->id);
+        $this->assertContains('ubuntu-24.04', $imageIds);
+        $this->assertContains('debian-12.9', $imageIds);
+        $this->assertContains('windowsserver-2025', $imageIds);
+        $this->assertContains('docker-29.1.2', $imageIds);
+        $this->assertContains('jitsi-stable-11146', $imageIds);
         $this->assertSame('10500000', $sizes[0]->monthlyPrice?->amount);
 
         Http::assertSentCount(3);
