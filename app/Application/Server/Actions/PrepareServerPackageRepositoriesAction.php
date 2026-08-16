@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Server\Actions;
 
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\DTOs\OperatingSystemInfo;
 use App\Domain\Server\Exceptions\ServerPackageRepositoryException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
@@ -12,8 +13,6 @@ use App\Support\SSH\SSHTimeout;
 
 final readonly class PrepareServerPackageRepositoriesAction
 {
-    private const string ARVAN_PROVIDER = 'arvan';
-
     private const string DEFAULT_ARVAN_UBUNTU_MIRROR =
         'https://mirror.arvancloud.ir/ubuntu';
 
@@ -26,7 +25,7 @@ final readonly class PrepareServerPackageRepositoriesAction
         OperatingSystemInfo $operatingSystem,
     ): void {
         if (
-            $server->cloud_provider !== self::ARVAN_PROVIDER
+            $server->cloud_provider !== CloudProviderType::Arvan
             || $operatingSystem->id !== 'ubuntu'
         ) {
             return;
