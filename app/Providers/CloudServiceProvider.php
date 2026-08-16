@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
@@ -49,6 +50,8 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerLiaraCloudClient();
         $this->registerLiaraCloudMapper();
         $this->registerLiaraCloudProvider();
+
+        $this->app->bind(FilterSupportedCloudImagesAction::class);
 
         $this->registerCloudProviderRegistry();
         $this->registerCloudProviderContract();
