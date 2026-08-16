@@ -18,23 +18,11 @@ final readonly class CloudServerCapabilityResolver
 
     public function target(Server $server): CloudServerTargetData
     {
-        $providerValue = strtolower(
-            $this->requiredMetadata(
-                server: $server,
-                attribute: 'cloud_provider',
-            ),
-        );
-
-        $provider = CloudProviderType::tryFrom(
-            $providerValue,
-        );
+        $provider = $server->cloud_provider;
 
         if (! $provider instanceof CloudProviderType) {
             throw new CloudValidationException(
-                sprintf(
-                    'Cloud provider metadata [%s] is unsupported.',
-                    $providerValue,
-                ),
+                'Cloud server provider metadata is incomplete.',
             );
         }
 
