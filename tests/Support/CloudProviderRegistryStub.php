@@ -13,11 +13,20 @@ final readonly class CloudProviderRegistryStub implements CloudProviderRegistryI
 {
     /**
      * @param  array<class-string, object>  $capabilities
+     * @param  list<CloudProviderType>  $registeredProviders
      */
     public function __construct(
         private CloudProviderInterface $provider,
         private array $capabilities = [],
+        private array $registeredProviders = [
+            CloudProviderType::Arvan,
+        ],
     ) {}
+
+    public function registeredProviders(): array
+    {
+        return $this->registeredProviders;
+    }
 
     public function resolve(
         CloudProviderType $provider,
