@@ -8,6 +8,11 @@ use App\Domain\Cloud\Enums\CloudProviderType;
 
 interface CloudProviderRegistryInterface
 {
+    /**
+     * @return list<CloudProviderType>
+     */
+    public function registeredProviders(): array;
+
     public function resolve(
         CloudProviderType $provider,
     ): CloudProviderInterface;
