@@ -9,6 +9,7 @@ use App\Application\Billing\Actions\ProvisionPaidOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConnectionException;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
@@ -33,6 +34,10 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
 
         Http::preventStrayRequests();
 
+        config()->set('cloud.default', CloudProviderType::Liara->value);
+        config()->set('cloud.providers.liara.defaults.init_script', '');
+        config()->set('cloud.providers.liara.defaults.ha_enabled', false);
+
         $provider = new LiaraCloudProvider(
             client: new LiaraCloudClient(
                 baseUrl: self::BASE_URL,
@@ -51,9 +56,6 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
                 ],
             ),
         );
-
-        config()->set('cloud.providers.liara.defaults.init_script', '');
-        config()->set('cloud.providers.liara.defaults.ha_enabled', false);
     }
 
     public function test_paid_liara_order_uses_frozen_provider_and_fulfills_through_real_adapter_boundary(): void
@@ -133,10 +135,7 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
             ),
         );
 
-        $expectedServerName = sprintf(
-            'cf-%s',
-            base_convert((string) $order->getKey(), 10, 36),
-        );
+        $expectedServerName = $this->providerServerName($order->getKey());
 
         Http::assertSent(
             fn (Request $request): bool => $request->method() === 'POST'
@@ -154,6 +153,125 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
         Http::assertSent(
             fn (Request $request): bool => $request->method() === 'GET'
                 && $request->url() === self::BASE_URL.'/vm/'.self::VM_ID,
+        );
+    }
+
+    public function test_failed_details_poll_recovers_local_server_by_provider_identity_not_display_name(): void
+    {
+        $providerServerName = '';
+
+        Http::fake(
+            function (Request $request) use (&$providerServerName) {
+                if ($request->url() === self::BASE_URL.'/plans') {
+                    return Http::response($this->plansResponse());
+                }
+
+                if ($request->url() === self::BASE_URL.'/oss') {
+                    return Http::response([
+                        'ubuntu' => [
+                            '24.04',
+                            '22.04',
+                        ],
+                    ]);
+                }
+
+                if (
+                    $request->method() === 'POST'
+                    && $request->url() === self::BASE_URL.'/vm'
+                ) {
+                    return Http::response([
+                        'taskID' => '6a80c1906727f3d124d794cb',
+                        'VMID' => self::VM_ID,
+                    ]);
+                }
+
+                if ($request->url() === self::BASE_URL.'/vm/'.self::VM_ID) {
+                    return Http::response('', 500);
+                }
+
+                if (
+                    $request->method() === 'GET'
+                    && $request->url() === self::BASE_URL.'/vm'
+                ) {
+                    return Http::response([
+                        'vms' => [
+                            [
+                                '_id' => self::VM_ID,
+                                'plan' => 'standard-base-g2',
+                                'OS' => 'ubuntu-24.04',
+                                'state' => 'CREATED',
+                                'name' => $providerServerName,
+                                'guestCus' => [
+                                    'status' => 'IDLE',
+                                ],
+                                'createdAt' => '2026-08-15T19:44:15.993Z',
+                                'guestState' => 'NOT_RUNNING',
+                                'power' => 'POWERED_OFF',
+                            ],
+                        ],
+                    ]);
+                }
+
+                return Http::response('', 404);
+            },
+        );
+
+        $user = User::factory()->create();
+
+        $order = app(CreateOrderAction::class)->execute(
+            user: $user,
+            region: 'iran',
+            sizeId: 'standard-base-g2',
+            imageId: 'ubuntu-24.04',
+            selectedDiskGiB: 20,
+            period: '2_days',
+            provider: CloudProviderType::Liara,
+        );
+
+        $providerServerName = $this->providerServerName(
+            $order->getKey(),
+        );
+
+        $order->forceFill([
+            'status' => OrderStatus::Paid,
+            'paid_at' => now(),
+        ])->saveOrFail();
+
+        $this->expectException(CloudConnectionException::class);
+
+        try {
+            app(ProvisionPaidOrderAction::class)->execute(
+                $order->getKey(),
+            );
+        } finally {
+            $freshOrder = $order->fresh();
+
+            $this->assertSame(
+                OrderStatus::Provisioning,
+                $freshOrder->status,
+            );
+            $this->assertNotNull($freshOrder->server_id);
+
+            $server = $freshOrder->server;
+
+            $this->assertNotNull($server);
+            $this->assertSame('liara', $server->cloud_provider);
+            $this->assertSame(self::VM_ID, $server->cloud_server_id);
+            $this->assertSame('iran', $server->cloud_region);
+            $this->assertNotSame($providerServerName, $server->name);
+
+            Http::assertSent(
+                fn (Request $request): bool => $request->method() === 'GET'
+                    && $request->url() === self::BASE_URL.'/vm',
+            );
+        }
+    }
+
+    private function providerServerName(int $orderId): string
+    {
+        return sprintf(
+            'cf-%s',
+            base_convert((string) $orderId, 10, 36),
         );
     }
 
