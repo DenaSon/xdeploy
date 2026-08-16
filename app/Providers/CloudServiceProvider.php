@@ -223,11 +223,13 @@ final class CloudServiceProvider extends ServiceProvider
             CloudProviderRegistry::class,
             function (Application $app): CloudProviderRegistry {
                 $providers = [];
+                $purchasableProviders = [];
                 $capabilities = [];
 
-                $arvanApiKey = config('cloud.providers.arvan.api_key');
+                $this->assertAvailabilityConfiguration(CloudProviderType::Arvan);
+                $this->assertAvailabilityConfiguration(CloudProviderType::Liara);
 
-                if (is_string($arvanApiKey) && trim($arvanApiKey) !== '') {
+                if ($this->providerEnabled(CloudProviderType::Arvan)) {
                     $arvanCapabilities = $app->make(
                         ArvanCloudCatalogCapabilities::class,
                     );
@@ -243,22 +245,40 @@ final class CloudServiceProvider extends ServiceProvider
                         CloudQuotaReaderInterface::class => $arvanCapabilities,
                         CloudSshKeyCatalogInterface::class => $arvanCapabilities,
                     ];
+
+                    if ($this->providerPurchaseEnabled(CloudProviderType::Arvan)) {
+                        $purchasableProviders[] = CloudProviderType::Arvan->value;
+                    }
                 }
 
-                $liaraToken = config('cloud.providers.liara.api_token');
-
-                if (is_string($liaraToken) && trim($liaraToken) !== '') {
+                if ($this->providerEnabled(CloudProviderType::Liara)) {
                     $providers[CloudProviderType::Liara->value] = $app->make(
                         LiaraCloudProvider::class,
+                    );
+
+                    if ($this->providerPurchaseEnabled(CloudProviderType::Liara)) {
+                        $purchasableProviders[] = CloudProviderType::Liara->value;
+                    }
+                }
+
+                $defaultProvider = $this->defaultCloudProvider();
+
+                if (! $this->providerEnabled($defaultProvider)) {
+                    throw new CloudConfigurationException(
+                        sprintf(
+                            'The default cloud provider [%s] is disabled.',
+                            $defaultProvider->value,
+                        ),
                     );
                 }
 
                 $registry = new CloudProviderRegistry(
                     providers: $providers,
+                    purchasableProviders: $purchasableProviders,
                     capabilities: $capabilities,
                 );
 
-                $registry->resolve($this->defaultCloudProvider());
+                $registry->resolve($defaultProvider);
 
                 return $registry;
             },
@@ -362,5 +382,63 @@ final class CloudServiceProvider extends ServiceProvider
         }
 
         return $providerType;
+    }
+
+    private function providerEnabled(CloudProviderType $provider): bool
+    {
+        return $this->providerAvailabilityFlag(
+            provider: $provider,
+            flag: 'enabled',
+        );
+    }
+
+    private function providerPurchaseEnabled(CloudProviderType $provider): bool
+    {
+        return $this->providerAvailabilityFlag(
+            provider: $provider,
+            flag: 'purchase_enabled',
+        );
+    }
+
+    private function providerAvailabilityFlag(
+        CloudProviderType $provider,
+        string $flag,
+    ): bool {
+        $value = config(
+            sprintf(
+                'cloud.providers.%s.%s',
+                $provider->value,
+                $flag,
+            ),
+            false,
+        );
+
+        if (! is_bool($value)) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud provider [%s] availability flag [%s] must be boolean.',
+                    $provider->value,
+                    $flag,
+                ),
+            );
+        }
+
+        return $value;
+    }
+
+    private function assertAvailabilityConfiguration(
+        CloudProviderType $provider,
+    ): void {
+        if (
+            ! $this->providerEnabled($provider)
+            && $this->providerPurchaseEnabled($provider)
+        ) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'The cloud provider [%s] cannot accept purchases while disabled.',
+                    $provider->value,
+                ),
+            );
+        }
     }
 }
