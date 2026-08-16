@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\SSH\Services;
 
+use App\Infrastructure\SSH\Contracts\SSHCredentialVerifierInterface;
 use App\Infrastructure\SSH\Exceptions\SSHPasswordRotationException;
 use App\Infrastructure\SSH\Security\SSHConnectionTargetPolicy;
 use App\Models\Server;
@@ -12,7 +13,7 @@ use phpseclib3\Net\SSH2;
 use SensitiveParameter;
 use Throwable;
 
-final readonly class SSHPasswordRotationService
+final readonly class SSHPasswordRotationService implements SSHCredentialVerifierInterface
 {
     private const string VERIFICATION_MARKER =
         '__xdeploy_password_rotation_ready__';
