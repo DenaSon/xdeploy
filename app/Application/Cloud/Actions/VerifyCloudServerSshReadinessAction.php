@@ -297,7 +297,7 @@ final readonly class VerifyCloudServerSshReadinessAction
             $server->saveOrFail();
             $server->refresh();
         } catch (Throwable $exception) {
-            throw new CloudServerProvisioningException(
+            throw new CloudServerSshUnavailableException(
                 message: sprintf(
                     'Cloud server [%s] password rotation candidate could not be persisted before the remote mutation.',
                     $server->cloud_server_id,
@@ -312,7 +312,7 @@ final readonly class VerifyCloudServerSshReadinessAction
         $pendingPassword = $server->pending_credential;
 
         if (! is_string($pendingPassword) || $pendingPassword === '') {
-            throw new CloudServerProvisioningException(
+            throw new CloudServerSshUnavailableException(
                 sprintf(
                     'Cloud server [%s] has no pending credential to promote.',
                     $server->cloud_server_id,
@@ -335,7 +335,7 @@ final readonly class VerifyCloudServerSshReadinessAction
             $server->saveOrFail();
             $server->refresh();
         } catch (Throwable $exception) {
-            throw new CloudServerProvisioningException(
+            throw new CloudServerSshUnavailableException(
                 message: sprintf(
                     'Cloud server [%s] password changed remotely but its recoverable pending credential could not be promoted.',
                     $server->cloud_server_id,
@@ -355,7 +355,7 @@ final readonly class VerifyCloudServerSshReadinessAction
             $server->saveOrFail();
             $server->refresh();
         } catch (Throwable $exception) {
-            throw new CloudServerProvisioningException(
+            throw new CloudServerSshUnavailableException(
                 message: sprintf(
                     'Cloud server [%s] stale password rotation candidate could not be cleared.',
                     $server->cloud_server_id,
