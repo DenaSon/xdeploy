@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudQuotaReaderInterface;
+use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
@@ -25,9 +26,10 @@ use Illuminate\Console\Command;
 
 final class CheckCloudProviderCommand extends Command
 {
-    protected $signature = 'cloud:check';
+    protected $signature = 'cloud:check
+        {--provider= : Cloud provider to check instead of cloud.default}';
 
-    protected $description = 'Check the configured cloud provider and catalog defaults.';
+    protected $description = 'Run a read-only check of a cloud provider and its configured catalog defaults.';
 
     public function __construct(
         private readonly CloudProviderRegistryInterface $providers,
@@ -38,8 +40,10 @@ final class CheckCloudProviderCommand extends Command
     public function handle(): int
     {
         try {
-            $driver = $this->requiredConfigString('cloud.default');
-            $providerType = $this->providerType($driver);
+            $providerType = $this->providerType(
+                $this->selectedDriver(),
+            );
+            $driver = $providerType->value;
             $provider = $this->providers->resolve($providerType);
 
             $regionId = $this->requiredConfigString(
@@ -131,6 +135,11 @@ final class CheckCloudProviderCommand extends Command
             );
 
             $this->checkQuota(
+                provider: $providerType,
+                regionId: $regionId,
+            );
+
+            $this->checkInventory(
                 provider: $providerType,
                 regionId: $regionId,
             );
@@ -272,6 +281,54 @@ final class CheckCloudProviderCommand extends Command
                 ),
             ),
         );
+    }
+
+    private function checkInventory(
+        CloudProviderType $provider,
+        string $regionId,
+    ): void {
+        if (! $this->providers->supportsCapability(
+            provider: $provider,
+            capability: CloudServerInventoryInterface::class,
+        )) {
+            $this->components->warn(
+                'Server inventory: skipped because the provider does not expose a compatible inventory capability.',
+            );
+
+            return;
+        }
+
+        /** @var CloudServerInventoryInterface $inventory */
+        $inventory = $this->providers->resolveCapability(
+            provider: $provider,
+            capability: CloudServerInventoryInterface::class,
+        );
+
+        $servers = $inventory->listServers($regionId);
+
+        $this->line(
+            sprintf(
+                'Server inventory: %d',
+                count($servers),
+            ),
+        );
+    }
+
+    private function selectedDriver(): string
+    {
+        $option = $this->option('provider');
+
+        if ($option === null) {
+            return $this->requiredConfigString('cloud.default');
+        }
+
+        if (! is_string($option) || trim($option) === '') {
+            throw new CloudConfigurationException(
+                'Cloud provider option cannot be empty.',
+            );
+        }
+
+        return trim($option);
     }
 
     private function providerType(string $driver): CloudProviderType
