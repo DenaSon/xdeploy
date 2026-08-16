@@ -29,6 +29,9 @@ use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
+use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
+use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
+use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,6 +44,10 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudProvider();
         $this->registerArvanCloudCatalogCapabilities();
         $this->registerArvanCloudProvisioner();
+
+        $this->registerLiaraCloudClient();
+        $this->registerLiaraCloudMapper();
+        $this->registerLiaraCloudProvider();
 
         $this->registerCloudProviderRegistry();
         $this->registerCloudProviderContract();
@@ -146,6 +153,66 @@ final class CloudServiceProvider extends ServiceProvider
         );
     }
 
+    private function registerLiaraCloudClient(): void
+    {
+        $this->app->singleton(
+            LiaraCloudClient::class,
+            static function (): LiaraCloudClient {
+                $baseUrl = config('cloud.providers.liara.base_url');
+                $apiToken = config('cloud.providers.liara.api_token');
+                $connectTimeout = config('cloud.providers.liara.timeouts.connect', 10);
+                $requestTimeout = config('cloud.providers.liara.timeouts.request', 90);
+
+                if (! is_string($baseUrl) || trim($baseUrl) === '') {
+                    throw new CloudConfigurationException(
+                        'Liara base URL is not configured.',
+                    );
+                }
+
+                if (! is_string($apiToken) || trim($apiToken) === '') {
+                    throw new CloudConfigurationException(
+                        'Liara API token is not configured.',
+                    );
+                }
+
+                if (! is_int($connectTimeout) && ! is_numeric($connectTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Liara connect timeout must be an integer.',
+                    );
+                }
+
+                if (! is_int($requestTimeout) && ! is_numeric($requestTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Liara request timeout must be an integer.',
+                    );
+                }
+
+                return new LiaraCloudClient(
+                    baseUrl: trim($baseUrl),
+                    apiToken: trim($apiToken),
+                    connectTimeout: (int) $connectTimeout,
+                    requestTimeout: (int) $requestTimeout,
+                );
+            },
+        );
+    }
+
+    private function registerLiaraCloudMapper(): void
+    {
+        $this->app->singleton(LiaraCloudResponseMapper::class);
+    }
+
+    private function registerLiaraCloudProvider(): void
+    {
+        $this->app->singleton(
+            LiaraCloudProvider::class,
+            static fn (Application $app): LiaraCloudProvider => new LiaraCloudProvider(
+                client: $app->make(LiaraCloudClient::class),
+                mapper: $app->make(LiaraCloudResponseMapper::class),
+            ),
+        );
+    }
+
     private function registerCloudProviderRegistry(): void
     {
         $this->app->singleton(
@@ -155,12 +222,22 @@ final class CloudServiceProvider extends ServiceProvider
                     ArvanCloudCatalogCapabilities::class,
                 );
 
+                $providers = [
+                    CloudProviderType::Arvan->value => $app->make(
+                        ArvanCloudProvider::class,
+                    ),
+                ];
+
+                $liaraToken = config('cloud.providers.liara.api_token');
+
+                if (is_string($liaraToken) && trim($liaraToken) !== '') {
+                    $providers[CloudProviderType::Liara->value] = $app->make(
+                        LiaraCloudProvider::class,
+                    );
+                }
+
                 return new CloudProviderRegistry(
-                    providers: [
-                        CloudProviderType::Arvan->value => $app->make(
-                            ArvanCloudProvider::class,
-                        ),
-                    ],
+                    providers: $providers,
                     capabilities: [
                         CloudProviderType::Arvan->value => [
                             CloudServerProvisionerInterface::class => $app->make(
