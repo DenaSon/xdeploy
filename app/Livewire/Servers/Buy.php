@@ -495,7 +495,7 @@ final class Buy extends Component
     public function render(): View
     {
         return view(
-            'livewire.servers.buy',
+            'livewire.servers.buy-page',
             [
                 'visibleRegions' => $this->regionsForGroup(
                     $this->regionGroup,
