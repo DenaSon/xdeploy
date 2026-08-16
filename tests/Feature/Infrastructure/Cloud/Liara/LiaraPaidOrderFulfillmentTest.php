@@ -130,7 +130,7 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
         $this->assertNotNull($freshServer->expires_at);
         $this->assertSame(
             $freshOrder->duration_hours,
-            $freshServer->provisioned_at->diffInHours(
+            (int) $freshServer->provisioned_at->diffInHours(
                 $freshServer->expires_at,
             ),
         );
