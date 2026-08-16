@@ -44,7 +44,28 @@ final readonly class BuildCloudServerDataFromOrderAction
 
     public function serverName(Order $order): string
     {
-        return sprintf('xdeploy-order-%d', $order->getKey());
+        $orderId = $order->getKey();
+
+        if (! is_int($orderId) || $orderId < 1) {
+            throw new LogicException(
+                'Cloud server names require a persisted order identifier.',
+            );
+        }
+
+        /*
+         * Provider-safe, deterministic and compact. Liara currently limits VM
+         * names to 19 characters, while Arvan also accepts this hostname-safe
+         * shape. Base36 keeps even a 64-bit order id comfortably below that
+         * limit without truncation or collision-prone hashing.
+         */
+        return sprintf(
+            'cf-%s',
+            base_convert(
+                (string) $orderId,
+                10,
+                36,
+            ),
+        );
     }
 
     public function providerName(Order $order): string
