@@ -47,7 +47,12 @@ final class MultiProviderRoutingTest extends TestCase
 
             public function reboot(string $region, string $serverId): void {}
 
-            public function delete(string $region, string $serverId): void {}
+            public function deleteServer(string $region, string $serverId): void {}
+
+            public function getAvailableActions(string $region, string $serverId): array
+            {
+                return [];
+            }
         };
 
         $this->app->instance(
