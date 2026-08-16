@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Application\Cloud\Actions\ResolveCloudProvisioningInfrastructureAction;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
+use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
@@ -27,7 +28,7 @@ use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
-use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
+use App\Infrastructure\Cloud\Catalog\CloudCatalogReaderResolver;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
@@ -274,17 +275,25 @@ final class CloudServiceProvider extends ServiceProvider
     private function registerCloudCatalogReader(): void
     {
         $this->app->singleton(
-            CachedCloudCatalogReader::class,
-            static fn (Application $app): CachedCloudCatalogReader => new CachedCloudCatalogReader(
-                cloud: $app->make(CloudProviderInterface::class),
+            CloudCatalogReaderResolver::class,
+            static fn (Application $app): CloudCatalogReaderResolver => new CloudCatalogReaderResolver(
+                providers: $app->make(CloudProviderRegistryInterface::class),
+            ),
+        );
+
+        $this->app->singleton(
+            CloudCatalogReaderResolverInterface::class,
+            static fn (Application $app): CloudCatalogReaderResolverInterface => $app->make(
+                CloudCatalogReaderResolver::class,
             ),
         );
 
         $this->app->singleton(
             CloudCatalogReaderInterface::class,
-            static fn (Application $app): CloudCatalogReaderInterface => $app->make(
-                CachedCloudCatalogReader::class,
-            ),
+            function (Application $app): CloudCatalogReaderInterface {
+                return $app->make(CloudCatalogReaderResolverInterface::class)
+                    ->resolve($this->defaultCloudProvider());
+            },
         );
     }
 
