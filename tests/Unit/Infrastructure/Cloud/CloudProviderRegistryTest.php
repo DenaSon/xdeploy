@@ -53,6 +53,27 @@ final class CloudProviderRegistryTest extends TestCase
         );
     }
 
+    public function test_omitted_purchase_list_defaults_to_registered_providers(): void
+    {
+        $arvan = Mockery::mock(CloudProviderInterface::class);
+        $liara = Mockery::mock(CloudProviderInterface::class);
+
+        $registry = new CloudProviderRegistry(
+            providers: [
+                CloudProviderType::Arvan->value => $arvan,
+                CloudProviderType::Liara->value => $liara,
+            ],
+        );
+
+        $this->assertSame(
+            [
+                CloudProviderType::Arvan,
+                CloudProviderType::Liara,
+            ],
+            $registry->purchasableProviders(),
+        );
+    }
+
     public function test_purchase_disabled_provider_remains_registered_for_operations(): void
     {
         $arvan = Mockery::mock(CloudProviderInterface::class);
