@@ -186,12 +186,12 @@ final class LiaraCloudClient
                     method: self::METHOD_POST,
                     url: $url,
                 )
-                : $request->post(
+                : $request->asJson()->post(
                     url: $url,
                     data: $data,
                 ),
 
-            self::METHOD_PATCH => $request->patch(
+            self::METHOD_PATCH => $request->asJson()->patch(
                 url: $url,
                 data: $data ?? [],
             ),
@@ -207,7 +207,6 @@ final class LiaraCloudClient
     private function pendingRequest(): PendingRequest
     {
         return Http::acceptJson()
-            ->asJson()
             ->withToken($this->apiToken)
             ->connectTimeout($this->connectTimeout)
             ->timeout($this->requestTimeout)
