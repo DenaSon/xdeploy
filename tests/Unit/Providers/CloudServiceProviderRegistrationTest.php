@@ -8,7 +8,12 @@ use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudCatalogCapabilities;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
+use App\Infrastructure\Cloud\CloudProviderRegistry;
+use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
 use Tests\TestCase;
 
@@ -30,12 +35,15 @@ final class CloudServiceProviderRegistrationTest extends TestCase
         config()->set('cloud.providers.liara.api_token', 'test-liara-token');
         config()->set('cloud.providers.liara.timeouts.connect', 5);
         config()->set('cloud.providers.liara.timeouts.request', 15);
+
+        $this->resetCloudResolutionState();
     }
 
     public function test_liara_only_configuration_boots_without_arvan_credentials(): void
     {
         config()->set('cloud.default', 'liara');
         config()->set('cloud.providers.arvan.api_key', null);
+        $this->resetCloudResolutionState();
 
         $registry = $this->app->make(CloudProviderRegistryInterface::class);
         $liara = $this->app->make(LiaraCloudProvider::class);
@@ -57,6 +65,7 @@ final class CloudServiceProviderRegistrationTest extends TestCase
     public function test_arvan_only_configuration_boots_without_liara_credentials(): void
     {
         config()->set('cloud.providers.liara.api_token', null);
+        $this->resetCloudResolutionState();
 
         $registry = $this->app->make(CloudProviderRegistryInterface::class);
         $arvan = $this->app->make(ArvanCloudProvider::class);
@@ -92,6 +101,7 @@ final class CloudServiceProviderRegistrationTest extends TestCase
     {
         config()->set('cloud.default', 'liara');
         config()->set('cloud.providers.arvan.api_key', null);
+        $this->resetCloudResolutionState();
 
         $this->assertInstanceOf(
             LiaraCloudProvider::class,
@@ -103,6 +113,7 @@ final class CloudServiceProviderRegistrationTest extends TestCase
     {
         config()->set('cloud.default', 'liara');
         config()->set('cloud.providers.liara.api_token', null);
+        $this->resetCloudResolutionState();
 
         $this->expectException(CloudConfigurationException::class);
         $this->expectExceptionMessage(
@@ -110,5 +121,22 @@ final class CloudServiceProviderRegistrationTest extends TestCase
         );
 
         $this->app->make(CloudProviderRegistryInterface::class);
+    }
+
+    private function resetCloudResolutionState(): void
+    {
+        foreach ([
+            CloudProviderRegistry::class,
+            CloudProviderRegistryInterface::class,
+            CloudProviderInterface::class,
+            ArvanCloudClient::class,
+            ArvanCloudProvider::class,
+            ArvanCloudCatalogCapabilities::class,
+            ArvanCloudProvisioner::class,
+            LiaraCloudClient::class,
+            LiaraCloudProvider::class,
+        ] as $abstract) {
+            $this->app->forgetInstance($abstract);
+        }
     }
 }
