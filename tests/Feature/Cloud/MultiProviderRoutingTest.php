@@ -8,9 +8,6 @@ use App\Application\Cloud\Servers\PowerOnCloudServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
-use App\Domain\Cloud\DTOs\CloudImageData;
-use App\Domain\Cloud\DTOs\CloudRegionData;
-use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Server;
 use App\Models\User;
@@ -26,11 +23,14 @@ final class MultiProviderRoutingTest extends TestCase
     {
         config()->set('cloud.default', CloudProviderType::Arvan->value);
 
-        $calls = [];
+        $calls = new class
+        {
+            public array $items = [];
+        };
 
         $provider = new class($calls) implements CloudProviderInterface, CloudServerLifecycleInterface
         {
-            public function __construct(private array &$calls) {}
+            public function __construct(private object $calls) {}
 
             public function listRegions(): array { return []; }
 
@@ -40,7 +40,7 @@ final class MultiProviderRoutingTest extends TestCase
 
             public function powerOn(string $region, string $serverId): void
             {
-                $this->calls[] = [$region, $serverId];
+                $this->calls->items[] = [$region, $serverId];
             }
 
             public function powerOff(string $region, string $serverId): void {}
@@ -72,6 +72,6 @@ final class MultiProviderRoutingTest extends TestCase
 
         $this->assertSame([
             ['iran', 'liara-vm-1'],
-        ], $calls);
+        ], $calls->items);
     }
 }
