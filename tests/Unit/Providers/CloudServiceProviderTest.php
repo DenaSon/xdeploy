@@ -25,6 +25,9 @@ use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
+use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
+use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
+use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -40,6 +43,11 @@ final class CloudServiceProviderTest extends TestCase
         config()->set('cloud.providers.arvan.timeouts.connect', 5);
         config()->set('cloud.providers.arvan.timeouts.request', 15);
         config()->set('cloud.providers.arvan.defaults.create_type', 'cinder');
+
+        config()->set('cloud.providers.liara.base_url', 'https://iaas-api.example.test');
+        config()->set('cloud.providers.liara.api_token', 'test-liara-token');
+        config()->set('cloud.providers.liara.timeouts.connect', 5);
+        config()->set('cloud.providers.liara.timeouts.request', 15);
     }
 
     public function test_it_resolves_default_cloud_provider(): void
@@ -60,6 +68,16 @@ final class CloudServiceProviderTest extends TestCase
         );
     }
 
+    public function test_registry_resolves_registered_liara_provider(): void
+    {
+        $registry = $this->app->make(CloudProviderRegistryInterface::class);
+
+        $this->assertSame(
+            $this->app->make(LiaraCloudProvider::class),
+            $registry->resolve(CloudProviderType::Liara),
+        );
+    }
+
     public function test_registry_resolves_arvan_provisioning_capability_override(): void
     {
         $registry = $this->app->make(CloudProviderRegistryInterface::class);
@@ -73,11 +91,75 @@ final class CloudServiceProviderTest extends TestCase
         );
     }
 
+    public function test_registry_resolves_liara_provider_backed_capabilities(): void
+    {
+        $registry = $this->app->make(CloudProviderRegistryInterface::class);
+        $liara = $this->app->make(LiaraCloudProvider::class);
+
+        foreach ([
+            CloudServerProvisionerInterface::class,
+            CloudServerLifecycleInterface::class,
+            CloudServerInventoryInterface::class,
+            CloudServerCredentialManagerInterface::class,
+            CloudServerResizeCatalogInterface::class,
+        ] as $contract) {
+            $this->assertSame(
+                $liara,
+                $registry->resolveCapability(
+                    provider: CloudProviderType::Liara,
+                    capability: $contract,
+                ),
+            );
+        }
+    }
+
+    public function test_registry_does_not_fabricate_unverified_liara_capabilities(): void
+    {
+        $registry = $this->app->make(CloudProviderRegistryInterface::class);
+
+        foreach ([
+            CloudProvisioningInfrastructureCatalogInterface::class,
+            CloudQuotaReaderInterface::class,
+            CloudSshKeyCatalogInterface::class,
+            CloudServerConsoleInterface::class,
+            CloudServerNetworkingInterface::class,
+            CloudServerReportsInterface::class,
+            CloudServerResizerInterface::class,
+        ] as $contract) {
+            $this->assertFalse(
+                $registry->supportsCapability(
+                    provider: CloudProviderType::Liara,
+                    capability: $contract,
+                ),
+            );
+        }
+    }
+
     public function test_default_provisioner_uses_arvan_provisioning_adapter(): void
     {
         $this->assertSame(
             $this->app->make(ArvanCloudProvisioner::class),
             $this->app->make(CloudServerProvisionerInterface::class),
+        );
+    }
+
+    public function test_liara_can_be_selected_as_default_provider(): void
+    {
+        config()->set('cloud.default', 'liara');
+
+        $liara = $this->app->make(LiaraCloudProvider::class);
+
+        $this->assertSame(
+            $liara,
+            $this->app->make(CloudProviderInterface::class),
+        );
+        $this->assertSame(
+            $liara,
+            $this->app->make(CloudServerProvisionerInterface::class),
+        );
+        $this->assertSame(
+            $liara,
+            $this->app->make(CloudServerLifecycleInterface::class),
         );
     }
 
@@ -99,8 +181,10 @@ final class CloudServiceProviderTest extends TestCase
         }
     }
 
-    public function test_registry_rejects_unregistered_provider(): void
+    public function test_registry_leaves_liara_unregistered_when_token_is_missing(): void
     {
+        config()->set('cloud.providers.liara.api_token', null);
+
         $registry = $this->app->make(CloudProviderRegistryInterface::class);
 
         $this->expectException(CloudConfigurationException::class);
@@ -114,6 +198,14 @@ final class CloudServiceProviderTest extends TestCase
         $this->assertSame(
             $this->app->make(ArvanCloudProvider::class),
             $this->app->make(ArvanCloudProvider::class),
+        );
+    }
+
+    public function test_liara_provider_is_registered_as_singleton(): void
+    {
+        $this->assertSame(
+            $this->app->make(LiaraCloudProvider::class),
+            $this->app->make(LiaraCloudProvider::class),
         );
     }
 
@@ -158,6 +250,22 @@ final class CloudServiceProviderTest extends TestCase
         $this->assertSame(
             $this->app->make(ArvanCloudResponseMapper::class),
             $this->app->make(ArvanCloudResponseMapper::class),
+        );
+    }
+
+    public function test_liara_cloud_client_is_registered_as_singleton(): void
+    {
+        $this->assertSame(
+            $this->app->make(LiaraCloudClient::class),
+            $this->app->make(LiaraCloudClient::class),
+        );
+    }
+
+    public function test_liara_cloud_mapper_is_registered_as_singleton(): void
+    {
+        $this->assertSame(
+            $this->app->make(LiaraCloudResponseMapper::class),
+            $this->app->make(LiaraCloudResponseMapper::class),
         );
     }
 
@@ -209,6 +317,26 @@ final class CloudServiceProviderTest extends TestCase
         $this->expectExceptionMessage('ArvanCloud default create type is not configured.');
 
         $this->app->make(ArvanCloudProvider::class);
+    }
+
+    public function test_it_rejects_missing_liara_api_token(): void
+    {
+        config()->set('cloud.providers.liara.api_token', null);
+
+        $this->expectException(CloudConfigurationException::class);
+        $this->expectExceptionMessage('Liara API token is not configured.');
+
+        $this->app->make(LiaraCloudProvider::class);
+    }
+
+    public function test_it_rejects_missing_liara_base_url(): void
+    {
+        config()->set('cloud.providers.liara.base_url', null);
+
+        $this->expectException(CloudConfigurationException::class);
+        $this->expectExceptionMessage('Liara base URL is not configured.');
+
+        $this->app->make(LiaraCloudProvider::class);
     }
 
     /**
