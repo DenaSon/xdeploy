@@ -7,6 +7,9 @@ namespace App\Application\Billing\Actions;
 use App\Application\Cloud\Actions\ProvisionCloudServerAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Exceptions\OrderNotProvisionableException;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
+use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Order;
 use App\Models\Server;
@@ -20,6 +23,7 @@ final readonly class ProvisionPaidOrderAction
     public function __construct(
         private ProvisionCloudServerAction $provisionCloudServer,
         private BuildCloudServerDataFromOrderAction $buildCloudServerData,
+        private CloudProviderRegistryInterface $providers,
     ) {}
 
     public function execute(
@@ -46,10 +50,6 @@ final readonly class ProvisionPaidOrderAction
                 provider: $provider,
             );
         }
-
-        $serverName = $this->buildCloudServerData->serverName(
-            $order,
-        );
 
         try {
             $data = $this->buildCloudServerData->execute(
@@ -81,7 +81,6 @@ final readonly class ProvisionPaidOrderAction
             $recoveredServer = $this->findRecoverableServer(
                 order: $order,
                 provider: $provider,
-                serverName: $serverName,
             );
 
             if ($recoveredServer instanceof Server) {
@@ -184,17 +183,10 @@ final readonly class ProvisionPaidOrderAction
             );
         }
 
-        $server = $order->server;
-
-        if (! $server instanceof Server) {
-            $server = $this->findRecoverableServer(
-                order: $order,
-                provider: $provider,
-                serverName: $this->buildCloudServerData->serverName(
-                    $order,
-                ),
-            );
-        }
+        $server = $this->findRecoverableServer(
+            order: $order,
+            provider: $provider,
+        );
 
         if ($server instanceof Server) {
             if (
@@ -228,14 +220,50 @@ final readonly class ProvisionPaidOrderAction
     private function findRecoverableServer(
         Order $order,
         CloudProviderType $provider,
-        string $serverName,
     ): ?Server {
+        $attachedServer = $order->server;
+
+        if ($attachedServer instanceof Server) {
+            return $attachedServer;
+        }
+
+        $providerServerName = $this->buildCloudServerData->serverName(
+            $order,
+        );
+
+        try {
+            /** @var CloudServerInventoryInterface $inventory */
+            $inventory = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerInventoryInterface::class,
+            );
+
+            $matches = array_values(
+                array_filter(
+                    $inventory->listServers($order->region_id),
+                    static fn (CloudServerData $cloudServer): bool => $cloudServer->name
+                        === $providerServerName,
+                ),
+            );
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (count($matches) !== 1) {
+            return null;
+        }
+
+        $providerServerId = trim($matches[0]->id);
+
+        if ($providerServerId === '') {
+            return null;
+        }
+
         return Server::query()
             ->where('user_id', $order->user_id)
-            ->where('name', $serverName)
             ->where('cloud_provider', $provider->value)
+            ->where('cloud_server_id', $providerServerId)
             ->where('cloud_region', $order->region_id)
-            ->latest('id')
             ->first();
     }
 
