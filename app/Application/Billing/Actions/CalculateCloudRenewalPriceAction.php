@@ -61,7 +61,7 @@ final readonly class CalculateCloudRenewalPriceAction
 
         $serverRegion = trim((string) $server->cloud_region);
         $orderRegion = trim((string) $sourceOrder->region_id);
-        $serverProvider = trim((string) $server->cloud_provider);
+        $serverProvider = $server->cloud_provider;
 
         if (
             $serverRegion === ''
@@ -76,8 +76,8 @@ final readonly class CalculateCloudRenewalPriceAction
         }
 
         if (
-            $serverProvider === ''
-            || $serverProvider !== $provider->value
+            ! $serverProvider instanceof CloudProviderType
+            || $serverProvider !== $provider
         ) {
             throw new LogicException(
                 sprintf(
