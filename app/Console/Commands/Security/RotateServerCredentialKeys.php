@@ -7,6 +7,7 @@ namespace App\Console\Commands\Security;
 use App\Infrastructure\Security\Encryption\ServerCredentialCipher;
 use App\Models\Server;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
@@ -20,7 +21,7 @@ final class RotateServerCredentialKeys extends Command
     ';
 
     protected $description =
-        'Rewrap server credential data-encryption keys using the current master key.';
+        'Rewrap active and pending server credential data-encryption keys using the current master key.';
 
     public function __construct(
         private readonly ServerCredentialCipher $cipher,
@@ -34,11 +35,20 @@ final class RotateServerCredentialKeys extends Command
         $chunkSize = $this->chunkSize();
 
         $query = Server::query()
-            ->whereNotNull('credential')
             ->where(
-                'credential',
-                'like',
-                ServerCredentialCipher::PREFIX.'%',
+                static function (Builder $query): void {
+                    $query
+                        ->where(
+                            'credential',
+                            'like',
+                            ServerCredentialCipher::PREFIX.'%',
+                        )
+                        ->orWhere(
+                            'pending_credential',
+                            'like',
+                            ServerCredentialCipher::PREFIX.'%',
+                        );
+                },
             );
 
         $total = (clone $query)->count();
@@ -52,7 +62,7 @@ final class RotateServerCredentialKeys extends Command
         }
 
         $this->info(
-            "Found {$total} encrypted server credential(s).",
+            "Found {$total} server credential record(s).",
         );
 
         if ($dryRun) {
@@ -77,6 +87,8 @@ final class RotateServerCredentialKeys extends Command
                 'id',
                 'credential',
                 'credential_context',
+                'pending_credential',
+                'pending_credential_context',
             ])
             ->chunkById(
                 $chunkSize,
@@ -92,85 +104,58 @@ final class RotateServerCredentialKeys extends Command
                         $checked++;
 
                         try {
-                            $encryptedCredential =
-                                $server->getRawOriginal(
+                            $updates = [];
+
+                            $active = $this->rewrapCredentialIfNeeded(
+                                encryptedCredential: $server->getRawOriginal(
                                     'credential',
-                                );
-
-                            $credentialContext =
-                                $server->getRawOriginal(
+                                ),
+                                credentialContext: $server->getRawOriginal(
                                     'credential_context',
-                                );
+                                ),
+                                label: 'active credential',
+                            );
 
-                            if (
-                                ! is_string($encryptedCredential)
-                                || $encryptedCredential === ''
-                            ) {
-                                throw new RuntimeException(
-                                    'The stored credential is missing or invalid.',
-                                );
+                            if ($active !== null) {
+                                $updates['credential'] = $active;
                             }
 
-                            if (
-                                ! is_string($credentialContext)
-                                || $credentialContext === ''
-                            ) {
-                                throw new RuntimeException(
-                                    'The credential context is missing.',
-                                );
+                            $pending = $this->rewrapCredentialIfNeeded(
+                                encryptedCredential: $server->getRawOriginal(
+                                    'pending_credential',
+                                ),
+                                credentialContext: $server->getRawOriginal(
+                                    'pending_credential_context',
+                                ),
+                                label: 'pending credential',
+                            );
+
+                            if ($pending !== null) {
+                                $updates['pending_credential'] = $pending;
                             }
 
-                            if (
-                                ! $this->cipher->needsRewrap(
-                                    $encryptedCredential,
-                                )
-                            ) {
+                            if ($updates === []) {
                                 $unchanged++;
-
                                 $progressBar->advance();
 
                                 continue;
                             }
 
-                            $rewrappedCredential =
-                                $this->cipher->rewrap(
-                                    encryptedValue: $encryptedCredential,
-
-                                    context: $credentialContext,
-                                );
-
-                            /*
-                             * Verify the rotated envelope before writing.
-                             *
-                             * This decrypts the payload only for validation,
-                             * but the resulting plaintext is never stored,
-                             * printed or logged.
-                             */
-                            $this->cipher->decrypt(
-                                encryptedValue: $rewrappedCredential,
-
-                                context: $credentialContext,
-                            );
-
                             if (! $dryRun) {
                                 /*
-                                 * DB query builder intentionally bypasses
-                                 * the Eloquent credential cast.
-                                 *
-                                 * Using $server->credential here would cause
-                                 * the password to be encrypted again instead
-                                 * of only replacing the wrapped data key.
+                                 * Query builder intentionally bypasses the
+                                 * Eloquent casts. Both values are already
+                                 * encrypted envelopes with the same binding
+                                 * context, only their wrapped data keys changed.
                                  */
+                                $updates['updated_at'] = now();
+
                                 DB::table('servers')
                                     ->where(
                                         'id',
                                         $server->getKey(),
                                     )
-                                    ->update([
-                                        'credential' => $rewrappedCredential,
-
-                                        'updated_at' => now(),
-                                    ]);
+                                    ->update($updates);
                             }
 
                             $rotated++;
@@ -249,6 +234,52 @@ final class RotateServerCredentialKeys extends Command
         );
 
         return self::SUCCESS;
+    }
+
+    private function rewrapCredentialIfNeeded(
+        mixed $encryptedCredential,
+        mixed $credentialContext,
+        string $label,
+    ): ?string {
+        if ($encryptedCredential === null) {
+            return null;
+        }
+
+        if (! is_string($encryptedCredential) || $encryptedCredential === '') {
+            throw new RuntimeException(
+                sprintf('The stored %s is invalid.', $label),
+            );
+        }
+
+        if (! $this->cipher->isEncryptedValue($encryptedCredential)) {
+            return null;
+        }
+
+        if (! is_string($credentialContext) || $credentialContext === '') {
+            throw new RuntimeException(
+                sprintf('The %s context is missing.', $label),
+            );
+        }
+
+        if (! $this->cipher->needsRewrap($encryptedCredential)) {
+            return null;
+        }
+
+        $rewrappedCredential = $this->cipher->rewrap(
+            encryptedValue: $encryptedCredential,
+            context: $credentialContext,
+        );
+
+        /*
+         * Verify the rotated envelope before writing. Plaintext exists only
+         * transiently inside the cipher and is never stored, printed or logged.
+         */
+        $this->cipher->decrypt(
+            encryptedValue: $rewrappedCredential,
+            context: $credentialContext,
+        );
+
+        return $rewrappedCredential;
     }
 
     private function chunkSize(): int
