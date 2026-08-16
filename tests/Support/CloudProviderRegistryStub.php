@@ -14,6 +14,7 @@ final readonly class CloudProviderRegistryStub implements CloudProviderRegistryI
     /**
      * @param  array<class-string, object>  $capabilities
      * @param  list<CloudProviderType>  $registeredProviders
+     * @param  list<CloudProviderType>|null  $purchasableProviders
      */
     public function __construct(
         private CloudProviderInterface $provider,
@@ -21,11 +22,18 @@ final readonly class CloudProviderRegistryStub implements CloudProviderRegistryI
         private array $registeredProviders = [
             CloudProviderType::Arvan,
         ],
+        private ?array $purchasableProviders = null,
     ) {}
 
     public function registeredProviders(): array
     {
         return $this->registeredProviders;
+    }
+
+    public function purchasableProviders(): array
+    {
+        return $this->purchasableProviders
+            ?? $this->registeredProviders;
     }
 
     public function resolve(
