@@ -241,7 +241,7 @@ final class CheckCloudProviderCommandTest extends TestCase
             $output,
         );
         $this->assertStringContainsString(
-            'Default: Ubuntu 24.04',
+            'Default: ubuntu-24.04',
             $output,
         );
         $this->assertStringContainsString(
