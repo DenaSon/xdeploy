@@ -117,7 +117,7 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
         $this->assertSame(OrderStatus::Fulfilled, $freshOrder->status);
         $this->assertSame($freshServer->getKey(), $freshOrder->server_id);
 
-        $this->assertSame('liara', $freshServer->cloud_provider);
+        $this->assertSame(CloudProviderType::Liara, $freshServer->cloud_provider);
         $this->assertSame(self::VM_ID, $freshServer->cloud_server_id);
         $this->assertSame('iran', $freshServer->cloud_region);
         $this->assertSame('46.34.163.219', $freshServer->host);
@@ -256,7 +256,7 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
             $server = $freshOrder->server;
 
             $this->assertNotNull($server);
-            $this->assertSame('liara', $server->cloud_provider);
+            $this->assertSame(CloudProviderType::Liara, $server->cloud_provider);
             $this->assertSame(self::VM_ID, $server->cloud_server_id);
             $this->assertSame('iran', $server->cloud_region);
             $this->assertNotSame($providerServerName, $server->name);
@@ -347,7 +347,7 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
         $this->assertSame(OrderStatus::Fulfilled, $freshOrder->status);
         $this->assertSame($server->getKey(), $freshOrder->server_id);
         $this->assertSame(1, Server::query()->count());
-        $this->assertSame('liara', $server->cloud_provider);
+        $this->assertSame(CloudProviderType::Liara, $server->cloud_provider);
         $this->assertSame(self::VM_ID, $server->cloud_server_id);
         $this->assertSame('46.34.163.219', $server->host);
         $this->assertSame('generated-root-password', $server->credential);
