@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Infrastructure\Security\Casts\ServerCredentialCast;
@@ -53,6 +54,7 @@ class Server extends Model
         'pending_credential' => ServerCredentialCast::class,
         'status' => ServerStatus::class,
         'authentication_type' => AuthenticationType::class,
+        'cloud_provider' => CloudProviderType::class,
         'bootstrap_credential_rotated_at' => 'immutable_datetime',
         'provisioned_at' => 'immutable_datetime',
         'expires_at' => 'immutable_datetime',
