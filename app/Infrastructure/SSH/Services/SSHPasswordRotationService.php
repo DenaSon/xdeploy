@@ -62,8 +62,7 @@ final readonly class SSHPasswordRotationService
             );
         }
 
-        $this->verifyNewPassword(
-            host: $host,
+        $this->verifyCredential(
             server: $server,
             password: $newPassword,
         );
@@ -115,10 +114,31 @@ final readonly class SSHPasswordRotationService
             );
         }
 
-        $this->verifyNewPassword(
-            host: $host,
+        $this->verifyCredential(
             server: $server,
             password: $newPassword,
+        );
+    }
+
+    public function verifyCredential(
+        Server $server,
+        #[SensitiveParameter]
+        string $password,
+    ): void {
+        if ($password === '') {
+            throw new SSHPasswordRotationException(
+                'SSH credential verification requires a password.',
+            );
+        }
+
+        $host = $this->targetPolicy->resolve(
+            $server->host,
+        );
+
+        $this->verifyPassword(
+            host: $host,
+            server: $server,
+            password: $password,
         );
     }
 
@@ -293,7 +313,7 @@ final readonly class SSHPasswordRotationService
         }
     }
 
-    private function verifyNewPassword(
+    private function verifyPassword(
         string $host,
         Server $server,
         #[SensitiveParameter]
@@ -323,7 +343,7 @@ final readonly class SSHPasswordRotationService
                 !== self::VERIFICATION_MARKER
             ) {
                 throw new SSHPasswordRotationException(
-                    'New SSH password could not execute commands.',
+                    'SSH password could not execute commands.',
                 );
             }
         } finally {
