@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Actions;
 
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
 use App\Application\Cloud\Services\CloudServerCredentialRecovery;
 use App\Application\Server\Actions\EnsureSupportedOperatingSystemAction;
-use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialRotationInterface;
 use App\Domain\Cloud\Exceptions\CloudServerProvisioningException;
 use App\Domain\Cloud\Exceptions\CloudServerSshUnavailableException;
 use App\Domain\Server\Enums\AuthenticationType;
@@ -35,6 +36,7 @@ final readonly class VerifyCloudServerSshReadinessAction
         private CloudServerCredentialRecovery $credentialRecovery,
         private SSHPortReadinessProbeInterface $portReadinessProbe,
         private EnsureSupportedOperatingSystemAction $ensureSupportedOperatingSystem,
+        private CloudServerCapabilityResolver $capabilities,
     ) {}
 
     public function handle(
@@ -58,7 +60,7 @@ final readonly class VerifyCloudServerSshReadinessAction
              */
             $this->credentialRecovery->recoverPendingCredentialIfNeeded(
                 server: $server,
-                markBootstrapCredentialRotated: $this->isLiaraPasswordServer(
+                markBootstrapCredentialRotated: $this->providerUsesBootstrapCredential(
                     $server,
                 ),
             );
@@ -154,7 +156,7 @@ final readonly class VerifyCloudServerSshReadinessAction
     private function rotateProviderBootstrapCredentialIfNeeded(
         Server $server,
     ): void {
-        if (! $this->usesProviderBootstrapCredential($server)) {
+        if (! $this->requiresProviderBootstrapCredentialRotation($server)) {
             return;
         }
 
@@ -166,19 +168,21 @@ final readonly class VerifyCloudServerSshReadinessAction
         $this->assertCommandReadyAfterPasswordRotation();
     }
 
-    private function usesProviderBootstrapCredential(
+    private function requiresProviderBootstrapCredentialRotation(
         Server $server,
     ): bool {
-        return $this->isLiaraPasswordServer($server)
+        return $this->providerUsesBootstrapCredential($server)
             && $server->bootstrap_credential_rotated_at === null;
     }
 
-    private function isLiaraPasswordServer(Server $server): bool
-    {
-        return strtolower(
-            trim((string) $server->cloud_provider),
-        ) === CloudProviderType::Liara->value
-            && $server->authentication_type === AuthenticationType::Password;
+    private function providerUsesBootstrapCredential(
+        Server $server,
+    ): bool {
+        return $server->authentication_type === AuthenticationType::Password
+            && $this->capabilities->supports(
+                server: $server,
+                capability: CloudServerBootstrapCredentialRotationInterface::class,
+            );
     }
 
     private function rotateCredential(
@@ -232,7 +236,7 @@ final readonly class VerifyCloudServerSshReadinessAction
 
         $this->credentialRecovery->promotePendingCredential(
             server: $server,
-            markBootstrapCredentialRotated: $this->isLiaraPasswordServer(
+            markBootstrapCredentialRotated: $this->providerUsesBootstrapCredential(
                 $server,
             ),
         );
