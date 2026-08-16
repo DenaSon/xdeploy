@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Actions;
 
+use App\Application\Cloud\Services\CloudServerCredentialRecovery;
 use App\Application\Server\Actions\EnsureSupportedOperatingSystemAction;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudServerProvisioningException;
@@ -18,7 +19,6 @@ use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Contracts\SSHPortReadinessProbeInterface;
 use App\Infrastructure\SSH\Enums\SSHCommandReadinessStatus;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
-use App\Infrastructure\SSH\Exceptions\SSHPasswordRotationException;
 use App\Infrastructure\SSH\Services\SSHCommandReadinessInspector;
 use App\Infrastructure\SSH\Services\SSHPasswordRotationService;
 use App\Models\Server;
@@ -32,6 +32,7 @@ final readonly class VerifyCloudServerSshReadinessAction
         private PrivilegedExecutionPreflight $preflight,
         private SSHCommandReadinessInspector $commandReadiness,
         private SSHPasswordRotationService $passwordRotation,
+        private CloudServerCredentialRecovery $credentialRecovery,
         private SSHPortReadinessProbeInterface $portReadinessProbe,
         private EnsureSupportedOperatingSystemAction $ensureSupportedOperatingSystem,
     ) {}
@@ -55,8 +56,11 @@ final readonly class VerifyCloudServerSshReadinessAction
              * crashed before promoting the locally persisted candidate. Reconcile
              * that distributed state before attempting the normal SSH session.
              */
-            $this->recoverPendingCredentialIfNeeded(
-                $server,
+            $this->credentialRecovery->recoverPendingCredentialIfNeeded(
+                server: $server,
+                markBootstrapCredentialRotated: $this->isLiaraPasswordServer(
+                    $server,
+                ),
             );
 
             $this->connect(
@@ -205,7 +209,7 @@ final readonly class VerifyCloudServerSshReadinessAction
          * after passwd succeeds, the candidate secret survives for the next
          * readiness attempt and can be verified/promoted safely.
          */
-        $this->persistPendingCredential(
+        $this->credentialRecovery->persistPendingCredential(
             server: $server,
             pendingPassword: $newPassword,
         );
@@ -226,143 +230,16 @@ final readonly class VerifyCloudServerSshReadinessAction
             );
         }
 
-        $this->promotePendingCredential(
-            $server,
+        $this->credentialRecovery->promotePendingCredential(
+            server: $server,
+            markBootstrapCredentialRotated: $this->isLiaraPasswordServer(
+                $server,
+            ),
         );
 
         $this->connect(
             $server,
         );
-    }
-
-    private function recoverPendingCredentialIfNeeded(Server $server): void
-    {
-        if (! $server->hasPendingCredential()) {
-            return;
-        }
-
-        $pendingPassword = $server->pending_credential;
-
-        if (! is_string($pendingPassword) || $pendingPassword === '') {
-            return;
-        }
-
-        try {
-            $this->passwordRotation->verifyCredential(
-                server: $server,
-                password: $pendingPassword,
-            );
-
-            $this->promotePendingCredential(
-                $server,
-            );
-
-            return;
-        } catch (SSHPasswordRotationException $pendingException) {
-            $currentPassword = $server->credential;
-
-            if (is_string($currentPassword) && $currentPassword !== '') {
-                try {
-                    $this->passwordRotation->verifyCredential(
-                        server: $server,
-                        password: $currentPassword,
-                    );
-
-                    $this->clearPendingCredential(
-                        $server,
-                    );
-
-                    return;
-                } catch (SSHPasswordRotationException) {
-                    // Neither known credential could be verified. Preserve both.
-                }
-            }
-
-            throw new CloudServerSshUnavailableException(
-                message: 'Cloud server password rotation state is ambiguous; the recoverable pending credential was preserved.',
-                previous: $pendingException,
-            );
-        }
-    }
-
-    private function persistPendingCredential(
-        Server $server,
-        string $pendingPassword,
-    ): void {
-        try {
-            $server->forceFill([
-                'pending_credential' => $pendingPassword,
-            ]);
-
-            $server->saveOrFail();
-            $server->refresh();
-        } catch (Throwable $exception) {
-            throw new CloudServerSshUnavailableException(
-                message: sprintf(
-                    'Cloud server [%s] password rotation candidate could not be persisted before the remote mutation.',
-                    $server->cloud_server_id,
-                ),
-                previous: $exception,
-            );
-        }
-    }
-
-    private function promotePendingCredential(Server $server): void
-    {
-        $pendingPassword = $server->pending_credential;
-
-        if (! is_string($pendingPassword) || $pendingPassword === '') {
-            throw new CloudServerSshUnavailableException(
-                sprintf(
-                    'Cloud server [%s] has no pending credential to promote.',
-                    $server->cloud_server_id,
-                ),
-            );
-        }
-
-        try {
-            $attributes = [
-                'credential' => $pendingPassword,
-                'pending_credential' => null,
-            ];
-
-            if ($this->isLiaraPasswordServer($server)) {
-                $attributes['bootstrap_credential_rotated_at'] =
-                    $server->bootstrap_credential_rotated_at ?? now();
-            }
-
-            $server->forceFill($attributes);
-            $server->saveOrFail();
-            $server->refresh();
-        } catch (Throwable $exception) {
-            throw new CloudServerSshUnavailableException(
-                message: sprintf(
-                    'Cloud server [%s] password changed remotely but its recoverable pending credential could not be promoted.',
-                    $server->cloud_server_id,
-                ),
-                previous: $exception,
-            );
-        }
-    }
-
-    private function clearPendingCredential(Server $server): void
-    {
-        try {
-            $server->forceFill([
-                'pending_credential' => null,
-            ]);
-
-            $server->saveOrFail();
-            $server->refresh();
-        } catch (Throwable $exception) {
-            throw new CloudServerSshUnavailableException(
-                message: sprintf(
-                    'Cloud server [%s] stale password rotation candidate could not be cleared.',
-                    $server->cloud_server_id,
-                ),
-                previous: $exception,
-            );
-        }
     }
 
     private function assertCommandReadyAfterPasswordRotation(): void
