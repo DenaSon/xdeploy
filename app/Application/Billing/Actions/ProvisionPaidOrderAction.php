@@ -397,10 +397,10 @@ final readonly class ProvisionPaidOrderAction
     private function hasProviderDeliveryEvidence(
         Server $server,
     ): bool {
-        $provider = trim((string) $server->cloud_provider);
+        $provider = $server->cloud_provider;
         $providerServerId = trim((string) $server->cloud_server_id);
 
-        return $provider !== ''
+        return $provider instanceof CloudProviderType
             && $providerServerId !== ''
             && $server->hasConnectionHost()
             && $server->hasCredential();
