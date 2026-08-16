@@ -14,6 +14,7 @@ use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
 use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
+use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -265,6 +266,96 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
                     && $request->url() === self::BASE_URL.'/vm',
             );
         }
+    }
+
+    public function test_existing_remote_vm_is_adopted_without_creating_a_second_provider_resource(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            self::BASE_URL.'/plans' => Http::response(
+                $this->plansResponse(),
+            ),
+            self::BASE_URL.'/oss' => Http::response([
+                'ubuntu' => [
+                    '24.04',
+                    '22.04',
+                ],
+            ]),
+        ]);
+
+        $order = app(CreateOrderAction::class)->execute(
+            user: $user,
+            region: 'iran',
+            sizeId: 'standard-base-g2',
+            imageId: 'ubuntu-24.04',
+            selectedDiskGiB: 20,
+            period: '2_days',
+            provider: CloudProviderType::Liara,
+        );
+
+        $providerServerName = $this->providerServerName(
+            $order->getKey(),
+        );
+
+        $order->forceFill([
+            'status' => OrderStatus::Provisioning,
+            'paid_at' => now(),
+        ])->saveOrFail();
+
+        $details = $this->readyVmDetails();
+        $details['name'] = $providerServerName;
+
+        Http::fake(
+            function (Request $request) use ($providerServerName, $details) {
+                if (
+                    $request->method() === 'GET'
+                    && $request->url() === self::BASE_URL.'/vm'
+                ) {
+                    return Http::response([
+                        'vms' => [
+                            [
+                                '_id' => self::VM_ID,
+                                'plan' => 'standard-base-g2',
+                                'OS' => 'ubuntu-24.04',
+                                'state' => 'CREATED',
+                                'name' => $providerServerName,
+                                'createdAt' => '2026-08-15T19:44:15.993Z',
+                                'power' => 'POWERED_ON',
+                            ],
+                        ],
+                    ]);
+                }
+
+                if (
+                    $request->method() === 'GET'
+                    && $request->url() === self::BASE_URL.'/vm/'.self::VM_ID
+                ) {
+                    return Http::response($details);
+                }
+
+                return Http::response('', 404);
+            },
+        );
+
+        $server = app(ProvisionPaidOrderAction::class)->execute(
+            $order->getKey(),
+        );
+
+        $freshOrder = $order->fresh();
+
+        $this->assertSame(OrderStatus::Fulfilled, $freshOrder->status);
+        $this->assertSame($server->getKey(), $freshOrder->server_id);
+        $this->assertSame(1, Server::query()->count());
+        $this->assertSame('liara', $server->cloud_provider);
+        $this->assertSame(self::VM_ID, $server->cloud_server_id);
+        $this->assertSame('46.34.163.219', $server->host);
+        $this->assertSame('generated-root-password', $server->credential);
+
+        Http::assertNotSent(
+            fn (Request $request): bool => $request->method() === 'POST'
+                && $request->url() === self::BASE_URL.'/vm',
+        );
     }
 
     private function providerServerName(int $orderId): string
