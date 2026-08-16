@@ -28,9 +28,10 @@ final class VerifyProvisionedServerReadinessJob implements ShouldBeUnique, Shoul
     ];
 
     /**
-     * Readiness retries are safe because this job never creates or mutates
-     * provider resources. Each attempt only verifies SSH readiness and can
-     * activate the already-delivered local Server.
+     * Readiness retries never create or bill a second provider resource.
+     * SSH password rotation may mutate the delivered server, but it persists
+     * a recoverable candidate credential before the remote change and each
+     * retry reconciles that pending state before doing any further mutation.
      */
     public int $tries = 4;
 
