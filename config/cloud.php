@@ -198,17 +198,16 @@ return [
                     true,
                 ),
                 FILTER_VALIDATE_BOOL,
+                FILTER_NULL_ON_FAILURE,
             ),
 
             'purchase_enabled' => filter_var(
                 env(
                     'ARVAN_CLOUD_PURCHASE_ENABLED',
-                    env(
-                        'ARVAN_CLOUD_ENABLED',
-                        true,
-                    ),
+                    true,
                 ),
                 FILTER_VALIDATE_BOOL,
+                FILTER_NULL_ON_FAILURE,
             ),
 
             'base_url' => env(
@@ -321,17 +320,16 @@ return [
                     false,
                 ),
                 FILTER_VALIDATE_BOOL,
+                FILTER_NULL_ON_FAILURE,
             ),
 
             'purchase_enabled' => filter_var(
                 env(
                     'LIARA_CLOUD_PURCHASE_ENABLED',
-                    env(
-                        'LIARA_CLOUD_ENABLED',
-                        false,
-                    ),
+                    false,
                 ),
                 FILTER_VALIDATE_BOOL,
+                FILTER_NULL_ON_FAILURE,
             ),
 
             'base_url' => env(
