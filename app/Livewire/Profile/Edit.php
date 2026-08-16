@@ -41,6 +41,10 @@ final class Edit extends Component
     ): void {
         $user = $this->user();
 
+        $this->email = mb_strtolower(
+            trim($this->email),
+        );
+
         $validated = $this->validate([
             'firstName' => ['nullable', 'string', 'max:80'],
             'lastName' => ['nullable', 'string', 'max:80'],
@@ -60,9 +64,7 @@ final class Edit extends Component
         $this->lastName = trim(
             (string) ($validated['lastName'] ?? ''),
         );
-        $this->email = mb_strtolower(
-            trim((string) ($validated['email'] ?? '')),
-        );
+        $this->email = (string) ($validated['email'] ?? '');
 
         $updateEmail->handle(
             user: $user,
