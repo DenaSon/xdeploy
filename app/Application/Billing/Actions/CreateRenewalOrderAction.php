@@ -157,7 +157,7 @@ final readonly class CreateRenewalOrderAction
         Order $sourceOrder,
     ): void {
         $serverRegion = trim((string) $server->cloud_region);
-        $serverProvider = trim((string) $server->cloud_provider);
+        $serverProvider = $server->cloud_provider;
         $provider = $sourceOrder->cloud_provider;
 
         if (! $provider instanceof CloudProviderType) {
@@ -182,8 +182,8 @@ final readonly class CreateRenewalOrderAction
         }
 
         if (
-            $serverProvider === ''
-            || $serverProvider !== $provider->value
+            ! $serverProvider instanceof CloudProviderType
+            || $serverProvider !== $provider
         ) {
             throw new LogicException(
                 sprintf(
