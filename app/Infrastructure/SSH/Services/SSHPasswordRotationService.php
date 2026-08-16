@@ -28,28 +28,10 @@ final readonly class SSHPasswordRotationService
         #[SensitiveParameter]
         string $newPassword,
     ): void {
-        if ($currentPassword === '') {
-            throw new SSHPasswordRotationException(
-                'Current SSH password is missing.',
-            );
-        }
-
-        if ($newPassword === '') {
-            throw new SSHPasswordRotationException(
-                'New SSH password is missing.',
-            );
-        }
-
-        if (
-            hash_equals(
-                $currentPassword,
-                $newPassword,
-            )
-        ) {
-            throw new SSHPasswordRotationException(
-                'New SSH password must differ from the current password.',
-            );
-        }
+        $this->assertPasswords(
+            currentPassword: $currentPassword,
+            newPassword: $newPassword,
+        );
 
         $host = $this->targetPolicy->resolve(
             $server->host,
@@ -80,17 +62,94 @@ final readonly class SSHPasswordRotationService
             );
         }
 
-        /*
-         * Do not consider rotation successful merely because
-         * passwd printed a success message.
-         *
-         * Verify a completely new SSH authentication session.
-         */
         $this->verifyNewPassword(
             host: $host,
             server: $server,
             password: $newPassword,
         );
+    }
+
+    public function rotateManagedPassword(
+        Server $server,
+        #[SensitiveParameter]
+        string $currentPassword,
+        #[SensitiveParameter]
+        string $newPassword,
+    ): void {
+        $this->assertPasswords(
+            currentPassword: $currentPassword,
+            newPassword: $newPassword,
+        );
+
+        if (strtolower(trim($server->username)) !== 'root') {
+            throw new SSHPasswordRotationException(
+                'Managed SSH password rotation currently requires root SSH access.',
+            );
+        }
+
+        $host = $this->targetPolicy->resolve(
+            $server->host,
+        );
+
+        $ssh = $this->connect(
+            host: $host,
+            server: $server,
+            password: $currentPassword,
+        );
+
+        try {
+            $this->completeManagedPasswordChange(
+                ssh: $ssh,
+                newPassword: $newPassword,
+            );
+        } catch (SSHPasswordRotationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            throw new SSHPasswordRotationException(
+                message: 'Managed SSH password rotation failed.',
+                previous: $exception,
+            );
+        } finally {
+            $this->disconnect(
+                $ssh,
+            );
+        }
+
+        $this->verifyNewPassword(
+            host: $host,
+            server: $server,
+            password: $newPassword,
+        );
+    }
+
+    private function assertPasswords(
+        #[SensitiveParameter]
+        string $currentPassword,
+        #[SensitiveParameter]
+        string $newPassword,
+    ): void {
+        if ($currentPassword === '') {
+            throw new SSHPasswordRotationException(
+                'Current SSH password is missing.',
+            );
+        }
+
+        if ($newPassword === '') {
+            throw new SSHPasswordRotationException(
+                'New SSH password is missing.',
+            );
+        }
+
+        if (
+            hash_equals(
+                $currentPassword,
+                $newPassword,
+            )
+        ) {
+            throw new SSHPasswordRotationException(
+                'New SSH password must differ from the current password.',
+            );
+        }
     }
 
     private function completeForcedPasswordChange(
@@ -133,6 +192,88 @@ final readonly class SSHPasswordRotationService
             $newPassword."\n",
         );
 
+        $this->assertPasswordUpdateConfirmed(
+            $ssh,
+        );
+    }
+
+    private function completeManagedPasswordChange(
+        SSH2 $ssh,
+        #[SensitiveParameter]
+        string $newPassword,
+    ): void {
+        $ssh->setTimeout(
+            SSHTimeout::NORMAL,
+        );
+
+        /*
+         * Liara supplies a usable root bootstrap password instead of a
+         * password-expired account. Rotate it through an interactive
+         * `passwd` session so the new secret never appears in a command
+         * string or structured SSH logs.
+         */
+        $ssh->write(
+            "passwd\n",
+        );
+
+        $this->waitForPrompt(
+            ssh: $ssh,
+            pattern: '/New password:\s*/i',
+            errorMessage: 'Expected new-password prompt was not received.',
+        );
+
+        $ssh->write(
+            $newPassword."\n",
+        );
+
+        $this->waitForPrompt(
+            ssh: $ssh,
+            pattern: '/Retype new password:\s*/i',
+            errorMessage: 'Expected password confirmation prompt was not received.',
+        );
+
+        $ssh->write(
+            $newPassword."\n",
+        );
+
+        $this->assertPasswordUpdateConfirmed(
+            $ssh,
+        );
+    }
+
+    private function waitForPasswordPrompt(
+        SSH2 $ssh,
+    ): void {
+        $this->waitForPrompt(
+            ssh: $ssh,
+            pattern: '/password:\s*/i',
+            errorMessage: 'Expected password-change prompt was not received.',
+        );
+    }
+
+    private function waitForPrompt(
+        SSH2 $ssh,
+        string $pattern,
+        string $errorMessage,
+    ): void {
+        $output = $ssh->read(
+            $pattern,
+            SSH2::READ_REGEX,
+        );
+
+        if (
+            $ssh->isTimeout()
+            || ! is_string($output)
+        ) {
+            throw new SSHPasswordRotationException(
+                $errorMessage,
+            );
+        }
+    }
+
+    private function assertPasswordUpdateConfirmed(
+        SSH2 $ssh,
+    ): void {
         $output = $ssh->read(
             '/password updated successfully/i',
             SSH2::READ_REGEX,
@@ -148,24 +289,6 @@ final readonly class SSHPasswordRotationService
         ) {
             throw new SSHPasswordRotationException(
                 'Remote server did not confirm the password change.',
-            );
-        }
-    }
-
-    private function waitForPasswordPrompt(
-        SSH2 $ssh,
-    ): void {
-        $output = $ssh->read(
-            '/password:\s*/i',
-            SSH2::READ_REGEX,
-        );
-
-        if (
-            $ssh->isTimeout()
-            || ! is_string($output)
-        ) {
-            throw new SSHPasswordRotationException(
-                'Expected password-change prompt was not received.',
             );
         }
     }
