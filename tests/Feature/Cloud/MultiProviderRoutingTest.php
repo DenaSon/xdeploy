@@ -10,15 +10,11 @@ use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Server;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\CloudProviderRegistryStub;
 use Tests\TestCase;
 
 final class MultiProviderRoutingTest extends TestCase
 {
-    use RefreshDatabase;
-
     public function test_liara_owned_server_does_not_use_default_arvan_provider_for_lifecycle(): void
     {
         config()->set('cloud.default', CloudProviderType::Arvan->value);
@@ -66,8 +62,7 @@ final class MultiProviderRoutingTest extends TestCase
             ),
         );
 
-        $server = Server::factory()->create([
-            'user_id' => User::factory()->create()->id,
+        $server = new Server([
             'cloud_provider' => CloudProviderType::Liara->value,
             'cloud_region' => 'iran',
             'cloud_server_id' => 'liara-vm-1',
