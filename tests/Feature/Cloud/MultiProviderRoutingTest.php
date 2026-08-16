@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace Tests\Feature\Cloud;
 
 use App\Application\Cloud\Servers\PowerOnCloudServerAction;
+use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\DTOs\CloudImageData;
+use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\CloudProviderRegistryStub;
 use Tests\TestCase;
 
 final class MultiProviderRoutingTest extends TestCase
@@ -23,9 +28,15 @@ final class MultiProviderRoutingTest extends TestCase
 
         $calls = [];
 
-        $liara = new class($calls) implements CloudServerLifecycleInterface
+        $provider = new class($calls) implements CloudProviderInterface, CloudServerLifecycleInterface
         {
             public function __construct(private array &$calls) {}
+
+            public function listRegions(): array { return []; }
+
+            public function listSizes(string $region): array { return []; }
+
+            public function listImages(string $region): array { return []; }
 
             public function powerOn(string $region, string $serverId): void
             {
@@ -39,11 +50,15 @@ final class MultiProviderRoutingTest extends TestCase
             public function delete(string $region, string $serverId): void {}
         };
 
-        $registry = $this->app->make(CloudProviderRegistryInterface::class);
-        $registry->registerForTesting(
-            CloudProviderType::Liara,
-            CloudServerLifecycleInterface::class,
-            $liara,
+        $this->app->instance(
+            CloudProviderRegistryInterface::class,
+            new CloudProviderRegistryStub(
+                provider: $provider,
+                capabilities: [
+                    CloudServerLifecycleInterface::class => $provider,
+                ],
+                registeredProviders: [CloudProviderType::Liara],
+            ),
         );
 
         $server = Server::factory()->create([
