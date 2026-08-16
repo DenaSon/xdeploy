@@ -7,7 +7,9 @@ namespace App\Application\Billing\Actions;
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudProviderPurchaseUnavailableException;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +19,7 @@ final readonly class CreateOrderAction
     public function __construct(
         private CalculateCloudPurchasePriceAction $calculatePrice,
         private ResolveCloudImageForOrderAction $resolveImage,
+        private CloudProviderRegistryInterface $providers,
     ) {}
 
     public function execute(
@@ -28,6 +31,19 @@ final readonly class CreateOrderAction
         string $period,
         CloudProviderType $provider = CloudProviderType::Arvan,
     ): Order {
+        if (! in_array(
+            $provider,
+            $this->providers->purchasableProviders(),
+            true,
+        )) {
+            throw new CloudProviderPurchaseUnavailableException(
+                sprintf(
+                    'The cloud provider [%s] is not available for new purchases.',
+                    $provider->value,
+                ),
+            );
+        }
+
         $region = trim($region);
         $sizeId = trim($sizeId);
         $imageId = trim($imageId);
