@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Cloud\Liara;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialRotationInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
@@ -26,7 +27,7 @@ use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
 
-final readonly class LiaraCloudProvider implements CloudProviderInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface
+final readonly class LiaraCloudProvider implements CloudProviderInterface, CloudServerBootstrapCredentialRotationInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface
 {
     private const string RESOURCE_PLANS = 'plans';
 
