@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Actions;
 
 use App\Application\Server\Actions\EnsureSupportedOperatingSystemAction;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudServerProvisioningException;
 use App\Domain\Cloud\Exceptions\CloudServerSshUnavailableException;
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\PrivilegedExecutionMode;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Domain\Server\Exceptions\RootPrivilegesRequiredException;
@@ -59,6 +61,10 @@ final readonly class VerifyCloudServerSshReadinessAction
                 ->handle();
 
             $mode = $this->preflight->detect();
+
+            $this->rotateProviderBootstrapCredentialIfNeeded(
+                $server,
+            );
         } catch (
             RootPrivilegesRequiredException $exception
         ) {
@@ -125,6 +131,40 @@ final readonly class VerifyCloudServerSshReadinessAction
     private function rotateExpiredPassword(
         Server $server,
     ): void {
+        $this->rotateCredential(
+            server: $server,
+            forcedPasswordChange: true,
+        );
+    }
+
+    private function rotateProviderBootstrapCredentialIfNeeded(
+        Server $server,
+    ): void {
+        if (! $this->usesProviderBootstrapCredential($server)) {
+            return;
+        }
+
+        $this->rotateCredential(
+            server: $server,
+            forcedPasswordChange: false,
+        );
+
+        $this->assertCommandReadyAfterPasswordRotation();
+    }
+
+    private function usesProviderBootstrapCredential(
+        Server $server,
+    ): bool {
+        return strtolower(
+            trim((string) $server->cloud_provider),
+        ) === CloudProviderType::Liara->value
+            && $server->authentication_type === AuthenticationType::Password;
+    }
+
+    private function rotateCredential(
+        Server $server,
+        bool $forcedPasswordChange,
+    ): void {
         $currentPassword = $server->credential;
 
         if (
@@ -132,7 +172,7 @@ final readonly class VerifyCloudServerSshReadinessAction
             || trim($currentPassword) === ''
         ) {
             throw new CloudServerSshUnavailableException(
-                'Cloud server requires a password change but no current password is available.',
+                'Cloud server password rotation requires the current credential.',
             );
         }
 
@@ -146,11 +186,19 @@ final readonly class VerifyCloudServerSshReadinessAction
 
         $this->ssh->disconnect();
 
-        $this->passwordRotation->rotate(
-            server: $server,
-            currentPassword: $currentPassword,
-            newPassword: $newPassword,
-        );
+        if ($forcedPasswordChange) {
+            $this->passwordRotation->rotate(
+                server: $server,
+                currentPassword: $currentPassword,
+                newPassword: $newPassword,
+            );
+        } else {
+            $this->passwordRotation->rotateManagedPassword(
+                server: $server,
+                currentPassword: $currentPassword,
+                newPassword: $newPassword,
+            );
+        }
 
         $this->persistRotatedCredential(
             server: $server,
