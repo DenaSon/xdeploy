@@ -49,7 +49,8 @@ final class LiaraCloudClientTest extends TestCase
                     'Authorization',
                     'Bearer '.self::API_TOKEN,
                 )
-                && $request->hasHeader('Accept', 'application/json'),
+                && $request->hasHeader('Accept', 'application/json')
+                && ! $request->hasHeader('Content-Type'),
         );
     }
 
@@ -81,7 +82,11 @@ final class LiaraCloudClientTest extends TestCase
         Http::assertSent(
             fn (Request $request): bool => $request->method() === 'POST'
                 && $request->url() === self::BASE_URL.'/vm'
-                && $request->data() === $payload,
+                && $request->data() === $payload
+                && $request->hasHeader(
+                    'Content-Type',
+                    'application/json',
+                ),
         );
     }
 
@@ -104,7 +109,11 @@ final class LiaraCloudClientTest extends TestCase
             fn (Request $request): bool => $request->method() === 'PATCH'
                 && $request->data() === [
                     'action' => 'stop',
-                ],
+                ]
+                && $request->hasHeader(
+                    'Content-Type',
+                    'application/json',
+                ),
         );
     }
 
@@ -124,7 +133,8 @@ final class LiaraCloudClientTest extends TestCase
         Http::assertSent(
             fn (Request $request): bool => $request->method() === 'DELETE'
                 && $request->url() === self::BASE_URL
-                .'/vm/6a80c18f6727f3d124d794c6',
+                .'/vm/6a80c18f6727f3d124d794c6'
+                && ! $request->hasHeader('Content-Type'),
         );
     }
 
