@@ -138,6 +138,31 @@ final class LiaraCloudClientTest extends TestCase
         );
     }
 
+    public function test_it_preserves_safe_provider_validation_message(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/*' => Http::response([
+                'statusCode' => 400,
+                'error' => 'Bad Request',
+                'message' => 'VM must be powered off before deletion.',
+            ], 400),
+        ]);
+
+        try {
+            $this->client()->delete(
+                'vm/6a80c18f6727f3d124d794c6',
+            );
+
+            $this->fail('Expected Liara validation failure.');
+        } catch (CloudValidationException $exception) {
+            $this->assertSame(400, $exception->getCode());
+            $this->assertSame(
+                'Cloud provider rejected the request: VM must be powered off before deletion.',
+                $exception->getMessage(),
+            );
+        }
+    }
+
     public function test_it_maps_payment_required_to_insufficient_balance(): void
     {
         Http::fake([
