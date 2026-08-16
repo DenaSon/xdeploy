@@ -221,16 +221,29 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             CloudProviderRegistry::class,
-            static function (Application $app): CloudProviderRegistry {
-                $arvanCapabilities = $app->make(
-                    ArvanCloudCatalogCapabilities::class,
-                );
+            function (Application $app): CloudProviderRegistry {
+                $providers = [];
+                $capabilities = [];
 
-                $providers = [
-                    CloudProviderType::Arvan->value => $app->make(
+                $arvanApiKey = config('cloud.providers.arvan.api_key');
+
+                if (is_string($arvanApiKey) && trim($arvanApiKey) !== '') {
+                    $arvanCapabilities = $app->make(
+                        ArvanCloudCatalogCapabilities::class,
+                    );
+
+                    $providers[CloudProviderType::Arvan->value] = $app->make(
                         ArvanCloudProvider::class,
-                    ),
-                ];
+                    );
+                    $capabilities[CloudProviderType::Arvan->value] = [
+                        CloudServerProvisionerInterface::class => $app->make(
+                            ArvanCloudProvisioner::class,
+                        ),
+                        CloudProvisioningInfrastructureCatalogInterface::class => $arvanCapabilities,
+                        CloudQuotaReaderInterface::class => $arvanCapabilities,
+                        CloudSshKeyCatalogInterface::class => $arvanCapabilities,
+                    ];
+                }
 
                 $liaraToken = config('cloud.providers.liara.api_token');
 
@@ -240,19 +253,14 @@ final class CloudServiceProvider extends ServiceProvider
                     );
                 }
 
-                return new CloudProviderRegistry(
+                $registry = new CloudProviderRegistry(
                     providers: $providers,
-                    capabilities: [
-                        CloudProviderType::Arvan->value => [
-                            CloudServerProvisionerInterface::class => $app->make(
-                                ArvanCloudProvisioner::class,
-                            ),
-                            CloudProvisioningInfrastructureCatalogInterface::class => $arvanCapabilities,
-                            CloudQuotaReaderInterface::class => $arvanCapabilities,
-                            CloudSshKeyCatalogInterface::class => $arvanCapabilities,
-                        ],
-                    ],
+                    capabilities: $capabilities,
                 );
+
+                $registry->resolve($this->defaultCloudProvider());
+
+                return $registry;
             },
         );
 
