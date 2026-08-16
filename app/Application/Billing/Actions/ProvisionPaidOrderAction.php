@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Application\Billing\Actions;
 
 use App\Application\Cloud\Actions\ProvisionCloudServerAction;
+use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Exceptions\OrderNotProvisionableException;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
+use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Server\Enums\AuthenticationType;
+use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Order;
 use App\Models\Server;
 use App\Models\User;
@@ -24,6 +29,7 @@ final readonly class ProvisionPaidOrderAction
         private ProvisionCloudServerAction $provisionCloudServer,
         private BuildCloudServerDataFromOrderAction $buildCloudServerData,
         private CloudProviderRegistryInterface $providers,
+        private CreateServerAction $createServer,
     ) {}
 
     public function execute(
@@ -259,12 +265,133 @@ final readonly class ProvisionPaidOrderAction
             return null;
         }
 
+        $existing = $this->findLocalProviderServer(
+            order: $order,
+            provider: $provider,
+            providerServerId: $providerServerId,
+        );
+
+        if ($existing instanceof Server) {
+            return $existing;
+        }
+
+        return $this->adoptProviderServer(
+            order: $order,
+            provider: $provider,
+            providerServerId: $providerServerId,
+        );
+    }
+
+    private function findLocalProviderServer(
+        Order $order,
+        CloudProviderType $provider,
+        string $providerServerId,
+    ): ?Server {
         return Server::query()
             ->where('user_id', $order->user_id)
             ->where('cloud_provider', $provider->value)
             ->where('cloud_server_id', $providerServerId)
             ->where('cloud_region', $order->region_id)
             ->first();
+    }
+
+    private function adoptProviderServer(
+        Order $order,
+        CloudProviderType $provider,
+        string $providerServerId,
+    ): ?Server {
+        try {
+            /** @var CloudServerProvisionerInterface $provisioner */
+            $provisioner = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerProvisionerInterface::class,
+            );
+
+            $cloudServer = $provisioner->findServer(
+                region: $order->region_id,
+                serverId: $providerServerId,
+            );
+
+            $host = $cloudServer->firstPublicIpv4();
+            $username = trim((string) $cloudServer->username);
+
+            if ($host === null || $username === '') {
+                return null;
+            }
+
+            $credential = $cloudServer->generatedPassword();
+
+            if (
+                (! is_string($credential) || trim($credential) === '')
+                && $this->providers->supportsCapability(
+                    provider: $provider,
+                    capability: CloudServerCredentialManagerInterface::class,
+                )
+            ) {
+                /** @var CloudServerCredentialManagerInterface $credentials */
+                $credentials = $this->providers->resolveCapability(
+                    provider: $provider,
+                    capability: CloudServerCredentialManagerInterface::class,
+                );
+
+                $credential = $credentials->resetRootPassword(
+                    region: $order->region_id,
+                    serverId: $providerServerId,
+                )->password;
+            }
+
+            if (! is_string($credential) || trim($credential) === '') {
+                return null;
+            }
+
+            $user = $order->user;
+
+            if (! $user instanceof User) {
+                $user = User::query()->find($order->user_id);
+            }
+
+            if (! $user instanceof User) {
+                throw new LogicException(
+                    sprintf(
+                        'Order [%d] has no valid owner for provider resource recovery.',
+                        $order->getKey(),
+                    ),
+                );
+            }
+
+            try {
+                return $this->createServer->handle(
+                    user: $user,
+                    attributes: [
+                        'name' => $cloudServer->name,
+                        'host' => $host,
+                        'port' => 22,
+                        'username' => $username,
+                        'authentication_type' => AuthenticationType::Password,
+                        'credential' => $credential,
+                        'cloud_provider' => $provider->value,
+                        'cloud_server_id' => $providerServerId,
+                        'cloud_region' => $order->region_id,
+                        'provisioned_at' => $cloudServer->createdAt ?? now(),
+                    ],
+                    status: ServerStatus::Inactive,
+                );
+            } catch (Throwable $exception) {
+                $existing = $this->findLocalProviderServer(
+                    order: $order,
+                    provider: $provider,
+                    providerServerId: $providerServerId,
+                );
+
+                if ($existing instanceof Server) {
+                    return $existing;
+                }
+
+                throw $exception;
+            }
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function hasProviderDeliveryEvidence(
