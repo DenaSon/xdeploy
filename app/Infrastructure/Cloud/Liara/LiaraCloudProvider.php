@@ -22,6 +22,7 @@ use App\Domain\Cloud\DTOs\CreateCloudServerData;
 use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
+use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
 
@@ -73,9 +74,10 @@ final readonly class LiaraCloudProvider implements CloudProviderInterface, Cloud
     public function listImages(string $region): array
     {
         $regionId = $this->normalizeRegion($region);
+        $response = $this->client->get(self::RESOURCE_OPERATING_SYSTEMS);
 
         return $this->mapper->mapImages(
-            response: $this->client->get(self::RESOURCE_OPERATING_SYSTEMS),
+            response: $this->normalizeOperatingSystemCatalog($response),
             region: $regionId,
         );
     }
@@ -353,6 +355,48 @@ final readonly class LiaraCloudProvider implements CloudProviderInterface, Cloud
                 billingPeriod: CloudBillingPeriod::Monthly,
             ),
         );
+    }
+
+    /**
+     * Liara exposes regular operating systems at the top level while
+     * one-click application images are nested under [one-click-apps].
+     * Coreflare keeps the mapper provider-shape-neutral by flattening that
+     * Liara-specific grouping at the provider boundary.
+     *
+     * @param  array<array-key, mixed>  $response
+     * @return array<array-key, mixed>
+     */
+    private function normalizeOperatingSystemCatalog(array $response): array
+    {
+        if (! array_key_exists('one-click-apps', $response)) {
+            return $response;
+        }
+
+        $oneClickApps = $response['one-click-apps'];
+
+        if (! is_array($oneClickApps)) {
+            throw new CloudUnexpectedResponseException(
+                'Liara one-click application catalog payload is invalid.',
+            );
+        }
+
+        unset($response['one-click-apps']);
+
+        foreach ($oneClickApps as $application => $versions) {
+            if (
+                ! is_string($application)
+                || trim($application) === ''
+                || array_key_exists($application, $response)
+            ) {
+                throw new CloudUnexpectedResponseException(
+                    'Liara one-click application catalog contains an invalid entry.',
+                );
+            }
+
+            $response[$application] = $versions;
+        }
+
+        return $response;
     }
 
     private function assertRegion(string $region): void
