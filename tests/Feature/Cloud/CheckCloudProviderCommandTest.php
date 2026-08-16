@@ -159,6 +159,8 @@ final class CheckCloudProviderCommandTest extends TestCase
 
     public function test_provider_option_runs_read_only_liara_smoke_without_changing_default_provider(): void
     {
+        config()->set('cloud.providers.liara.enabled', true);
+        config()->set('cloud.providers.liara.purchase_enabled', true);
         config()->set(
             'cloud.providers.liara.base_url',
             self::LIARA_BASE_URL,
