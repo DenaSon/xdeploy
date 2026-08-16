@@ -47,7 +47,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Fulfilled);
         $server = $this->server(
             user: $order->user,
-            name: $this->serverName($order),
+            name: 'bright-falcon-1001',
             status: ServerStatus::Active,
         );
 
@@ -61,14 +61,16 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $this->assertDatabaseCount('servers', 1);
     }
 
-    public function test_reinvoking_provisioning_order_does_not_create_another_server(): void
+    public function test_reinvoking_provisioning_order_uses_attached_server_without_display_name_correlation(): void
     {
         $order = $this->order(OrderStatus::Provisioning);
         $server = $this->server(
             user: $order->user,
-            name: $this->serverName($order),
+            name: 'silent-orbit-2002',
             status: ServerStatus::Inactive,
         );
+
+        $order->forceFill(['server_id' => $server->id])->save();
 
         $this->expectException(OrderNotProvisionableException::class);
 
@@ -78,6 +80,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
             $freshOrder = $order->fresh();
             $this->assertSame(OrderStatus::Provisioning, $freshOrder->status);
             $this->assertSame($server->id, $freshOrder->server_id);
+            $this->assertSame('silent-orbit-2002', $server->fresh()->name);
             $this->assertDatabaseCount('servers', 1);
         }
     }
@@ -87,7 +90,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Failed);
         $server = $this->server(
             user: $order->user,
-            name: $this->serverName($order),
+            name: 'steady-node-3003',
             status: ServerStatus::Inactive,
         );
 
@@ -101,6 +104,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $this->assertSame($server->id, $order->fresh()->server_id);
         $this->assertSame(ServerStatus::Inactive, $server->fresh()->status);
         $this->assertSame('203.0.113.77', $server->fresh()->host);
+        $this->assertSame('steady-node-3003', $server->fresh()->name);
         $this->assertDatabaseCount('servers', 1);
     }
 
@@ -109,7 +113,7 @@ final class ProvisionPaidOrderActionTest extends TestCase
         $order = $this->order(OrderStatus::Failed);
         $server = $this->server(
             user: $order->user,
-            name: $this->serverName($order),
+            name: 'calm-river-4004',
             status: ServerStatus::Inactive,
             credential: null,
         );
@@ -147,14 +151,6 @@ final class ProvisionPaidOrderActionTest extends TestCase
     private function action(): ProvisionPaidOrderAction
     {
         return app(ProvisionPaidOrderAction::class);
-    }
-
-    private function serverName(Order $order): string
-    {
-        return sprintf(
-            'cf-%s',
-            base_convert((string) $order->id, 10, 36),
-        );
     }
 
     private function order(OrderStatus $status): Order
