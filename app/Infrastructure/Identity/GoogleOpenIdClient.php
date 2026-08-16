@@ -19,8 +19,10 @@ final class GoogleOpenIdClient
     public function authorizationUrl(
         string $state,
         string $redirectUri,
+        string $codeVerifier,
     ): string {
         $this->ensureConfigured();
+        $this->ensureValidCodeVerifier($codeVerifier);
 
         $query = http_build_query(
             [
@@ -29,6 +31,10 @@ final class GoogleOpenIdClient
                 'response_type' => 'code',
                 'scope' => 'openid email',
                 'state' => $state,
+                'code_challenge' => $this->codeChallenge(
+                    $codeVerifier,
+                ),
+                'code_challenge_method' => 'S256',
                 'access_type' => 'online',
                 'prompt' => 'select_account',
             ],
@@ -43,8 +49,10 @@ final class GoogleOpenIdClient
     public function resolveIdentity(
         string $authorizationCode,
         string $redirectUri,
+        string $codeVerifier,
     ): GoogleOpenIdIdentity {
         $this->ensureConfigured();
+        $this->ensureValidCodeVerifier($codeVerifier);
 
         $tokenResponse = Http::asForm()
             ->acceptJson()
@@ -58,6 +66,7 @@ final class GoogleOpenIdClient
                     'client_secret' => $this->clientSecret(),
                     'redirect_uri' => $redirectUri,
                     'grant_type' => 'authorization_code',
+                    'code_verifier' => $codeVerifier,
                 ],
             );
 
@@ -106,6 +115,42 @@ final class GoogleOpenIdClient
             email: $email,
             emailVerified: $emailVerified,
         );
+    }
+
+    private function codeChallenge(string $codeVerifier): string
+    {
+        return rtrim(
+            strtr(
+                base64_encode(
+                    hash(
+                        'sha256',
+                        $codeVerifier,
+                        true,
+                    ),
+                ),
+                '+/',
+                '-_',
+            ),
+            '=',
+        );
+    }
+
+    private function ensureValidCodeVerifier(string $codeVerifier): void
+    {
+        $length = strlen($codeVerifier);
+
+        if (
+            $length < 43
+            || $length > 128
+            || preg_match(
+                '/\A[A-Za-z0-9\-._~]+\z/D',
+                $codeVerifier,
+            ) !== 1
+        ) {
+            throw new RuntimeException(
+                'Google PKCE code verifier is invalid.',
+            );
+        }
     }
 
     private function ensureConfigured(): void

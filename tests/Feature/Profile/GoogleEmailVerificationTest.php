@@ -78,6 +78,14 @@ final class GoogleEmailVerificationTest extends TestCase
             $query['redirect_uri'] ?? null,
         );
         $this->assertNotEmpty($query['state'] ?? null);
+        $this->assertSame(
+            'S256',
+            $query['code_challenge_method'] ?? null,
+        );
+        $this->assertArrayNotHasKey(
+            'code_verifier',
+            $query,
+        );
 
         $attempt = session(
             'profile.google_email_verification',
@@ -99,6 +107,22 @@ final class GoogleEmailVerificationTest extends TestCase
             ),
             $attempt['state_hash'] ?? null,
         );
+
+        $codeVerifier = $attempt['code_verifier'] ?? null;
+
+        $this->assertIsString($codeVerifier);
+        $this->assertGreaterThanOrEqual(
+            43,
+            strlen($codeVerifier),
+        );
+        $this->assertLessThanOrEqual(
+            128,
+            strlen($codeVerifier),
+        );
+        $this->assertSame(
+            $this->codeChallenge($codeVerifier),
+            $query['code_challenge'] ?? null,
+        );
         $this->assertArrayNotHasKey(
             'state',
             $attempt,
@@ -113,6 +137,12 @@ final class GoogleEmailVerificationTest extends TestCase
         ]);
 
         $state = $this->startAttempt($user);
+        $attempt = session(
+            'profile.google_email_verification',
+        );
+        $this->assertIsArray($attempt);
+        $codeVerifier = $attempt['code_verifier'] ?? null;
+        $this->assertIsString($codeVerifier);
 
         $this->fakeGoogleIdentity(
             email: 'user@example.com',
@@ -138,6 +168,11 @@ final class GoogleEmailVerificationTest extends TestCase
             $user->email_verified_at,
         );
 
+        Http::assertSent(
+            static fn ($request): bool => $request->url()
+                === 'https://oauth2.googleapis.com/token'
+                && $request['code_verifier'] === $codeVerifier,
+        );
         Http::assertSentCount(2);
     }
 
@@ -395,6 +430,24 @@ final class GoogleEmailVerificationTest extends TestCase
         $this->assertNotSame('', $state);
 
         return $state;
+    }
+
+    private function codeChallenge(string $codeVerifier): string
+    {
+        return rtrim(
+            strtr(
+                base64_encode(
+                    hash(
+                        'sha256',
+                        $codeVerifier,
+                        true,
+                    ),
+                ),
+                '+/',
+                '-_',
+            ),
+            '=',
+        );
     }
 
     /**

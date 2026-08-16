@@ -41,11 +41,13 @@ final class GoogleEmailVerificationController
         }
 
         $state = bin2hex(random_bytes(32));
+        $codeVerifier = $this->codeVerifier();
 
         $request->session()->put(
             self::SESSION_KEY,
             [
                 'state_hash' => hash('sha256', $state),
+                'code_verifier' => $codeVerifier,
                 'user_id' => $user->getKey(),
                 'expected_email' => $this->normalizeEmail(
                     $user->email,
@@ -58,6 +60,7 @@ final class GoogleEmailVerificationController
             $google->authorizationUrl(
                 state: $state,
                 redirectUri: $this->callbackUrl(),
+                codeVerifier: $codeVerifier,
             ),
         );
     }
@@ -72,18 +75,19 @@ final class GoogleEmailVerificationController
             self::SESSION_KEY,
         );
 
-        if ($request->filled('error')) {
-            return $this->failure(
-                'فرایند تأیید ایمیل در Google لغو شد.',
-            );
-        }
-
         if (! $this->validAttempt($attempt, $user, $request)) {
             return $this->failure(
                 'درخواست تأیید ایمیل معتبر نیست یا منقضی شده است.',
             );
         }
 
+        if ($request->filled('error')) {
+            return $this->failure(
+                'فرایند تأیید ایمیل در Google لغو شد.',
+            );
+        }
+
+        $codeVerifier = $attempt['code_verifier'];
         $authorizationCode = $request->query('code');
 
         if (
@@ -99,6 +103,7 @@ final class GoogleEmailVerificationController
             $identity = $google->resolveIdentity(
                 authorizationCode: $authorizationCode,
                 redirectUri: $this->callbackUrl(),
+                codeVerifier: $codeVerifier,
             );
 
             if (! $identity->emailVerified) {
@@ -143,6 +148,7 @@ final class GoogleEmailVerificationController
 
         $state = $request->query('state');
         $stateHash = $attempt['state_hash'] ?? null;
+        $codeVerifier = $attempt['code_verifier'] ?? null;
         $userId = $attempt['user_id'] ?? null;
         $startedAt = $attempt['started_at'] ?? null;
         $issuer = $request->query('iss');
@@ -152,6 +158,7 @@ final class GoogleEmailVerificationController
             || $state === ''
             || ! is_string($stateHash)
             || $stateHash === ''
+            || ! $this->validCodeVerifier($codeVerifier)
             || ! is_int($startedAt)
             || (string) $userId !== (string) $user->getKey()
             || $issuer !== 'https://accounts.google.com'
@@ -172,6 +179,36 @@ final class GoogleEmailVerificationController
 
         return $age >= 0
             && $age <= self::ATTEMPT_TTL_SECONDS;
+    }
+
+    private function codeVerifier(): string
+    {
+        return rtrim(
+            strtr(
+                base64_encode(
+                    random_bytes(64),
+                ),
+                '+/',
+                '-_',
+            ),
+            '=',
+        );
+    }
+
+    private function validCodeVerifier(mixed $codeVerifier): bool
+    {
+        if (! is_string($codeVerifier)) {
+            return false;
+        }
+
+        $length = strlen($codeVerifier);
+
+        return $length >= 43
+            && $length <= 128
+            && preg_match(
+                '/\A[A-Za-z0-9\-._~]+\z/D',
+                $codeVerifier,
+            ) === 1;
     }
 
     private function normalizeEmail(?string $email): ?string
