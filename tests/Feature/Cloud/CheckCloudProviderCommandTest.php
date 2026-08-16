@@ -261,7 +261,7 @@ final class CheckCloudProviderCommandTest extends TestCase
             $output,
         );
 
-        Http::assertSentCount(3);
+        Http::assertSentCount(4);
         Http::assertSent(
             static fn (Request $request): bool => $request->method() === 'GET'
                 && $request->url() === self::LIARA_BASE_URL.'/plans',
