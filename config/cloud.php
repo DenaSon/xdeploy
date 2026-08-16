@@ -177,6 +177,11 @@ return [
     |--------------------------------------------------------------------------
     | Cloud Providers
     |--------------------------------------------------------------------------
+    |
+    | enabled کنترل می‌کند Provider برای مدیریت resourceهای موجود در Registry
+    | عملیاتی باشد. purchase_enabled فقط اجازه خرید جدید را کنترل می‌کند.
+    | Provider غیرفعال نمی‌تواند برای خرید جدید فعال باشد.
+    |
     */
 
     'providers' => [
@@ -187,6 +192,25 @@ return [
         */
 
         'arvan' => [
+            'enabled' => filter_var(
+                env(
+                    'ARVAN_CLOUD_ENABLED',
+                    true,
+                ),
+                FILTER_VALIDATE_BOOL,
+            ),
+
+            'purchase_enabled' => filter_var(
+                env(
+                    'ARVAN_CLOUD_PURCHASE_ENABLED',
+                    env(
+                        'ARVAN_CLOUD_ENABLED',
+                        true,
+                    ),
+                ),
+                FILTER_VALIDATE_BOOL,
+            ),
+
             'base_url' => env(
                 'ARVAN_CLOUD_BASE_URL',
                 'https://napi.arvancloud.ir/ecc/v1',
@@ -291,6 +315,25 @@ return [
         */
 
         'liara' => [
+            'enabled' => filter_var(
+                env(
+                    'LIARA_CLOUD_ENABLED',
+                    false,
+                ),
+                FILTER_VALIDATE_BOOL,
+            ),
+
+            'purchase_enabled' => filter_var(
+                env(
+                    'LIARA_CLOUD_PURCHASE_ENABLED',
+                    env(
+                        'LIARA_CLOUD_ENABLED',
+                        false,
+                    ),
+                ),
+                FILTER_VALIDATE_BOOL,
+            ),
+
             'base_url' => env(
                 'LIARA_CLOUD_BASE_URL',
                 'https://iaas-api.liara.ir',
