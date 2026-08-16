@@ -58,6 +58,28 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
         $this->capabilities = $normalizedCapabilities;
     }
 
+    public function registeredProviders(): array
+    {
+        $providers = [];
+
+        foreach (array_keys($this->providers) as $providerKey) {
+            $provider = CloudProviderType::tryFrom($providerKey);
+
+            if (! $provider instanceof CloudProviderType) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'The registered cloud provider [%s] has no supported provider type.',
+                        $providerKey,
+                    ),
+                );
+            }
+
+            $providers[] = $provider;
+        }
+
+        return $providers;
+    }
+
     public function resolve(
         CloudProviderType $provider,
     ): CloudProviderInterface {
