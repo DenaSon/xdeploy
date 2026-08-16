@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Application\Cloud\ServerConsole\Actions\GetCloudServerConsoleAction;
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
+use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -24,8 +26,10 @@ final class Console extends Component
 
     public ?string $consoleError = null;
 
-    public function mount(Server $server): void
-    {
+    public function mount(
+        Server $server,
+        CloudServerCapabilityResolver $capabilities,
+    ): void {
         $this->server = $this
             ->authenticatedUser()
             ->servers()
@@ -36,8 +40,10 @@ final class Console extends Component
 
         abort_unless(
             $this->server->isCloudProvisioned()
-            && filled($this->server->cloud_region)
-            && filled($this->server->cloud_server_id),
+            && $capabilities->supports(
+                server: $this->server,
+                capability: CloudServerConsoleInterface::class,
+            ),
             404,
         );
     }
@@ -50,8 +56,7 @@ final class Console extends Component
 
         try {
             $console = $action->execute(
-                region: (string) $this->server->cloud_region,
-                serverId: (string) $this->server->cloud_server_id,
+                $this->server,
             );
 
             $this->consoleUrl = $console->url;
