@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Cloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialRotationInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
@@ -43,9 +44,10 @@ final class CloudProviderCapabilityMatrixTest extends TestCase
         $this->assertTrue($registry->supportsCapability(CloudProviderType::Arvan, CloudServerProvisionerInterface::class));
         $this->assertTrue($registry->supportsCapability(CloudProviderType::Liara, CloudServerLifecycleInterface::class));
         $this->assertTrue($registry->supportsCapability(CloudProviderType::Liara, CloudServerProvisionerInterface::class));
+        $this->assertTrue($registry->supportsCapability(CloudProviderType::Liara, CloudServerBootstrapCredentialRotationInterface::class));
     }
 
-    public function test_unsupported_capability_is_not_reported_as_available(): void
+    public function test_provider_specific_capabilities_are_reported_truthfully(): void
     {
         $registry = $this->app->make(CloudProviderRegistryInterface::class);
 
@@ -53,6 +55,13 @@ final class CloudProviderCapabilityMatrixTest extends TestCase
             $registry->supportsCapability(
                 CloudProviderType::Liara,
                 CloudServerConsoleInterface::class,
+            ),
+        );
+
+        $this->assertFalse(
+            $registry->supportsCapability(
+                CloudProviderType::Arvan,
+                CloudServerBootstrapCredentialRotationInterface::class,
             ),
         );
     }
