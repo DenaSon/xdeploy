@@ -44,6 +44,22 @@ return new class extends Migration
                 ->nullable()
                 ->unique();
 
+            /*
+             * A password rotation is a distributed mutation: the remote SSH
+             * credential can change before the local active credential is
+             * promoted. Persist the candidate secret first so a crash or DB
+             * failure after the remote mutation remains recoverable.
+             */
+            $table->text('pending_credential')
+                ->nullable();
+
+            $table->uuid('pending_credential_context')
+                ->nullable()
+                ->unique();
+
+            $table->timestamp('bootstrap_credential_rotated_at')
+                ->nullable();
+
             $table->enum('status', array_column(
                 ServerStatus::cases(),
                 'value',

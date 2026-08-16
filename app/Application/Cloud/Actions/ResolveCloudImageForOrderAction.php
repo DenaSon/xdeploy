@@ -5,15 +5,20 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Actions;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use InvalidArgumentException;
 
 final readonly class ResolveCloudImageForOrderAction
 {
     public function __construct(
-        private CloudProviderInterface $cloud,
-        private ListSupportedCloudImagesAction $supportedImages,
+        private ?CloudProviderRegistryInterface $providers = null,
+        private ?FilterSupportedCloudImagesAction $filter = null,
+        private ?CloudProviderInterface $cloud = null,
+        private ?ListSupportedCloudImagesAction $supportedImages = null,
     ) {}
 
     public function execute(
@@ -21,6 +26,7 @@ final readonly class ResolveCloudImageForOrderAction
         string $sizeId,
         string $imageId,
         int $selectedDiskGiB,
+        CloudProviderType $provider = CloudProviderType::Arvan,
     ): CloudImageData {
         $region = trim($region);
         $sizeId = trim($sizeId);
@@ -50,15 +56,17 @@ final readonly class ResolveCloudImageForOrderAction
             );
         }
 
+        $cloud = $this->provider(
+            $provider,
+        );
+
         $size = $this->resolveSize(
+            cloud: $cloud,
             region: $region,
             sizeId: $sizeId,
         );
 
-        if (
-            $selectedDiskGiB
-            < $size->diskGiB
-        ) {
+        if ($selectedDiskGiB < $size->diskGiB) {
             throw new InvalidArgumentException(
                 sprintf(
                     'Selected disk cannot be smaller than the size default of [%d] GiB.',
@@ -68,6 +76,8 @@ final readonly class ResolveCloudImageForOrderAction
         }
 
         $image = $this->resolveImage(
+            cloud: $cloud,
+            provider: $provider,
             region: $region,
             imageId: $imageId,
         );
@@ -77,10 +87,7 @@ final readonly class ResolveCloudImageForOrderAction
             $image->minDiskGiB ?? 0,
         );
 
-        if (
-            $selectedDiskGiB
-            < $minimumDiskGiB
-        ) {
+        if ($selectedDiskGiB < $minimumDiskGiB) {
             throw new InvalidArgumentException(
                 sprintf(
                     'Selected image [%s] requires at least [%d] GiB of disk.',
@@ -92,8 +99,7 @@ final readonly class ResolveCloudImageForOrderAction
 
         if (
             $image->minMemoryMiB !== null
-            && $size->memoryMiB
-            < $image->minMemoryMiB
+            && $size->memoryMiB < $image->minMemoryMiB
         ) {
             throw new InvalidArgumentException(
                 sprintf(
@@ -107,15 +113,41 @@ final readonly class ResolveCloudImageForOrderAction
         return $image;
     }
 
+    private function provider(
+        CloudProviderType $provider,
+    ): CloudProviderInterface {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            return $this->providers->resolve(
+                $provider,
+            );
+        }
+
+        /*
+         * Transitional direct-construction seam for existing tests. Runtime
+         * container resolution supplies the registry and remains provider
+         * aware. A non-Arvan provider may never use this fallback.
+         */
+        if (
+            $provider !== CloudProviderType::Arvan
+            || ! $this->cloud instanceof CloudProviderInterface
+        ) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud image dependencies for provider [%s] are not configured.',
+                    $provider->value,
+                ),
+            );
+        }
+
+        return $this->cloud;
+    }
+
     private function resolveSize(
+        CloudProviderInterface $cloud,
         string $region,
         string $sizeId,
     ): CloudSizeData {
-        foreach (
-            $this->cloud->listSizes(
-                $region,
-            ) as $size
-        ) {
+        foreach ($cloud->listSizes($region) as $size) {
             if ($size->id === $sizeId) {
                 return $size;
             }
@@ -131,14 +163,40 @@ final readonly class ResolveCloudImageForOrderAction
     }
 
     private function resolveImage(
+        CloudProviderInterface $cloud,
+        CloudProviderType $provider,
         string $region,
         string $imageId,
     ): CloudImageData {
-        foreach (
-            $this->supportedImages->execute(
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            if (! $this->filter instanceof FilterSupportedCloudImagesAction) {
+                throw new CloudConfigurationException(
+                    'Cloud image filter is not configured.',
+                );
+            }
+
+            $images = $this->filter->execute(
+                $cloud->listImages($region),
+            );
+        } else {
+            if (
+                $provider !== CloudProviderType::Arvan
+                || ! $this->supportedImages instanceof ListSupportedCloudImagesAction
+            ) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'Supported cloud image lookup for provider [%s] is not configured.',
+                        $provider->value,
+                    ),
+                );
+            }
+
+            $images = $this->supportedImages->execute(
                 $region,
-            ) as $image
-        ) {
+            );
+        }
+
+        foreach ($images as $image) {
             if ($image->id === $imageId) {
                 return $image;
             }

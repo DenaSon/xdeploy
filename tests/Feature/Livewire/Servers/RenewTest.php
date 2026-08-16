@@ -10,6 +10,7 @@ use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
@@ -24,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Support\CloudProviderRegistryStub;
 use Tests\TestCase;
 
 final class RenewTest extends TestCase
@@ -250,6 +252,16 @@ final class RenewTest extends TestCase
         $this->app->instance(
             CloudServerResizeCatalogInterface::class,
             $resizeCatalog,
+        );
+
+        $this->app->instance(
+            CloudProviderRegistryInterface::class,
+            new CloudProviderRegistryStub(
+                provider: $cloud,
+                capabilities: [
+                    CloudServerResizeCatalogInterface::class => $resizeCatalog,
+                ],
+            ),
         );
     }
 

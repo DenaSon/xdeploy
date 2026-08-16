@@ -7,6 +7,7 @@ namespace App\Application\Billing\Actions;
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -25,13 +26,14 @@ final readonly class CreateOrderAction
         string $imageId,
         int $selectedDiskGiB,
         string $period,
+        CloudProviderType $provider = CloudProviderType::Arvan,
     ): Order {
         $region = trim($region);
         $sizeId = trim($sizeId);
         $imageId = trim($imageId);
 
         /*
-         * Resolve the image again from the provider catalog.
+         * Resolve the image again from the selected provider catalog.
          * Never trust image metadata coming from Presentation.
          */
         $image = $this->resolveImage->execute(
@@ -39,17 +41,19 @@ final readonly class CreateOrderAction
             sizeId: $sizeId,
             imageId: $imageId,
             selectedDiskGiB: $selectedDiskGiB,
+            provider: $provider,
         );
 
         /*
-         * Calculate the authoritative price from the current
-         * provider catalog.
+         * Calculate the authoritative price from the same provider that
+         * becomes immutable ownership metadata on the Order.
          */
         $price = $this->calculatePrice->execute(
             region: $region,
             sizeId: $sizeId,
             selectedDiskGiB: $selectedDiskGiB,
             period: $period,
+            provider: $provider,
         );
 
         $quoteTtlMinutes = max(
@@ -64,6 +68,7 @@ final readonly class CreateOrderAction
             static fn (): Order => Order::query()->create([
                 'user_id' => $user->getKey(),
                 'type' => OrderType::Provisioning,
+                'cloud_provider' => $provider->value,
 
                 'region_id' => $price->regionId,
                 'size_id' => $price->sizeId,

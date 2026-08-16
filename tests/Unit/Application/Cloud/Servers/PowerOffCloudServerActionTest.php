@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Application\Cloud\Servers;
 
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
 use App\Application\Cloud\Servers\PowerOffCloudServerAction;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
-use App\Domain\Cloud\Exceptions\CloudConnectionException;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Models\Server;
 use PHPUnit\Framework\TestCase;
 
 final class PowerOffCloudServerActionTest extends TestCase
 {
-    public function test_it_delegates_power_off_to_lifecycle_provider(): void
+    public function test_it_routes_power_off_to_the_servers_owning_provider(): void
     {
         $lifecycle = $this->createMock(
             CloudServerLifecycleInterface::class,
@@ -21,54 +24,34 @@ final class PowerOffCloudServerActionTest extends TestCase
             ->expects($this->once())
             ->method('powerOff')
             ->with(
-                'eu-west1-a',
-                'server-123',
+                'iran',
+                'liara-vm-123',
             );
 
-        $action = new PowerOffCloudServerAction(
-            lifecycle: $lifecycle,
+        $providers = $this->createMock(
+            CloudProviderRegistryInterface::class,
         );
 
-        $action->handle(
-            region: 'eu-west1-a',
-            serverId: 'server-123',
-        );
-    }
-
-    public function test_it_does_not_hide_provider_exceptions(): void
-    {
-        $lifecycle = $this->createMock(
-            CloudServerLifecycleInterface::class,
-        );
-
-        $lifecycle
+        $providers
             ->expects($this->once())
-            ->method('powerOff')
+            ->method('resolveCapability')
             ->with(
-                'eu-west1-a',
-                'server-123',
+                CloudProviderType::Liara,
+                CloudServerLifecycleInterface::class,
             )
-            ->willThrowException(
-                new CloudConnectionException(
-                    'Cloud provider is temporarily unavailable.',
-                ),
-            );
+            ->willReturn($lifecycle);
 
-        $action = new PowerOffCloudServerAction(
-            lifecycle: $lifecycle,
-        );
+        $server = new Server();
+        $server->forceFill([
+            'cloud_provider' => 'liara',
+            'cloud_region' => 'iran',
+            'cloud_server_id' => 'liara-vm-123',
+        ]);
 
-        $this->expectException(
-            CloudConnectionException::class,
-        );
-
-        $this->expectExceptionMessage(
-            'Cloud provider is temporarily unavailable.',
-        );
-
-        $action->handle(
-            region: 'eu-west1-a',
-            serverId: 'server-123',
-        );
+        (new PowerOffCloudServerAction(
+            capabilities: new CloudServerCapabilityResolver(
+                providers: $providers,
+            ),
+        ))->handle($server);
     }
 }

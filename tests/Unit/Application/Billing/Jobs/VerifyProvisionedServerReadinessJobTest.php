@@ -38,7 +38,7 @@ final class VerifyProvisionedServerReadinessJobTest extends TestCase
         );
 
         $this->assertSame(
-            1,
+            4,
             $job->tries,
         );
 
@@ -49,6 +49,11 @@ final class VerifyProvisionedServerReadinessJobTest extends TestCase
 
         $this->assertTrue(
             $job->failOnTimeout,
+        );
+
+        $this->assertSame(
+            900,
+            $job->uniqueFor,
         );
 
         $this->assertSame(

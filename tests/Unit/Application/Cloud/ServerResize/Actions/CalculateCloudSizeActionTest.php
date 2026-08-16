@@ -5,55 +5,53 @@ declare(strict_types=1);
 namespace Tests\Unit\Application\Cloud\ServerResize\Actions;
 
 use App\Application\Cloud\ServerResize\Actions\CalculateCloudSizeAction;
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudSizeData;
-use Tests\TestCase;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Models\Server;
+use PHPUnit\Framework\TestCase;
 
 final class CalculateCloudSizeActionTest extends TestCase
 {
-    public function test_it_returns_calculated_size_from_catalog(): void
+    public function test_it_uses_the_servers_provider_and_region(): void
     {
-        $calculatedSize = new CloudSizeData(
-            id: 'eco-4-8-0',
-            name: 'eco-large',
-            regionId: 'eu-west1-a',
-            vCpu: 4,
-            memoryMiB: 8192,
-            diskGiB: 150,
-            category: 'economic',
+        $expected = new CloudSizeData(
+            id: 'plan-1',
+            name: 'Plan 1',
+            regionId: 'region-a',
+            vCpu: 2,
+            memoryMiB: 4096,
+            diskGiB: 40,
+            category: null,
             hourlyPrice: null,
             monthlyPrice: null,
         );
 
-        $catalog = $this->createMock(
-            CloudServerResizeCatalogInterface::class,
-        );
-
-        $catalog
-            ->expects($this->once())
+        $catalog = $this->createMock(CloudServerResizeCatalogInterface::class);
+        $catalog->expects($this->once())
             ->method('calculateSize')
-            ->with(
-                'eu-west1-a',
-                'eco-4-8-0',
-                150,
-            )
-            ->willReturn(
-                $calculatedSize,
-            );
+            ->with('region-a', 'plan-1', 40)
+            ->willReturn($expected);
 
-        $action = new CalculateCloudSizeAction(
-            catalog: $catalog,
-        );
+        $providers = $this->createMock(CloudProviderRegistryInterface::class);
+        $providers->expects($this->once())
+            ->method('resolveCapability')
+            ->with(CloudProviderType::Arvan, CloudServerResizeCatalogInterface::class)
+            ->willReturn($catalog);
 
-        $result = $action->handle(
-            region: 'eu-west1-a',
-            sizeId: 'eco-4-8-0',
-            diskGiB: 150,
-        );
+        $server = new Server();
+        $server->forceFill([
+            'cloud_provider' => 'arvan',
+            'cloud_region' => 'region-a',
+            'cloud_server_id' => 'server-1',
+        ]);
 
-        $this->assertSame(
-            $calculatedSize,
-            $result,
-        );
+        $result = (new CalculateCloudSizeAction(
+            capabilities: new CloudServerCapabilityResolver($providers),
+        ))->handle($server, 'plan-1', 40);
+
+        $this->assertSame($expected, $result);
     }
 }

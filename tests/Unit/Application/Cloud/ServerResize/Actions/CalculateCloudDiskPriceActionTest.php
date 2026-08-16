@@ -5,76 +5,57 @@ declare(strict_types=1);
 namespace Tests\Unit\Application\Cloud\ServerResize\Actions;
 
 use App\Application\Cloud\ServerResize\Actions\CalculateCloudDiskPriceAction;
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudDiskPriceData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
-use Tests\TestCase;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Models\Server;
+use PHPUnit\Framework\TestCase;
 
 final class CalculateCloudDiskPriceActionTest extends TestCase
 {
-    public function test_it_returns_calculated_disk_price_from_catalog(): void
+    public function test_it_uses_the_servers_provider_and_region(): void
     {
-        $diskPrice = new CloudDiskPriceData(
-            diskGiB: 150,
-
+        $expected = new CloudDiskPriceData(
+            diskGiB: 40,
             hourlyPrice: new CloudPriceData(
-                amount: '2550.25',
-                currencyCode: null,
+                amount: '100',
+                currencyCode: 'IRR',
                 billingPeriod: CloudBillingPeriod::Hourly,
             ),
-
             monthlyPrice: new CloudPriceData(
-                amount: '1836180.50',
-                currencyCode: null,
+                amount: '72000',
+                currencyCode: 'IRR',
                 billingPeriod: CloudBillingPeriod::Monthly,
             ),
         );
 
-        $catalog = $this->createMock(
-            CloudServerResizeCatalogInterface::class,
-        );
-
-        $catalog
-            ->expects($this->once())
+        $catalog = $this->createMock(CloudServerResizeCatalogInterface::class);
+        $catalog->expects($this->once())
             ->method('calculateDiskPrice')
-            ->with(
-                'eu-west1-a',
-                'eco-4-8-0',
-                150,
-            )
-            ->willReturn(
-                $diskPrice,
-            );
+            ->with('region-a', 'plan-1', 40)
+            ->willReturn($expected);
 
-        $action = new CalculateCloudDiskPriceAction(
-            catalog: $catalog,
-        );
+        $providers = $this->createMock(CloudProviderRegistryInterface::class);
+        $providers->expects($this->once())
+            ->method('resolveCapability')
+            ->with(CloudProviderType::Arvan, CloudServerResizeCatalogInterface::class)
+            ->willReturn($catalog);
 
-        $result = $action->handle(
-            region: 'eu-west1-a',
-            sizeId: 'eco-4-8-0',
-            diskGiB: 150,
-        );
+        $server = new Server();
+        $server->forceFill([
+            'cloud_provider' => 'arvan',
+            'cloud_region' => 'region-a',
+            'cloud_server_id' => 'server-1',
+        ]);
 
-        $this->assertSame(
-            $diskPrice,
-            $result,
-        );
+        $result = (new CalculateCloudDiskPriceAction(
+            capabilities: new CloudServerCapabilityResolver($providers),
+        ))->handle($server, 'plan-1', 40);
 
-        $this->assertSame(
-            150,
-            $result->diskGiB,
-        );
-
-        $this->assertSame(
-            '2550.25',
-            $result->hourlyPrice->amount,
-        );
-
-        $this->assertSame(
-            '1836180.50',
-            $result->monthlyPrice->amount,
-        );
+        $this->assertSame($expected, $result);
     }
 }

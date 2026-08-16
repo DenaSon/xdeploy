@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Servers;
 
+use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Domain\Server\Enums\ServerStatus;
@@ -15,6 +18,7 @@ final readonly class DeleteCloudServerAction
 {
     public function __construct(
         private CloudServerLifecycleInterface $lifecycle,
+        private ?CloudProviderRegistryInterface $providers = null,
     ) {}
 
     public function handle(
@@ -36,32 +40,27 @@ final readonly class DeleteCloudServerAction
             attribute: 'cloud_server_id',
         );
 
-        $this->requiredCloudMetadata(
-            server: $server,
-            attribute: 'cloud_provider',
+        $provider = $this->requiredCloudProvider(
+            $server,
+        );
+
+        $lifecycle = $this->lifecycleFor(
+            $provider,
         );
 
         /*
          * Provider deletion is the authoritative external side effect.
-         *
-         * "Not found" is also a successful terminal state: a previous
-         * DELETE may already have removed the resource before xDeploy
-         * persisted its local completion state.
+         * Not-found is also a successful terminal state.
          */
         try {
-            $this->lifecycle->deleteServer(
+            $lifecycle->deleteServer(
                 region: $cloudRegion,
                 serverId: $cloudServerId,
             );
         } catch (CloudResourceNotFoundException) {
-            // Desired state already reached at the provider.
+            // Desired state already reached at the owning provider.
         }
 
-        /*
-         * Persist termination metadata before the local soft delete.
-         * If this persistence fails, a later retry can safely call the
-         * provider again; provider "not found" remains idempotent.
-         */
         $server->forceFill([
             'status' => ServerStatus::Inactive,
             'terminated_at' => $server->terminated_at
@@ -70,6 +69,45 @@ final readonly class DeleteCloudServerAction
         ])->saveOrFail();
 
         $server->delete();
+    }
+
+    private function lifecycleFor(
+        CloudProviderType $provider,
+    ): CloudServerLifecycleInterface {
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            /** @var CloudServerLifecycleInterface $lifecycle */
+            $lifecycle = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerLifecycleInterface::class,
+            );
+
+            return $lifecycle;
+        }
+
+        if ($provider !== CloudProviderType::Arvan) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Cloud provider [%s] cannot be resolved without the provider registry.',
+                    $provider->value,
+                ),
+            );
+        }
+
+        return $this->lifecycle;
+    }
+
+    private function requiredCloudProvider(
+        Server $server,
+    ): CloudProviderType {
+        $provider = $server->cloud_provider;
+
+        if (! $provider instanceof CloudProviderType) {
+            throw new CloudValidationException(
+                'Cloud server metadata is incomplete.',
+            );
+        }
+
+        return $provider;
     }
 
     private function ownedServer(
@@ -99,8 +137,6 @@ final readonly class DeleteCloudServerAction
             );
         }
 
-        return trim(
-            $value,
-        );
+        return trim($value);
     }
 }

@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Actions;
 
+use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
+use App\Application\Cloud\Services\CloudServerCredentialRecovery;
 use App\Application\Server\Actions\EnsureSupportedOperatingSystemAction;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialRotationInterface;
 use App\Domain\Cloud\Exceptions\CloudServerProvisioningException;
 use App\Domain\Cloud\Exceptions\CloudServerSshUnavailableException;
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\PrivilegedExecutionMode;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Domain\Server\Exceptions\RootPrivilegesRequiredException;
@@ -29,8 +33,10 @@ final readonly class VerifyCloudServerSshReadinessAction
         private PrivilegedExecutionPreflight $preflight,
         private SSHCommandReadinessInspector $commandReadiness,
         private SSHPasswordRotationService $passwordRotation,
+        private CloudServerCredentialRecovery $credentialRecovery,
         private SSHPortReadinessProbeInterface $portReadinessProbe,
         private EnsureSupportedOperatingSystemAction $ensureSupportedOperatingSystem,
+        private CloudServerCapabilityResolver $capabilities,
     ) {}
 
     public function handle(
@@ -47,6 +53,18 @@ final readonly class VerifyCloudServerSshReadinessAction
                 $server,
             );
 
+            /*
+             * A previous process may have changed the remote password and
+             * crashed before promoting the locally persisted candidate. Reconcile
+             * that distributed state before attempting the normal SSH session.
+             */
+            $this->credentialRecovery->recoverPendingCredentialIfNeeded(
+                server: $server,
+                markBootstrapCredentialRotated: $this->providerUsesBootstrapCredential(
+                    $server,
+                ),
+            );
+
             $this->connect(
                 $server,
             );
@@ -59,6 +77,10 @@ final readonly class VerifyCloudServerSshReadinessAction
                 ->handle();
 
             $mode = $this->preflight->detect();
+
+            $this->rotateProviderBootstrapCredentialIfNeeded(
+                $server,
+            );
         } catch (
             RootPrivilegesRequiredException $exception
         ) {
@@ -125,6 +147,48 @@ final readonly class VerifyCloudServerSshReadinessAction
     private function rotateExpiredPassword(
         Server $server,
     ): void {
+        $this->rotateCredential(
+            server: $server,
+            forcedPasswordChange: true,
+        );
+    }
+
+    private function rotateProviderBootstrapCredentialIfNeeded(
+        Server $server,
+    ): void {
+        if (! $this->requiresProviderBootstrapCredentialRotation($server)) {
+            return;
+        }
+
+        $this->rotateCredential(
+            server: $server,
+            forcedPasswordChange: false,
+        );
+
+        $this->assertCommandReadyAfterPasswordRotation();
+    }
+
+    private function requiresProviderBootstrapCredentialRotation(
+        Server $server,
+    ): bool {
+        return $this->providerUsesBootstrapCredential($server)
+            && $server->bootstrap_credential_rotated_at === null;
+    }
+
+    private function providerUsesBootstrapCredential(
+        Server $server,
+    ): bool {
+        return $server->authentication_type === AuthenticationType::Password
+            && $this->capabilities->supports(
+                server: $server,
+                capability: CloudServerBootstrapCredentialRotationInterface::class,
+            );
+    }
+
+    private function rotateCredential(
+        Server $server,
+        bool $forcedPasswordChange,
+    ): void {
         $currentPassword = $server->credential;
 
         if (
@@ -132,7 +196,7 @@ final readonly class VerifyCloudServerSshReadinessAction
             || trim($currentPassword) === ''
         ) {
             throw new CloudServerSshUnavailableException(
-                'Cloud server requires a password change but no current password is available.',
+                'Cloud server password rotation requires the current credential.',
             );
         }
 
@@ -144,17 +208,37 @@ final readonly class VerifyCloudServerSshReadinessAction
             spaces: false,
         );
 
-        $this->ssh->disconnect();
-
-        $this->passwordRotation->rotate(
+        /*
+         * Persist first, mutate the remote host second. If the process dies
+         * after passwd succeeds, the candidate secret survives for the next
+         * readiness attempt and can be verified/promoted safely.
+         */
+        $this->credentialRecovery->persistPendingCredential(
             server: $server,
-            currentPassword: $currentPassword,
-            newPassword: $newPassword,
+            pendingPassword: $newPassword,
         );
 
-        $this->persistRotatedCredential(
+        $this->ssh->disconnect();
+
+        if ($forcedPasswordChange) {
+            $this->passwordRotation->rotate(
+                server: $server,
+                currentPassword: $currentPassword,
+                newPassword: $newPassword,
+            );
+        } else {
+            $this->passwordRotation->rotateManagedPassword(
+                server: $server,
+                currentPassword: $currentPassword,
+                newPassword: $newPassword,
+            );
+        }
+
+        $this->credentialRecovery->promotePendingCredential(
             server: $server,
-            newPassword: $newPassword,
+            markBootstrapCredentialRotated: $this->providerUsesBootstrapCredential(
+                $server,
+            ),
         );
 
         $this->connect(
@@ -174,29 +258,6 @@ final readonly class VerifyCloudServerSshReadinessAction
         throw new CloudServerSshUnavailableException(
             'Cloud server password was changed but command execution is still unavailable.',
         );
-    }
-
-    private function persistRotatedCredential(
-        Server $server,
-        string $newPassword,
-    ): void {
-        try {
-            $server->forceFill([
-                'credential' => $newPassword,
-            ]);
-
-            $server->saveOrFail();
-
-            $server->refresh();
-        } catch (Throwable $exception) {
-            throw new CloudServerProvisioningException(
-                message: sprintf(
-                    'Cloud server [%s] password was rotated but the new credential could not be persisted.',
-                    $server->cloud_server_id,
-                ),
-                previous: $exception,
-            );
-        }
     }
 
     private function waitForSshPort(
