@@ -61,12 +61,15 @@ final class ProfileEmailTest extends TestCase
 
     public function test_saving_same_email_keeps_verification(): void
     {
-        $verifiedAt = now()->subMinute();
-
         $user = User::factory()->create([
             'email' => 'user@example.com',
-            'email_verified_at' => $verifiedAt,
+            'email_verified_at' => now()->subMinute(),
         ]);
+
+        $user->refresh();
+        $persistedVerifiedAt = $user->email_verified_at;
+
+        $this->assertNotNull($persistedVerifiedAt);
 
         Livewire::actingAs($user)
             ->test(Edit::class)
@@ -81,7 +84,9 @@ final class ProfileEmailTest extends TestCase
             $user->email,
         );
         $this->assertTrue(
-            $user->email_verified_at?->equalTo($verifiedAt) ?? false,
+            $user->email_verified_at?->equalTo(
+                $persistedVerifiedAt,
+            ) ?? false,
         );
     }
 
