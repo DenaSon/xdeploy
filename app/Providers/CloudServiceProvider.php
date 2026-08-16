@@ -226,8 +226,9 @@ final class CloudServiceProvider extends ServiceProvider
                 $purchasableProviders = [];
                 $capabilities = [];
 
-                $this->assertAvailabilityConfiguration(CloudProviderType::Arvan);
-                $this->assertAvailabilityConfiguration(CloudProviderType::Liara);
+                foreach (CloudProviderType::cases() as $provider) {
+                    $this->assertAvailabilityConfiguration($provider);
+                }
 
                 if ($this->providerEnabled(CloudProviderType::Arvan)) {
                     $arvanCapabilities = $app->make(
