@@ -18,6 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
     'phone',
+    'email',
 ])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -85,7 +86,7 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * Scope users by phone or profile name.
+     * Scope users by phone, email, or profile name.
      *
      * @param Builder<User> $query
      * @return Builder<User>
@@ -111,6 +112,7 @@ class User extends Authenticatable implements PasskeyUser
             function (Builder $query) use ($search, $terms): void {
                 $query
                     ->where('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
                     ->orWhereHas(
                         'profile',
                         function (Builder $profileQuery) use ($terms): void {
@@ -162,6 +164,7 @@ class User extends Authenticatable implements PasskeyUser
     {
         return [
             'is_admin' => 'boolean',
+            'email_verified_at' => 'datetime',
         ];
     }
 }

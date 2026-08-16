@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Profile\GoogleEmailVerificationController;
 use App\Http\Controllers\Servers\RevealServerCredentialController;
 use App\Livewire\Applications\Index as ApplicationsIndex;
 use App\Livewire\Applications\Show as ApplicationShow;
@@ -81,6 +82,20 @@ Route::middleware(['web', 'auth'])
             '/profile',
             ProfileEdit::class,
         )->name('profile');
+
+        Route::get(
+            '/profile/email/google',
+            [GoogleEmailVerificationController::class, 'redirect'],
+        )
+            ->middleware('throttle:10,1')
+            ->name('profile.email.google.redirect');
+
+        Route::get(
+            '/profile/email/google/callback',
+            [GoogleEmailVerificationController::class, 'callback'],
+        )
+            ->middleware('throttle:20,1')
+            ->name('profile.email.google.callback');
 
         Route::livewire(
             '/security',
