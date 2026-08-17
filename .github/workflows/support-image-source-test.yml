@@ -40,5 +40,5 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate --force
 
-      - name: Run support attachment tests
-        run: php artisan test tests/Feature/Support/SupportMessageAttachmentTest.php --colors=never
+      - name: Run full PHP test suite
+        run: php artisan test --colors=never
