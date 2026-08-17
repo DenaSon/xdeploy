@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Support;
 
 use App\Application\Support\Actions\CreateSupportRequestAction;
+use App\Application\Support\SupportAttachmentPolicy;
 use App\Domain\Support\Enums\SupportRequestCategory;
 use App\Models\Server;
 use App\Models\User;
@@ -12,11 +13,14 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 #[Layout('layouts.panel')]
 #[Title('درخواست پشتیبانی جدید')]
 final class Create extends Component
 {
+    use WithFileUploads;
+
     public string $subject = '';
 
     public string $category = SupportRequestCategory::Technical->value;
@@ -25,19 +29,41 @@ final class Create extends Component
 
     public string $message = '';
 
+    /** @var array<int, mixed> */
+    public array $attachments = [];
+
+    public function updatedAttachments(): void
+    {
+        $this->validate($this->attachmentRules());
+    }
+
+    public function removeAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->attachments)) {
+            return;
+        }
+
+        unset($this->attachments[$index]);
+        $this->attachments = array_values($this->attachments);
+        $this->resetValidation();
+    }
+
     public function submit(
         CreateSupportRequestAction $createSupportRequest,
     ) {
-        $validated = $this->validate([
-            'subject' => ['required', 'string', 'max:160'],
-            'category' => [
-                'required',
-                'string',
-                'in:technical,billing,account,other',
+        $validated = $this->validate(array_merge(
+            [
+                'subject' => ['required', 'string', 'max:160'],
+                'category' => [
+                    'required',
+                    'string',
+                    'in:technical,billing,account,other',
+                ],
+                'serverId' => ['nullable', 'integer'],
+                'message' => ['required', 'string', 'max:10000'],
             ],
-            'serverId' => ['nullable', 'integer'],
-            'message' => ['required', 'string', 'max:10000'],
-        ]);
+            $this->attachmentRules(),
+        ));
 
         $supportRequest = $createSupportRequest->execute(
             user: $this->user(),
@@ -49,6 +75,7 @@ final class Create extends Component
             serverId: $this->normalizedServerId(
                 $validated['serverId'] ?? null,
             ),
+            attachments: $this->attachments,
         );
 
         return redirect()->route(
@@ -77,6 +104,29 @@ final class Create extends Component
                 'servers' => $servers,
             ],
         );
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function attachmentRules(): array
+    {
+        return [
+            'attachments' => [
+                'array',
+                'max:'.SupportAttachmentPolicy::MAX_FILES,
+            ],
+            'attachments.*' => [
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:'.SupportAttachmentPolicy::MAX_KILOBYTES,
+                'dimensions:max_width='.
+                    SupportAttachmentPolicy::MAX_SOURCE_DIMENSION.
+                    ',max_height='.
+                    SupportAttachmentPolicy::MAX_SOURCE_DIMENSION,
+            ],
+        ];
     }
 
     private function normalizedServerId(mixed $value): ?int
