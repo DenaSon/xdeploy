@@ -12,31 +12,42 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class ShowSupportMessageAttachmentController
 {
-    public function __invoke(
+    public function owner(
         Request $request,
         SupportMessageAttachment $attachment,
     ): StreamedResponse {
-        $user = $request->user();
-
-        abort_unless(
-            $user instanceof User,
-            401,
-        );
+        $user = $this->user($request);
 
         $attachment->loadMissing(
             'supportMessage.supportRequest',
         );
 
-        $supportRequest = $attachment
-            ->supportMessage
-            ->supportRequest;
-
         abort_unless(
-            $user->isAdmin()
-            || $supportRequest->isOwnedBy($user),
+            $attachment
+                ->supportMessage
+                ->supportRequest
+                ->isOwnedBy($user),
             404,
         );
 
+        return $this->stream($attachment);
+    }
+
+    public function admin(
+        Request $request,
+        SupportMessageAttachment $attachment,
+    ): StreamedResponse {
+        abort_unless(
+            $this->user($request)->isAdmin(),
+            404,
+        );
+
+        return $this->stream($attachment);
+    }
+
+    private function stream(
+        SupportMessageAttachment $attachment,
+    ): StreamedResponse {
         $disk = Storage::disk($attachment->disk);
 
         abort_unless(
@@ -56,5 +67,17 @@ final class ShowSupportMessageAttachmentController
                 'X-Content-Type-Options' => 'nosniff',
             ],
         );
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
     }
 }
