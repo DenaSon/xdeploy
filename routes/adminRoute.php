@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\Servers\ConfirmSupportPasskeyController;
 use App\Http\Controllers\Admin\Servers\RevealSupportCredentialController;
 use App\Http\Controllers\Admin\Servers\SupportPasskeyOptionsController;
+use App\Http\Controllers\Support\ShowSupportMessageAttachmentController;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Admin\Documentation\Articles\Create as AdminDocumentationArticlesCreate;
 use App\Livewire\Admin\Documentation\Articles\Edit as AdminDocumentationArticlesEdit;
@@ -101,6 +102,14 @@ Route::middleware([
 
                 Route::livewire('/support', AdminSupportIndex::class)
                     ->name('support.index');
+                Route::get(
+                    '/support/attachments/{attachment}',
+                    [
+                        ShowSupportMessageAttachmentController::class,
+                        'admin',
+                    ],
+                )->whereNumber('attachment')
+                    ->name('support.attachments.show');
                 Route::livewire('/support/{supportRequestId}', AdminSupportShow::class)
                     ->whereNumber('supportRequestId')
                     ->name('support.show');

@@ -33,7 +33,7 @@ jobs:
         with:
           php-version: '8.4'
           coverage: none
-          extensions: mbstring, dom, fileinfo, pdo_sqlite, sqlite3, simplexml, sodium
+          extensions: mbstring, dom, fileinfo, gd, pdo_sqlite, sqlite3, simplexml, sodium
           tools: composer:v2
 
       - name: Setup Node.js
