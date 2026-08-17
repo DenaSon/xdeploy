@@ -14,8 +14,10 @@ use App\Domain\Platform\Exceptions\PlatformRestartException;
 use App\Domain\Platform\Exceptions\PlatformStartException;
 use App\Domain\Platform\Exceptions\PlatformStopException;
 use App\Domain\Platform\Support\SupportedPlatformOperatingSystems;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
@@ -130,12 +132,23 @@ final readonly class DockerPlatform implements PlatformInterface, StartablePlatf
         }
 
         $result = $this->privileged->executeWithResult(
-            command: $command,
+            command: PackageManagerLockRetryCommand::wrap(
+                $command,
+            ),
             timeout: SSHTimeout::DOCKER_INSTALL,
             sensitive: true,
         );
 
         if (! $result->successful()) {
+            if (
+                str_contains(
+                    $result->output,
+                    PackageManagerLockRetryCommand::BUSY_MARKER,
+                )
+            ) {
+                throw new SystemPackageManagerBusyException;
+            }
+
             throw new PlatformInstallationException(
                 $this->installerFailureMessage(
                     output: $result->output,
