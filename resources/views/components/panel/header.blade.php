@@ -51,10 +51,11 @@
         @endif
 
         @if ($showBuyVpsCta)
+            <div class="aura text-success/70 bg-success/8">
             <a
                 data-panel-buy-vps-cta
                 href="{{ route('panel.servers.buy') }}"
-                wire:navigate
+                wire:navigate.hover
                 class="btn btn-soft btn-accent btn-sm
                        h-8 min-h-8
                        cursor-pointer rounded-xl
@@ -66,12 +67,12 @@
                     class="!size-3.5 stroke-[1.8]"
                 />
 
-                <span>خرید VPS</span>
+                <span>راه‌اندازی</span>
             </a>
+            </div>
         @endif
 
     </div>
-
     {{-- Utilities --}}
     <div
         class="flex shrink-0
