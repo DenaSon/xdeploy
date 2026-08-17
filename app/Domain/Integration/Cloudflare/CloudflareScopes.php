@@ -12,6 +12,8 @@ final class CloudflareScopes
 
     public const DNS_READ = 'dns.read';
 
+    public const DNS_WRITE = 'dns.write';
+
     public const OFFLINE_ACCESS = 'offline_access';
 
     /** @return list<string> */
@@ -25,10 +27,19 @@ final class CloudflareScopes
     }
 
     /** @return list<string> */
+    public static function dnsWrite(): array
+    {
+        return [
+            self::DNS_WRITE,
+        ];
+    }
+
+    /** @return list<string> */
     public static function oauth(): array
     {
         return [
             ...self::read(),
+            ...self::dnsWrite(),
             self::OFFLINE_ACCESS,
         ];
     }
