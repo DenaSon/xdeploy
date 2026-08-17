@@ -2,6 +2,11 @@
     'title' => null,
 ])
 
+@php
+    $showBuyVpsCta = auth()->check()
+        && ! auth()->user()->hasActiveCloudServer();
+@endphp
+
 <header
     {{ $attributes->class([
         'relative z-40',
@@ -14,7 +19,7 @@
         'backdrop-blur-xl',
     ]) }}
 >
-    {{-- Mobile context --}}
+    {{-- Mobile context + contextual CTA --}}
     <div class="flex min-w-0 items-center gap-2.5">
 
         {{-- Drawer trigger --}}
@@ -43,6 +48,26 @@
             >
                 {{ $title }}
             </span>
+        @endif
+
+        @if ($showBuyVpsCta)
+            <a
+                data-panel-buy-vps-cta
+                href="{{ route('panel.servers.buy') }}"
+                wire:navigate
+                class="btn btn-soft btn-accent btn-sm
+                       h-8 min-h-8
+                       cursor-pointer rounded-xl
+                       px-3 text-xs font-semibold
+                       shadow-none"
+            >
+                <x-icon
+                    name="lucide.cloud"
+                    class="!size-3.5 stroke-[1.8]"
+                />
+
+                <span>خرید VPS</span>
+            </a>
         @endif
 
     </div>
