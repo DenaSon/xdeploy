@@ -26,7 +26,9 @@ final class CloudflareDisconnectTest extends TestCase
             'services.cloudflare_oauth.token_endpoint' => 'https://dash.cloudflare.com/oauth2/token',
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
             'services.cloudflare_oauth.scopes' => [
-                'account.read',
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
                 'offline_access',
             ],
             'services.cloudflare_oauth.connect_timeout' => 5,
@@ -94,7 +96,7 @@ final class CloudflareDisconnectTest extends TestCase
                 'access_token' => 'new-access-token',
                 'refresh_token' => 'new-refresh-token',
                 'expires_in' => 3600,
-                'scope' => 'account.read offline_access',
+                'scope' => 'account-settings.read zone.read dns.read offline_access',
             ], 200)
             ->push([], 503)
             ->push([], 503)
@@ -132,7 +134,12 @@ final class CloudflareDisconnectTest extends TestCase
             'provider' => IntegrationProvider::Cloudflare,
             'access_token' => 'access-token',
             'refresh_token' => 'refresh-token',
-            'scopes' => ['account.read', 'offline_access'],
+            'scopes' => [
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
             'connected_at' => now(),
         ]);
     }

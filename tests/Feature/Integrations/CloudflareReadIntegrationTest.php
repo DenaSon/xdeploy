@@ -30,7 +30,7 @@ final class CloudflareReadIntegrationTest extends TestCase
             'services.cloudflare_oauth.token_endpoint' => 'https://dash.cloudflare.com/oauth2/token',
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
             'services.cloudflare_oauth.scopes' => [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',
@@ -73,6 +73,7 @@ final class CloudflareReadIntegrationTest extends TestCase
             ->get(route('panel.integrations.cloudflare.overview'))
             ->assertOk()
             ->assertSee('دسترسی Cloudflare باید به‌روزرسانی شود')
+            ->assertSee('account-settings.read')
             ->assertSee('zone.read')
             ->assertSee('dns.read')
             ->assertDontSee('legacy-access-token')
@@ -91,7 +92,7 @@ final class CloudflareReadIntegrationTest extends TestCase
             'access_token' => 'read-access-token',
             'refresh_token' => 'read-refresh-token',
             'scopes' => [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',
@@ -141,7 +142,7 @@ final class CloudflareReadIntegrationTest extends TestCase
             'access_token' => 'expired-access-token',
             'refresh_token' => 'old-refresh-token',
             'scopes' => [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',
@@ -155,7 +156,7 @@ final class CloudflareReadIntegrationTest extends TestCase
                 'access_token' => 'fresh-access-token',
                 'refresh_token' => 'fresh-refresh-token',
                 'expires_in' => 3600,
-                'scope' => 'account.read zone.read dns.read offline_access',
+                'scope' => 'account-settings.read zone.read dns.read offline_access',
                 'token_type' => 'Bearer',
             ]),
             'https://api.cloudflare.com/client/v4/accounts*' => Http::response(
@@ -216,7 +217,7 @@ final class CloudflareReadIntegrationTest extends TestCase
             'access_token' => 'access-token',
             'refresh_token' => 'refresh-token',
             'scopes' => [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',

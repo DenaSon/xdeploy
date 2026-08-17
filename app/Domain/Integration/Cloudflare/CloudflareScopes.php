@@ -6,7 +6,7 @@ namespace App\Domain\Integration\Cloudflare;
 
 final class CloudflareScopes
 {
-    public const ACCOUNT_READ = 'account.read';
+    public const ACCOUNT_SETTINGS_READ = 'account-settings.read';
 
     public const ZONE_READ = 'zone.read';
 
@@ -18,7 +18,7 @@ final class CloudflareScopes
     public static function read(): array
     {
         return [
-            self::ACCOUNT_READ,
+            self::ACCOUNT_SETTINGS_READ,
             self::ZONE_READ,
             self::DNS_READ,
         ];
