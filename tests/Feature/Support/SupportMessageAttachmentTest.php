@@ -11,6 +11,7 @@ use App\Domain\Support\Enums\SupportRequestCategory;
 use App\Models\SupportMessage;
 use App\Models\SupportMessageAttachment;
 use App\Models\User;
+use App\Support\Admin\AdminPasskeyVerificationSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -203,22 +204,12 @@ final class SupportMessageAttachmentTest extends TestCase
         );
     }
 
-    public function test_attachment_can_only_be_read_by_request_owner_or_admin(): void
+    public function test_user_attachment_route_is_scoped_to_request_owner(): void
     {
         Storage::fake(SupportAttachmentPolicy::DISK);
 
         $owner = User::factory()->create();
-        $message = $this->createMessage($owner);
-
-        /** @var SupportMessageAttachment $attachment */
-        $attachment = app(
-            StoreSupportMessageAttachmentsAction::class,
-        )->execute(
-            message: $message,
-            files: [
-                UploadedFile::fake()->image('error.png'),
-            ],
-        )->firstOrFail();
+        $attachment = $this->createAttachment($owner);
 
         $ownerResponse = $this
             ->actingAs($owner)
@@ -249,28 +240,78 @@ final class SupportMessageAttachmentTest extends TestCase
             ),
         );
 
-        $otherUser = User::factory()->create();
-
         $this
-            ->actingAs($otherUser)
+            ->actingAs(User::factory()->create())
             ->get(route(
                 'panel.support.attachments.show',
                 $attachment,
             ))
             ->assertNotFound();
 
-        $admin = User::factory()->create();
-        $admin->forceFill([
-            'is_admin' => true,
-        ])->save();
-
         $this
-            ->actingAs($admin)
+            ->actingAs($this->adminWithPasskey())
             ->get(route(
                 'panel.support.attachments.show',
                 $attachment,
             ))
-            ->assertOk();
+            ->assertNotFound();
+    }
+
+    public function test_admin_attachment_route_requires_fresh_passkey_verification(): void
+    {
+        Storage::fake(SupportAttachmentPolicy::DISK);
+
+        $attachment = $this->createAttachment();
+        $admin = $this->adminWithPasskey();
+
+        $this
+            ->actingAs($admin)
+            ->get(route(
+                'admin.support.attachments.show',
+                $attachment,
+            ))
+            ->assertRedirect(
+                route('admin.passkey.confirm'),
+            );
+
+        $this
+            ->actingAs($admin)
+            ->withSession([
+                AdminPasskeyVerificationSession::SESSION_KEY => [
+                    'admin_user_id' => (int) $admin->getKey(),
+                    'verified_at' => now()->timestamp,
+                ],
+            ])
+            ->get(route(
+                'admin.support.attachments.show',
+                $attachment,
+            ))
+            ->assertOk()
+            ->assertHeader(
+                'Content-Type',
+                SupportAttachmentPolicy::OUTPUT_MIME_TYPE,
+            );
+    }
+
+    protected function automaticallyVerifyAdminPasskey(): bool
+    {
+        return false;
+    }
+
+    private function createAttachment(
+        ?User $owner = null,
+    ): SupportMessageAttachment {
+        /** @var SupportMessageAttachment $attachment */
+        $attachment = app(
+            StoreSupportMessageAttachmentsAction::class,
+        )->execute(
+            message: $this->createMessage($owner),
+            files: [
+                UploadedFile::fake()->image('error.png'),
+            ],
+        )->firstOrFail();
+
+        return $attachment;
     }
 
     private function createMessage(
@@ -290,5 +331,22 @@ final class SupportMessageAttachmentTest extends TestCase
         return $supportRequest
             ->messages()
             ->firstOrFail();
+    }
+
+    private function adminWithPasskey(): User
+    {
+        $admin = User::factory()->create([
+            'is_admin' => true,
+        ]);
+
+        $admin->passkeys()->create([
+            'name' => 'Admin device',
+            'credential_id' => 'c3VwcG9ydC1hdHRhY2htZW50LWFkbWlu',
+            'credential' => [
+                'aaguid' => '00000000-0000-0000-0000-000000000000',
+            ],
+        ]);
+
+        return $admin;
     }
 }
