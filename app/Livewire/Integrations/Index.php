@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Integrations;
 
+use App\Domain\Integration\Cloudflare\CloudflareScopes;
 use App\Domain\Integration\Enums\IntegrationProvider;
 use App\Infrastructure\Integrations\Cloudflare\CloudflareOAuthClient;
 use App\Models\IntegrationConnection;
@@ -30,15 +31,25 @@ final class Index extends Component
             )
             ->first();
 
+        $scopes = is_array($connection?->scopes)
+            ? $connection->scopes
+            : [];
+
+        $missingReadScopes = CloudflareScopes::missing(
+            $scopes,
+        );
+
         return view(
             'livewire.integrations.index',
             [
                 'cloudflareConfigured' => $cloudflare->configured(),
+                'cloudflareReadConfigured' => $cloudflare->configuredForRead(),
                 'cloudflareConnected' => $connection !== null,
+                'cloudflareReadReady' => $connection !== null
+                    && $missingReadScopes === [],
                 'cloudflareConnectedAt' => $connection?->connected_at,
-                'cloudflareScopes' => is_array($connection?->scopes)
-                    ? $connection->scopes
-                    : [],
+                'cloudflareScopes' => $scopes,
+                'cloudflareMissingReadScopes' => $missingReadScopes,
             ],
         );
     }
