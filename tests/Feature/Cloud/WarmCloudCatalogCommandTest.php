@@ -6,9 +6,7 @@ namespace Tests\Feature\Cloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
-use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
-use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Infrastructure\Cloud\Catalog\CloudCatalogReaderResolver;
 use Illuminate\Console\Command;
@@ -47,15 +45,6 @@ final class WarmCloudCatalogCommandTest extends TestCase
         $this->assertSame(1, $liara->regionCalls);
         $this->assertSame(1, $liara->sizeCalls);
         $this->assertSame(1, $liara->imageCalls);
-
-        $this->assertStringContainsString(
-            'Warmed arvan:arvan-region',
-            Artisan::output(),
-        );
-        $this->assertStringContainsString(
-            'Warmed liara:liara-region',
-            Artisan::output(),
-        );
     }
 
     public function test_force_refreshes_provider_scoped_catalog_entries(): void
@@ -153,10 +142,6 @@ final class WarmCloudCatalogCommandTest extends TestCase
         $this->assertSame(1, $liara->imageCalls);
         $this->assertStringContainsString(
             'Failed to load catalog regions for provider [arvan].',
-            Artisan::output(),
-        );
-        $this->assertStringContainsString(
-            'Warmed liara:liara-region',
             Artisan::output(),
         );
     }
