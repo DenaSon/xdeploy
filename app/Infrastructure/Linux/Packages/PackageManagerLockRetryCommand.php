@@ -63,10 +63,11 @@ while [ "$package_manager_attempt" -le "$PACKAGE_MANAGER_MAX_ATTEMPTS" ]; do
     fi
 
     package_manager_output="$(cat "$package_manager_output_file")"
+    package_manager_error_tail="$(tail -n 20 "$package_manager_output_file")"
     rm -f "$package_manager_output_file"
     package_manager_output_file=''
 
-    if ! package_manager_is_busy "$package_manager_output"; then
+    if ! package_manager_is_busy "$package_manager_error_tail"; then
         printf '%s\n' "$package_manager_output" >&2
         trap - EXIT HUP INT TERM
 
