@@ -14,73 +14,70 @@ final class ProfileEmailTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_add_normalized_email(): void
+    public function test_profile_does_not_expose_manual_email_input(): void
     {
         $user = User::factory()->create([
             'email' => null,
             'email_verified_at' => null,
         ]);
 
-        Livewire::actingAs($user)
-            ->test(Edit::class)
-            ->set('email', '  User@Example.COM  ')
-            ->call('save')
-            ->assertHasNoErrors()
-            ->assertSet('email', 'user@example.com');
-
-        $this->assertDatabaseHas('users', [
-            'id' => $user->id,
-            'email' => 'user@example.com',
-            'email_verified_at' => null,
-        ]);
+        $this->actingAs($user)
+            ->get(route('panel.profile'))
+            ->assertOk()
+            ->assertSee('افزودن ایمیل با Google')
+            ->assertDontSee('wire:model="email"', false);
     }
 
-    public function test_changing_email_clears_previous_verification(): void
+    public function test_unverified_legacy_email_is_not_presented_as_account_email(): void
     {
         $user = User::factory()->create([
-            'email' => 'old@example.com',
+            'email' => 'legacy@example.com',
+            'email_verified_at' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('panel.profile'))
+            ->assertOk()
+            ->assertSee('افزودن ایمیل با Google')
+            ->assertDontSee('legacy@example.com');
+    }
+
+    public function test_verified_google_email_is_displayed_read_only(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'verified@example.com',
             'email_verified_at' => now(),
         ]);
 
-        Livewire::actingAs($user)
-            ->test(Edit::class)
-            ->set('email', 'new@example.com')
-            ->call('save')
-            ->assertHasNoErrors();
-
-        $user->refresh();
-
-        $this->assertSame(
-            'new@example.com',
-            $user->email,
-        );
-        $this->assertNull(
-            $user->email_verified_at,
-        );
+        $this->actingAs($user)
+            ->get(route('panel.profile'))
+            ->assertOk()
+            ->assertSee('verified@example.com')
+            ->assertSee('تأیید شده با Google')
+            ->assertDontSee('افزودن ایمیل با Google')
+            ->assertDontSee('wire:model="email"', false);
     }
 
-    public function test_saving_same_email_keeps_verification(): void
+    public function test_saving_profile_does_not_mutate_email_identity(): void
     {
         $user = User::factory()->create([
-            'email' => 'user@example.com',
+            'email' => 'verified@example.com',
             'email_verified_at' => now()->subMinute(),
         ]);
 
-        $user->refresh();
         $persistedVerifiedAt = $user->email_verified_at;
-
-        $this->assertNotNull($persistedVerifiedAt);
 
         Livewire::actingAs($user)
             ->test(Edit::class)
-            ->set('email', ' User@Example.COM ')
+            ->set('firstName', 'محمد')
+            ->set('lastName', 'اسدی')
             ->call('save')
             ->assertHasNoErrors();
 
         $user->refresh();
 
         $this->assertSame(
-            'user@example.com',
+            'verified@example.com',
             $user->email,
         );
         $this->assertTrue(
@@ -88,41 +85,5 @@ final class ProfileEmailTest extends TestCase
                 $persistedVerifiedAt,
             ) ?? false,
         );
-    }
-
-    public function test_email_must_be_unique(): void
-    {
-        User::factory()->create([
-            'email' => 'used@example.com',
-        ]);
-
-        $user = User::factory()->create([
-            'email' => null,
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(Edit::class)
-            ->set('email', 'used@example.com')
-            ->call('save')
-            ->assertHasErrors(['email' => 'unique']);
-    }
-
-    public function test_user_can_remove_optional_email(): void
-    {
-        $user = User::factory()->create([
-            'email' => 'user@example.com',
-            'email_verified_at' => now(),
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(Edit::class)
-            ->set('email', '')
-            ->call('save')
-            ->assertHasNoErrors();
-
-        $user->refresh();
-
-        $this->assertNull($user->email);
-        $this->assertNull($user->email_verified_at);
     }
 }
