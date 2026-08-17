@@ -6,6 +6,7 @@ namespace Tests\Unit\Infrastructure\Integrations\Cloudflare;
 
 use App\Infrastructure\Integrations\Cloudflare\CloudflareApiClient;
 use App\Infrastructure\Integrations\Cloudflare\CloudflareApiException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -119,6 +120,7 @@ final class CloudflareApiClientTest extends TestCase
                         'type' => 'A',
                         'name' => 'app.example.com',
                         'content' => '203.0.113.10',
+                        'proxiable' => true,
                         'proxied' => true,
                         'ttl' => 1,
                         'comment' => 'managed externally',
@@ -146,8 +148,127 @@ final class CloudflareApiClientTest extends TestCase
         self::assertSame('A', $records[0]['type']);
         self::assertSame('app.example.com', $records[0]['name']);
         self::assertSame('203.0.113.10', $records[0]['content']);
+        self::assertTrue($records[0]['proxiable']);
         self::assertTrue($records[0]['proxied']);
         self::assertSame(1, $records[0]['ttl']);
+    }
+
+    public function test_dns_record_mutations_use_expected_methods_and_payloads(): void
+    {
+        $zoneId = str_repeat('c', 32);
+        $recordId = str_repeat('d', 32);
+        $url = "https://api.cloudflare.com/client/v4/zones/{$zoneId}/dns_records";
+        $recordUrl = "{$url}/{$recordId}";
+
+        Http::fake(static function (Request $request) use (
+            $url,
+            $recordUrl,
+            $recordId,
+        ) {
+            if ($request->method() === 'POST' && $request->url() === $url) {
+                return Http::response([
+                    'success' => true,
+                    'result' => [
+                        'id' => $recordId,
+                        'type' => 'A',
+                        'name' => 'api.example.com',
+                        'content' => '203.0.113.20',
+                        'proxiable' => true,
+                        'proxied' => true,
+                        'ttl' => 300,
+                        'comment' => 'managed by Coreflare',
+                        'modified_on' => '2026-08-18T00:00:00Z',
+                    ],
+                ]);
+            }
+
+            if ($request->method() === 'PATCH' && $request->url() === $recordUrl) {
+                return Http::response([
+                    'success' => true,
+                    'result' => [
+                        'id' => $recordId,
+                        'type' => 'A',
+                        'name' => 'api.example.com',
+                        'content' => '203.0.113.21',
+                        'proxiable' => true,
+                        'proxied' => false,
+                        'ttl' => 900,
+                        'comment' => 'updated by Coreflare',
+                        'modified_on' => '2026-08-18T00:01:00Z',
+                    ],
+                ]);
+            }
+
+            if ($request->method() === 'DELETE' && $request->url() === $recordUrl) {
+                return Http::response([
+                    'result' => ['id' => $recordId],
+                ]);
+            }
+
+            return Http::response([], 500);
+        });
+
+        $client = app(CloudflareApiClient::class);
+
+        $created = $client->createDnsRecord(
+            'access-token',
+            $zoneId,
+            [
+                'type' => 'A',
+                'name' => 'api.example.com',
+                'content' => '203.0.113.20',
+                'ttl' => 300,
+                'proxied' => true,
+                'comment' => 'managed by Coreflare',
+            ],
+        );
+
+        $updated = $client->updateDnsRecord(
+            'access-token',
+            $zoneId,
+            $recordId,
+            [
+                'type' => 'A',
+                'name' => 'api.example.com',
+                'content' => '203.0.113.21',
+                'ttl' => 900,
+                'proxied' => false,
+                'comment' => 'updated by Coreflare',
+            ],
+        );
+
+        $client->deleteDnsRecord(
+            'access-token',
+            $zoneId,
+            $recordId,
+        );
+
+        self::assertSame('203.0.113.20', $created['content']);
+        self::assertTrue($created['proxied']);
+        self::assertSame('203.0.113.21', $updated['content']);
+        self::assertFalse($updated['proxied']);
+
+        Http::assertSent(static function (Request $request) use ($url): bool {
+            return $request->method() === 'POST'
+                && $request->url() === $url
+                && $request->hasHeader('Authorization', 'Bearer access-token')
+                && $request['type'] === 'A'
+                && $request['name'] === 'api.example.com'
+                && $request['content'] === '203.0.113.20'
+                && $request['ttl'] === 300
+                && $request['proxied'] === true;
+        });
+
+        Http::assertSent(static function (Request $request) use ($recordUrl): bool {
+            return $request->method() === 'PATCH'
+                && $request->url() === $recordUrl
+                && $request['content'] === '203.0.113.21'
+                && $request['ttl'] === 900
+                && $request['proxied'] === false;
+        });
+
+        Http::assertSent(static fn (Request $request): bool => $request->method() === 'DELETE'
+            && $request->url() === $recordUrl);
     }
 
     public function test_api_failure_never_returns_untrusted_result(): void
