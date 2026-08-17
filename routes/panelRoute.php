@@ -75,7 +75,10 @@ Route::middleware(['web', 'auth'])
 
         Route::get(
             '/support/attachments/{attachment}',
-            ShowSupportMessageAttachmentController::class,
+            [
+                ShowSupportMessageAttachmentController::class,
+                'owner',
+            ],
         )->whereNumber('attachment')
             ->name('support.attachments.show');
 
