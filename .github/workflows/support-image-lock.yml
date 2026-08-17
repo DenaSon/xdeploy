@@ -20,13 +20,6 @@ jobs:
         with:
           ref: agent/support-image-attachments-phase1
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, gd
-          coverage: none
-
       - name: Add Laravel image dependency
         run: composer require intervention/image:^4.0 --no-interaction --no-progress --no-scripts --no-install
 
