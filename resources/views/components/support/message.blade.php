@@ -16,6 +16,10 @@
                 ? ($message->author?->displayName() ?? $message->author?->phone ?? 'کاربر')
                 : 'شما'
         );
+
+    $attachmentRoute = $adminView
+        ? 'admin.support.attachments.show'
+        : 'panel.support.attachments.show';
 @endphp
 
 <div
@@ -64,5 +68,42 @@
         </div>
 
         <p class="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-base-content/75">{{ $message->body }}</p>
+
+        @if($message->attachments->isNotEmpty())
+            <div
+                data-support-message-attachments
+                class="mt-3 grid grid-cols-2 gap-2"
+            >
+                @foreach($message->attachments as $attachment)
+                    @php
+                        $attachmentUrl = route(
+                            $attachmentRoute,
+                            ['attachment' => $attachment],
+                        );
+                    @endphp
+
+                    <a
+                        href="{{ $attachmentUrl }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="group relative overflow-hidden rounded-xl border border-base-300/70 bg-base-100"
+                        aria-label="مشاهده تصویر پیوست"
+                    >
+                        <img
+                            src="{{ $attachmentUrl }}"
+                            alt="تصویر پیوست پیام پشتیبانی"
+                            width="{{ $attachment->width }}"
+                            height="{{ $attachment->height }}"
+                            loading="lazy"
+                            class="aspect-video w-full object-cover transition duration-200 group-hover:scale-[1.015]"
+                        />
+
+                        <span class="absolute left-1.5 top-1.5 flex size-6 items-center justify-center rounded-lg bg-base-100/90 text-base-content/45 opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100">
+                            <x-icon name="lucide.external-link" class="!size-3" />
+                        </span>
+                    </a>
+                @endforeach
+            </div>
+        @endif
     </article>
 </div>
