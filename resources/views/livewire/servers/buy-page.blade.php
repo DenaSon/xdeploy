@@ -17,8 +17,6 @@
             this.pendingProvider = provider;
             this.switchingProvider = true;
 
-            await this.$nextTick();
-
             try {
                 await this.$wire.selectProvider(provider);
                 this.currentProvider = provider;
@@ -231,12 +229,12 @@
                                     </div>
 
                                     <span
-                                        class="
-                                            shrink-0 rounded-full
-                                            px-2 py-1
-                                            text-[9px] font-medium
-                                        "
                                         @class([
+                                            '
+                                                shrink-0 rounded-full
+                                                px-2 py-1
+                                                text-[9px] font-medium
+                                            ',
                                             'bg-primary/10 text-primary' => $isSelected,
                                             'bg-base-200/70 text-base-content/35' => ! $isSelected,
                                         ])
