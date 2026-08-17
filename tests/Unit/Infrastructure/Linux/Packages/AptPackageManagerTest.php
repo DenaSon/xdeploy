@@ -6,9 +6,11 @@ namespace Tests\Unit\Infrastructure\Linux\Packages;
 
 use App\Domain\Server\Exceptions\InvalidSystemPackageException;
 use App\Domain\Server\Exceptions\SystemPackageInstallationException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
 use App\Infrastructure\Linux\Packages\AptPackageManager;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Support\SSH\SSHTimeout;
@@ -68,7 +70,7 @@ final class AptPackageManagerTest extends TestCase
         $this->assertFalse($installed);
     }
 
-    public function test_it_installs_normalized_unique_packages_using_privileged_executor(): void
+    public function test_it_installs_normalized_unique_packages_using_lock_aware_privileged_executor(): void
     {
         $ssh = Mockery::mock(
             SSHConnectionInterface::class,
@@ -76,21 +78,17 @@ final class AptPackageManagerTest extends TestCase
 
         $this->expectRootPreflight($ssh);
 
-        $ssh
-            ->shouldReceive('executeWithResult')
-            ->once()
-            ->ordered()
-            ->with(
-                "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -- 'curl' 'ca-certificates'",
-                SSHTimeout::SYSTEM_PACKAGE_INSTALL,
-                false,
-            )
-            ->andReturn(
-                new SSHResult(
-                    'Packages installed.',
-                    0,
-                ),
-            );
+        $this->expectPackageInstallCommand(
+            ssh: $ssh,
+            packages: [
+                'curl',
+                'ca-certificates',
+            ],
+            result: new SSHResult(
+                'Packages installed.',
+                0,
+            ),
+        );
 
         $this->expectInstalledPackage(
             ssh: $ssh,
@@ -126,7 +124,7 @@ final class AptPackageManagerTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    public function test_it_throws_when_package_installation_command_fails(): void
+    public function test_it_throws_a_specific_exception_when_package_manager_stays_busy(): void
     {
         $ssh = Mockery::mock(
             SSHConnectionInterface::class,
@@ -134,21 +132,40 @@ final class AptPackageManagerTest extends TestCase
 
         $this->expectRootPreflight($ssh);
 
-        $ssh
-            ->shouldReceive('executeWithResult')
-            ->once()
-            ->ordered()
-            ->with(
-                "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -- 'curl'",
-                SSHTimeout::SYSTEM_PACKAGE_INSTALL,
-                false,
-            )
-            ->andReturn(
-                new SSHResult(
-                    'Unable to install package.',
-                    100,
-                ),
-            );
+        $this->expectPackageInstallCommand(
+            ssh: $ssh,
+            packages: ['curl'],
+            result: new SSHResult(
+                PackageManagerLockRetryCommand::BUSY_MARKER,
+                75,
+            ),
+        );
+
+        $this->expectException(
+            SystemPackageManagerBusyException::class,
+        );
+
+        $this->manager($ssh)->install([
+            'curl',
+        ]);
+    }
+
+    public function test_it_does_not_misclassify_a_generic_package_failure_as_lock_contention(): void
+    {
+        $ssh = Mockery::mock(
+            SSHConnectionInterface::class,
+        );
+
+        $this->expectRootPreflight($ssh);
+
+        $this->expectPackageInstallCommand(
+            ssh: $ssh,
+            packages: ['curl'],
+            result: new SSHResult(
+                'Unable to install package.',
+                100,
+            ),
+        );
 
         $this->expectException(
             SystemPackageInstallationException::class,
@@ -171,21 +188,14 @@ final class AptPackageManagerTest extends TestCase
 
         $this->expectRootPreflight($ssh);
 
-        $ssh
-            ->shouldReceive('executeWithResult')
-            ->once()
-            ->ordered()
-            ->with(
-                "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -- 'curl'",
-                SSHTimeout::SYSTEM_PACKAGE_INSTALL,
-                false,
-            )
-            ->andReturn(
-                new SSHResult(
-                    'Package command completed.',
-                    0,
-                ),
-            );
+        $this->expectPackageInstallCommand(
+            ssh: $ssh,
+            packages: ['curl'],
+            result: new SSHResult(
+                'Package command completed.',
+                0,
+            ),
+        );
 
         $ssh
             ->shouldReceive('executeWithResult')
@@ -245,6 +255,51 @@ final class AptPackageManagerTest extends TestCase
             ->andReturn(
                 new SSHResult('0', 0),
             );
+    }
+
+    /**
+     * @param  list<string>  $packages
+     */
+    private function expectPackageInstallCommand(
+        SSHConnectionInterface $ssh,
+        array $packages,
+        SSHResult $result,
+    ): void {
+        $expectedArguments = implode(
+            ' ',
+            array_map(
+                static fn (string $package): string => "'{$package}'",
+                $packages,
+            ),
+        );
+
+        $ssh
+            ->shouldReceive('executeWithResult')
+            ->once()
+            ->ordered()
+            ->with(
+                Mockery::on(
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        'PACKAGE_MANAGER_MAX_ATTEMPTS=4',
+                    )
+                        && str_contains(
+                            $command,
+                            PackageManagerLockRetryCommand::BUSY_MARKER,
+                        )
+                        && str_contains(
+                            $command,
+                            'DPkg::Lock::Timeout=60',
+                        )
+                        && str_contains(
+                            $command,
+                            "install -y -- {$expectedArguments}",
+                        ),
+                ),
+                SSHTimeout::SYSTEM_PACKAGE_INSTALL,
+                false,
+            )
+            ->andReturn($result);
     }
 
     private function expectInstalledPackage(
