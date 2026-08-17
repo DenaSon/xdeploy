@@ -25,6 +25,7 @@ final class CloudflareOAuthClientTest extends TestCase
                 'account-settings.read',
                 'zone.read',
                 'dns.read',
+                'dns.write',
                 'offline_access',
             ],
             'services.cloudflare_oauth.connect_timeout' => 5,
@@ -58,7 +59,7 @@ final class CloudflareOAuthClientTest extends TestCase
         );
         self::assertSame('code', $query['response_type'] ?? null);
         self::assertSame(
-            'account-settings.read zone.read dns.read offline_access',
+            'account-settings.read zone.read dns.read dns.write offline_access',
             $query['scope'] ?? null,
         );
         self::assertSame('state-value', $query['state'] ?? null);
@@ -71,6 +72,9 @@ final class CloudflareOAuthClientTest extends TestCase
         self::assertTrue(
             app(CloudflareOAuthClient::class)->configuredForRead(),
         );
+        self::assertTrue(
+            app(CloudflareOAuthClient::class)->configuredForDnsWrite(),
+        );
     }
 
     public function test_exchange_returns_normalized_token_set(): void
@@ -81,7 +85,7 @@ final class CloudflareOAuthClientTest extends TestCase
                     'access_token' => 'access-token',
                     'refresh_token' => 'refresh-token',
                     'expires_in' => 3600,
-                    'scope' => 'account-settings.read zone.read dns.read offline_access',
+                    'scope' => 'account-settings.read zone.read dns.read dns.write offline_access',
                     'token_type' => 'Bearer',
                 ],
                 200,
@@ -103,6 +107,7 @@ final class CloudflareOAuthClientTest extends TestCase
                 'account-settings.read',
                 'zone.read',
                 'dns.read',
+                'dns.write',
                 'offline_access',
             ],
             $tokens->scopes,
@@ -140,6 +145,7 @@ final class CloudflareOAuthClientTest extends TestCase
                     'account-settings.read',
                     'zone.read',
                     'dns.read',
+                    'dns.write',
                     'offline_access',
                 ],
             );
@@ -152,6 +158,7 @@ final class CloudflareOAuthClientTest extends TestCase
                 'account-settings.read',
                 'zone.read',
                 'dns.read',
+                'dns.write',
                 'offline_access',
             ],
             $tokens->scopes,

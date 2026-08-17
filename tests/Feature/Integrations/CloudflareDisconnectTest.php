@@ -25,12 +25,7 @@ final class CloudflareDisconnectTest extends TestCase
             'services.cloudflare_oauth.authorization_endpoint' => 'https://dash.cloudflare.com/oauth2/auth',
             'services.cloudflare_oauth.token_endpoint' => 'https://dash.cloudflare.com/oauth2/token',
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
-            'services.cloudflare_oauth.scopes' => [
-                'account-settings.read',
-                'zone.read',
-                'dns.read',
-                'offline_access',
-            ],
+            'services.cloudflare_oauth.scopes' => $this->fullScopes(),
             'services.cloudflare_oauth.connect_timeout' => 5,
             'services.cloudflare_oauth.timeout' => 10,
         ]);
@@ -96,7 +91,7 @@ final class CloudflareDisconnectTest extends TestCase
                 'access_token' => 'new-access-token',
                 'refresh_token' => 'new-refresh-token',
                 'expires_in' => 3600,
-                'scope' => 'account-settings.read zone.read dns.read offline_access',
+                'scope' => 'account-settings.read zone.read dns.read dns.write offline_access',
             ], 200)
             ->push([], 503)
             ->push([], 503)
@@ -134,12 +129,7 @@ final class CloudflareDisconnectTest extends TestCase
             'provider' => IntegrationProvider::Cloudflare,
             'access_token' => 'access-token',
             'refresh_token' => 'refresh-token',
-            'scopes' => [
-                'account-settings.read',
-                'zone.read',
-                'dns.read',
-                'offline_access',
-            ],
+            'scopes' => $this->fullScopes(),
             'connected_at' => now(),
         ]);
     }
@@ -165,5 +155,17 @@ final class CloudflareDisconnectTest extends TestCase
         self::assertNotSame('', $state);
 
         return $state;
+    }
+
+    /** @return list<string> */
+    private function fullScopes(): array
+    {
+        return [
+            'account-settings.read',
+            'zone.read',
+            'dns.read',
+            'dns.write',
+            'offline_access',
+        ];
     }
 }

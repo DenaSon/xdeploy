@@ -30,6 +30,7 @@ final class CloudflareIntegrationTest extends TestCase
                 'account-settings.read',
                 'zone.read',
                 'dns.read',
+                'dns.write',
                 'offline_access',
             ],
             'services.cloudflare_oauth.connect_timeout' => 5,
@@ -85,7 +86,7 @@ final class CloudflareIntegrationTest extends TestCase
             $query['client_id'] ?? null,
         );
         self::assertSame(
-            'account-settings.read zone.read dns.read offline_access',
+            'account-settings.read zone.read dns.read dns.write offline_access',
             $query['scope'] ?? null,
         );
         self::assertSame(
@@ -125,7 +126,7 @@ final class CloudflareIntegrationTest extends TestCase
                     'access_token' => 'access-token',
                     'refresh_token' => 'refresh-token',
                     'expires_in' => 3600,
-                    'scope' => 'account-settings.read zone.read dns.read offline_access',
+                    'scope' => 'account-settings.read zone.read dns.read dns.write offline_access',
                     'token_type' => 'Bearer',
                 ],
                 200,
@@ -158,12 +159,7 @@ final class CloudflareIntegrationTest extends TestCase
         self::assertSame('access-token', $connection->access_token);
         self::assertSame('refresh-token', $connection->refresh_token);
         self::assertSame(
-            [
-                'account-settings.read',
-                'zone.read',
-                'dns.read',
-                'offline_access',
-            ],
+            $this->fullScopes(),
             $connection->scopes,
         );
         self::assertNotNull($connection->access_token_expires_at);
@@ -226,7 +222,7 @@ final class CloudflareIntegrationTest extends TestCase
                     'access_token' => 'new-access-token',
                     'refresh_token' => 'new-refresh-token',
                     'expires_in' => 7200,
-                    'scope' => 'account-settings.read zone.read dns.read offline_access',
+                    'scope' => 'account-settings.read zone.read dns.read dns.write offline_access',
                 ],
                 200,
             ),
@@ -254,12 +250,7 @@ final class CloudflareIntegrationTest extends TestCase
         self::assertSame('new-access-token', $connection->access_token);
         self::assertSame('new-refresh-token', $connection->refresh_token);
         self::assertSame(
-            [
-                'account-settings.read',
-                'zone.read',
-                'dns.read',
-                'offline_access',
-            ],
+            $this->fullScopes(),
             $connection->scopes,
         );
 
@@ -284,12 +275,7 @@ final class CloudflareIntegrationTest extends TestCase
             'provider' => IntegrationProvider::Cloudflare,
             'access_token' => 'access-token',
             'refresh_token' => 'refresh-token',
-            'scopes' => [
-                'account-settings.read',
-                'zone.read',
-                'dns.read',
-                'offline_access',
-            ],
+            'scopes' => $this->fullScopes(),
             'connected_at' => now(),
         ]);
 
@@ -332,12 +318,7 @@ final class CloudflareIntegrationTest extends TestCase
             'provider' => IntegrationProvider::Cloudflare,
             'access_token' => 'never-render-access-token',
             'refresh_token' => 'never-render-refresh-token',
-            'scopes' => [
-                'account-settings.read',
-                'zone.read',
-                'dns.read',
-                'offline_access',
-            ],
+            'scopes' => $this->fullScopes(),
             'connected_at' => now(),
         ]);
 
@@ -345,6 +326,7 @@ final class CloudflareIntegrationTest extends TestCase
             ->get(route('panel.integrations.index'))
             ->assertOk()
             ->assertSee('Cloudflare')
+            ->assertSee('DNS Write فعال')
             ->assertDontSee('never-render-access-token')
             ->assertDontSee('never-render-refresh-token');
     }
@@ -370,5 +352,17 @@ final class CloudflareIntegrationTest extends TestCase
         self::assertNotSame('', $state);
 
         return $state;
+    }
+
+    /** @return list<string> */
+    private function fullScopes(): array
+    {
+        return [
+            'account-settings.read',
+            'zone.read',
+            'dns.read',
+            'dns.write',
+            'offline_access',
+        ];
     }
 }

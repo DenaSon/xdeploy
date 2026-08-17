@@ -37,6 +37,11 @@ final class Index extends Component
 
         $missingReadScopes = CloudflareScopes::missing(
             $scopes,
+            CloudflareScopes::read(),
+        );
+        $missingDnsWriteScopes = CloudflareScopes::missing(
+            $scopes,
+            CloudflareScopes::dnsWrite(),
         );
 
         return view(
@@ -44,12 +49,16 @@ final class Index extends Component
             [
                 'cloudflareConfigured' => $cloudflare->configured(),
                 'cloudflareReadConfigured' => $cloudflare->configuredForRead(),
+                'cloudflareDnsWriteConfigured' => $cloudflare->configuredForDnsWrite(),
                 'cloudflareConnected' => $connection !== null,
                 'cloudflareReadReady' => $connection !== null
                     && $missingReadScopes === [],
+                'cloudflareDnsWriteReady' => $connection !== null
+                    && $missingDnsWriteScopes === [],
                 'cloudflareConnectedAt' => $connection?->connected_at,
                 'cloudflareScopes' => $scopes,
                 'cloudflareMissingReadScopes' => $missingReadScopes,
+                'cloudflareMissingDnsWriteScopes' => $missingDnsWriteScopes,
             ],
         );
     }
