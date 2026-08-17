@@ -307,6 +307,9 @@ final class Show extends Component
 
         $operationType = $operation->operation;
         $operationStatus = $operation->status;
+        $operationFailureCode = is_string($operation->failure_code)
+            ? $operation->failure_code
+            : null;
 
         $this->clearOperationState();
         $this->processing = false;
@@ -354,27 +357,33 @@ final class Show extends Component
         }
 
         if (! $this->sshUnavailable) {
-            $this->errorMessage = match ($operationType) {
-                ApplicationOperationType::Install => sprintf(
-                    'نصب %s با خطا مواجه شد.',
-                    $this->name,
-                ),
-                ApplicationOperationType::Uninstall => sprintf(
-                    'حذف %s با خطا مواجه شد.',
-                    $this->name,
-                ),
-                ApplicationOperationType::Start => sprintf(
-                    'اجرای %s با خطا مواجه شد.',
-                    $this->name,
-                ),
-                ApplicationOperationType::Stop => sprintf(
-                    'توقف %s با خطا مواجه شد.',
-                    $this->name,
-                ),
-                ApplicationOperationType::Restart => sprintf(
-                    'راه‌اندازی مجدد %s با خطا مواجه شد.',
-                    $this->name,
-                ),
+            $this->errorMessage = match (true) {
+                $operationType === ApplicationOperationType::Install
+                    && $operationFailureCode === 'package_manager_busy'
+                        => 'بروزرسانی‌های اولیه سیستم‌عامل هنوز در حال اجرا هستند و مدیر بسته‌ها در زمان مجاز آزاد نشد. چند دقیقه بعد دوباره نصب را اجرا کنید.',
+
+                default => match ($operationType) {
+                    ApplicationOperationType::Install => sprintf(
+                        'نصب %s با خطا مواجه شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Uninstall => sprintf(
+                        'حذف %s با خطا مواجه شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Start => sprintf(
+                        'اجرای %s با خطا مواجه شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Stop => sprintf(
+                        'توقف %s با خطا مواجه شد.',
+                        $this->name,
+                    ),
+                    ApplicationOperationType::Restart => sprintf(
+                        'راه‌اندازی مجدد %s با خطا مواجه شد.',
+                        $this->name,
+                    ),
+                },
             };
         }
     }
