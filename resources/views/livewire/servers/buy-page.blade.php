@@ -45,17 +45,21 @@
             border-top-left-radius: 0;
             border-top-right-radius: 0;
         }
-
-        .cloud-purchase-page--fixed-disk
-        .grid:has(> div > [wire\:click="decreaseDisk"]) {
-            grid-template-columns: minmax(0, 1fr);
-        }
-
-        .cloud-purchase-page--fixed-disk
-        div:has(> [wire\:click="decreaseDisk"]) {
-            display: none;
-        }
     </style>
+
+    @if(! $customDiskEnabled)
+        <style>
+            .cloud-purchase-page--fixed-disk
+            .grid:has(> div > [wire\:click="decreaseDisk"]) {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .cloud-purchase-page--fixed-disk
+            div:has(> [wire\:click="decreaseDisk"]) {
+                display: none;
+            }
+        </style>
+    @endif
 
     <div
         data-buy-workspace-toolbar
