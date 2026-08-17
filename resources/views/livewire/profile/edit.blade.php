@@ -101,54 +101,63 @@
                 />
             </div>
 
-            <div class="space-y-3 rounded-xl border border-base-300 bg-base-200/30 p-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div class="min-w-0 flex-1">
-                        <x-input
-                            label="ایمیل"
-                            wire:model="email"
-                            type="email"
-                            maxlength="254"
-                            autocomplete="email"
-                            dir="ltr"
-                        />
-                    </div>
+            <div class="rounded-xl border border-base-300 bg-base-200/30 p-4">
+                @if($user->email_verified_at !== null && $user->email)
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-medium text-base-content/60">
+                                    ایمیل حساب
+                                </span>
 
-                    @if($user->email_verified_at !== null)
-                        <div class="flex h-12 shrink-0 items-center gap-1.5 rounded-xl border border-success/20 bg-success/[0.06] px-3 text-sm font-medium text-success">
-                            <x-icon
-                                name="lucide.badge-check"
-                                class="!size-4 stroke-[1.8]"
-                            />
-                            تأیید شده
+                                <span class="badge badge-success badge-sm gap-1">
+                                    <x-icon
+                                        name="lucide.badge-check"
+                                        class="!size-3 stroke-[1.8]"
+                                    />
+                                    تأیید شده با Google
+                                </span>
+                            </div>
+
+                            <div
+                                dir="ltr"
+                                class="mt-2 break-all text-sm font-medium text-base-content/75"
+                            >
+                                {{ $user->email }}
+                            </div>
                         </div>
-                    @else
+                    </div>
+                @else
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-base-content">
+                                ایمیل حساب
+                            </div>
+
+                            <p class="mt-1 text-xs leading-6 text-base-content/45">
+                                برای افزودن ایمیل تأییدشده، حساب Google خود را متصل کنید.
+                            </p>
+                        </div>
+
                         <a
                             href="{{ route('panel.profile.email.google.redirect') }}"
-                            class="btn btn-outline h-12 shrink-0 rounded-xl"
+                            class="btn btn-outline shrink-0 rounded-xl"
                         >
                             <x-icon
-                                name="lucide.badge-check"
+                                name="lucide.plus"
                                 class="!size-4 stroke-[1.8]"
                             />
 
-                            {{ $user->email ? 'تأیید با Google' : 'افزودن و تأیید با Google' }}
+                            افزودن ایمیل با Google
                         </a>
-                    @endif
-                </div>
+                    </div>
+                @endif
 
                 @error('email')
-                    <p class="text-xs leading-6 text-error">
+                    <p class="mt-3 text-xs leading-6 text-error">
                         {{ $message }}
                     </p>
                 @enderror
-
-                @if($user->email_verified_at === null)
-                    <p class="text-xs leading-6 text-base-content/45">
-                        اگر ایمیلی ذخیره کرده‌اید، حساب Google انتخاب‌شده باید همان ایمیل را داشته باشد.
-                        اگر ایمیل خالی باشد، ایمیل تأییدشده Google به حساب اضافه می‌شود.
-                    </p>
-                @endif
             </div>
 
             <div class="flex items-center justify-end border-t border-base-300 pt-5">
