@@ -56,9 +56,10 @@ while [ "$package_manager_attempt" -le "$PACKAGE_MANAGER_MAX_ATTEMPTS" ]; do
         trap - EXIT HUP INT TERM
 
         exit 0
+    else
+        package_manager_exit_code=$?
     fi
 
-    package_manager_exit_code=$?
     package_manager_output="$(cat "$package_manager_output_file")"
     rm -f "$package_manager_output_file"
     package_manager_output_file=''
