@@ -7,6 +7,7 @@ namespace App\Application\Applications\Operations;
 use App\Application\Applications\Manager\ApplicationManager;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Models\ApplicationOperation;
 use App\Models\Server;
@@ -190,6 +191,15 @@ final class RunApplicationOperationJob implements ShouldQueue
         string $fallback = 'operation_failed',
     ): string {
         if (
+            $this->exceptionChainContains(
+                $exception,
+                SystemPackageManagerBusyException::class,
+            )
+        ) {
+            return 'package_manager_busy';
+        }
+
+        if (
             $exception instanceof ApplicationInstallationException
             && $exception->failureCode !== null
         ) {
@@ -197,6 +207,26 @@ final class RunApplicationOperationJob implements ShouldQueue
         }
 
         return $fallback;
+    }
+
+    /**
+     * @param  class-string<Throwable>  $type
+     */
+    private function exceptionChainContains(
+        Throwable $exception,
+        string $type,
+    ): bool {
+        $current = $exception;
+
+        do {
+            if ($current instanceof $type) {
+                return true;
+            }
+
+            $current = $current->getPrevious();
+        } while ($current instanceof Throwable);
+
+        return false;
     }
 
     private function durationInMilliseconds(float $startedAt): int
