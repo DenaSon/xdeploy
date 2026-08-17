@@ -21,7 +21,7 @@ jobs:
           ref: agent/support-image-attachments-phase1
 
       - name: Add Laravel image dependency
-        run: composer require intervention/image:^4.0 --no-interaction --no-progress --no-scripts --no-install
+        run: composer require intervention/image:^4.0 --no-interaction --no-progress --no-scripts --no-install --ignore-platform-req=php
 
       - name: Commit lock files
         run: |
