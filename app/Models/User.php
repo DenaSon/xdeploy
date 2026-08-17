@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Server\Enums\ServerStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +39,43 @@ class User extends Authenticatable implements PasskeyUser
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class);
+    }
+
+    /**
+     * Determine whether the account currently owns a usable purchased VPS.
+     *
+     * User-provided servers intentionally do not satisfy this predicate: the
+     * result is used by purchase-oriented presentation such as the global
+     * "Buy VPS" CTA.
+     */
+    public function hasActiveCloudServer(): bool
+    {
+        return $this->servers()
+            ->where(
+                'status',
+                ServerStatus::Active,
+            )
+            ->whereNotNull(
+                'cloud_provider',
+            )
+            ->whereNotNull(
+                'cloud_server_id',
+            )
+            ->whereNull(
+                'terminated_at',
+            )
+            ->where(
+                static function (Builder $query): void {
+                    $query
+                        ->whereNull('expires_at')
+                        ->orWhere(
+                            'expires_at',
+                            '>',
+                            now(),
+                        );
+                },
+            )
+            ->exists();
     }
 
     /**
