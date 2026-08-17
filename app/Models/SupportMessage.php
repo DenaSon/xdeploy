@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Domain\Support\Enums\SupportMessageAuthorRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SupportMessage extends Model
 {
@@ -27,6 +28,16 @@ class SupportMessage extends Model
     public function supportRequest(): BelongsTo
     {
         return $this->belongsTo(SupportRequest::class);
+    }
+
+    /**
+     * @return HasMany<SupportMessageAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SupportMessageAttachment::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Profile\GoogleEmailEnrollmentController;
 use App\Http\Controllers\Servers\RevealServerCredentialController;
+use App\Http\Controllers\Support\ShowSupportMessageAttachmentController;
 use App\Livewire\Applications\Index as ApplicationsIndex;
 use App\Livewire\Applications\Show as ApplicationShow;
 use App\Livewire\Domains\Index as DomainsIndex;
@@ -71,6 +72,12 @@ Route::middleware(['web', 'auth'])
             '/support/create',
             SupportCreate::class,
         )->name('support.create');
+
+        Route::get(
+            '/support/attachments/{attachment}',
+            ShowSupportMessageAttachmentController::class,
+        )->whereNumber('attachment')
+            ->name('support.attachments.show');
 
         Route::livewire(
             '/support/{supportRequestId}',

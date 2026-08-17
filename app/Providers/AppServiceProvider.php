@@ -5,8 +5,10 @@ namespace App\Providers;
 use App;
 use App\Application\Navigation\PublicDocumentationNavigation;
 use App\Application\Navigation\PublicFooterNavigation;
+use App\Application\Support\Contracts\SupportImageProcessorInterface;
 use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Infrastructure\Support\LaravelSupportImageProcessor;
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
 use App\Models\Page;
@@ -25,6 +27,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Passkeys::ignoreRoutes();
+
+        $this->app->bind(
+            SupportImageProcessorInterface::class,
+            LaravelSupportImageProcessor::class,
+        );
     }
 
     public function boot(): void
