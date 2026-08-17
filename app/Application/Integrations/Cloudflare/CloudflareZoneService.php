@@ -23,7 +23,7 @@ final readonly class CloudflareZoneService
     ): bool {
         return $this->accessTokens->hasScopes(
             $connection,
-            CloudflareScopes::zoneWrite(),
+            CloudflareScopes::zoneManagement(),
         );
     }
 
@@ -37,10 +37,7 @@ final readonly class CloudflareZoneService
 
         $token = $this->accessTokens->token(
             $connection,
-            [
-                CloudflareScopes::ACCOUNT_SETTINGS_READ,
-                ...CloudflareScopes::zoneWrite(),
-            ],
+            CloudflareScopes::zoneManagement(),
         );
 
         $this->ensureAccessibleAccount(
@@ -86,10 +83,7 @@ final readonly class CloudflareZoneService
     ): void {
         $token = $this->accessTokens->token(
             $connection,
-            [
-                CloudflareScopes::ZONE_READ,
-                ...CloudflareScopes::zoneWrite(),
-            ],
+            CloudflareScopes::zoneManagement(),
         );
 
         // Resolve the zone through the same user-bound OAuth connection before
