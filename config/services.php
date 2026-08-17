@@ -66,7 +66,7 @@ return [
                         ',',
                         (string) env(
                             'CLOUDFLARE_OAUTH_SCOPES',
-                            'account-settings.read,zone.read,dns.read,offline_access',
+                            'account-settings.read,zone.read,dns.read,dns.write,offline_access',
                         ),
                     ),
                 ),
