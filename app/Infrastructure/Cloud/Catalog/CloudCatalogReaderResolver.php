@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Cloud\Catalog;
 
-use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
@@ -17,7 +16,7 @@ final readonly class CloudCatalogReaderResolver implements CloudCatalogReaderRes
 
     public function resolve(
         CloudProviderType $provider,
-    ): CloudCatalogReaderInterface {
+    ): CachedCloudCatalogReader {
         return new CachedCloudCatalogReader(
             cloud: $this->providers->resolve($provider),
             provider: $provider,
