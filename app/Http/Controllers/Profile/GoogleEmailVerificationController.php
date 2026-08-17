@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Profile;
 
-use App\Application\User\Actions\VerifyGoogleEmailAction;
+use App\Application\User\Actions\AttachVerifiedGoogleEmailAction;
 use App\Infrastructure\Identity\GoogleOpenIdClient;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -28,7 +28,7 @@ final class GoogleEmailVerificationController
             return to_route('panel.profile')
                 ->with(
                     'profile_status',
-                    'ایمیل شما قبلاً تأیید شده است.',
+                    'ایمیل حساب قبلاً تأیید شده است.',
                 );
         }
 
@@ -36,7 +36,7 @@ final class GoogleEmailVerificationController
             return to_route('panel.profile')
                 ->with(
                     'profile_error',
-                    'تأیید ایمیل با Google هنوز پیکربندی نشده است.',
+                    'افزودن ایمیل با Google هنوز پیکربندی نشده است.',
                 );
         }
 
@@ -49,9 +49,6 @@ final class GoogleEmailVerificationController
                 'state_hash' => hash('sha256', $state),
                 'code_verifier' => $codeVerifier,
                 'user_id' => $user->getKey(),
-                'expected_email' => $this->normalizeEmail(
-                    $user->email,
-                ),
                 'started_at' => now()->timestamp,
             ],
         );
@@ -68,7 +65,7 @@ final class GoogleEmailVerificationController
     public function callback(
         Request $request,
         GoogleOpenIdClient $google,
-        VerifyGoogleEmailAction $verifyGoogleEmail,
+        AttachVerifiedGoogleEmailAction $attachGoogleEmail,
     ): RedirectResponse {
         $user = $this->user($request);
         $attempt = $request->session()->pull(
@@ -77,13 +74,13 @@ final class GoogleEmailVerificationController
 
         if (! $this->validAttempt($attempt, $user, $request)) {
             return $this->failure(
-                'درخواست تأیید ایمیل معتبر نیست یا منقضی شده است.',
+                'درخواست افزودن ایمیل معتبر نیست یا منقضی شده است.',
             );
         }
 
         if ($request->filled('error')) {
             return $this->failure(
-                'فرایند تأیید ایمیل در Google لغو شد.',
+                'فرایند افزودن ایمیل در Google لغو شد.',
             );
         }
 
@@ -95,7 +92,7 @@ final class GoogleEmailVerificationController
             || trim($authorizationCode) === ''
         ) {
             return $this->failure(
-                'Google کد تأیید معتبری برنگرداند.',
+                'Google کد معتبر لازم برای افزودن ایمیل را برنگرداند.',
             );
         }
 
@@ -112,28 +109,23 @@ final class GoogleEmailVerificationController
                 );
             }
 
-            $verifyGoogleEmail->handle(
+            $attachGoogleEmail->handle(
                 user: $user,
                 googleEmail: $identity->email,
-                expectedEmail: is_string(
-                    $attempt['expected_email'] ?? null,
-                )
-                    ? $attempt['expected_email']
-                    : null,
             );
         } catch (ValidationException $exception) {
             return to_route('panel.profile')
                 ->withErrors($exception->errors());
         } catch (Throwable) {
             return $this->failure(
-                'ارتباط با Google برای تأیید ایمیل ناموفق بود. دوباره تلاش کنید.',
+                'ارتباط با Google برای افزودن ایمیل ناموفق بود. دوباره تلاش کنید.',
             );
         }
 
         return to_route('panel.profile')
             ->with(
                 'profile_status',
-                'ایمیل با موفقیت از طریق Google تأیید شد.',
+                'ایمیل با موفقیت به حساب اضافه و تأیید شد.',
             );
     }
 
@@ -209,15 +201,6 @@ final class GoogleEmailVerificationController
                 '/\A[A-Za-z0-9\-._~]+\z/D',
                 $codeVerifier,
             ) === 1;
-    }
-
-    private function normalizeEmail(?string $email): ?string
-    {
-        $email = mb_strtolower(trim((string) $email));
-
-        return $email !== ''
-            ? $email
-            : null;
     }
 
     private function callbackUrl(): string
