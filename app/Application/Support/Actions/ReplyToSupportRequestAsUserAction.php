@@ -11,22 +11,33 @@ use App\Domain\Support\Exceptions\SupportRequestClosedException;
 use App\Models\SupportMessage;
 use App\Models\SupportRequest;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 final readonly class ReplyToSupportRequestAsUserAction
 {
+    public function __construct(
+        private StoreSupportMessageAttachmentsAction $storeAttachments,
+    ) {}
+
+    /**
+     * @param array<int, UploadedFile> $attachments
+     */
     public function execute(
         User $user,
         int $supportRequestId,
         string $message,
+        array $attachments = [],
     ): SupportMessage {
         $message = SupportContent::message($message);
+        $attachments = array_values($attachments);
 
         return DB::transaction(
             function () use (
                 $user,
                 $supportRequestId,
                 $message,
+                $attachments,
             ): SupportMessage {
                 /** @var SupportRequest $supportRequest */
                 $supportRequest = SupportRequest::query()
@@ -46,6 +57,13 @@ final readonly class ReplyToSupportRequestAsUserAction
                     'author_role' => SupportMessageAuthorRole::User,
                     'body' => $message,
                 ]);
+
+                if ($attachments !== []) {
+                    $this->storeAttachments->execute(
+                        message: $supportMessage,
+                        files: $attachments,
+                    );
+                }
 
                 $supportRequest->forceFill([
                     'status' => SupportRequestStatus::Open,

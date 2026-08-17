@@ -11,19 +11,29 @@ use App\Domain\Support\Enums\SupportRequestStatus;
 use App\Models\Server;
 use App\Models\SupportRequest;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 final readonly class CreateSupportRequestAction
 {
+    public function __construct(
+        private StoreSupportMessageAttachmentsAction $storeAttachments,
+    ) {}
+
+    /**
+     * @param array<int, UploadedFile> $attachments
+     */
     public function execute(
         User $user,
         string $subject,
         SupportRequestCategory $category,
         string $message,
         ?int $serverId = null,
+        array $attachments = [],
     ): SupportRequest {
         $subject = SupportContent::subject($subject);
         $message = SupportContent::message($message);
+        $attachments = array_values($attachments);
 
         return DB::transaction(
             function () use (
@@ -32,6 +42,7 @@ final readonly class CreateSupportRequestAction
                 $category,
                 $message,
                 $serverId,
+                $attachments,
             ): SupportRequest {
                 $ownedServerId = $this->resolveOwnedServerId(
                     user: $user,
@@ -50,11 +61,18 @@ final readonly class CreateSupportRequestAction
                     'closed_at' => null,
                 ]);
 
-                $supportRequest->messages()->create([
+                $supportMessage = $supportRequest->messages()->create([
                     'author_id' => $user->getKey(),
                     'author_role' => SupportMessageAuthorRole::User,
                     'body' => $message,
                 ]);
+
+                if ($attachments !== []) {
+                    $this->storeAttachments->execute(
+                        message: $supportMessage,
+                        files: $attachments,
+                    );
+                }
 
                 return $supportRequest;
             },

@@ -113,6 +113,11 @@
                 @enderror
             </label>
 
+            <x-support.image-uploader
+                :files="$attachments"
+                label="اسکرین‌شات مشکل"
+            />
+
             <div class="flex flex-col-reverse gap-2 border-t border-base-300/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-[11px] leading-5 text-base-content/35">
                     پس از ثبت، درخواست در بخش پشتیبانی قابل پیگیری و ادامه گفتگو خواهد بود.
@@ -123,6 +128,8 @@
                     label="ثبت درخواست"
                     icon="lucide.send"
                     spinner="submit"
+                    wire:loading.attr="disabled"
+                    wire:target="attachments"
                     class="btn-primary rounded-xl px-5"
                 />
             </div>

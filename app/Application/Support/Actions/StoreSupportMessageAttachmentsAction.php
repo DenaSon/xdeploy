@@ -7,6 +7,7 @@ namespace App\Application\Support\Actions;
 use App\Application\Support\Contracts\SupportImageProcessorInterface;
 use App\Application\Support\Data\ProcessedSupportImage;
 use App\Application\Support\SupportAttachmentPolicy;
+use App\Application\Support\SupportAttachmentValidationRules;
 use App\Models\SupportMessage;
 use App\Models\SupportMessageAttachment;
 use Illuminate\Database\Eloquent\Collection;
@@ -146,26 +147,8 @@ final readonly class StoreSupportMessageAttachmentsAction
     private function validateFiles(array $files): void
     {
         Validator::make(
-            [
-                'attachments' => $files,
-            ],
-            [
-                'attachments' => [
-                    'array',
-                    'max:'.SupportAttachmentPolicy::MAX_FILES,
-                ],
-                'attachments.*' => [
-                    'required',
-                    'file',
-                    'image',
-                    'mimes:jpg,jpeg,png,webp',
-                    'max:'.SupportAttachmentPolicy::MAX_KILOBYTES,
-                    'dimensions:max_width='
-                        .SupportAttachmentPolicy::MAX_SOURCE_DIMENSION
-                        .',max_height='
-                        .SupportAttachmentPolicy::MAX_SOURCE_DIMENSION,
-                ],
-            ],
+            ['attachments' => $files],
+            SupportAttachmentValidationRules::make(),
         )->validate();
     }
 }

@@ -118,12 +118,21 @@
                         @enderror
                     </label>
 
+                    <div class="mt-3">
+                        <x-support.image-uploader
+                            :files="$attachments"
+                            label="اسکرین‌شات تکمیلی"
+                        />
+                    </div>
+
                     <div class="mt-3 flex justify-end">
                         <x-button
                             type="submit"
                             label="ارسال پاسخ"
                             icon="lucide.send"
                             spinner="sendReply"
+                            wire:loading.attr="disabled"
+                            wire:target="attachments"
                             class="btn-primary btn-sm rounded-xl px-4"
                         />
                     </div>
