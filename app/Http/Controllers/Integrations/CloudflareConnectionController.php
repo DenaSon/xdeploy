@@ -98,6 +98,35 @@ final class CloudflareConnectionController
             );
         }
 
+        $existingConnection = $this->connectionFor($user);
+
+        if ($existingConnection instanceof IntegrationConnection) {
+            $oldRevocation = $this->revokeTokensBestEffort(
+                cloudflare: $cloudflare,
+                tokens: [
+                    $existingConnection->refresh_token,
+                    $existingConnection->access_token,
+                ],
+            );
+
+            if (
+                $oldRevocation['attempts'] > 0
+                && $oldRevocation['successes'] === 0
+            ) {
+                $this->revokeTokensBestEffort(
+                    cloudflare: $cloudflare,
+                    tokens: [
+                        $tokens->refreshToken,
+                        $tokens->accessToken,
+                    ],
+                );
+
+                return $this->failure(
+                    'اتصال قبلی Cloudflare قابل لغو نبود؛ برای جلوگیری از باقی‌ماندن دسترسی بدون کنترل، اتصال جدید ذخیره نشد. دوباره تلاش کنید.',
+                );
+            }
+        }
+
         IntegrationConnection::query()->updateOrCreate(
             [
                 'user_id' => $user->getKey(),
@@ -127,29 +156,64 @@ final class CloudflareConnectionController
         CloudflareOAuthClient $cloudflare,
     ): RedirectResponse {
         $user = $this->user($request);
+        $connection = $this->connectionFor($user);
 
-        $connection = IntegrationConnection::query()
+        if (! $connection instanceof IntegrationConnection) {
+            return to_route('panel.integrations.index');
+        }
+
+        $revocation = $this->revokeTokensBestEffort(
+            cloudflare: $cloudflare,
+            tokens: [
+                $connection->refresh_token,
+                $connection->access_token,
+            ],
+        );
+
+        $connection->delete();
+
+        if (
+            $revocation['attempts'] > 0
+            && $revocation['successes'] === 0
+        ) {
+            return $this->failure(
+                'اتصال از Coreflare حذف شد، اما لغو دسترسی در Cloudflare تأیید نشد. مجوز Coreflare را در Cloudflare نیز بررسی کنید.',
+            );
+        }
+
+        return to_route('panel.integrations.index')
+            ->with(
+                'integration_status',
+                'اتصال Cloudflare با موفقیت قطع شد.',
+            );
+    }
+
+    private function connectionFor(User $user): ?IntegrationConnection
+    {
+        return IntegrationConnection::query()
             ->ownedBy($user)
             ->where(
                 'provider',
                 IntegrationProvider::Cloudflare->value,
             )
             ->first();
+    }
 
-        if (! $connection instanceof IntegrationConnection) {
-            return to_route('panel.integrations.index');
-        }
-
+    /**
+     * @param array<int, mixed> $tokens
+     * @return array{attempts: int, successes: int}
+     */
+    private function revokeTokensBestEffort(
+        CloudflareOAuthClient $cloudflare,
+        array $tokens,
+    ): array {
         $revocationAttempts = 0;
         $successfulRevocations = 0;
 
         $tokens = array_values(
             array_unique(
                 array_filter(
-                    [
-                        $connection->refresh_token,
-                        $connection->access_token,
-                    ],
+                    $tokens,
                     static fn (mixed $token): bool => is_string($token)
                         && trim($token) !== '',
                 ),
@@ -163,26 +227,14 @@ final class CloudflareConnectionController
                 $cloudflare->revoke($token);
                 $successfulRevocations++;
             } catch (Throwable) {
-                // Local disconnect must remain possible even if Cloudflare is unavailable.
+                // Remote revocation is best-effort; never expose token data.
             }
         }
 
-        $connection->delete();
-
-        if (
-            $revocationAttempts > 0
-            && $successfulRevocations === 0
-        ) {
-            return $this->failure(
-                'اتصال از Coreflare حذف شد، اما لغو دسترسی در Cloudflare تأیید نشد. مجوز Coreflare را در Cloudflare نیز بررسی کنید.',
-            );
-        }
-
-        return to_route('panel.integrations.index')
-            ->with(
-                'integration_status',
-                'اتصال Cloudflare با موفقیت قطع شد.',
-            );
+        return [
+            'attempts' => $revocationAttempts,
+            'successes' => $successfulRevocations,
+        ];
     }
 
     private function validAttempt(
