@@ -140,26 +140,39 @@ final class CloudflareConnectionController
             return to_route('panel.integrations.index');
         }
 
-        $revocationFailed = false;
+        $revocationAttempts = 0;
+        $successfulRevocations = 0;
 
-        foreach (
-            [$connection->refresh_token, $connection->access_token]
-            as $token
-        ) {
-            if (! is_string($token) || trim($token) === '') {
-                continue;
-            }
+        $tokens = array_values(
+            array_unique(
+                array_filter(
+                    [
+                        $connection->refresh_token,
+                        $connection->access_token,
+                    ],
+                    static fn (mixed $token): bool => is_string($token)
+                        && trim($token) !== '',
+                ),
+            ),
+        );
+
+        foreach ($tokens as $token) {
+            $revocationAttempts++;
 
             try {
                 $cloudflare->revoke($token);
+                $successfulRevocations++;
             } catch (Throwable) {
-                $revocationFailed = true;
+                // Local disconnect must remain possible even if Cloudflare is unavailable.
             }
         }
 
         $connection->delete();
 
-        if ($revocationFailed) {
+        if (
+            $revocationAttempts > 0
+            && $successfulRevocations === 0
+        ) {
             return $this->failure(
                 'اتصال از Coreflare حذف شد، اما لغو دسترسی در Cloudflare تأیید نشد. مجوز Coreflare را در Cloudflare نیز بررسی کنید.',
             );
