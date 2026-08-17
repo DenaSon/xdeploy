@@ -25,6 +25,14 @@ final class CloudflareOAuthClient
         ) === [];
     }
 
+    public function configuredForDnsWrite(): bool
+    {
+        return CloudflareScopes::missing(
+            $this->scopes(),
+            CloudflareScopes::dnsWrite(),
+        ) === [];
+    }
+
     public function authorizationUrl(
         string $state,
         string $redirectUri,
