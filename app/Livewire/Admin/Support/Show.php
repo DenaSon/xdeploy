@@ -87,6 +87,7 @@ final class Show extends Component
                 'user.profile',
                 'server',
                 'messages.author.profile',
+                'messages.attachments',
             ]);
         }
 
