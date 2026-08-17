@@ -7,12 +7,16 @@ namespace App\Infrastructure\Linux\Packages;
 use App\Domain\Server\Contracts\SystemPackageManager;
 use App\Domain\Server\Exceptions\InvalidSystemPackageException;
 use App\Domain\Server\Exceptions\SystemPackageInstallationException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
 
 final readonly class AptPackageManager implements SystemPackageManager
 {
+    private const string PACKAGE_MANAGER_BUSY_MARKER =
+        '[xDeploy][apt][error] reason=package_manager_busy';
+
     public function __construct(
         private SSHConnectionInterface $ssh,
         private PrivilegedCommandExecutor $privileged,
@@ -58,16 +62,22 @@ final readonly class AptPackageManager implements SystemPackageManager
         );
 
         $result = $this->privileged->executeWithResult(
-            command: sprintf(
-                <<<'COMMAND'
-apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -- %s
-COMMAND,
+            command: $this->installCommand(
                 $packageArguments,
             ),
             timeout: SSHTimeout::SYSTEM_PACKAGE_INSTALL,
         );
 
         if (! $result->successful()) {
+            if (
+                str_contains(
+                    $result->output,
+                    self::PACKAGE_MANAGER_BUSY_MARKER,
+                )
+            ) {
+                throw new SystemPackageManagerBusyException;
+            }
+
             throw new SystemPackageInstallationException(
                 sprintf(
                     'Failed to install system packages [%s].',
@@ -77,6 +87,106 @@ COMMAND,
         }
 
         $this->verifyInstalledPackages($packages);
+    }
+
+    private function installCommand(
+        string $packageArguments,
+    ): string {
+        $command = <<<'BASH'
+set -eu
+
+export DEBIAN_FRONTEND=noninteractive
+export LC_ALL=C
+
+APT_LOCK_TIMEOUT_SECONDS=30
+PACKAGE_MANAGER_BUSY_EXIT_CODE=75
+PACKAGE_MANAGER_MAX_ATTEMPTS=5
+output_file=''
+
+cleanup() {
+    if [ -n "$output_file" ]; then
+        rm -f "$output_file"
+    fi
+}
+
+is_package_manager_busy() {
+    printf '%s\n' "$1" \
+        | grep -Eqi \
+            'Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock directory|Waiting for cache lock|is another process using it'
+}
+
+retry_delay_for_attempt() {
+    case "$1" in
+        1) printf '15\n' ;;
+        2) printf '30\n' ;;
+        3) printf '60\n' ;;
+        *) printf '90\n' ;;
+    esac
+}
+
+run_apt() {
+    stage="$1"
+    shift
+    attempt=1
+
+    while [ "$attempt" -le "$PACKAGE_MANAGER_MAX_ATTEMPTS" ]; do
+        output_file="$(mktemp)"
+
+        if apt-get \
+            -o "DPkg::Lock::Timeout=${APT_LOCK_TIMEOUT_SECONDS}" \
+            "$@" >"$output_file" 2>&1; then
+            cat "$output_file"
+            rm -f "$output_file"
+            output_file=''
+
+            return 0
+        fi
+
+        exit_code=$?
+        output="$(cat "$output_file")"
+        rm -f "$output_file"
+        output_file=''
+
+        if ! is_package_manager_busy "$output"; then
+            printf '%s\n' "$output" >&2
+
+            return "$exit_code"
+        fi
+
+        if [ "$attempt" -ge "$PACKAGE_MANAGER_MAX_ATTEMPTS" ]; then
+            printf '[xDeploy][apt][error] reason=package_manager_busy stage=%s exit_code=%s\n' \
+                "$stage" \
+                "$PACKAGE_MANAGER_BUSY_EXIT_CODE" >&2
+
+            return "$PACKAGE_MANAGER_BUSY_EXIT_CODE"
+        fi
+
+        delay="$(retry_delay_for_attempt "$attempt")"
+
+        printf '[xDeploy][apt] package manager busy stage=%s attempt=%s retry_in=%ss\n' \
+            "$stage" \
+            "$attempt" \
+            "$delay"
+
+        sleep "$delay"
+        attempt=$((attempt + 1))
+    done
+}
+
+trap cleanup EXIT HUP INT TERM
+
+run_apt update update
+run_apt install install -y -- __XDEPLOY_PACKAGES__
+
+trap - EXIT HUP INT TERM
+cleanup
+BASH;
+
+        return str_replace(
+            '__XDEPLOY_PACKAGES__',
+            $packageArguments,
+            $command,
+        );
     }
 
     /**
