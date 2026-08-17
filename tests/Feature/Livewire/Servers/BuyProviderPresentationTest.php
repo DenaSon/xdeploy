@@ -20,7 +20,7 @@ final class BuyProviderPresentationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_buy_page_renders_compact_public_provider_options_and_switch_overlay(): void
+    public function test_buy_page_renders_unified_public_provider_workspace_and_switch_overlay(): void
     {
         config()->set(
             'cloud.default',
@@ -66,6 +66,15 @@ final class BuyProviderPresentationTest extends TestCase
                 $arvanCode,
             )
             ->assertSeeHtml(
+                'data-buy-workspace',
+            )
+            ->assertSeeHtml(
+                'data-buy-workspace-toolbar',
+            )
+            ->assertSeeHtml(
+                'data-buy-provider-row',
+            )
+            ->assertSeeHtml(
                 sprintf(
                     'data-provider-option="%s"',
                     $arvanCode,
@@ -78,7 +87,13 @@ final class BuyProviderPresentationTest extends TestCase
                 ),
             )
             ->assertSeeHtml(
+                'cursor-pointer',
+            )
+            ->assertSeeHtml(
                 'data-provider-switch-overlay',
+            )
+            ->assertSee(
+                'سرور جدید',
             )
             ->assertSee(
                 'در حال تغییر زیرساخت',
