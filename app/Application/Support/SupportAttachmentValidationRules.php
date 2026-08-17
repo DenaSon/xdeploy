@@ -17,6 +17,7 @@ final class SupportAttachmentValidationRules
                 'max:'.SupportAttachmentPolicy::MAX_FILES,
             ],
             'attachments.*' => [
+                'required',
                 'file',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
