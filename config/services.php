@@ -43,4 +43,43 @@ return [
         ),
     ],
 
+    'cloudflare_oauth' => [
+        'client_id' => env('CLOUDFLARE_OAUTH_CLIENT_ID'),
+        'client_secret' => env('CLOUDFLARE_OAUTH_CLIENT_SECRET'),
+        'authorization_endpoint' => env(
+            'CLOUDFLARE_OAUTH_AUTHORIZATION_ENDPOINT',
+            'https://dash.cloudflare.com/oauth2/auth',
+        ),
+        'token_endpoint' => env(
+            'CLOUDFLARE_OAUTH_TOKEN_ENDPOINT',
+            'https://dash.cloudflare.com/oauth2/token',
+        ),
+        'revoke_endpoint' => env(
+            'CLOUDFLARE_OAUTH_REVOKE_ENDPOINT',
+            'https://dash.cloudflare.com/oauth2/revoke',
+        ),
+        'scopes' => array_values(
+            array_filter(
+                array_map(
+                    'trim',
+                    explode(
+                        ',',
+                        (string) env(
+                            'CLOUDFLARE_OAUTH_SCOPES',
+                            'account.read,offline_access',
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        'connect_timeout' => (int) env(
+            'CLOUDFLARE_OAUTH_CONNECT_TIMEOUT',
+            5,
+        ),
+        'timeout' => (int) env(
+            'CLOUDFLARE_OAUTH_TIMEOUT',
+            10,
+        ),
+    ],
+
 ];

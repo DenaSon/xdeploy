@@ -86,6 +86,34 @@
         @endif
 
         <x-menu-item
+            title="اتصال‌ها"
+            icon="lucide.link-2"
+            :link="route('panel.integrations.index')"
+            :active="request()->routeIs('panel.integrations.*')"
+            wire:navigate
+
+            class="
+                rounded-xl
+                text-sm
+                text-base-content/65
+                transition-colors duration-200
+                hover:bg-base-200
+                hover:text-base-content
+            "
+
+            active-bg-color="
+                !bg-primary/10
+                !text-primary
+                !font-medium
+            "
+
+            icon-classes="
+                !size-[18px]
+                stroke-[1.7]
+            "
+        />
+
+        <x-menu-item
             title="پشتیبانی"
             icon="lucide.headset"
             :link="route('panel.support.index')"
