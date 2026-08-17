@@ -1,0 +1,233 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Profile;
+
+use App\Application\User\Actions\AttachVerifiedGoogleEmailAction;
+use App\Infrastructure\Identity\GoogleOpenIdClient;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Throwable;
+
+final class GoogleEmailEnrollmentController
+{
+    private const SESSION_KEY = 'profile.google_email_enrollment';
+
+    private const ATTEMPT_TTL_SECONDS = 600;
+
+    public function redirect(
+        Request $request,
+        GoogleOpenIdClient $google,
+    ): RedirectResponse {
+        $user = $this->user($request);
+
+        if ($user->email_verified_at !== null) {
+            return to_route('panel.profile')
+                ->with(
+                    'profile_status',
+                    'ایمیل حساب قبلاً تأیید شده است.',
+                );
+        }
+
+        if (! $google->configured()) {
+            return to_route('panel.profile')
+                ->with(
+                    'profile_error',
+                    'افزودن ایمیل با Google هنوز پیکربندی نشده است.',
+                );
+        }
+
+        $state = bin2hex(random_bytes(32));
+        $codeVerifier = $this->codeVerifier();
+
+        $request->session()->put(
+            self::SESSION_KEY,
+            [
+                'state_hash' => hash('sha256', $state),
+                'code_verifier' => $codeVerifier,
+                'user_id' => $user->getKey(),
+                'started_at' => now()->timestamp,
+            ],
+        );
+
+        return redirect()->away(
+            $google->authorizationUrl(
+                state: $state,
+                redirectUri: $this->callbackUrl(),
+                codeVerifier: $codeVerifier,
+            ),
+        );
+    }
+
+    public function callback(
+        Request $request,
+        GoogleOpenIdClient $google,
+        AttachVerifiedGoogleEmailAction $attachGoogleEmail,
+    ): RedirectResponse {
+        $user = $this->user($request);
+        $attempt = $request->session()->pull(
+            self::SESSION_KEY,
+        );
+
+        if (! $this->validAttempt($attempt, $user, $request)) {
+            return $this->failure(
+                'درخواست افزودن ایمیل معتبر نیست یا منقضی شده است.',
+            );
+        }
+
+        if ($request->filled('error')) {
+            return $this->failure(
+                'فرایند افزودن ایمیل در Google لغو شد.',
+            );
+        }
+
+        $codeVerifier = $attempt['code_verifier'];
+        $authorizationCode = $request->query('code');
+
+        if (
+            ! is_string($authorizationCode)
+            || trim($authorizationCode) === ''
+        ) {
+            return $this->failure(
+                'Google کد معتبر لازم برای افزودن ایمیل را برنگرداند.',
+            );
+        }
+
+        try {
+            $identity = $google->resolveIdentity(
+                authorizationCode: $authorizationCode,
+                redirectUri: $this->callbackUrl(),
+                codeVerifier: $codeVerifier,
+            );
+
+            if (! $identity->emailVerified) {
+                return $this->failure(
+                    'Google مالکیت این ایمیل را تأیید نکرده است.',
+                );
+            }
+
+            $attachGoogleEmail->handle(
+                user: $user,
+                googleEmail: $identity->email,
+            );
+        } catch (ValidationException $exception) {
+            return to_route('panel.profile')
+                ->withErrors($exception->errors());
+        } catch (Throwable) {
+            return $this->failure(
+                'ارتباط با Google برای افزودن ایمیل ناموفق بود. دوباره تلاش کنید.',
+            );
+        }
+
+        return to_route('panel.profile')
+            ->with(
+                'profile_status',
+                'ایمیل با موفقیت به حساب اضافه و تأیید شد.',
+            );
+    }
+
+    private function validAttempt(
+        mixed $attempt,
+        User $user,
+        Request $request,
+    ): bool {
+        if (! is_array($attempt)) {
+            return false;
+        }
+
+        $state = $request->query('state');
+        $stateHash = $attempt['state_hash'] ?? null;
+        $codeVerifier = $attempt['code_verifier'] ?? null;
+        $userId = $attempt['user_id'] ?? null;
+        $startedAt = $attempt['started_at'] ?? null;
+        $issuer = $request->query('iss');
+
+        if (
+            ! is_string($state)
+            || $state === ''
+            || ! is_string($stateHash)
+            || $stateHash === ''
+            || ! $this->validCodeVerifier($codeVerifier)
+            || ! is_int($startedAt)
+            || (string) $userId !== (string) $user->getKey()
+            || $issuer !== 'https://accounts.google.com'
+        ) {
+            return false;
+        }
+
+        if (
+            ! hash_equals(
+                $stateHash,
+                hash('sha256', $state),
+            )
+        ) {
+            return false;
+        }
+
+        $age = now()->timestamp - $startedAt;
+
+        return $age >= 0
+            && $age <= self::ATTEMPT_TTL_SECONDS;
+    }
+
+    private function codeVerifier(): string
+    {
+        return rtrim(
+            strtr(
+                base64_encode(
+                    random_bytes(64),
+                ),
+                '+/',
+                '-_',
+            ),
+            '=',
+        );
+    }
+
+    private function validCodeVerifier(mixed $codeVerifier): bool
+    {
+        if (! is_string($codeVerifier)) {
+            return false;
+        }
+
+        $length = strlen($codeVerifier);
+
+        return $length >= 43
+            && $length <= 128
+            && preg_match(
+                '/\A[A-Za-z0-9\-._~]+\z/D',
+                $codeVerifier,
+            ) === 1;
+    }
+
+    private function callbackUrl(): string
+    {
+        return route(
+            'panel.profile.email.google.callback',
+        );
+    }
+
+    private function failure(string $message): RedirectResponse
+    {
+        return to_route('panel.profile')
+            ->with(
+                'profile_error',
+                $message,
+            );
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user instanceof User,
+            401,
+        );
+
+        return $user;
+    }
+}
