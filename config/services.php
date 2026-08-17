@@ -66,7 +66,7 @@ return [
                         ',',
                         (string) env(
                             'CLOUDFLARE_OAUTH_SCOPES',
-                            'account.read,offline_access',
+                            'account.read,zone.read,dns.read,offline_access',
                         ),
                     ),
                 ),
@@ -79,6 +79,25 @@ return [
         'timeout' => (int) env(
             'CLOUDFLARE_OAUTH_TIMEOUT',
             10,
+        ),
+    ],
+
+    'cloudflare_api' => [
+        'base_url' => env(
+            'CLOUDFLARE_API_BASE_URL',
+            'https://api.cloudflare.com/client/v4',
+        ),
+        'connect_timeout' => (int) env(
+            'CLOUDFLARE_API_CONNECT_TIMEOUT',
+            5,
+        ),
+        'timeout' => (int) env(
+            'CLOUDFLARE_API_TIMEOUT',
+            15,
+        ),
+        'max_pages' => (int) env(
+            'CLOUDFLARE_API_MAX_PAGES',
+            20,
         ),
     ],
 
