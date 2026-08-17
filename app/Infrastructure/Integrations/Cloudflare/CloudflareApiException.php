@@ -14,6 +14,8 @@ final class CloudflareApiException extends RuntimeException
 
     public const RATE_LIMITED = 'rate_limited';
 
+    public const INVALID_REQUEST = 'invalid_request';
+
     public const INVALID_RESPONSE = 'invalid_response';
 
     public const RESOURCE_LIMIT = 'resource_limit';
