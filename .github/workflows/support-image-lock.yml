@@ -1,0 +1,39 @@
+name: Support image dependency lock
+
+on:
+  push:
+    branches:
+      - agent/support-image-attachments-phase1
+    paths:
+      - .github/workflows/support-image-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/support-image-attachments-phase1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, gd
+          coverage: none
+
+      - name: Add Laravel image dependency
+        run: composer require intervention/image:^4.0 --no-interaction --no-progress --no-scripts
+
+      - name: Commit lock files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.json composer.lock
+          git diff --cached --quiet || git commit -m "Add Laravel image processing dependency"
+          git push origin HEAD:agent/support-image-attachments-phase1
