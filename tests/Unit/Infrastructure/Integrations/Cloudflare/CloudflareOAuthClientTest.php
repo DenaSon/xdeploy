@@ -22,7 +22,7 @@ final class CloudflareOAuthClientTest extends TestCase
             'services.cloudflare_oauth.token_endpoint' => 'https://dash.cloudflare.com/oauth2/token',
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
             'services.cloudflare_oauth.scopes' => [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',
@@ -58,7 +58,7 @@ final class CloudflareOAuthClientTest extends TestCase
         );
         self::assertSame('code', $query['response_type'] ?? null);
         self::assertSame(
-            'account.read zone.read dns.read offline_access',
+            'account-settings.read zone.read dns.read offline_access',
             $query['scope'] ?? null,
         );
         self::assertSame('state-value', $query['state'] ?? null);
@@ -81,7 +81,7 @@ final class CloudflareOAuthClientTest extends TestCase
                     'access_token' => 'access-token',
                     'refresh_token' => 'refresh-token',
                     'expires_in' => 3600,
-                    'scope' => 'account.read zone.read dns.read offline_access',
+                    'scope' => 'account-settings.read zone.read dns.read offline_access',
                     'token_type' => 'Bearer',
                 ],
                 200,
@@ -100,7 +100,7 @@ final class CloudflareOAuthClientTest extends TestCase
         self::assertSame(3600, $tokens->expiresIn);
         self::assertSame(
             [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',
@@ -137,7 +137,7 @@ final class CloudflareOAuthClientTest extends TestCase
             ->refresh(
                 refreshToken: 'old-refresh-token',
                 fallbackScopes: [
-                    'account.read',
+                    'account-settings.read',
                     'zone.read',
                     'dns.read',
                     'offline_access',
@@ -149,7 +149,7 @@ final class CloudflareOAuthClientTest extends TestCase
         self::assertSame(7200, $tokens->expiresIn);
         self::assertSame(
             [
-                'account.read',
+                'account-settings.read',
                 'zone.read',
                 'dns.read',
                 'offline_access',

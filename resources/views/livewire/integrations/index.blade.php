@@ -187,7 +187,7 @@
                 <x-icon name="lucide.settings-2" class="mt-1 !size-3.5 shrink-0 text-warning" />
                 <span>
                     تنظیم <code dir="ltr" class="rounded bg-base-100 px-1.5 py-0.5">CLOUDFLARE_OAUTH_SCOPES</code> باید مجوزهای
-                    <code dir="ltr">account.read</code>، <code dir="ltr">zone.read</code> و <code dir="ltr">dns.read</code> را شامل شود.
+                    <code dir="ltr">account-settings.read</code>، <code dir="ltr">zone.read</code> و <code dir="ltr">dns.read</code> را شامل شود.
                 </span>
             </div>
         @elseif ($cloudflareConnected && ! $cloudflareReadReady)

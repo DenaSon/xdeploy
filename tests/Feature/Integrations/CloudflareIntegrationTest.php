@@ -27,7 +27,9 @@ final class CloudflareIntegrationTest extends TestCase
             'services.cloudflare_oauth.token_endpoint' => 'https://dash.cloudflare.com/oauth2/token',
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
             'services.cloudflare_oauth.scopes' => [
-                'account.read',
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
                 'offline_access',
             ],
             'services.cloudflare_oauth.connect_timeout' => 5,
@@ -83,7 +85,7 @@ final class CloudflareIntegrationTest extends TestCase
             $query['client_id'] ?? null,
         );
         self::assertSame(
-            'account.read offline_access',
+            'account-settings.read zone.read dns.read offline_access',
             $query['scope'] ?? null,
         );
         self::assertSame(
@@ -123,7 +125,7 @@ final class CloudflareIntegrationTest extends TestCase
                     'access_token' => 'access-token',
                     'refresh_token' => 'refresh-token',
                     'expires_in' => 3600,
-                    'scope' => 'account.read offline_access',
+                    'scope' => 'account-settings.read zone.read dns.read offline_access',
                     'token_type' => 'Bearer',
                 ],
                 200,
@@ -156,7 +158,12 @@ final class CloudflareIntegrationTest extends TestCase
         self::assertSame('access-token', $connection->access_token);
         self::assertSame('refresh-token', $connection->refresh_token);
         self::assertSame(
-            ['account.read', 'offline_access'],
+            [
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
             $connection->scopes,
         );
         self::assertNotNull($connection->access_token_expires_at);
@@ -219,7 +226,7 @@ final class CloudflareIntegrationTest extends TestCase
                     'access_token' => 'new-access-token',
                     'refresh_token' => 'new-refresh-token',
                     'expires_in' => 7200,
-                    'scope' => 'account.read offline_access',
+                    'scope' => 'account-settings.read zone.read dns.read offline_access',
                 ],
                 200,
             ),
@@ -246,6 +253,15 @@ final class CloudflareIntegrationTest extends TestCase
         $connection = IntegrationConnection::query()->sole();
         self::assertSame('new-access-token', $connection->access_token);
         self::assertSame('new-refresh-token', $connection->refresh_token);
+        self::assertSame(
+            [
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
+            $connection->scopes,
+        );
 
         Http::assertSent(
             static fn ($request): bool => $request->url()
@@ -268,7 +284,12 @@ final class CloudflareIntegrationTest extends TestCase
             'provider' => IntegrationProvider::Cloudflare,
             'access_token' => 'access-token',
             'refresh_token' => 'refresh-token',
-            'scopes' => ['account.read', 'offline_access'],
+            'scopes' => [
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
             'connected_at' => now(),
         ]);
 
@@ -311,7 +332,12 @@ final class CloudflareIntegrationTest extends TestCase
             'provider' => IntegrationProvider::Cloudflare,
             'access_token' => 'never-render-access-token',
             'refresh_token' => 'never-render-refresh-token',
-            'scopes' => ['account.read'],
+            'scopes' => [
+                'account-settings.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
             'connected_at' => now(),
         ]);
 
