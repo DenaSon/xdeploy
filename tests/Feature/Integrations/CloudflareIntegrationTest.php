@@ -223,6 +223,10 @@ final class CloudflareIntegrationTest extends TestCase
                 ],
                 200,
             ),
+            'https://dash.cloudflare.com/oauth2/revoke' => Http::response(
+                [],
+                200,
+            ),
         ]);
 
         $this->actingAs($user)
@@ -242,6 +246,17 @@ final class CloudflareIntegrationTest extends TestCase
         $connection = IntegrationConnection::query()->sole();
         self::assertSame('new-access-token', $connection->access_token);
         self::assertSame('new-refresh-token', $connection->refresh_token);
+
+        Http::assertSent(
+            static fn ($request): bool => $request->url()
+                === 'https://dash.cloudflare.com/oauth2/revoke'
+                && $request['token'] === 'old-refresh-token',
+        );
+        Http::assertSent(
+            static fn ($request): bool => $request->url()
+                === 'https://dash.cloudflare.com/oauth2/revoke'
+                && $request['token'] === 'old-access-token',
+        );
     }
 
     public function test_disconnect_revokes_tokens_and_removes_local_connection(): void
