@@ -88,6 +88,7 @@ final class SupportAttachmentUiTest extends TestCase
 
         $reply = $supportRequest
             ->messages()
+            ->reorder()
             ->with('attachments')
             ->latest('id')
             ->firstOrFail();
