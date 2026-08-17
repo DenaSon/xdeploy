@@ -22,7 +22,13 @@ final class CloudflareDisconnectTest extends TestCase
         config([
             'services.cloudflare_oauth.client_id' => 'cloudflare-client-id',
             'services.cloudflare_oauth.client_secret' => 'cloudflare-client-secret',
+            'services.cloudflare_oauth.authorization_endpoint' => 'https://dash.cloudflare.com/oauth2/auth',
+            'services.cloudflare_oauth.token_endpoint' => 'https://dash.cloudflare.com/oauth2/token',
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
+            'services.cloudflare_oauth.scopes' => [
+                'account.read',
+                'offline_access',
+            ],
             'services.cloudflare_oauth.connect_timeout' => 5,
             'services.cloudflare_oauth.timeout' => 10,
         ]);
@@ -77,6 +83,48 @@ final class CloudflareDisconnectTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_reconnect_keeps_old_connection_when_old_tokens_cannot_be_revoked(): void
+    {
+        $user = User::factory()->create();
+        $connection = $this->connection($user);
+        $state = $this->startAttempt($user);
+
+        Http::fakeSequence()
+            ->push([
+                'access_token' => 'new-access-token',
+                'refresh_token' => 'new-refresh-token',
+                'expires_in' => 3600,
+                'scope' => 'account.read offline_access',
+            ], 200)
+            ->push([], 503)
+            ->push([], 503)
+            ->push([], 200)
+            ->push([], 200);
+
+        $this->actingAs($user)
+            ->get(
+                route(
+                    'panel.integrations.cloudflare.callback',
+                    [
+                        'state' => $state,
+                        'code' => 'new-code',
+                    ],
+                ),
+            )
+            ->assertRedirect(route('panel.integrations.index'))
+            ->assertSessionHas(
+                'integration_error',
+                'اتصال قبلی Cloudflare قابل لغو نبود؛ برای جلوگیری از باقی‌ماندن دسترسی بدون کنترل، اتصال جدید ذخیره نشد. دوباره تلاش کنید.',
+            );
+
+        $connection->refresh();
+
+        self::assertSame('access-token', $connection->access_token);
+        self::assertSame('refresh-token', $connection->refresh_token);
+        self::assertDatabaseCount('integration_connections', 1);
+        Http::assertSentCount(5);
+    }
+
     private function connection(User $user): IntegrationConnection
     {
         return IntegrationConnection::query()->create([
@@ -87,5 +135,28 @@ final class CloudflareDisconnectTest extends TestCase
             'scopes' => ['account.read', 'offline_access'],
             'connected_at' => now(),
         ]);
+    }
+
+    private function startAttempt(User $user): string
+    {
+        $response = $this->actingAs($user)
+            ->get(
+                route('panel.integrations.cloudflare.redirect'),
+            )
+            ->assertRedirect();
+
+        $location = $response->headers->get('Location');
+        self::assertIsString($location);
+
+        parse_str(
+            (string) parse_url($location, PHP_URL_QUERY),
+            $query,
+        );
+
+        $state = $query['state'] ?? null;
+        self::assertIsString($state);
+        self::assertNotSame('', $state);
+
+        return $state;
     }
 }
