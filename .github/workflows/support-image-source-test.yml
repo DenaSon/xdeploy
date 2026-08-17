@@ -40,5 +40,5 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate --force
 
-      - name: Run full PHP test suite
+      - name: Run full PHP test suite after attachment access hardening
         run: php artisan test --colors=never
