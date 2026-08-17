@@ -27,7 +27,7 @@ package_manager_cleanup() {
 package_manager_is_busy() {
     printf '%s\n' "$1" \
         | grep -Eqi \
-            'Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock directory|Waiting for cache lock|is another process using it'
+            'Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock directory|is another process using it'
 }
 
 package_manager_retry_delay() {
