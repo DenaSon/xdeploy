@@ -7,6 +7,7 @@ namespace App\Infrastructure\Linux\Packages;
 use App\Domain\Server\Contracts\SystemPackageManager;
 use App\Domain\Server\Exceptions\InvalidSystemPackageException;
 use App\Domain\Server\Exceptions\SystemPackageInstallationException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Support\SSH\SSHTimeout;
@@ -57,17 +58,33 @@ final readonly class AptPackageManager implements SystemPackageManager
             ),
         );
 
-        $result = $this->privileged->executeWithResult(
-            command: sprintf(
-                <<<'COMMAND'
-apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -- %s
+        $command = sprintf(
+            <<<'COMMAND'
+LC_ALL=C apt-get -o DPkg::Lock::Timeout=60 update \
+    && DEBIAN_FRONTEND=noninteractive LC_ALL=C apt-get \
+        -o DPkg::Lock::Timeout=60 \
+        install -y -- %s
 COMMAND,
-                $packageArguments,
+            $packageArguments,
+        );
+
+        $result = $this->privileged->executeWithResult(
+            command: PackageManagerLockRetryCommand::wrap(
+                $command,
             ),
             timeout: SSHTimeout::SYSTEM_PACKAGE_INSTALL,
         );
 
         if (! $result->successful()) {
+            if (
+                str_contains(
+                    $result->output,
+                    PackageManagerLockRetryCommand::BUSY_MARKER,
+                )
+            ) {
+                throw new SystemPackageManagerBusyException;
+            }
+
             throw new SystemPackageInstallationException(
                 sprintf(
                     'Failed to install system packages [%s].',

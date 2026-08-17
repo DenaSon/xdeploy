@@ -7,8 +7,10 @@ namespace Tests\Unit\Application\Server;
 use App\Application\Server\Actions\PrepareServerPackageRepositoriesAction;
 use App\Domain\Server\DTOs\OperatingSystemInfo;
 use App\Domain\Server\Exceptions\ServerPackageRepositoryException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Models\Server;
@@ -56,6 +58,10 @@ final class PrepareServerPackageRepositoriesActionTest extends TestCase
                         && str_contains(
                             $command,
                             'apt-get',
+                        )
+                        && str_contains(
+                            $command,
+                            PackageManagerLockRetryCommand::BUSY_MARKER,
                         ),
                 ),
                 SSHTimeout::SYSTEM_PACKAGE_INSTALL,
@@ -121,6 +127,43 @@ final class PrepareServerPackageRepositoriesActionTest extends TestCase
         );
 
         $this->assertTrue(true);
+    }
+
+    public function test_repository_lock_exhaustion_uses_package_manager_busy_exception(): void
+    {
+        $ssh = $this->ssh();
+
+        $this->expectRootPreflight(
+            $ssh,
+        );
+
+        $ssh
+            ->shouldReceive('executeWithResult')
+            ->once()
+            ->with(
+                Mockery::type('string'),
+                SSHTimeout::SYSTEM_PACKAGE_INSTALL,
+                false,
+            )
+            ->andReturn(
+                new SSHResult(
+                    output: PackageManagerLockRetryCommand::BUSY_MARKER,
+                    exitCode: 75,
+                ),
+            );
+
+        $this->expectException(
+            SystemPackageManagerBusyException::class,
+        );
+
+        $this->action(
+            $ssh,
+        )->handle(
+            server: new Server([
+                'cloud_provider' => 'arvan',
+            ]),
+            operatingSystem: $this->ubuntu(),
+        );
     }
 
     public function test_repository_failure_reports_only_the_controlled_stage(): void

@@ -7,7 +7,9 @@ namespace App\Application\Server\Actions;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\DTOs\OperatingSystemInfo;
 use App\Domain\Server\Exceptions\ServerPackageRepositoryException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
 
@@ -51,14 +53,25 @@ final readonly class PrepareServerPackageRepositoriesAction
         }
 
         $result = $this->privileged->executeWithResult(
-            command: $this->command(
-                $mirror,
+            command: PackageManagerLockRetryCommand::wrap(
+                $this->command(
+                    $mirror,
+                ),
             ),
             timeout: SSHTimeout::SYSTEM_PACKAGE_INSTALL,
         );
 
         if ($result->successful()) {
             return;
+        }
+
+        if (
+            str_contains(
+                $result->output,
+                PackageManagerLockRetryCommand::BUSY_MARKER,
+            )
+        ) {
+            throw new SystemPackageManagerBusyException;
         }
 
         $stage = 'unknown';

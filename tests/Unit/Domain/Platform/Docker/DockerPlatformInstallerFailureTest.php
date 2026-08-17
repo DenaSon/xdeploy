@@ -6,9 +6,11 @@ namespace Tests\Unit\Domain\Platform\Docker;
 
 use App\Domain\Platform\Docker\DockerPlatform;
 use App\Domain\Platform\Exceptions\PlatformInstallationException;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
 use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
@@ -50,6 +52,20 @@ final class DockerPlatformInstallerFailureTest extends TestCase
             new SSHResult(
                 'sensitive apt output',
                 124,
+            ),
+        );
+    }
+
+    public function test_it_reports_package_manager_lock_exhaustion_separately(): void
+    {
+        $this->expectException(
+            SystemPackageManagerBusyException::class,
+        );
+
+        $this->installWithResult(
+            new SSHResult(
+                PackageManagerLockRetryCommand::BUSY_MARKER,
+                75,
             ),
         );
     }
@@ -112,7 +128,20 @@ final class DockerPlatformInstallerFailureTest extends TestCase
             ->once()
             ->ordered()
             ->with(
-                'xdeploy-docker-installer-command',
+                Mockery::on(
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        'xdeploy-docker-installer-command',
+                    )
+                        && str_contains(
+                            $command,
+                            'PACKAGE_MANAGER_MAX_ATTEMPTS=4',
+                        )
+                        && str_contains(
+                            $command,
+                            PackageManagerLockRetryCommand::BUSY_MARKER,
+                        ),
+                ),
                 SSHTimeout::DOCKER_INSTALL,
                 true,
             )

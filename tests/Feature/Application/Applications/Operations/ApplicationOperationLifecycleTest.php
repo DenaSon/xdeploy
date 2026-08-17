@@ -8,6 +8,7 @@ use App\Application\Applications\Operations\RunApplicationOperationJob;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Models\ApplicationOperation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,6 +87,36 @@ final class ApplicationOperationLifecycleTest extends TestCase
 
         self::assertNotNull(
             $operation->finished_at,
+        );
+    }
+
+    public function test_package_manager_busy_failure_uses_specific_failure_code(): void
+    {
+        $operation = $this->createOperation();
+
+        self::assertTrue(
+            $operation->markRunning(),
+        );
+
+        (new RunApplicationOperationJob(
+            (int) $operation->getKey(),
+        ))->failed(
+            new RuntimeException(
+                'wrapped package manager failure',
+                previous: new SystemPackageManagerBusyException,
+            ),
+        );
+
+        $operation->refresh();
+
+        self::assertSame(
+            ApplicationOperationStatus::Failed,
+            $operation->status,
+        );
+
+        self::assertSame(
+            'package_manager_busy',
+            $operation->failure_code,
         );
     }
 
