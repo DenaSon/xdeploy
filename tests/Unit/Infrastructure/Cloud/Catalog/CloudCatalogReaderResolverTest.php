@@ -57,6 +57,7 @@ final class CloudCatalogReaderResolverTest extends TestCase
                     CloudProviderType::Arvan->value => $arvan,
                     CloudProviderType::Liara->value => $liara,
                 ],
+                purchasableProviders: [],
             ),
         );
 

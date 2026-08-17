@@ -55,6 +55,9 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
                 providers: [
                     CloudProviderType::Liara->value => $provider,
                 ],
+                purchasableProviders: [
+                    CloudProviderType::Liara->value,
+                ],
             ),
         );
     }

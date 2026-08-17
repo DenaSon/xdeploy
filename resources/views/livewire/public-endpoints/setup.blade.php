@@ -344,7 +344,7 @@
                     </p>
 
                     <p class="mt-1 text-xs leading-6 text-base-content/45">
-                        اکنون xDeploy می‌تواند Caddy و تنظیمات {{ $applicationName }} را به‌صورت امن اعمال کند.
+                        اکنون Coreflare می‌تواند Caddy و تنظیمات {{ $applicationName }} را به‌صورت امن اعمال کند.
                     </p>
                 </div>
             </div>

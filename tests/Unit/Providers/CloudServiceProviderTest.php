@@ -38,12 +38,16 @@ final class CloudServiceProviderTest extends TestCase
         parent::setUp();
 
         config()->set('cloud.default', 'arvan');
+        config()->set('cloud.providers.arvan.enabled', true);
+        config()->set('cloud.providers.arvan.purchase_enabled', true);
         config()->set('cloud.providers.arvan.base_url', 'https://api.example.test/ecc/v1');
         config()->set('cloud.providers.arvan.api_key', 'test-api-key');
         config()->set('cloud.providers.arvan.timeouts.connect', 5);
         config()->set('cloud.providers.arvan.timeouts.request', 15);
         config()->set('cloud.providers.arvan.defaults.create_type', 'cinder');
 
+        config()->set('cloud.providers.liara.enabled', true);
+        config()->set('cloud.providers.liara.purchase_enabled', true);
         config()->set('cloud.providers.liara.base_url', 'https://iaas-api.example.test');
         config()->set('cloud.providers.liara.api_token', 'test-liara-token');
         config()->set('cloud.providers.liara.timeouts.connect', 5);
@@ -181,16 +185,14 @@ final class CloudServiceProviderTest extends TestCase
         }
     }
 
-    public function test_registry_leaves_liara_unregistered_when_token_is_missing(): void
+    public function test_enabled_liara_without_token_fails_registry_resolution(): void
     {
         config()->set('cloud.providers.liara.api_token', null);
 
-        $registry = $this->app->make(CloudProviderRegistryInterface::class);
-
         $this->expectException(CloudConfigurationException::class);
-        $this->expectExceptionMessage('The cloud provider [liara] is not registered.');
+        $this->expectExceptionMessage('Liara API token is not configured.');
 
-        $registry->resolve(CloudProviderType::Liara);
+        $this->app->make(CloudProviderRegistryInterface::class);
     }
 
     public function test_it_resolves_concrete_provider_as_singleton(): void

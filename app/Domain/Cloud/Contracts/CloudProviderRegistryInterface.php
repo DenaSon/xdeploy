@@ -9,9 +9,18 @@ use App\Domain\Cloud\Enums\CloudProviderType;
 interface CloudProviderRegistryInterface
 {
     /**
+     * Providers that remain operationally available for existing resources.
+     *
      * @return list<CloudProviderType>
      */
     public function registeredProviders(): array;
+
+    /**
+     * Operational providers that are allowed to accept new purchases.
+     *
+     * @return list<CloudProviderType>
+     */
+    public function purchasableProviders(): array;
 
     public function resolve(
         CloudProviderType $provider,

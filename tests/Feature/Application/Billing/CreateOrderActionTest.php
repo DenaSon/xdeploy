@@ -18,7 +18,10 @@ use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
+use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Domain\Cloud\Exceptions\CloudProviderPurchaseUnavailableException;
 use App\Domain\Server\Services\SupportedOperatingSystemPolicy;
+use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -266,6 +269,44 @@ final class CreateOrderActionTest extends TestCase
         );
     }
 
+    public function test_it_rejects_order_when_provider_is_not_open_for_new_purchases(): void
+    {
+        $user = User::factory()->create();
+        $cloud = $this->cloud();
+        $diskPricing = $this->diskPricing();
+
+        $cloud->shouldNotReceive('listSizes');
+        $cloud->shouldNotReceive('listImages');
+        $diskPricing->shouldNotReceive('calculateDiskPrice');
+
+        $this->expectException(
+            CloudProviderPurchaseUnavailableException::class,
+        );
+        $this->expectExceptionMessage(
+            'The cloud provider [arvan] is not available for new purchases.',
+        );
+
+        try {
+            $this->action(
+                cloud: $cloud,
+                diskPricing: $diskPricing,
+                purchaseEnabled: false,
+            )->execute(
+                user: $user,
+                region: self::REGION,
+                sizeId: self::SIZE_ID,
+                imageId: self::SUPPORTED_IMAGE_ID,
+                selectedDiskGiB: 30,
+                period: self::PERIOD,
+            );
+        } finally {
+            $this->assertDatabaseCount(
+                'orders',
+                0,
+            );
+        }
+    }
+
     public function test_it_rejects_image_version_not_supported_by_xdeploy(): void
     {
         $user = User::factory()->create();
@@ -435,6 +476,7 @@ final class CreateOrderActionTest extends TestCase
     private function action(
         CloudProviderInterface $cloud,
         CloudServerResizeCatalogInterface $diskPricing,
+        bool $purchaseEnabled = true,
     ): CreateOrderAction {
         $filter =
             new FilterSupportedCloudImagesAction(
@@ -462,9 +504,19 @@ final class CreateOrderActionTest extends TestCase
                 calculator: new CloudPricingCalculator,
             );
 
+        $providers = new CloudProviderRegistry(
+            providers: [
+                CloudProviderType::Arvan->value => $cloud,
+            ],
+            purchasableProviders: $purchaseEnabled
+                ? [CloudProviderType::Arvan->value]
+                : [],
+        );
+
         return new CreateOrderAction(
             calculatePrice: $calculatePrice,
             resolveImage: $resolveImage,
+            providers: $providers,
         );
     }
 

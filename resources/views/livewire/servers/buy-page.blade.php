@@ -1,4 +1,24 @@
-<div dir="rtl">
+<div
+    dir="rtl"
+    @class([
+        'cloud-purchase-page',
+        'cloud-purchase-page--fixed-disk' => ! $customDiskEnabled,
+    ])
+>
+    @if(! $customDiskEnabled)
+        <style>
+            .cloud-purchase-page--fixed-disk
+            .grid:has(> div > [wire\:click="decreaseDisk"]) {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .cloud-purchase-page--fixed-disk
+            div:has(> [wire\:click="decreaseDisk"]) {
+                display: none;
+            }
+        </style>
+    @endif
+
     @if(count($providers) > 1)
         <section
             class="
