@@ -28,7 +28,7 @@ jobs:
           coverage: none
 
       - name: Add Laravel image dependency
-        run: composer require intervention/image:^4.0 --no-interaction --no-progress --no-scripts
+        run: composer require intervention/image:^4.0 --no-interaction --no-progress --no-scripts --no-install
 
       - name: Commit lock files
         run: |
