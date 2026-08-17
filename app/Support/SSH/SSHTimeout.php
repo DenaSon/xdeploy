@@ -58,9 +58,11 @@ final class SSHTimeout
     public const int CADDY_INSTALL = 300;
 
     /**
-     * Operating-system package installation.
+     * Operating-system package installation. This includes a bounded retry
+     * budget for temporary APT/DPKG lock contention on freshly provisioned
+     * servers while unattended upgrades are still running.
      */
-    public const int SYSTEM_PACKAGE_INSTALL = 180;
+    public const int SYSTEM_PACKAGE_INSTALL = 900;
 
     /**
      * Docker image pull operations.
