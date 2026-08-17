@@ -10,6 +10,7 @@ use App\Domain\Platform\Exceptions\PlatformInstallationException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
 use App\Infrastructure\Installers\Contracts\InstallerSourceInterface;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Infrastructure\Linux\Services\OperatingSystemInspector;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
@@ -109,21 +110,14 @@ final class DockerPlatformTest extends TestCase
             $ssh,
         );
 
-        $ssh
-            ->shouldReceive('executeWithResult')
-            ->once()
-            ->ordered()
-            ->with(
-                $installerCommand,
-                SSHTimeout::DOCKER_INSTALL,
-                true,
-            )
-            ->andReturn(
-                new SSHResult(
-                    'Docker installed.',
-                    0,
-                ),
-            );
+        $this->expectLockAwareInstallerCommand(
+            ssh: $ssh,
+            installerCommand: $installerCommand,
+            result: new SSHResult(
+                'Docker installed.',
+                0,
+            ),
+        );
 
         $this->expectRunningInspection(
             $ssh,
@@ -214,21 +208,14 @@ final class DockerPlatformTest extends TestCase
             $ssh,
         );
 
-        $ssh
-            ->shouldReceive('executeWithResult')
-            ->once()
-            ->ordered()
-            ->with(
-                $installerCommand,
-                SSHTimeout::DOCKER_INSTALL,
-                true,
-            )
-            ->andReturn(
-                new SSHResult(
-                    'Installation failed.',
-                    1,
-                ),
-            );
+        $this->expectLockAwareInstallerCommand(
+            ssh: $ssh,
+            installerCommand: $installerCommand,
+            result: new SSHResult(
+                'Installation failed.',
+                1,
+            ),
+        );
 
         $this->expectException(
             PlatformInstallationException::class,
@@ -392,6 +379,36 @@ final class DockerPlatformTest extends TestCase
             ->andReturn(
                 new SSHResult('0', 0),
             );
+    }
+
+    private function expectLockAwareInstallerCommand(
+        SSHConnectionInterface $ssh,
+        string $installerCommand,
+        SSHResult $result,
+    ): void {
+        $ssh
+            ->shouldReceive('executeWithResult')
+            ->once()
+            ->ordered()
+            ->with(
+                Mockery::on(
+                    static fn (string $command): bool => str_contains(
+                        $command,
+                        $installerCommand,
+                    )
+                        && str_contains(
+                            $command,
+                            'PACKAGE_MANAGER_MAX_ATTEMPTS=4',
+                        )
+                        && str_contains(
+                            $command,
+                            PackageManagerLockRetryCommand::BUSY_MARKER,
+                        ),
+                ),
+                SSHTimeout::DOCKER_INSTALL,
+                true,
+            )
+            ->andReturn($result);
     }
 
     private function expectRunningInspection(
