@@ -37,6 +37,16 @@ final class CloudflareScopes
     }
 
     /** @return list<string> */
+    public static function zoneManagement(): array
+    {
+        return [
+            self::ACCOUNT_SETTINGS_READ,
+            self::ZONE_READ,
+            self::ZONE_WRITE,
+        ];
+    }
+
+    /** @return list<string> */
     public static function dnsWrite(): array
     {
         return [
