@@ -18,6 +18,8 @@ Route::livewire('/pages/{slug}', PublicPageShow::class)
 
 require __DIR__.'/panelRoute.php';
 
+require __DIR__.'/integrations.php';
+
 require __DIR__.'/payments.php';
 
 require __DIR__.'/adminRoute.php';
