@@ -28,7 +28,7 @@ final class GoogleEmailVerificationTest extends TestCase
         ]);
     }
 
-    public function test_google_verification_requires_authentication(): void
+    public function test_google_email_enrollment_requires_authentication(): void
     {
         $this->get(
             route('panel.profile.email.google.redirect'),
@@ -46,10 +46,10 @@ final class GoogleEmailVerificationTest extends TestCase
         )->assertRedirect(route('login'));
     }
 
-    public function test_redirect_starts_bound_google_openid_attempt(): void
+    public function test_redirect_starts_user_bound_google_openid_attempt_without_expected_email(): void
     {
         $user = User::factory()->create([
-            'email' => 'user@example.com',
+            'email' => 'legacy@example.com',
             'email_verified_at' => null,
         ]);
 
@@ -96,9 +96,9 @@ final class GoogleEmailVerificationTest extends TestCase
             $user->id,
             $attempt['user_id'] ?? null,
         );
-        $this->assertSame(
-            'user@example.com',
-            $attempt['expected_email'] ?? null,
+        $this->assertArrayNotHasKey(
+            'expected_email',
+            $attempt,
         );
         $this->assertSame(
             hash(
@@ -129,10 +129,10 @@ final class GoogleEmailVerificationTest extends TestCase
         );
     }
 
-    public function test_matching_verified_google_email_marks_saved_email_verified(): void
+    public function test_verified_google_email_is_added_and_verified_when_account_email_is_empty(): void
     {
         $user = User::factory()->create([
-            'email' => 'user@example.com',
+            'email' => null,
             'email_verified_at' => null,
         ]);
 
@@ -145,7 +145,7 @@ final class GoogleEmailVerificationTest extends TestCase
         $this->assertIsString($codeVerifier);
 
         $this->fakeGoogleIdentity(
-            email: 'user@example.com',
+            email: 'New.User@Example.COM',
             verified: true,
         );
 
@@ -159,11 +159,15 @@ final class GoogleEmailVerificationTest extends TestCase
             ->assertRedirect(route('panel.profile'))
             ->assertSessionHas(
                 'profile_status',
-                'ایمیل با موفقیت از طریق Google تأیید شد.',
+                'ایمیل با موفقیت به حساب اضافه و تأیید شد.',
             );
 
         $user->refresh();
 
+        $this->assertSame(
+            'new.user@example.com',
+            $user->email,
+        );
         $this->assertNotNull(
             $user->email_verified_at,
         );
@@ -176,17 +180,17 @@ final class GoogleEmailVerificationTest extends TestCase
         Http::assertSentCount(2);
     }
 
-    public function test_verified_google_email_is_added_when_account_email_is_empty(): void
+    public function test_verified_google_email_replaces_unverified_legacy_email(): void
     {
         $user = User::factory()->create([
-            'email' => null,
+            'email' => 'legacy@example.com',
             'email_verified_at' => null,
         ]);
 
         $state = $this->startAttempt($user);
 
         $this->fakeGoogleIdentity(
-            email: 'New.User@Example.COM',
+            email: 'verified@example.com',
             verified: true,
         );
 
@@ -202,7 +206,7 @@ final class GoogleEmailVerificationTest extends TestCase
         $user->refresh();
 
         $this->assertSame(
-            'new.user@example.com',
+            'verified@example.com',
             $user->email,
         );
         $this->assertNotNull(
@@ -210,52 +214,39 @@ final class GoogleEmailVerificationTest extends TestCase
         );
     }
 
-    public function test_mismatched_google_email_never_changes_saved_email(): void
+    public function test_verified_account_cannot_start_another_email_enrollment(): void
     {
         $user = User::factory()->create([
-            'email' => 'expected@example.com',
-            'email_verified_at' => null,
+            'email' => 'verified@example.com',
+            'email_verified_at' => now(),
         ]);
-
-        $state = $this->startAttempt($user);
-
-        $this->fakeGoogleIdentity(
-            email: 'other@example.com',
-            verified: true,
-        );
 
         $this->actingAs($user)
             ->get(
-                route(
-                    'panel.profile.email.google.callback',
-                    $this->callbackQuery($state),
-                ),
+                route('panel.profile.email.google.redirect'),
             )
             ->assertRedirect(route('panel.profile'))
-            ->assertSessionHasErrors('email');
+            ->assertSessionHas(
+                'profile_status',
+                'ایمیل حساب قبلاً تأیید شده است.',
+            );
 
-        $user->refresh();
-
-        $this->assertSame(
-            'expected@example.com',
-            $user->email,
-        );
         $this->assertNull(
-            $user->email_verified_at,
+            session('profile.google_email_verification'),
         );
     }
 
-    public function test_unverified_google_email_is_rejected(): void
+    public function test_unverified_google_email_is_rejected_without_mutating_account_email(): void
     {
         $user = User::factory()->create([
-            'email' => 'user@example.com',
+            'email' => 'legacy@example.com',
             'email_verified_at' => null,
         ]);
 
         $state = $this->startAttempt($user);
 
         $this->fakeGoogleIdentity(
-            email: 'user@example.com',
+            email: 'verified@example.com',
             verified: false,
         );
 
@@ -272,69 +263,10 @@ final class GoogleEmailVerificationTest extends TestCase
                 'Google مالکیت این ایمیل را تأیید نکرده است.',
             );
 
-        $this->assertNull(
-            $user->fresh()->email_verified_at,
-        );
-    }
-
-    public function test_invalid_state_is_rejected_before_google_request(): void
-    {
-        $user = User::factory()->create([
-            'email' => 'user@example.com',
-        ]);
-
-        $this->startAttempt($user);
-
-        Http::fake();
-
-        $this->actingAs($user)
-            ->get(
-                route(
-                    'panel.profile.email.google.callback',
-                    $this->callbackQuery('invalid-state'),
-                ),
-            )
-            ->assertRedirect(route('panel.profile'))
-            ->assertSessionHas(
-                'profile_error',
-                'درخواست تأیید ایمیل معتبر نیست یا منقضی شده است.',
-            );
-
-        Http::assertNothingSent();
-    }
-
-    public function test_email_changed_during_google_round_trip_is_rejected(): void
-    {
-        $user = User::factory()->create([
-            'email' => 'first@example.com',
-            'email_verified_at' => null,
-        ]);
-
-        $state = $this->startAttempt($user);
-
-        $user->forceFill([
-            'email' => 'second@example.com',
-        ])->save();
-
-        $this->fakeGoogleIdentity(
-            email: 'first@example.com',
-            verified: true,
-        );
-
-        $this->actingAs($user)
-            ->get(
-                route(
-                    'panel.profile.email.google.callback',
-                    $this->callbackQuery($state),
-                ),
-            )
-            ->assertRedirect(route('panel.profile'))
-            ->assertSessionHasErrors('email');
-
         $user->refresh();
 
         $this->assertSame(
-            'second@example.com',
+            'legacy@example.com',
             $user->email,
         );
         $this->assertNull(
@@ -376,10 +308,68 @@ final class GoogleEmailVerificationTest extends TestCase
         );
     }
 
+    public function test_google_attempt_is_bound_to_the_user_that_started_it(): void
+    {
+        $owner = User::factory()->create([
+            'email' => null,
+            'email_verified_at' => null,
+        ]);
+        $otherUser = User::factory()->create([
+            'email' => null,
+            'email_verified_at' => null,
+        ]);
+
+        $state = $this->startAttempt($owner);
+
+        Http::fake();
+
+        $this->actingAs($otherUser)
+            ->get(
+                route(
+                    'panel.profile.email.google.callback',
+                    $this->callbackQuery($state),
+                ),
+            )
+            ->assertRedirect(route('panel.profile'))
+            ->assertSessionHas(
+                'profile_error',
+                'درخواست افزودن ایمیل معتبر نیست یا منقضی شده است.',
+            );
+
+        Http::assertNothingSent();
+    }
+
+    public function test_invalid_state_is_rejected_before_google_request(): void
+    {
+        $user = User::factory()->create([
+            'email' => null,
+            'email_verified_at' => null,
+        ]);
+
+        $this->startAttempt($user);
+
+        Http::fake();
+
+        $this->actingAs($user)
+            ->get(
+                route(
+                    'panel.profile.email.google.callback',
+                    $this->callbackQuery('invalid-state'),
+                ),
+            )
+            ->assertRedirect(route('panel.profile'))
+            ->assertSessionHas(
+                'profile_error',
+                'درخواست افزودن ایمیل معتبر نیست یا منقضی شده است.',
+            );
+
+        Http::assertNothingSent();
+    }
+
     public function test_callback_consumes_attempt_once(): void
     {
         $user = User::factory()->create([
-            'email' => 'user@example.com',
+            'email' => null,
             'email_verified_at' => null,
         ]);
 
@@ -406,7 +396,7 @@ final class GoogleEmailVerificationTest extends TestCase
             ->assertRedirect(route('panel.profile'))
             ->assertSessionHas(
                 'profile_error',
-                'درخواست تأیید ایمیل معتبر نیست یا منقضی شده است.',
+                'درخواست افزودن ایمیل معتبر نیست یا منقضی شده است.',
             );
 
         Http::assertNothingSent();
