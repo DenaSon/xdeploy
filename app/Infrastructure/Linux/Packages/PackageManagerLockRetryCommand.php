@@ -48,16 +48,17 @@ trap package_manager_cleanup EXIT HUP INT TERM
 while [ "$package_manager_attempt" -le "$PACKAGE_MANAGER_MAX_ATTEMPTS" ]; do
     package_manager_output_file="$(mktemp)"
 
-    if package_manager_run_command \
-        >"$package_manager_output_file" 2>&1; then
+    package_manager_run_command \
+        >"$package_manager_output_file" 2>&1
+    package_manager_exit_code=$?
+
+    if [ "$package_manager_exit_code" -eq 0 ]; then
         cat "$package_manager_output_file"
         rm -f "$package_manager_output_file"
         package_manager_output_file=''
         trap - EXIT HUP INT TERM
 
         exit 0
-    else
-        package_manager_exit_code=$?
     fi
 
     package_manager_output="$(cat "$package_manager_output_file")"
