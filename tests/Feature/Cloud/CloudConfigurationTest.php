@@ -16,12 +16,30 @@ final class CloudConfigurationTest extends TestCase
         );
     }
 
+    public function test_provider_availability_defaults_are_explicit(): void
+    {
+        $this->assertTrue(
+            config('cloud.providers.arvan.enabled'),
+        );
+        $this->assertTrue(
+            config('cloud.providers.arvan.purchase_enabled'),
+        );
+        $this->assertFalse(
+            config('cloud.providers.liara.enabled'),
+        );
+        $this->assertFalse(
+            config('cloud.providers.liara.purchase_enabled'),
+        );
+    }
+
     public function test_arvan_cloud_configuration_exists(): void
     {
         $configuration = config('cloud.providers.arvan');
 
         $this->assertIsArray($configuration);
 
+        $this->assertArrayHasKey('enabled', $configuration);
+        $this->assertArrayHasKey('purchase_enabled', $configuration);
         $this->assertArrayHasKey('base_url', $configuration);
         $this->assertArrayHasKey('api_key', $configuration);
         $this->assertArrayHasKey('region', $configuration);

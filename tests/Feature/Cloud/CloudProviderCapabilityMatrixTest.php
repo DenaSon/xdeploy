@@ -24,6 +24,8 @@ final class CloudProviderCapabilityMatrixTest extends TestCase
     {
         parent::setUp();
 
+        config()->set('cloud.providers.liara.enabled', true);
+        config()->set('cloud.providers.liara.purchase_enabled', true);
         config()->set('cloud.providers.liara.api_token', 'test-liara-token');
 
         foreach ([

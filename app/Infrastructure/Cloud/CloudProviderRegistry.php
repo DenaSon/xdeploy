@@ -14,21 +14,43 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
     /** @var array<string, CloudProviderInterface> */
     private array $providers;
 
+    /** @var array<string, true> */
+    private array $purchasableProviders;
+
     /** @var array<string, array<class-string, object>> */
     private array $capabilities;
 
     /**
      * @param  array<string, CloudProviderInterface>  $providers
+     * @param  list<string>  $purchasableProviders
      * @param  array<string, array<class-string, object>>  $capabilities
      */
     public function __construct(
         array $providers,
+        array $purchasableProviders,
         array $capabilities = [],
     ) {
         $normalizedProviders = [];
 
         foreach ($providers as $key => $provider) {
             $normalizedProviders[$this->normalizeProviderKey($key)] = $provider;
+        }
+
+        $normalizedPurchasableProviders = [];
+
+        foreach ($purchasableProviders as $key) {
+            $providerKey = $this->normalizeProviderKey($key);
+
+            if (! array_key_exists($providerKey, $normalizedProviders)) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'The purchasable cloud provider [%s] is not registered.',
+                        $providerKey,
+                    ),
+                );
+            }
+
+            $normalizedPurchasableProviders[$providerKey] = true;
         }
 
         $normalizedCapabilities = [];
@@ -55,29 +77,18 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
         }
 
         $this->providers = $normalizedProviders;
+        $this->purchasableProviders = $normalizedPurchasableProviders;
         $this->capabilities = $normalizedCapabilities;
     }
 
     public function registeredProviders(): array
     {
-        $providers = [];
+        return $this->providerTypes(array_keys($this->providers));
+    }
 
-        foreach (array_keys($this->providers) as $providerKey) {
-            $provider = CloudProviderType::tryFrom($providerKey);
-
-            if (! $provider instanceof CloudProviderType) {
-                throw new CloudConfigurationException(
-                    sprintf(
-                        'The registered cloud provider [%s] has no supported provider type.',
-                        $providerKey,
-                    ),
-                );
-            }
-
-            $providers[] = $provider;
-        }
-
-        return $providers;
+    public function purchasableProviders(): array
+    {
+        return $this->providerTypes(array_keys($this->purchasableProviders));
     }
 
     public function resolve(
@@ -136,6 +147,32 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
 
         return $override instanceof $capability
             || $resolved instanceof $capability;
+    }
+
+    /**
+     * @param  list<string>  $providerKeys
+     * @return list<CloudProviderType>
+     */
+    private function providerTypes(array $providerKeys): array
+    {
+        $providers = [];
+
+        foreach ($providerKeys as $providerKey) {
+            $provider = CloudProviderType::tryFrom($providerKey);
+
+            if (! $provider instanceof CloudProviderType) {
+                throw new CloudConfigurationException(
+                    sprintf(
+                        'The registered cloud provider [%s] has no supported provider type.',
+                        $providerKey,
+                    ),
+                );
+            }
+
+            $providers[] = $provider;
+        }
+
+        return $providers;
     }
 
     private function normalizeProviderKey(mixed $key): string

@@ -640,9 +640,9 @@ final class Buy extends Component
 
     private function loadProviders(): void
     {
-        $registered = app(
+        $purchasable = app(
             CloudProviderRegistryInterface::class,
-        )->registeredProviders();
+        )->purchasableProviders();
 
         $this->providers = array_map(
             fn (CloudProviderType $provider): array => [
@@ -650,7 +650,7 @@ final class Buy extends Component
                 'label' => $this->providerLabelFor($provider),
                 'description' => $this->providerDescriptionFor($provider),
             ],
-            $registered,
+            $purchasable,
         );
 
         $configuredDefault = CloudProviderType::tryFrom(

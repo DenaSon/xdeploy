@@ -19,7 +19,11 @@ final class LiaraProviderIsolationTest extends TestCase
     public function test_liara_provider_can_be_resolved_without_relying_on_arvan_runtime_configuration(): void
     {
         config()->set('cloud.default', CloudProviderType::Liara->value);
+        config()->set('cloud.providers.arvan.enabled', false);
+        config()->set('cloud.providers.arvan.purchase_enabled', false);
         config()->set('cloud.providers.arvan.api_key', null);
+        config()->set('cloud.providers.liara.enabled', true);
+        config()->set('cloud.providers.liara.purchase_enabled', true);
         config()->set('cloud.providers.liara.api_token', 'test-liara-token');
 
         foreach ([
@@ -36,6 +40,10 @@ final class LiaraProviderIsolationTest extends TestCase
         $this->assertSame(
             [CloudProviderType::Liara],
             $registry->registeredProviders(),
+        );
+        $this->assertSame(
+            [CloudProviderType::Liara],
+            $registry->purchasableProviders(),
         );
         $this->assertInstanceOf(
             LiaraCloudProvider::class,

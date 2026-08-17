@@ -315,6 +315,10 @@ final class BuyTest extends TestCase
                     CloudProviderType::Arvan->value => $arvan,
                     CloudProviderType::Liara->value => $liara,
                 ],
+                purchasableProviders: [
+                    CloudProviderType::Arvan->value,
+                    CloudProviderType::Liara->value,
+                ],
                 capabilities: [
                     CloudProviderType::Arvan->value => [
                         CloudServerResizeCatalogInterface::class => $arvanPricing,
