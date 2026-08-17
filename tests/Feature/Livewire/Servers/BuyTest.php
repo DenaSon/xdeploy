@@ -18,6 +18,7 @@ use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Livewire\Servers\Buy;
 use App\Models\User;
+use App\Support\Cloud\CloudProviderPublicIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
@@ -80,7 +81,9 @@ final class BuyTest extends TestCase
             )
             ->assertSet(
                 'provider',
-                CloudProviderType::Arvan->value,
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Arvan,
+                ),
             )
             ->assertSee(
                 'خرید VPS',
@@ -173,7 +176,9 @@ final class BuyTest extends TestCase
             )
             ->assertSet(
                 'provider',
-                CloudProviderType::Arvan->value,
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Arvan,
+                ),
             )
             ->assertSet(
                 'regionGroup',
@@ -334,21 +339,39 @@ final class BuyTest extends TestCase
 
         Livewire::test(Buy::class)
             ->call('loadCatalog')
-            ->assertSet('provider', CloudProviderType::Arvan->value)
+            ->assertSet(
+                'provider',
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Arvan,
+                ),
+            )
             ->assertSet('regionId', 'ir-thr-ba1')
             ->assertSet('sizeId', 'eco-2-2')
-            ->assertSee('ابر آروان')
-            ->assertSee('لیارا')
-            ->call('selectProvider', CloudProviderType::Liara->value)
+            ->assertSee('Core-1')
+            ->assertSee('Core-2')
+            ->assertDontSee('ابر آروان')
+            ->assertDontSee('لیارا')
+            ->call(
+                'selectProvider',
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Liara,
+                ),
+            )
             ->assertSet('catalogLoaded', true)
-            ->assertSet('provider', CloudProviderType::Liara->value)
+            ->assertSet(
+                'provider',
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Liara,
+                ),
+            )
             ->assertSet('regionGroup', 'iran')
             ->assertSet('regionId', 'iran')
             ->assertSet('sizeId', 'standard-base-g2')
             ->assertSet('imageId', 'ubuntu-24.04')
             ->assertSet('selectedDiskGiB', 20)
             ->assertSet('quote.selected_disk_gib', 20)
-            ->assertSee('لیارا');
+            ->assertSee('Core-2')
+            ->assertDontSee('لیارا');
     }
 
     /**

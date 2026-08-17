@@ -9,6 +9,7 @@ use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Livewire\Servers\Buy;
 use App\Models\User;
+use App\Support\Cloud\CloudProviderPublicIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
@@ -19,7 +20,7 @@ final class BuyProviderAvailabilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_buy_page_only_exposes_purchasable_providers(): void
+    public function test_buy_page_only_exposes_purchasable_providers_through_public_aliases(): void
     {
         config()->set(
             'cloud.default',
@@ -48,18 +49,22 @@ final class BuyProviderAvailabilityTest extends TestCase
             User::factory()->create(),
         );
 
+        $publicCode = CloudProviderPublicIdentity::code(
+            CloudProviderType::Liara,
+        );
+
         Livewire::test(
             Buy::class,
         )
             ->assertSet(
                 'provider',
-                CloudProviderType::Liara->value,
+                $publicCode,
             )
             ->assertSet(
                 'providers',
                 static fn (array $providers): bool => count($providers) === 1
-                    && ($providers[0]['id'] ?? null)
-                        === CloudProviderType::Liara->value,
+                    && ($providers[0]['id'] ?? null) === $publicCode
+                    && ($providers[0]['label'] ?? null) === 'Core-2',
             );
     }
 }

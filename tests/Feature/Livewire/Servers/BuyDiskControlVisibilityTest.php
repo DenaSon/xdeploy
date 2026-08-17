@@ -9,6 +9,7 @@ use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Livewire\Servers\Buy;
 use App\Models\User;
+use App\Support\Cloud\CloudProviderPublicIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
@@ -26,7 +27,12 @@ final class BuyDiskControlVisibilityTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         Livewire::test(Buy::class)
-            ->assertSet('provider', CloudProviderType::Liara->value)
+            ->assertSet(
+                'provider',
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Liara,
+                ),
+            )
             ->assertSeeHtml('cloud-purchase-page--fixed-disk');
     }
 
@@ -37,7 +43,12 @@ final class BuyDiskControlVisibilityTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         Livewire::test(Buy::class)
-            ->assertSet('provider', CloudProviderType::Arvan->value)
+            ->assertSet(
+                'provider',
+                CloudProviderPublicIdentity::code(
+                    CloudProviderType::Arvan,
+                ),
+            )
             ->assertDontSeeHtml('cloud-purchase-page--fixed-disk');
     }
 

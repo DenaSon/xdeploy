@@ -19,6 +19,7 @@ use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Models\User;
+use App\Support\Cloud\CloudProviderPublicIdentity;
 use App\Support\Cloud\CloudRegionLabel;
 use App\Support\Money\MoneyFormatter;
 use Illuminate\Contracts\View\View;
@@ -106,6 +107,10 @@ final class Buy extends Component
 
     public bool $catalogLoaded = false;
 
+    /**
+     * Public presentation code such as core-1/core-2.
+     * Canonical provider identity never crosses this Livewire boundary.
+     */
     public string $provider = '';
 
     public string $regionGroup = self::REGION_GROUP_IRAN;
@@ -645,10 +650,16 @@ final class Buy extends Component
         )->purchasableProviders();
 
         $this->providers = array_map(
-            fn (CloudProviderType $provider): array => [
-                'id' => $provider->value,
-                'label' => $this->providerLabelFor($provider),
-                'description' => $this->providerDescriptionFor($provider),
+            static fn (CloudProviderType $provider): array => [
+                'id' => CloudProviderPublicIdentity::code(
+                    $provider,
+                ),
+                'label' => CloudProviderPublicIdentity::label(
+                    $provider,
+                ),
+                'description' => CloudProviderPublicIdentity::description(
+                    $provider,
+                ),
             ],
             $purchasable,
         );
@@ -664,16 +675,21 @@ final class Buy extends Component
             ),
         );
 
-        if (
-            $configuredDefault instanceof CloudProviderType
-            && $this->findById(
-                $this->providers,
-                $configuredDefault->value,
-            ) !== null
-        ) {
-            $this->provider = $configuredDefault->value;
+        if ($configuredDefault instanceof CloudProviderType) {
+            $publicDefault = CloudProviderPublicIdentity::code(
+                $configuredDefault,
+            );
 
-            return;
+            if (
+                $this->findById(
+                    $this->providers,
+                    $publicDefault,
+                ) !== null
+            ) {
+                $this->provider = $publicDefault;
+
+                return;
+            }
         }
 
         $this->provider = $this->providers[0]['id'] ?? '';
@@ -966,18 +982,14 @@ final class Buy extends Component
 
     private function providerType(): CloudProviderType
     {
-        $provider = CloudProviderType::tryFrom(
-            strtolower(
-                trim(
-                    $this->provider,
-                ),
-            ),
+        $provider = CloudProviderPublicIdentity::provider(
+            $this->provider,
         );
 
         if (! $provider instanceof CloudProviderType) {
             throw new CloudConfigurationException(
                 sprintf(
-                    'Selected cloud provider [%s] is invalid.',
+                    'Selected public cloud provider [%s] is invalid.',
                     $this->provider,
                 ),
             );
@@ -1107,36 +1119,34 @@ final class Buy extends Component
 
     private function providerLabel(): string
     {
-        $provider = CloudProviderType::tryFrom(
+        $provider = CloudProviderPublicIdentity::provider(
             $this->provider,
         );
 
         return $provider instanceof CloudProviderType
             ? $this->providerLabelFor($provider)
-            : 'ارائه‌دهنده ابری';
+            : 'زیرساخت ابری';
     }
 
     private function providerLabelFor(
         CloudProviderType $provider,
     ): string {
-        return match ($provider) {
-            CloudProviderType::Arvan => 'ابر آروان',
-            CloudProviderType::Liara => 'لیارا',
-        };
+        return CloudProviderPublicIdentity::label(
+            $provider,
+        );
     }
 
     private function providerDescriptionFor(
         CloudProviderType $provider,
     ): string {
-        return match ($provider) {
-            CloudProviderType::Arvan => 'زیرساخت ابری آروان',
-            CloudProviderType::Liara => 'سرور ابری لیارا',
-        };
+        return CloudProviderPublicIdentity::description(
+            $provider,
+        );
     }
 
     private function customDiskEnabled(): bool
     {
-        return CloudProviderType::tryFrom(
+        return CloudProviderPublicIdentity::provider(
             $this->provider,
         ) === CloudProviderType::Arvan;
     }
