@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Integrations\Cloudflare;
 
+use App\Domain\Integration\Cloudflare\CloudflareScopes;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -15,6 +16,13 @@ final class CloudflareOAuthClient
     {
         return $this->clientId() !== ''
             && $this->clientSecret() !== '';
+    }
+
+    public function configuredForRead(): bool
+    {
+        return CloudflareScopes::missing(
+            $this->scopes(),
+        ) === [];
     }
 
     public function authorizationUrl(
@@ -74,35 +82,48 @@ final class CloudflareOAuthClient
             'Cloudflare token exchange failed.',
         );
 
-        $accessToken = $response->json('access_token');
+        return $this->tokenSet(
+            response: $response,
+            fallbackScopes: $this->scopes(),
+        );
+    }
 
-        if (! is_string($accessToken) || trim($accessToken) === '') {
+    /** @param array<int, mixed> $fallbackScopes */
+    public function refresh(
+        #[SensitiveParameter]
+        string $refreshToken,
+        array $fallbackScopes = [],
+    ): CloudflareOAuthTokenSet {
+        $this->ensureConfigured();
+
+        if (trim($refreshToken) === '') {
             throw new RuntimeException(
-                'Cloudflare token response did not contain an access token.',
+                'Cloudflare refresh token is missing.',
             );
         }
 
-        $refreshToken = $response->json('refresh_token');
+        $response = Http::asForm()
+            ->acceptJson()
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->timeout())
+            ->post(
+                $this->tokenEndpoint(),
+                [
+                    'grant_type' => 'refresh_token',
+                    'refresh_token' => $refreshToken,
+                    'client_id' => $this->clientId(),
+                    'client_secret' => $this->clientSecret(),
+                ],
+            );
 
-        if (! is_string($refreshToken) || trim($refreshToken) === '') {
-            $refreshToken = null;
-        }
+        $this->ensureSuccessful(
+            $response,
+            'Cloudflare token refresh failed.',
+        );
 
-        $expiresIn = $response->json('expires_in');
-
-        if (! is_int($expiresIn) && ! is_numeric($expiresIn)) {
-            $expiresIn = null;
-        }
-
-        return new CloudflareOAuthTokenSet(
-            accessToken: $accessToken,
-            refreshToken: $refreshToken,
-            scopes: $this->responseScopes(
-                $response->json('scope'),
-            ),
-            expiresIn: $expiresIn === null
-                ? null
-                : max(1, (int) $expiresIn),
+        return $this->tokenSet(
+            response: $response,
+            fallbackScopes: $fallbackScopes,
         );
     }
 
@@ -140,19 +161,99 @@ final class CloudflareOAuthClient
     {
         $configured = config(
             'services.cloudflare_oauth.scopes',
-            ['account.read', 'offline_access'],
+            CloudflareScopes::oauth(),
         );
 
         if (! is_array($configured)) {
-            return [
-                'account.read',
-                'offline_access',
-            ];
+            return CloudflareScopes::oauth();
         }
 
-        $scopes = [];
+        $scopes = $this->normalizeScopes($configured);
 
-        foreach ($configured as $scope) {
+        return $scopes === []
+            ? CloudflareScopes::oauth()
+            : $scopes;
+    }
+
+    /**
+     * @param array<int, mixed> $fallbackScopes
+     */
+    private function tokenSet(
+        Response $response,
+        array $fallbackScopes,
+    ): CloudflareOAuthTokenSet {
+        $accessToken = $response->json('access_token');
+
+        if (! is_string($accessToken) || trim($accessToken) === '') {
+            throw new RuntimeException(
+                'Cloudflare token response did not contain an access token.',
+            );
+        }
+
+        $refreshToken = $response->json('refresh_token');
+
+        if (! is_string($refreshToken) || trim($refreshToken) === '') {
+            $refreshToken = null;
+        }
+
+        $expiresIn = $response->json('expires_in');
+
+        if (! is_int($expiresIn) && ! is_numeric($expiresIn)) {
+            $expiresIn = null;
+        }
+
+        return new CloudflareOAuthTokenSet(
+            accessToken: $accessToken,
+            refreshToken: $refreshToken,
+            scopes: $this->responseScopes(
+                value: $response->json('scope'),
+                fallbackScopes: $fallbackScopes,
+            ),
+            expiresIn: $expiresIn === null
+                ? null
+                : max(1, (int) $expiresIn),
+        );
+    }
+
+    /**
+     * @param array<int, mixed> $fallbackScopes
+     * @return list<string>
+     */
+    private function responseScopes(
+        mixed $value,
+        array $fallbackScopes,
+    ): array {
+        if (is_string($value) && trim($value) !== '') {
+            $scopes = preg_split(
+                '/\s+/',
+                trim($value),
+                -1,
+                PREG_SPLIT_NO_EMPTY,
+            );
+
+            if (is_array($scopes) && $scopes !== []) {
+                return array_values(array_unique($scopes));
+            }
+        }
+
+        $fallbackScopes = $this->normalizeScopes(
+            $fallbackScopes,
+        );
+
+        return $fallbackScopes === []
+            ? $this->scopes()
+            : $fallbackScopes;
+    }
+
+    /**
+     * @param array<int, mixed> $scopes
+     * @return list<string>
+     */
+    private function normalizeScopes(array $scopes): array
+    {
+        $normalized = [];
+
+        foreach ($scopes as $scope) {
             if (! is_string($scope)) {
                 continue;
             }
@@ -160,34 +261,11 @@ final class CloudflareOAuthClient
             $scope = trim($scope);
 
             if ($scope !== '') {
-                $scopes[] = $scope;
+                $normalized[] = $scope;
             }
         }
 
-        $scopes = array_values(array_unique($scopes));
-
-        return $scopes === []
-            ? ['account.read', 'offline_access']
-            : $scopes;
-    }
-
-    /** @return list<string> */
-    private function responseScopes(mixed $value): array
-    {
-        if (! is_string($value) || trim($value) === '') {
-            return $this->scopes();
-        }
-
-        $scopes = preg_split(
-            '/\s+/',
-            trim($value),
-            -1,
-            PREG_SPLIT_NO_EMPTY,
-        );
-
-        return is_array($scopes) && $scopes !== []
-            ? array_values(array_unique($scopes))
-            : $this->scopes();
+        return array_values(array_unique($normalized));
     }
 
     private function codeChallenge(string $codeVerifier): string

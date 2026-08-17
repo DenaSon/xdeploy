@@ -12,7 +12,7 @@
         </h1>
 
         <p class="mt-2 text-sm leading-7 text-base-content/50">
-            اتصال سرویس‌ها فقط مجوزهای لازم را دریافت می‌کند. مدیریت دامنه و عملیات هر سرویس در بخش مرتبط خودش انجام می‌شود.
+            اتصال سرویس‌ها فقط مجوزهای لازم را دریافت می‌کند. مدیریت هر سرویس در فضای اختصاصی همان اتصال انجام می‌شود.
         </p>
     </header>
 
@@ -55,7 +55,7 @@
                     </div>
 
                     <p class="mt-1 max-w-2xl text-sm leading-7 text-base-content/45">
-                        اتصال Cloudflare پایه مدیریت خودکار DNS و دامنه‌ها در Coreflare است. در این فاز فقط دسترسی خواندن اطلاعات حساب درخواست می‌شود.
+                        مشاهده حساب‌ها، دامنه‌ها و رکوردهای DNS از طریق OAuth. این اتصال در حال حاضر فقط دسترسی خواندن درخواست می‌کند.
                     </p>
 
                     @if ($cloudflareConnected)
@@ -67,10 +67,15 @@
                                 </span>
                             @endif
 
-                            @if (in_array('account.read', $cloudflareScopes, true))
-                                <span class="inline-flex items-center gap-1.5">
+                            @if ($cloudflareReadReady)
+                                <span class="inline-flex items-center gap-1.5 text-success">
                                     <x-icon name="lucide.shield-check" class="!size-3.5" />
-                                    دسترسی خواندن حساب
+                                    Account + Zone + DNS Read
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 text-warning">
+                                    <x-icon name="lucide.shield-alert" class="!size-3.5" />
+                                    نیازمند به‌روزرسانی مجوزها
                                 </span>
                             @endif
                         </div>
@@ -78,7 +83,7 @@
                 </div>
             </div>
 
-            <div class="flex shrink-0 items-center gap-2">
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
                 @if (! $cloudflareConfigured)
                     <span class="rounded-xl bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
                         نیازمند پیکربندی
@@ -91,7 +96,59 @@
                         <x-icon name="lucide.link" class="!size-4" />
                         اتصال Cloudflare
                     </a>
+                @elseif (! $cloudflareReadConfigured)
+                    <span class="rounded-xl bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                        مجوزهای OAuth ناقص
+                    </span>
+
+                    <form
+                        method="POST"
+                        action="{{ route('panel.integrations.cloudflare.disconnect') }}"
+                        onsubmit="return confirm('اتصال Cloudflare قطع شود؟');"
+                    >
+                        @csrf
+                        @method('DELETE')
+
+                        <button
+                            type="submit"
+                            class="btn btn-ghost btn-sm rounded-xl text-error"
+                        >
+                            قطع اتصال
+                        </button>
+                    </form>
+                @elseif (! $cloudflareReadReady)
+                    <a
+                        href="{{ route('panel.integrations.cloudflare.redirect') }}"
+                        class="btn btn-primary btn-sm rounded-xl px-4"
+                    >
+                        به‌روزرسانی دسترسی
+                    </a>
+
+                    <form
+                        method="POST"
+                        action="{{ route('panel.integrations.cloudflare.disconnect') }}"
+                        onsubmit="return confirm('اتصال Cloudflare قطع شود؟');"
+                    >
+                        @csrf
+                        @method('DELETE')
+
+                        <button
+                            type="submit"
+                            class="btn btn-ghost btn-sm rounded-xl text-error"
+                        >
+                            قطع اتصال
+                        </button>
+                    </form>
                 @else
+                    <a
+                        href="{{ route('panel.integrations.cloudflare.overview') }}"
+                        wire:navigate
+                        class="btn btn-primary btn-sm rounded-xl px-4"
+                    >
+                        <x-icon name="lucide.external-link" class="!size-4" />
+                        مشاهده Cloudflare
+                    </a>
+
                     <a
                         href="{{ route('panel.integrations.cloudflare.redirect') }}"
                         class="btn btn-ghost btn-sm rounded-xl"
@@ -123,6 +180,21 @@
                 <x-icon name="lucide.settings-2" class="mt-1 !size-3.5 shrink-0 text-warning" />
                 <span>
                     Client ID و Client Secret مربوط به Cloudflare OAuth باید در محیط اجرا تنظیم شوند تا اتصال برای کاربران فعال شود.
+                </span>
+            </div>
+        @elseif (! $cloudflareReadConfigured)
+            <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
+                <x-icon name="lucide.settings-2" class="mt-1 !size-3.5 shrink-0 text-warning" />
+                <span>
+                    تنظیم <code dir="ltr" class="rounded bg-base-100 px-1.5 py-0.5">CLOUDFLARE_OAUTH_SCOPES</code> باید مجوزهای
+                    <code dir="ltr">account.read</code>، <code dir="ltr">zone.read</code> و <code dir="ltr">dns.read</code> را شامل شود.
+                </span>
+            </div>
+        @elseif ($cloudflareConnected && ! $cloudflareReadReady)
+            <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
+                <x-icon name="lucide.shield-alert" class="mt-1 !size-3.5 shrink-0 text-warning" />
+                <span>
+                    اتصال فعلی قبل از اضافه‌شدن خواندن Zone و DNS ساخته شده است. با «به‌روزرسانی دسترسی» مجوزهای جدید را دریافت کنید؛ مجوز نوشتن درخواست نمی‌شود.
                 </span>
             </div>
         @endif

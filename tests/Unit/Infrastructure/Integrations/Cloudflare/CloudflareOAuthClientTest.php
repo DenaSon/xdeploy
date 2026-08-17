@@ -23,6 +23,8 @@ final class CloudflareOAuthClientTest extends TestCase
             'services.cloudflare_oauth.revoke_endpoint' => 'https://dash.cloudflare.com/oauth2/revoke',
             'services.cloudflare_oauth.scopes' => [
                 'account.read',
+                'zone.read',
+                'dns.read',
                 'offline_access',
             ],
             'services.cloudflare_oauth.connect_timeout' => 5,
@@ -56,7 +58,7 @@ final class CloudflareOAuthClientTest extends TestCase
         );
         self::assertSame('code', $query['response_type'] ?? null);
         self::assertSame(
-            'account.read offline_access',
+            'account.read zone.read dns.read offline_access',
             $query['scope'] ?? null,
         );
         self::assertSame('state-value', $query['state'] ?? null);
@@ -66,6 +68,9 @@ final class CloudflareOAuthClientTest extends TestCase
             $query['code_challenge'] ?? null,
         );
         self::assertArrayNotHasKey('code_verifier', $query);
+        self::assertTrue(
+            app(CloudflareOAuthClient::class)->configuredForRead(),
+        );
     }
 
     public function test_exchange_returns_normalized_token_set(): void
@@ -76,7 +81,7 @@ final class CloudflareOAuthClientTest extends TestCase
                     'access_token' => 'access-token',
                     'refresh_token' => 'refresh-token',
                     'expires_in' => 3600,
-                    'scope' => 'account.read offline_access',
+                    'scope' => 'account.read zone.read dns.read offline_access',
                     'token_type' => 'Bearer',
                 ],
                 200,
@@ -94,7 +99,12 @@ final class CloudflareOAuthClientTest extends TestCase
         self::assertSame('refresh-token', $tokens->refreshToken);
         self::assertSame(3600, $tokens->expiresIn);
         self::assertSame(
-            ['account.read', 'offline_access'],
+            [
+                'account.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
             $tokens->scopes,
         );
 
@@ -106,6 +116,54 @@ final class CloudflareOAuthClientTest extends TestCase
                 && $request['client_secret'] === 'cloudflare-client-secret'
                 && $request['code'] === 'authorization-code'
                 && $request['code_verifier'] === str_repeat('b', 64),
+        );
+    }
+
+    public function test_refresh_rotates_access_token_and_preserves_granted_scopes_when_omitted(): void
+    {
+        Http::fake([
+            'https://dash.cloudflare.com/oauth2/token' => Http::response(
+                [
+                    'access_token' => 'new-access-token',
+                    'refresh_token' => 'new-refresh-token',
+                    'expires_in' => 7200,
+                    'token_type' => 'Bearer',
+                ],
+                200,
+            ),
+        ]);
+
+        $tokens = app(CloudflareOAuthClient::class)
+            ->refresh(
+                refreshToken: 'old-refresh-token',
+                fallbackScopes: [
+                    'account.read',
+                    'zone.read',
+                    'dns.read',
+                    'offline_access',
+                ],
+            );
+
+        self::assertSame('new-access-token', $tokens->accessToken);
+        self::assertSame('new-refresh-token', $tokens->refreshToken);
+        self::assertSame(7200, $tokens->expiresIn);
+        self::assertSame(
+            [
+                'account.read',
+                'zone.read',
+                'dns.read',
+                'offline_access',
+            ],
+            $tokens->scopes,
+        );
+
+        Http::assertSent(
+            static fn ($request): bool => $request->url()
+                === 'https://dash.cloudflare.com/oauth2/token'
+                && $request['grant_type'] === 'refresh_token'
+                && $request['refresh_token'] === 'old-refresh-token'
+                && $request['client_id'] === 'cloudflare-client-id'
+                && $request['client_secret'] === 'cloudflare-client-secret',
         );
     }
 

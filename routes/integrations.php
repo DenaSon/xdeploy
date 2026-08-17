@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Integrations\CloudflareConnectionController;
+use App\Livewire\Integrations\Cloudflare\Overview as CloudflareOverview;
 use App\Livewire\Integrations\Index as IntegrationsIndex;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,11 @@ Route::middleware(['web', 'auth'])
             '/integrations',
             IntegrationsIndex::class,
         )->name('integrations.index');
+
+        Route::livewire(
+            '/integrations/cloudflare',
+            CloudflareOverview::class,
+        )->name('integrations.cloudflare.overview');
 
         Route::get(
             '/integrations/cloudflare/connect',
