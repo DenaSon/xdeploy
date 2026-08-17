@@ -33,6 +33,7 @@ final class CloudflareReadIntegrationTest extends TestCase
                 'account-settings.read',
                 'zone.read',
                 'dns.read',
+                'dns.write',
                 'offline_access',
             ],
             'services.cloudflare_oauth.connect_timeout' => 5,
@@ -82,7 +83,7 @@ final class CloudflareReadIntegrationTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_read_page_loads_accounts_zones_and_dns_without_write_requests(): void
+    public function test_read_only_connection_still_loads_without_write_requests(): void
     {
         $user = User::factory()->create();
 
@@ -110,6 +111,7 @@ final class CloudflareReadIntegrationTest extends TestCase
             ->assertSee('example.com')
             ->assertSee('app.example.com')
             ->assertSee('203.0.113.10')
+            ->assertSee('dns.write')
             ->assertDontSee('read-access-token')
             ->assertDontSee('read-refresh-token');
 
@@ -311,6 +313,7 @@ final class CloudflareReadIntegrationTest extends TestCase
                     'name' => 'app.example.com',
                     'content' => '203.0.113.10',
                     'proxied' => true,
+                    'proxiable' => true,
                     'ttl' => 1,
                     'modified_on' => '2026-08-18T00:00:00Z',
                 ],
