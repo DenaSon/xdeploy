@@ -9,6 +9,7 @@ use App\Domain\Server\DTOs\OperatingSystemInfo;
 use App\Domain\Server\Exceptions\ServerPackageRepositoryException;
 use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
 use App\Domain\Server\Services\PrivilegedCommandExecutor;
+use App\Infrastructure\Linux\Packages\PackageManagerLockRetryCommand;
 use App\Models\Server;
 use App\Support\SSH\SSHTimeout;
 
@@ -16,9 +17,6 @@ final readonly class PrepareServerPackageRepositoriesAction
 {
     private const string DEFAULT_ARVAN_UBUNTU_MIRROR =
         'https://mirror.arvancloud.ir/ubuntu';
-
-    private const string PACKAGE_MANAGER_BUSY_MARKER =
-        '[xDeploy][repositories][error] reason=package_manager_busy';
 
     public function __construct(
         private PrivilegedCommandExecutor $privileged,
@@ -55,8 +53,10 @@ final readonly class PrepareServerPackageRepositoriesAction
         }
 
         $result = $this->privileged->executeWithResult(
-            command: $this->command(
-                $mirror,
+            command: PackageManagerLockRetryCommand::wrap(
+                $this->command(
+                    $mirror,
+                ),
             ),
             timeout: SSHTimeout::SYSTEM_PACKAGE_INSTALL,
         );
@@ -68,7 +68,7 @@ final readonly class PrepareServerPackageRepositoriesAction
         if (
             str_contains(
                 $result->output,
-                self::PACKAGE_MANAGER_BUSY_MARKER,
+                PackageManagerLockRetryCommand::BUSY_MARKER,
             )
         ) {
             throw new SystemPackageManagerBusyException;
@@ -104,9 +104,6 @@ ipv4_config='/etc/apt/apt.conf.d/99xdeploy-force-ipv4'
 stage='initialization'
 changed_files=()
 created_ipv4_config=0
-readonly APT_LOCK_TIMEOUT_SECONDS=30
-readonly PACKAGE_MANAGER_BUSY_EXIT_CODE=75
-readonly PACKAGE_MANAGER_MAX_ATTEMPTS=5
 
 on_error() {
     local exit_code=$?
@@ -153,75 +150,6 @@ rewrite_source() {
         "$file"
 
     changed_files+=("$file")
-}
-
-is_package_manager_busy() {
-    local output="$1"
-
-    printf '%s\n' "$output" \
-        | grep -Eqi \
-            'Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock directory|Waiting for cache lock|is another process using it'
-}
-
-retry_delay_for_attempt() {
-    case "$1" in
-        1) printf '15\n' ;;
-        2) printf '30\n' ;;
-        3) printf '60\n' ;;
-        *) printf '90\n' ;;
-    esac
-}
-
-run_apt() {
-    local apt_stage="$1"
-    shift
-
-    local attempt=1
-    local output_file
-    local output
-    local exit_code
-    local delay
-
-    while (( attempt <= PACKAGE_MANAGER_MAX_ATTEMPTS )); do
-        output_file="$(mktemp)"
-
-        if apt-get \
-            -o "DPkg::Lock::Timeout=${APT_LOCK_TIMEOUT_SECONDS}" \
-            -o Acquire::ForceIPv4=true \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=45 \
-            -o Acquire::https::Timeout=45 \
-            "$@" >"$output_file" 2>&1; then
-            cat "$output_file"
-            rm -f "$output_file"
-
-            return 0
-        fi
-
-        exit_code=$?
-        output="$(cat "$output_file")"
-        rm -f "$output_file"
-
-        if ! is_package_manager_busy "$output"; then
-            printf '%s\n' "$output" >&2
-
-            return "$exit_code"
-        fi
-
-        if (( attempt >= PACKAGE_MANAGER_MAX_ATTEMPTS )); then
-            return "$PACKAGE_MANAGER_BUSY_EXIT_CODE"
-        fi
-
-        delay="$(retry_delay_for_attempt "$attempt")"
-
-        printf '[xDeploy][repositories] package manager busy stage=%s attempt=%s retry_in=%ss\n' \
-            "$apt_stage" \
-            "$attempt" \
-            "$delay"
-
-        sleep "$delay"
-        attempt=$((attempt + 1))
-    done
 }
 
 trap on_error ERR
@@ -271,23 +199,19 @@ rewrite_source '/etc/apt/sources.list.d/ubuntu.sources'
 
 stage='apt_update'
 
-if run_apt apt_update update; then
-    :
-else
-    exit_code=$?
+if ! apt-get \
+    -o DPkg::Lock::Timeout=120 \
+    -o Acquire::ForceIPv4=true \
+    -o Acquire::Retries=3 \
+    -o Acquire::http::Timeout=45 \
+    -o Acquire::https::Timeout=45 \
+    update; then
     rollback
 
-    if [[ "$exit_code" == "$PACKAGE_MANAGER_BUSY_EXIT_CODE" ]]; then
-        printf '[xDeploy][repositories][error] reason=package_manager_busy stage=%s exit_code=%s\n' \
-            "$stage" \
-            "$exit_code" >&2
-    else
-        printf '[xDeploy][repositories][error] stage=%s exit_code=%s\n' \
-            "$stage" \
-            "$exit_code" >&2
-    fi
+    printf '[xDeploy][repositories][error] stage=%s exit_code=1\n' \
+        "$stage" >&2
 
-    exit "$exit_code"
+    exit 1
 fi
 
 trap - ERR
