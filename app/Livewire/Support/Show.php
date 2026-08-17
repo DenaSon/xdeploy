@@ -6,7 +6,7 @@ namespace App\Livewire\Support;
 
 use App\Application\Support\Actions\CloseSupportRequestAction;
 use App\Application\Support\Actions\ReplyToSupportRequestAsUserAction;
-use App\Application\Support\SupportAttachmentPolicy;
+use App\Application\Support\SupportAttachmentValidationRules;
 use App\Models\SupportRequest;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -41,7 +41,7 @@ final class Show extends Component
 
     public function updatedAttachments(): void
     {
-        $this->validate($this->attachmentRules());
+        $this->validate(SupportAttachmentValidationRules::make());
     }
 
     public function removeAttachment(int $index): void
@@ -62,7 +62,7 @@ final class Show extends Component
             [
                 'reply' => ['required', 'string', 'max:10000'],
             ],
-            $this->attachmentRules(),
+            SupportAttachmentValidationRules::make(),
         ));
 
         $replyToSupportRequest->execute(
@@ -101,29 +101,6 @@ final class Show extends Component
                 ),
             ],
         );
-    }
-
-    /**
-     * @return array<string, array<int, string>>
-     */
-    private function attachmentRules(): array
-    {
-        return [
-            'attachments' => [
-                'array',
-                'max:'.SupportAttachmentPolicy::MAX_FILES,
-            ],
-            'attachments.*' => [
-                'file',
-                'image',
-                'mimes:jpg,jpeg,png,webp',
-                'max:'.SupportAttachmentPolicy::MAX_KILOBYTES,
-                'dimensions:max_width='.
-                    SupportAttachmentPolicy::MAX_SOURCE_DIMENSION.
-                    ',max_height='.
-                    SupportAttachmentPolicy::MAX_SOURCE_DIMENSION,
-            ],
-        ];
     }
 
     private function supportRequest(
