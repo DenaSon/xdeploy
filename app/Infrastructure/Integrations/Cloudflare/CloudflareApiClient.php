@@ -62,29 +62,17 @@ final class CloudflareApiClient
     }
 
     /**
-     * @return list<array{
-     *     id: string,
-     *     type: string,
-     *     name: string,
-     *     content: string,
-     *     proxied: bool|null,
-     *     ttl: int,
-     *     priority: int|null,
-     *     comment: string|null,
-     *     modified_on: string|null
-     * }>
+     * @return list<array<string, mixed>>
      */
     public function dnsRecords(
         #[SensitiveParameter]
         string $accessToken,
         string $zoneId,
     ): array {
-        if (preg_match('/\A[a-f0-9]{32}\z/i', $zoneId) !== 1) {
-            throw new CloudflareApiException(
-                CloudflareApiException::INVALID_RESPONSE,
-                'Cloudflare zone identifier is invalid.',
-            );
-        }
+        $this->ensureIdentifier(
+            $zoneId,
+            'Cloudflare zone identifier is invalid.',
+        );
 
         return array_values(
             array_filter(
@@ -102,6 +90,94 @@ final class CloudflareApiClient
                 ),
             ),
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createDnsRecord(
+        #[SensitiveParameter]
+        string $accessToken,
+        string $zoneId,
+        array $payload,
+    ): array {
+        $this->ensureIdentifier(
+            $zoneId,
+            'Cloudflare zone identifier is invalid.',
+        );
+
+        return $this->dnsRecordMutation(
+            response: $this->mutate(
+                method: 'POST',
+                path: "/zones/{$zoneId}/dns_records",
+                accessToken: $accessToken,
+                payload: $payload,
+            ),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateDnsRecord(
+        #[SensitiveParameter]
+        string $accessToken,
+        string $zoneId,
+        string $recordId,
+        array $payload,
+    ): array {
+        $this->ensureIdentifier(
+            $zoneId,
+            'Cloudflare zone identifier is invalid.',
+        );
+        $this->ensureIdentifier(
+            $recordId,
+            'Cloudflare DNS record identifier is invalid.',
+        );
+
+        return $this->dnsRecordMutation(
+            response: $this->mutate(
+                method: 'PATCH',
+                path: "/zones/{$zoneId}/dns_records/{$recordId}",
+                accessToken: $accessToken,
+                payload: $payload,
+            ),
+        );
+    }
+
+    public function deleteDnsRecord(
+        #[SensitiveParameter]
+        string $accessToken,
+        string $zoneId,
+        string $recordId,
+    ): void {
+        $this->ensureIdentifier(
+            $zoneId,
+            'Cloudflare zone identifier is invalid.',
+        );
+        $this->ensureIdentifier(
+            $recordId,
+            'Cloudflare DNS record identifier is invalid.',
+        );
+
+        $response = $this->mutate(
+            method: 'DELETE',
+            path: "/zones/{$zoneId}/dns_records/{$recordId}",
+            accessToken: $accessToken,
+        );
+
+        $deletedId = $this->string(
+            $response->json('result.id'),
+        );
+
+        if ($deletedId === null || ! hash_equals($recordId, $deletedId)) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_RESPONSE,
+                'Cloudflare DNS delete response was invalid.',
+            );
+        }
     }
 
     /**
@@ -195,12 +271,7 @@ final class CloudflareApiClient
         string $accessToken,
         array $query,
     ): Response {
-        if (trim($accessToken) === '') {
-            throw new CloudflareApiException(
-                CloudflareApiException::UNAUTHORIZED,
-                'Cloudflare access token is missing.',
-            );
-        }
+        $this->ensureAccessToken($accessToken);
 
         $response = Http::withToken($accessToken)
             ->acceptJson()
@@ -211,6 +282,42 @@ final class CloudflareApiClient
                 $query,
             );
 
+        return $this->validated($response);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function mutate(
+        string $method,
+        string $path,
+        #[SensitiveParameter]
+        string $accessToken,
+        array $payload = [],
+    ): Response {
+        $this->ensureAccessToken($accessToken);
+
+        $request = Http::withToken($accessToken)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout($this->connectTimeout())
+            ->timeout($this->timeout());
+
+        $options = $payload === []
+            ? []
+            : ['json' => $payload];
+
+        return $this->validated(
+            $request->send(
+                strtoupper($method),
+                $this->url($path),
+                $options,
+            ),
+        );
+    }
+
+    private function validated(Response $response): Response
+    {
         if ($response->status() === 401) {
             throw new CloudflareApiException(
                 CloudflareApiException::UNAUTHORIZED,
@@ -247,6 +354,30 @@ final class CloudflareApiClient
         }
 
         return $response;
+    }
+
+    /** @return array<string, mixed> */
+    private function dnsRecordMutation(Response $response): array
+    {
+        $result = $response->json('result');
+
+        if (! is_array($result)) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_RESPONSE,
+                'Cloudflare DNS mutation response did not contain a record.',
+            );
+        }
+
+        $record = $this->normalizeDnsRecord($result);
+
+        if ($record === null) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_RESPONSE,
+                'Cloudflare DNS mutation response was invalid.',
+            );
+        }
+
+        return $record;
     }
 
     /** @param array<string, mixed> $item */
@@ -323,6 +454,7 @@ final class CloudflareApiClient
         }
 
         $proxied = $item['proxied'] ?? null;
+        $proxiable = $item['proxiable'] ?? null;
         $priority = $item['priority'] ?? null;
 
         return [
@@ -331,6 +463,7 @@ final class CloudflareApiClient
             'name' => $name,
             'content' => $content,
             'proxied' => is_bool($proxied) ? $proxied : null,
+            'proxiable' => is_bool($proxiable) ? $proxiable : false,
             'ttl' => is_numeric($item['ttl'] ?? null)
                 ? max(1, (int) $item['ttl'])
                 : 1,
@@ -340,6 +473,34 @@ final class CloudflareApiClient
             'comment' => $this->string($item['comment'] ?? null),
             'modified_on' => $this->string($item['modified_on'] ?? null),
         ];
+    }
+
+    private function ensureAccessToken(
+        #[SensitiveParameter]
+        string $accessToken,
+    ): void {
+        if (trim($accessToken) !== '') {
+            return;
+        }
+
+        throw new CloudflareApiException(
+            CloudflareApiException::UNAUTHORIZED,
+            'Cloudflare access token is missing.',
+        );
+    }
+
+    private function ensureIdentifier(
+        string $identifier,
+        string $message,
+    ): void {
+        if (preg_match('/\A[a-f0-9]{32}\z/i', $identifier) === 1) {
+            return;
+        }
+
+        throw new CloudflareApiException(
+            CloudflareApiException::INVALID_RESPONSE,
+            $message,
+        );
     }
 
     private function string(mixed $value): ?string
