@@ -9,8 +9,6 @@
 ])
 
 @php
-    use App\Support\PublicEndpoint\PublicEndpointStatusPresentation;
-
     $domain = is_string($domain) && trim($domain) !== ''
         ? trim($domain)
         : null;
@@ -19,7 +17,7 @@
         ? trim($openUrl)
         : null;
 
-    $presentation = PublicEndpointStatusPresentation::for(
+    $presentation = \App\Support\PublicEndpoint\PublicEndpointStatusPresentation::for(
         $removing ? 'removing' : $state,
     );
 
