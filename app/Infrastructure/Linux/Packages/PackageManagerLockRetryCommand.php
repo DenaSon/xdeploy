@@ -39,6 +39,7 @@ package_manager_retry_delay() {
 }
 
 package_manager_run_command() (
+export LC_ALL=C
 __XDEPLOY_PACKAGE_COMMAND__
 )
 
