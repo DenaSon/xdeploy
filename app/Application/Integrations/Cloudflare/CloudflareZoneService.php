@@ -33,6 +33,8 @@ final readonly class CloudflareZoneService
         string $accountId,
         string $domain,
     ): array {
+        $domainName = $this->domainName($domain);
+
         $token = $this->accessTokens->token(
             $connection,
             [
@@ -45,15 +47,6 @@ final readonly class CloudflareZoneService
             $token,
             $accountId,
         );
-
-        try {
-            $domainName = PublicDomainName::from($domain);
-        } catch (InvalidPublicDomainNameException) {
-            throw new CloudflareApiException(
-                CloudflareApiException::INVALID_REQUEST,
-                'Cloudflare zone domain is invalid.',
-            );
-        }
 
         return $this->api->createZone(
             accessToken: $token,
@@ -111,6 +104,18 @@ final readonly class CloudflareZoneService
             $token,
             $zoneId,
         );
+    }
+
+    private function domainName(string $domain): PublicDomainName
+    {
+        try {
+            return PublicDomainName::from($domain);
+        } catch (InvalidPublicDomainNameException) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_REQUEST,
+                'Cloudflare zone domain is invalid.',
+            );
+        }
     }
 
     private function ensureAccessibleAccount(
