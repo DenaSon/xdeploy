@@ -10,6 +10,8 @@ final class CloudflareScopes
 
     public const ZONE_READ = 'zone.read';
 
+    public const ZONE_WRITE = 'zone.write';
+
     public const DNS_READ = 'dns.read';
 
     public const DNS_WRITE = 'dns.write';
@@ -23,6 +25,24 @@ final class CloudflareScopes
             self::ACCOUNT_SETTINGS_READ,
             self::ZONE_READ,
             self::DNS_READ,
+        ];
+    }
+
+    /** @return list<string> */
+    public static function zoneWrite(): array
+    {
+        return [
+            self::ZONE_WRITE,
+        ];
+    }
+
+    /** @return list<string> */
+    public static function zoneManagement(): array
+    {
+        return [
+            self::ACCOUNT_SETTINGS_READ,
+            self::ZONE_READ,
+            self::ZONE_WRITE,
         ];
     }
 

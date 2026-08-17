@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Integrations\Cloudflare;
 
+use App\Domain\Integration\Cloudflare\CloudflareZoneStatus;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -37,16 +38,7 @@ final class CloudflareApiClient
     }
 
     /**
-     * @return list<array{
-     *     id: string,
-     *     name: string,
-     *     status: string,
-     *     paused: bool,
-     *     type: string,
-     *     development_mode: int,
-     *     account: array{id: string, name: string}|null,
-     *     name_servers: list<string>
-     * }>
+     * @return list<array<string, mixed>>
      */
     public function zones(
         #[SensitiveParameter]
@@ -64,6 +56,89 @@ final class CloudflareApiClient
                 ),
             ),
         );
+    }
+
+    /** @return array<string, mixed> */
+    public function zone(
+        #[SensitiveParameter]
+        string $accessToken,
+        string $zoneId,
+    ): array {
+        $this->ensureIdentifier(
+            $zoneId,
+            'Cloudflare zone identifier is invalid.',
+        );
+
+        return $this->zoneMutation(
+            $this->get(
+                path: "/zones/{$zoneId}",
+                accessToken: $accessToken,
+                query: [],
+            ),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function createZone(
+        #[SensitiveParameter]
+        string $accessToken,
+        string $accountId,
+        string $name,
+    ): array {
+        $this->ensureRequestIdentifier(
+            $accountId,
+            'Cloudflare account identifier is invalid.',
+        );
+
+        $name = strtolower(trim($name, " .\t\n\r\0\x0B"));
+
+        if ($name === '' || strlen($name) > 253) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_REQUEST,
+                'Cloudflare zone name is invalid.',
+            );
+        }
+
+        return $this->zoneMutation(
+            $this->mutate(
+                method: 'POST',
+                path: '/zones',
+                accessToken: $accessToken,
+                payload: [
+                    'account' => ['id' => $accountId],
+                    'name' => $name,
+                    'type' => 'full',
+                ],
+            ),
+        );
+    }
+
+    public function deleteZone(
+        #[SensitiveParameter]
+        string $accessToken,
+        string $zoneId,
+    ): void {
+        $this->ensureIdentifier(
+            $zoneId,
+            'Cloudflare zone identifier is invalid.',
+        );
+
+        $response = $this->mutate(
+            method: 'DELETE',
+            path: "/zones/{$zoneId}",
+            accessToken: $accessToken,
+        );
+
+        $deletedId = $this->string(
+            $response->json('result.id'),
+        );
+
+        if ($deletedId === null || ! hash_equals($zoneId, $deletedId)) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_RESPONSE,
+                'Cloudflare zone delete response was invalid.',
+            );
+        }
     }
 
     /**
@@ -391,6 +466,30 @@ final class CloudflareApiClient
     }
 
     /** @return array<string, mixed> */
+    private function zoneMutation(Response $response): array
+    {
+        $result = $response->json('result');
+
+        if (! is_array($result)) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_RESPONSE,
+                'Cloudflare zone response did not contain a zone.',
+            );
+        }
+
+        $zone = $this->normalizeZone($result);
+
+        if ($zone === null) {
+            throw new CloudflareApiException(
+                CloudflareApiException::INVALID_RESPONSE,
+                'Cloudflare zone response was invalid.',
+            );
+        }
+
+        return $zone;
+    }
+
+    /** @return array<string, mixed> */
     private function dnsRecordMutation(Response $response): array
     {
         $result = $response->json('result');
@@ -444,29 +543,26 @@ final class CloudflareApiClient
             ? $this->normalizeAccount($item['account'])
             : null;
 
-        $nameServers = [];
-
-        if (is_array($item['name_servers'] ?? null)) {
-            foreach ($item['name_servers'] as $nameServer) {
-                $nameServer = $this->string($nameServer);
-
-                if ($nameServer !== null) {
-                    $nameServers[] = $nameServer;
-                }
-            }
-        }
-
         return [
             'id' => $id,
-            'name' => $name,
-            'status' => $this->string($item['status'] ?? null) ?? 'unknown',
+            'name' => strtolower($name),
+            'status' => CloudflareZoneStatus::fromRemote(
+                $item['status'] ?? null,
+            )->value,
             'paused' => (bool) ($item['paused'] ?? false),
             'type' => $this->string($item['type'] ?? null) ?? 'unknown',
             'development_mode' => is_numeric($item['development_mode'] ?? null)
                 ? max(0, (int) $item['development_mode'])
                 : 0,
             'account' => $account,
-            'name_servers' => array_values(array_unique($nameServers)),
+            'name_servers' => $this->stringList(
+                $item['name_servers'] ?? null,
+            ),
+            'original_name_servers' => $this->stringList(
+                $item['original_name_servers'] ?? null,
+            ),
+            'created_on' => $this->string($item['created_on'] ?? null),
+            'activated_on' => $this->string($item['activated_on'] ?? null),
         ];
     }
 
@@ -535,6 +631,40 @@ final class CloudflareApiClient
             CloudflareApiException::INVALID_RESPONSE,
             $message,
         );
+    }
+
+    private function ensureRequestIdentifier(
+        string $identifier,
+        string $message,
+    ): void {
+        if (preg_match('/\A[a-f0-9]{32}\z/i', $identifier) === 1) {
+            return;
+        }
+
+        throw new CloudflareApiException(
+            CloudflareApiException::INVALID_REQUEST,
+            $message,
+        );
+    }
+
+    /** @return list<string> */
+    private function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($value as $item) {
+            $item = $this->string($item);
+
+            if ($item !== null) {
+                $items[] = strtolower($item);
+            }
+        }
+
+        return array_values(array_unique($items));
     }
 
     private function string(mixed $value): ?string
