@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Integrations\Cloudflare;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use SensitiveParameter;
 
 final class CloudflareApiClient
 {
+    private const READ_ATTEMPTS = 2;
+
+    private const READ_RETRY_DELAY_MICROSECONDS = 200_000;
+
     /**
      * @return list<array{id: string, name: string}>
      */
@@ -273,16 +278,31 @@ final class CloudflareApiClient
     ): Response {
         $this->ensureAccessToken($accessToken);
 
-        $response = Http::withToken($accessToken)
-            ->acceptJson()
-            ->connectTimeout($this->connectTimeout())
-            ->timeout($this->timeout())
-            ->get(
-                $this->url($path),
-                $query,
-            );
+        for ($attempt = 1; $attempt <= self::READ_ATTEMPTS; $attempt++) {
+            try {
+                $response = Http::withToken($accessToken)
+                    ->acceptJson()
+                    ->connectTimeout($this->connectTimeout())
+                    ->timeout($this->timeout())
+                    ->get(
+                        $this->url($path),
+                        $query,
+                    );
 
-        return $this->validated($response);
+                return $this->validated($response);
+            } catch (ConnectionException $exception) {
+                if ($attempt === self::READ_ATTEMPTS) {
+                    throw $this->connectionFailure($exception);
+                }
+
+                usleep(self::READ_RETRY_DELAY_MICROSECONDS);
+            }
+        }
+
+        throw new CloudflareApiException(
+            CloudflareApiException::CONNECTION_FAILED,
+            'Cloudflare API connection failed.',
+        );
     }
 
     /**
@@ -307,12 +327,26 @@ final class CloudflareApiClient
             ? []
             : ['json' => $payload];
 
-        return $this->validated(
-            $request->send(
-                strtoupper($method),
-                $this->url($path),
-                $options,
-            ),
+        try {
+            return $this->validated(
+                $request->send(
+                    strtoupper($method),
+                    $this->url($path),
+                    $options,
+                ),
+            );
+        } catch (ConnectionException $exception) {
+            throw $this->connectionFailure($exception);
+        }
+    }
+
+    private function connectionFailure(
+        ConnectionException $exception,
+    ): CloudflareApiException {
+        return new CloudflareApiException(
+            CloudflareApiException::CONNECTION_FAILED,
+            'Cloudflare API connection failed.',
+            $exception,
         );
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Integrations\Cloudflare;
 
 use RuntimeException;
+use Throwable;
 
 final class CloudflareApiException extends RuntimeException
 {
@@ -13,6 +14,8 @@ final class CloudflareApiException extends RuntimeException
     public const FORBIDDEN = 'forbidden';
 
     public const RATE_LIMITED = 'rate_limited';
+
+    public const CONNECTION_FAILED = 'connection_failed';
 
     public const INVALID_REQUEST = 'invalid_request';
 
@@ -29,7 +32,12 @@ final class CloudflareApiException extends RuntimeException
     public function __construct(
         public readonly string $reason,
         string $message,
+        ?Throwable $previous = null,
     ) {
-        parent::__construct($message);
+        parent::__construct(
+            $message,
+            0,
+            $previous,
+        );
     }
 }
