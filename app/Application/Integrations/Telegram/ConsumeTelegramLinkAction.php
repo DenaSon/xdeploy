@@ -22,13 +22,29 @@ final class ConsumeTelegramLinkAction
             return false;
         }
 
+        $tokenHash = hash('sha256', $link['token']);
+        $challengeOwnerId = TelegramLinkChallenge::query()
+            ->where('token_hash', $tokenHash)
+            ->value('user_id');
+
+        if (! is_int($challengeOwnerId)) {
+            return false;
+        }
+
         return DB::transaction(
-            function () use ($link): bool {
+            function () use (
+                $link,
+                $tokenHash,
+                $challengeOwnerId,
+            ): bool {
+                User::query()
+                    ->whereKey($challengeOwnerId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 $challenge = TelegramLinkChallenge::query()
-                    ->where(
-                        'token_hash',
-                        hash('sha256', $link['token']),
-                    )
+                    ->where('token_hash', $tokenHash)
+                    ->where('user_id', $challengeOwnerId)
                     ->lockForUpdate()
                     ->first();
 
@@ -40,11 +56,6 @@ final class ConsumeTelegramLinkAction
                     return false;
                 }
 
-                User::query()
-                    ->whereKey($challenge->user_id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
                 $conflictingConnection = TelegramConnection::query()
                     ->where(function ($query) use ($link): void {
                         $query
@@ -54,7 +65,7 @@ final class ConsumeTelegramLinkAction
                                 $link['telegram_user_id'],
                             );
                     })
-                    ->where('user_id', '!=', $challenge->user_id)
+                    ->where('user_id', '!=', $challengeOwnerId)
                     ->lockForUpdate()
                     ->first();
 
@@ -67,13 +78,13 @@ final class ConsumeTelegramLinkAction
                 }
 
                 $connection = TelegramConnection::query()
-                    ->where('user_id', $challenge->user_id)
+                    ->where('user_id', $challengeOwnerId)
                     ->lockForUpdate()
                     ->first();
 
                 if (! $connection instanceof TelegramConnection) {
                     TelegramConnection::query()->create([
-                        'user_id' => $challenge->user_id,
+                        'user_id' => $challengeOwnerId,
                         'chat_id' => $link['chat_id'],
                         'telegram_user_id' => $link['telegram_user_id'],
                         'username' => $link['username'],
@@ -101,9 +112,8 @@ final class ConsumeTelegramLinkAction
                 ])->save();
 
                 TelegramLinkChallenge::query()
-                    ->where('user_id', $challenge->user_id)
+                    ->where('user_id', $challengeOwnerId)
                     ->whereKeyNot($challenge->getKey())
-                    ->whereNull('consumed_at')
                     ->delete();
 
                 return true;
@@ -145,7 +155,7 @@ final class ConsumeTelegramLinkAction
 
         if (
             preg_match(
-                '/\A\/start(?:@[A-Za-z0-9_]{5,32})?\s+([A-Za-z0-9_-]{43})\s*\z/D',
+                '/\A\/start\s+([A-Za-z0-9_-]{43})\s*\z/D',
                 $text,
                 $matches,
             ) !== 1
