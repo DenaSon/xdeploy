@@ -107,10 +107,29 @@
                 </span>
 
                 <div class="min-w-0 flex-1">
-                    <h2 class="text-sm font-semibold">دسترسی Cloudflare نیاز به به‌روزرسانی دارد</h2>
+                    <h2 class="text-sm font-semibold">دسترسی Cloudflare باید به‌روزرسانی شود</h2>
                     <p class="mt-1 max-w-2xl text-xs leading-6 text-base-content/55">
                         اتصال فعلی اجازه مشاهده کامل دامنه‌ها و DNS را ندارد. مجوزهای اتصال را دوباره تأیید کنید.
                     </p>
+
+                    @if ($missingScopes !== [])
+                        <div x-data="{ open: false }" class="mt-3">
+                            <button
+                                type="button"
+                                @click="open = ! open"
+                                class="inline-flex items-center gap-1.5 text-[11px] font-medium text-base-content/45 hover:text-base-content/65"
+                            >
+                                جزئیات فنی
+                                <x-icon name="lucide.chevron-down" class="!size-3 transition-transform" x-bind:class="open && 'rotate-180'" />
+                            </button>
+
+                            <div x-cloak x-show="open" x-transition.opacity.duration.150ms class="mt-2 flex flex-wrap gap-1.5" dir="ltr">
+                                @foreach ($missingScopes as $scope)
+                                    <code class="rounded-lg bg-base-100 px-2 py-1 text-[11px] text-base-content/55">{{ $scope }}</code>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     <a
                         href="{{ route('panel.integrations.cloudflare.redirect') }}"
@@ -119,7 +138,7 @@
                         class="btn btn-primary btn-sm mt-4 rounded-xl px-4"
                         :class="loading && 'pointer-events-none opacity-70'"
                     >
-                        <span x-show="! loading">به‌روزرسانی مجوزهای Cloudflare</span>
+                        <span x-show="! loading">به‌روزرسانی دسترسی Cloudflare</span>
                         <span x-cloak x-show="loading" class="inline-flex items-center gap-2">
                             <span class="loading loading-spinner loading-xs"></span>
                             در حال انتقال
@@ -429,7 +448,7 @@
                                                     class="btn btn-ghost btn-xs rounded-lg data-loading:pointer-events-none data-loading:opacity-60"
                                                     title="ویرایش رکورد"
                                                 >
-                                                    <x-icon name="lucide.pencil" class="in-data-loading:block not-in-data-loading:hidden !size-3.5" />
+                                                    <x-icon name="lucide.pencil" class="in-data-loading:hidden !size-3.5" />
                                                     <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
                                                 </button>
                                             @endif
@@ -442,7 +461,7 @@
                                                     class="btn btn-ghost btn-xs rounded-lg text-error data-loading:pointer-events-none data-loading:opacity-60"
                                                     title="حذف رکورد"
                                                 >
-                                                    <x-icon name="lucide.trash-2" class="in-data-loading:block not-in-data-loading:hidden !size-3.5" />
+                                                    <x-icon name="lucide.trash-2" class="in-data-loading:hidden !size-3.5" />
                                                     <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
                                                 </button>
                                             @endif
@@ -472,7 +491,7 @@
                                 class="btn btn-ghost btn-xs rounded-lg data-loading:pointer-events-none data-loading:opacity-60"
                                 title="بستن فرم"
                             >
-                                <x-icon name="lucide.x" class="in-data-loading:block not-in-data-loading:hidden !size-4" />
+                                <x-icon name="lucide.x" class="in-data-loading:hidden !size-4" />
                                 <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
                             </button>
                         </div>
@@ -630,7 +649,9 @@
             >
                 خواندن اطلاعات با مجوزهای مشاهده انجام می‌شود و ساخت، ویرایش یا حذف رکوردها فقط در صورت داشتن مجوز
                 <code dir="ltr">dns.write</code>
-                انجام می‌شود. Coreflare در حال حاضر رکوردهای A، AAAA، CNAME، TXT و MX را برای ویرایش مستقیم پشتیبانی می‌کند.
+                انجام می‌شود. وضعیت فعلی:
+                <span class="font-medium {{ $canManageDns ? 'text-success' : 'text-warning' }}">{{ $canManageDns ? 'DNS Write فعال' : 'DNS Write غیرفعال' }}</span>.
+                Coreflare در حال حاضر رکوردهای A، AAAA، CNAME، TXT و MX را برای ویرایش مستقیم پشتیبانی می‌کند.
             </div>
         </section>
     @endif
