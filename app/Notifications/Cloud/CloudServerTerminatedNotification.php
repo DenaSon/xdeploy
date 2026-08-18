@@ -6,6 +6,7 @@ namespace App\Notifications\Cloud;
 
 use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
 use App\Application\Integrations\Telegram\TelegramMessage;
+use App\Application\Notifications\NotificationTopic;
 use App\Infrastructure\Integrations\Telegram\TelegramChannel;
 use Illuminate\Notifications\Notification;
 
@@ -28,6 +29,11 @@ final class CloudServerTerminatedNotification extends Notification implements Se
             'database',
             TelegramChannel::class,
         ];
+    }
+
+    public function telegramTopic(): NotificationTopic
+    {
+        return NotificationTopic::Servers;
     }
 
     /**
@@ -63,28 +69,18 @@ final class CloudServerTerminatedNotification extends Notification implements Se
     {
         return [
             'kind' => 'cloud_server_terminated',
-
             'title' => 'سرویس VPS پایان یافت',
-
             'message' => sprintf(
                 'مدت سرویس VPS «%s» به پایان رسید و سرور از زیرساخت ابری حذف شد.',
                 $this->serverName,
             ),
-
             'icon' => 'lucide.server-off',
-
             'tone' => 'neutral',
-
             'server_id' => $this->serverId,
-
             'server_name' => $this->serverName,
-
             'expires_at' => $this->expiresAt,
-
             'terminated_at' => $this->terminatedAt,
-
             'action_label' => 'مشاهده سرورها',
-
             'action_url' => route(
                 'panel.servers.index',
                 absolute: false,
