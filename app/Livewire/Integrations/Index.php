@@ -43,6 +43,16 @@ final class Index extends Component
             $scopes,
             CloudflareScopes::dnsWrite(),
         );
+        $missingZoneManagementScopes = CloudflareScopes::missing(
+            $scopes,
+            CloudflareScopes::zoneManagement(),
+        );
+
+        $configuredScopes = $cloudflare->scopes();
+        $zoneManagementConfigured = CloudflareScopes::missing(
+            $configuredScopes,
+            CloudflareScopes::zoneManagement(),
+        ) === [];
 
         return view(
             'livewire.integrations.index',
@@ -50,15 +60,19 @@ final class Index extends Component
                 'cloudflareConfigured' => $cloudflare->configured(),
                 'cloudflareReadConfigured' => $cloudflare->configuredForRead(),
                 'cloudflareDnsWriteConfigured' => $cloudflare->configuredForDnsWrite(),
+                'cloudflareZoneManagementConfigured' => $zoneManagementConfigured,
                 'cloudflareConnected' => $connection !== null,
                 'cloudflareReadReady' => $connection !== null
                     && $missingReadScopes === [],
                 'cloudflareDnsWriteReady' => $connection !== null
                     && $missingDnsWriteScopes === [],
+                'cloudflareZoneManagementReady' => $connection !== null
+                    && $missingZoneManagementScopes === [],
                 'cloudflareConnectedAt' => $connection?->connected_at,
                 'cloudflareScopes' => $scopes,
                 'cloudflareMissingReadScopes' => $missingReadScopes,
                 'cloudflareMissingDnsWriteScopes' => $missingDnsWriteScopes,
+                'cloudflareMissingZoneManagementScopes' => $missingZoneManagementScopes,
             ],
         );
     }

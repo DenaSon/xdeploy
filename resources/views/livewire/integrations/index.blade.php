@@ -55,7 +55,7 @@
                     </div>
 
                     <p class="mt-1 max-w-2xl text-sm leading-7 text-base-content/45">
-                        مشاهده حساب‌ها و دامنه‌ها و مدیریت رکوردهای DNS از طریق OAuth با مجوزهای حداقلی و تفکیک‌شده.
+                        مشاهده حساب‌ها و دامنه‌ها، مدیریت Zone و رکوردهای DNS از طریق OAuth با مجوزهای تفکیک‌شده.
                     </p>
 
                     @if ($cloudflareConnected)
@@ -81,13 +81,25 @@
 
                             @if ($cloudflareDnsWriteReady)
                                 <span class="inline-flex items-center gap-1.5 text-primary">
-                                    <x-icon name="lucide.shield-check" class="!size-3.5" />
+                                    <x-icon name="lucide.network" class="!size-3.5" />
                                     DNS Write فعال
                                 </span>
                             @else
                                 <span class="inline-flex items-center gap-1.5 text-base-content/40">
                                     <x-icon name="lucide.shield" class="!size-3.5" />
                                     DNS Write غیرفعال
+                                </span>
+                            @endif
+
+                            @if ($cloudflareZoneManagementReady)
+                                <span class="inline-flex items-center gap-1.5 text-primary">
+                                    <x-icon name="lucide.globe-2" class="!size-3.5" />
+                                    Zone Write فعال
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 text-base-content/40">
+                                    <x-icon name="lucide.shield" class="!size-3.5" />
+                                    Zone Write غیرفعال
                                 </span>
                             @endif
                         </div>
@@ -141,12 +153,21 @@
                         مدیریت Cloudflare
                     </a>
 
-                    @if (! $cloudflareDnsWriteConfigured || ! $cloudflareDnsWriteReady)
+                    <a
+                        href="{{ route('panel.integrations.cloudflare.zones') }}"
+                        wire:navigate
+                        class="btn btn-outline btn-sm rounded-xl px-4"
+                    >
+                        <x-icon name="lucide.globe-2" class="!size-4" />
+                        دامنه‌ها
+                    </a>
+
+                    @if (! $cloudflareDnsWriteConfigured || ! $cloudflareDnsWriteReady || ! $cloudflareZoneManagementConfigured || ! $cloudflareZoneManagementReady)
                         <a
                             href="{{ route('panel.integrations.cloudflare.redirect') }}"
-                            class="btn btn-outline btn-sm rounded-xl"
+                            class="btn btn-ghost btn-sm rounded-xl"
                         >
-                            فعال‌سازی DNS Write
+                            به‌روزرسانی مجوزها
                         </a>
                     @else
                         <a
@@ -200,6 +221,15 @@
                     را نیز شامل شود.
                 </span>
             </div>
+        @elseif (! $cloudflareZoneManagementConfigured)
+            <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
+                <x-icon name="lucide.settings-2" class="mt-1 !size-3.5 shrink-0 text-warning" />
+                <span>
+                    برای افزودن و حذف دامنه، تنظیم <code dir="ltr" class="rounded bg-base-100 px-1.5 py-0.5">CLOUDFLARE_OAUTH_SCOPES</code> باید
+                    <code dir="ltr">zone.write</code>
+                    را نیز شامل شود.
+                </span>
+            </div>
         @elseif ($cloudflareConnected && ! $cloudflareReadReady)
             <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
                 <x-icon name="lucide.shield-alert" class="mt-1 !size-3.5 shrink-0 text-warning" />
@@ -207,13 +237,11 @@
                     اتصال فعلی مجوزهای خواندن کامل ندارد. با «به‌روزرسانی دسترسی» اتصال را دوباره authorize کنید.
                 </span>
             </div>
-        @elseif ($cloudflareConnected && ! $cloudflareDnsWriteReady)
+        @elseif ($cloudflareConnected && (! $cloudflareDnsWriteReady || ! $cloudflareZoneManagementReady))
             <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
                 <x-icon name="lucide.shield-alert" class="mt-1 !size-3.5 shrink-0 text-warning" />
                 <span>
-                    اتصال فعلی همچنان برای مشاهده اطلاعات معتبر است، اما قبل از اضافه‌شدن
-                    <code dir="ltr">dns.write</code>
-                    ساخته شده است. برای ساخت، ویرایش و حذف رکوردها دسترسی را به‌روزرسانی کنید.
+                    اتصال فعلی برای مشاهده اطلاعات معتبر است، اما همه مجوزهای مدیریتی جدید را ندارد. با «به‌روزرسانی مجوزها» اتصال را دوباره authorize کنید.
                 </span>
             </div>
         @endif
