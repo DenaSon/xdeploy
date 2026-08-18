@@ -15,11 +15,13 @@ class PublicEndpoint extends Model
         'application_type',
         'domain',
         'activated_at',
+        'disabled_at',
     ];
 
     protected $casts = [
         'application_type' => ApplicationType::class,
         'activated_at' => 'immutable_datetime',
+        'disabled_at' => 'immutable_datetime',
     ];
 
     /**
@@ -35,5 +37,17 @@ class PublicEndpoint extends Model
     public function isActive(): bool
     {
         return $this->activated_at !== null;
+    }
+
+    public function isDisabled(): bool
+    {
+        return $this->activated_at === null
+            && $this->disabled_at !== null;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->activated_at === null
+            && $this->disabled_at === null;
     }
 }
