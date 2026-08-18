@@ -6,6 +6,7 @@ namespace App\Infrastructure\Integrations\Telegram;
 
 use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
 use App\Application\Integrations\Telegram\Jobs\DeliverTelegramNotification;
+use App\Application\Notifications\NotificationPreferenceService;
 use App\Models\TelegramConnection;
 use App\Models\User;
 use Illuminate\Notifications\Notification;
@@ -16,6 +17,7 @@ final readonly class TelegramChannel
 {
     public function __construct(
         private TelegramBotClient $telegram,
+        private NotificationPreferenceService $preferences,
     ) {
     }
 
@@ -33,9 +35,14 @@ final readonly class TelegramChannel
 
         try {
             $userId = (int) $notifiable->getKey();
+            $topic = $notification->telegramTopic();
 
             if (
                 $userId < 1
+                || ! $this->preferences->telegramEnabled(
+                    $notifiable,
+                    $topic,
+                )
                 || ! TelegramConnection::query()
                     ->where('user_id', $userId)
                     ->exists()
@@ -47,6 +54,7 @@ final readonly class TelegramChannel
 
             DeliverTelegramNotification::dispatch(
                 $userId,
+                $topic,
                 $message->text,
             );
         } catch (Throwable $exception) {
