@@ -6,6 +6,7 @@ namespace App\Notifications\Cloud;
 
 use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
 use App\Application\Integrations\Telegram\TelegramMessage;
+use App\Application\Notifications\NotificationTopic;
 use App\Infrastructure\Integrations\Telegram\TelegramChannel;
 use Illuminate\Notifications\Notification;
 
@@ -27,6 +28,11 @@ final class CloudServerExpiringSoonNotification extends Notification implements 
             'database',
             TelegramChannel::class,
         ];
+    }
+
+    public function telegramTopic(): NotificationTopic
+    {
+        return NotificationTopic::Servers;
     }
 
     /**
@@ -62,31 +68,20 @@ final class CloudServerExpiringSoonNotification extends Notification implements 
     {
         return [
             'kind' => 'cloud_server_expiring_soon',
-
             'title' => 'پایان سرویس نزدیک است',
-
             'message' => sprintf(
                 'کمتر از ۲۴ ساعت تا پایان سرویس VPS «%s» باقی مانده است.',
                 $this->serverName,
             ),
-
             'icon' => 'lucide.clock-alert',
-
             'tone' => 'warning',
-
             'server_id' => $this->serverId,
-
             'server_name' => $this->serverName,
-
             'expires_at' => $this->expiresAt,
-
             'action_label' => 'تمدید سرویس',
-
             'action_url' => route(
                 'panel.servers.renew',
-                [
-                    'server' => $this->serverId,
-                ],
+                ['server' => $this->serverId],
                 false,
             ),
         ];

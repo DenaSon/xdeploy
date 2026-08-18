@@ -7,6 +7,7 @@ use App\Http\Controllers\Integrations\TelegramConnectionController;
 use App\Livewire\Integrations\Cloudflare\Overview as CloudflareOverview;
 use App\Livewire\Integrations\Cloudflare\Zones as CloudflareZones;
 use App\Livewire\Integrations\Index as IntegrationsIndex;
+use App\Livewire\Integrations\Telegram\Overview as TelegramOverview;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth'])
@@ -48,6 +49,11 @@ Route::middleware(['web', 'auth'])
         )
             ->middleware('throttle:10,1')
             ->name('integrations.cloudflare.disconnect');
+
+        Route::livewire(
+            '/integrations/telegram',
+            TelegramOverview::class,
+        )->name('integrations.telegram.overview');
 
         Route::post(
             '/integrations/telegram/connect',
