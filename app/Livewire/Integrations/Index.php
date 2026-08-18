@@ -7,7 +7,9 @@ namespace App\Livewire\Integrations;
 use App\Domain\Integration\Cloudflare\CloudflareScopes;
 use App\Domain\Integration\Enums\IntegrationProvider;
 use App\Infrastructure\Integrations\Cloudflare\CloudflareOAuthClient;
+use App\Infrastructure\Integrations\Telegram\TelegramBotClient;
 use App\Models\IntegrationConnection;
+use App\Models\TelegramConnection;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -15,11 +17,12 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Layout('layouts.panel')]
-#[Title('اتصال‌ها')]
+#[Title('یکپارچه‌سازی‌ها')]
 final class Index extends Component
 {
     public function render(
         CloudflareOAuthClient $cloudflare,
+        TelegramBotClient $telegram,
     ): View {
         $user = $this->user();
 
@@ -54,6 +57,10 @@ final class Index extends Component
             CloudflareScopes::zoneManagement(),
         ) === [];
 
+        $telegramConnection = TelegramConnection::query()
+            ->ownedBy($user)
+            ->first();
+
         return view(
             'livewire.integrations.index',
             [
@@ -73,6 +80,10 @@ final class Index extends Component
                 'cloudflareMissingReadScopes' => $missingReadScopes,
                 'cloudflareMissingDnsWriteScopes' => $missingDnsWriteScopes,
                 'cloudflareMissingZoneManagementScopes' => $missingZoneManagementScopes,
+                'telegramConfigured' => $telegram->configured(),
+                'telegramConnected' => $telegramConnection !== null,
+                'telegramConnectedAt' => $telegramConnection?->connected_at,
+                'telegramUsername' => $telegramConnection?->username,
             ],
         );
     }
