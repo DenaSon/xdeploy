@@ -51,6 +51,94 @@ final class TelegramBotClientTest extends TestCase
         );
     }
 
+    public function test_send_message_uses_plain_text_without_parse_mode(): void
+    {
+        Http::fake([
+            'https://api.telegram.test/*' => Http::response([
+                'ok' => true,
+                'result' => [
+                    'message_id' => 10,
+                ],
+            ], 200),
+        ]);
+
+        app(TelegramBotClient::class)->sendMessage(
+            '123456789',
+            'اعلان آزمایشی Coreflare',
+        );
+
+        Http::assertSent(
+            static fn ($request): bool => $request->url()
+                === 'https://api.telegram.test/bot123456:ci-telegram-bot-token/sendMessage'
+                && $request['chat_id'] === '123456789'
+                && $request['text'] === 'اعلان آزمایشی Coreflare'
+                && ! isset($request['parse_mode']),
+        );
+    }
+
+    public function test_send_message_api_failure_is_sanitized(): void
+    {
+        Http::fake([
+            'https://api.telegram.test/*' => Http::response([
+                'ok' => false,
+                'description' => 'chat 123456789 rejected secret body',
+            ], 400),
+        ]);
+
+        try {
+            app(TelegramBotClient::class)->sendMessage(
+                '123456789',
+                'sensitive message body',
+            );
+            self::fail('Expected TelegramBotException was not thrown.');
+        } catch (TelegramBotException $exception) {
+            self::assertSame(
+                'Telegram message delivery failed.',
+                $exception->getMessage(),
+            );
+            self::assertStringNotContainsString(
+                '123456789',
+                $exception->getMessage(),
+            );
+            self::assertStringNotContainsString(
+                'sensitive message body',
+                $exception->getMessage(),
+            );
+        }
+    }
+
+    public function test_send_message_transport_failure_is_sanitized(): void
+    {
+        Http::fake(
+            static function (): never {
+                throw new ConnectionException(
+                    'failed bot token and chat 123456789 with message body',
+                );
+            },
+        );
+
+        try {
+            app(TelegramBotClient::class)->sendMessage(
+                '123456789',
+                'sensitive message body',
+            );
+            self::fail('Expected TelegramBotException was not thrown.');
+        } catch (TelegramBotException $exception) {
+            self::assertSame(
+                'Telegram API connection failed.',
+                $exception->getMessage(),
+            );
+            self::assertStringNotContainsString(
+                '123456789',
+                $exception->getMessage(),
+            );
+            self::assertStringNotContainsString(
+                'sensitive message body',
+                $exception->getMessage(),
+            );
+        }
+    }
+
     public function test_transport_failure_never_exposes_bot_token_or_webhook_secret(): void
     {
         Http::fake(
