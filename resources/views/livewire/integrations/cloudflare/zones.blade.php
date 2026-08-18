@@ -136,10 +136,29 @@
                 </span>
 
                 <div class="min-w-0 flex-1">
-                    <h2 class="text-sm font-semibold">دسترسی Cloudflare نیاز به به‌روزرسانی دارد</h2>
+                    <h2 class="text-sm font-semibold">دسترسی Cloudflare باید به‌روزرسانی شود</h2>
                     <p class="mt-1 max-w-2xl text-xs leading-6 text-base-content/55">
                         اتصال فعلی اجازه مشاهده کامل دامنه‌ها را ندارد. مجوزهای اتصال را دوباره تأیید کنید.
                     </p>
+
+                    @if ($missingReadScopes !== [])
+                        <div x-data="{ open: false }" class="mt-3">
+                            <button
+                                type="button"
+                                @click="open = ! open"
+                                class="inline-flex items-center gap-1.5 text-[11px] font-medium text-base-content/45 hover:text-base-content/65"
+                            >
+                                جزئیات فنی
+                                <x-icon name="lucide.chevron-down" class="!size-3 transition-transform" x-bind:class="open && 'rotate-180'" />
+                            </button>
+
+                            <div x-cloak x-show="open" x-transition.opacity.duration.150ms class="mt-2 flex flex-wrap gap-1.5" dir="ltr">
+                                @foreach ($missingReadScopes as $scope)
+                                    <code class="rounded-lg bg-base-100 px-2 py-1 text-[11px] text-base-content/55">{{ $scope }}</code>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     <a
                         href="{{ route('panel.integrations.cloudflare.redirect') }}"
@@ -148,7 +167,7 @@
                         class="btn btn-primary btn-sm mt-4 rounded-xl px-4"
                         :class="loading && 'pointer-events-none opacity-70'"
                     >
-                        <span x-show="! loading">به‌روزرسانی مجوزهای Cloudflare</span>
+                        <span x-show="! loading">به‌روزرسانی دسترسی Cloudflare</span>
                         <span x-cloak x-show="loading" class="inline-flex items-center gap-2">
                             <span class="loading loading-spinner loading-xs"></span>
                             در حال انتقال
@@ -171,6 +190,28 @@
                             <p class="mt-1 text-xs leading-6 text-base-content/55">
                                 مشاهده دامنه‌ها فعال است، اما برای افزودن یا حذف دامنه باید مجوز مدیریت Cloudflare را تکمیل کنید.
                             </p>
+
+                            <div x-data="{ open: false }" class="mt-2">
+                                <button
+                                    type="button"
+                                    @click="open = ! open"
+                                    class="inline-flex items-center gap-1.5 text-[11px] font-medium text-base-content/45 hover:text-base-content/65"
+                                >
+                                    جزئیات فنی
+                                    <x-icon name="lucide.chevron-down" class="!size-3 transition-transform" x-bind:class="open && 'rotate-180'" />
+                                </button>
+
+                                <div x-cloak x-show="open" x-transition.opacity.duration.150ms class="mt-2 text-[11px] leading-6 text-base-content/45">
+                                    Zone Write هنوز فعال نیست.
+                                    @if ($missingZoneManagementScopes !== [])
+                                        <span dir="ltr" class="ms-1 inline-flex flex-wrap gap-1">
+                                            @foreach ($missingZoneManagementScopes as $scope)
+                                                <code class="rounded bg-base-100 px-1.5 py-0.5">{{ $scope }}</code>
+                                            @endforeach
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -258,7 +299,7 @@
                         class="btn btn-ghost btn-xs rounded-lg data-loading:pointer-events-none data-loading:opacity-60"
                         title="بستن فرم"
                     >
-                        <x-icon name="lucide.x" class="in-data-loading:block not-in-data-loading:hidden !size-4" />
+                        <x-icon name="lucide.x" class="in-data-loading:hidden !size-4" />
                         <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
                     </button>
                 </div>
@@ -607,17 +648,6 @@
                                     <div class="text-[10px] text-base-content/40">نوع Zone</div>
                                     <div class="mt-1 text-xs font-medium" dir="ltr">{{ $selectedZone['type'] ?? 'unknown' }}</div>
                                 </div>
-
-                                @if (! $canManageZones && $missingZoneManagementScopes !== [])
-                                    <div class="sm:col-span-2 text-xs leading-6 text-base-content/45">
-                                        مجوز فنی موردنیاز برای افزودن و حذف دامنه:
-                                        <span dir="ltr" class="inline-flex flex-wrap gap-1">
-                                            @foreach ($missingZoneManagementScopes as $scope)
-                                                <code class="rounded bg-base-100 px-1.5 py-0.5">{{ $scope }}</code>
-                                            @endforeach
-                                        </span>
-                                    </div>
-                                @endif
                             </div>
                         </div>
                     @endif
