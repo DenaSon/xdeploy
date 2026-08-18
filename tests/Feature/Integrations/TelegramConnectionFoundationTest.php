@@ -32,13 +32,24 @@ final class TelegramConnectionFoundationTest extends TestCase
 
     public function test_connection_routes_require_authentication(): void
     {
-        $this->get(
+        $this->post(
             route('panel.integrations.telegram.connect'),
         )->assertRedirect(route('login'));
 
         $this->delete(
             route('panel.integrations.telegram.disconnect'),
         )->assertRedirect(route('login'));
+    }
+
+    public function test_connect_is_not_available_as_a_get_mutation(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('panel.integrations.telegram.connect'))
+            ->assertMethodNotAllowed();
+
+        self::assertDatabaseCount('telegram_link_challenges', 0);
     }
 
     public function test_connect_creates_only_a_hashed_short_lived_challenge(): void
@@ -291,7 +302,7 @@ final class TelegramConnectionFoundationTest extends TestCase
     private function startLink(User $user): string
     {
         $response = $this->actingAs($user)
-            ->get(
+            ->post(
                 route('panel.integrations.telegram.connect'),
             )
             ->assertRedirect();
