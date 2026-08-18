@@ -228,9 +228,15 @@ final class RunPublicEndpointOperationJob implements ShouldQueue
                 );
             }
 
-            $lockedEndpoint->activated_at = match ($operation->operation) {
-                PublicEndpointOperationType::Enable => now(),
-                PublicEndpointOperationType::Disable => null,
+            match ($operation->operation) {
+                PublicEndpointOperationType::Enable => $lockedEndpoint->forceFill([
+                    'activated_at' => now(),
+                    'disabled_at' => null,
+                ]),
+                PublicEndpointOperationType::Disable => $lockedEndpoint->forceFill([
+                    'activated_at' => null,
+                    'disabled_at' => now(),
+                ]),
             };
 
             $lockedEndpoint->save();
