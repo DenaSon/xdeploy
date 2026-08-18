@@ -12,10 +12,11 @@ final class PublicEndpointStatusPresentationTest extends TestCase
     public function test_actionable_states_have_expected_primary_actions(): void
     {
         $cases = [
-            'enabled' => ['آماده استفاده', 'open', 'باز کردن سرویس'],
-            'pending' => ['نیازمند تکمیل', 'manage', 'تکمیل راه‌اندازی'],
-            'misconfigured' => ['نیازمند بررسی', 'refresh', 'بررسی وضعیت'],
-            'unknown' => ['وضعیت نامشخص', 'refresh', 'بررسی مجدد'],
+            'enabled' => ['آماده استفاده', 'open', 'باز کردن دامنه'],
+            'disabled' => ['غیرفعال', 'manage', 'فعال‌سازی دوباره'],
+            'pending' => ['نیازمند تکمیل', 'manage', 'ادامه راه‌اندازی'],
+            'misconfigured' => ['نیازمند بررسی', 'refresh', 'بررسی دوباره'],
+            'unknown' => ['وضعیت نامشخص', 'refresh', 'بررسی وضعیت'],
         ];
 
         foreach ($cases as $state => [$label, $action, $actionLabel]) {
@@ -27,14 +28,22 @@ final class PublicEndpointStatusPresentationTest extends TestCase
         }
     }
 
-    public function test_removing_state_has_no_interactive_primary_action(): void
+    public function test_disabling_state_has_no_interactive_primary_action(): void
+    {
+        $presentation = PublicEndpointStatusPresentation::for('disabling');
+
+        self::assertSame('disabling', $presentation['state']);
+        self::assertSame('در حال غیرفعال‌سازی', $presentation['label']);
+        self::assertNull($presentation['primary_action']);
+        self::assertNull($presentation['primary_label']);
+    }
+
+    public function test_legacy_removing_state_uses_safe_disabling_presentation(): void
     {
         $presentation = PublicEndpointStatusPresentation::for('removing');
 
-        self::assertSame('removing', $presentation['state']);
-        self::assertSame('در حال حذف', $presentation['label']);
-        self::assertNull($presentation['primary_action']);
-        self::assertNull($presentation['primary_label']);
+        self::assertSame('disabling', $presentation['state']);
+        self::assertSame('در حال غیرفعال‌سازی', $presentation['label']);
     }
 
     public function test_unknown_input_falls_back_to_safe_refresh_presentation(): void
@@ -43,6 +52,6 @@ final class PublicEndpointStatusPresentationTest extends TestCase
 
         self::assertSame('unknown', $presentation['state']);
         self::assertSame('refresh', $presentation['primary_action']);
-        self::assertSame('بررسی مجدد', $presentation['primary_label']);
+        self::assertSame('بررسی وضعیت', $presentation['primary_label']);
     }
 }

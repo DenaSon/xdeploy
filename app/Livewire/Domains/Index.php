@@ -41,12 +41,12 @@ final class Index extends Component
     public int $serverId;
 
     #[Locked]
-    public ?int $removalOperationId = null;
+    public ?int $disableOperationId = null;
 
     #[Locked]
-    public ?int $removalEndpointId = null;
+    public ?int $disableEndpointId = null;
 
-    public bool $removalOperationActive = false;
+    public bool $disableOperationActive = false;
 
     /** @var array<string, array<string, mixed>> */
     public array $statuses = [];
@@ -74,9 +74,7 @@ final class Index extends Component
             ->firstOrFail();
 
         $this->serverId = (int) $server->getKey();
-
-        $this->cleanupSucceededRemovals();
-        $this->syncActiveRemovalOperation();
+        $this->syncActiveDisableOperation();
     }
 
     public function loadDomains(PublicEndpointDriverRegistry $drivers): void
@@ -170,7 +168,7 @@ final class Index extends Component
                         ->lockForUpdate()
                         ->firstOrFail();
 
-                    if ($endpoint->isActive()) {
+                    if (! $endpoint->isPending()) {
                         return false;
                     }
 
@@ -199,7 +197,7 @@ final class Index extends Component
         $this->endpointError = null;
     }
 
-    public function removeEndpoint(
+    public function disableEndpoint(
         int $endpointId,
         QueuePublicEndpointOperationAction $queueOperation,
     ): void {
@@ -219,40 +217,40 @@ final class Index extends Component
                 operationType: PublicEndpointOperationType::Disable,
             );
 
-            $this->removalOperationId = (int) $operation->getKey();
-            $this->removalEndpointId = (int) $endpoint->getKey();
-            $this->removalOperationActive = true;
+            $this->disableOperationId = (int) $operation->getKey();
+            $this->disableEndpointId = (int) $endpoint->getKey();
+            $this->disableOperationActive = true;
         } catch (ServerMutationInProgressException) {
-            $this->syncActiveRemovalOperation();
+            $this->syncActiveDisableOperation();
             $this->endpointError =
                 'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
         } catch (Throwable $exception) {
             report($exception);
             $this->endpointError =
-                'شروع حذف دامنه با خطا مواجه شد. دوباره تلاش کنید.';
+                'شروع غیرفعال‌سازی دامنه با خطا مواجه شد. دوباره تلاش کنید.';
         }
     }
 
-    public function pollRemovalOperation(): void
+    public function pollDisableOperation(): void
     {
         if (
-            ! $this->removalOperationActive
-            || $this->removalOperationId === null
+            ! $this->disableOperationActive
+            || $this->disableOperationId === null
         ) {
             return;
         }
 
         $operation = PublicEndpointOperation::query()
-            ->whereKey($this->removalOperationId)
+            ->whereKey($this->disableOperationId)
             ->where('user_id', $this->authenticatedUser()->getKey())
             ->where('server_id', $this->serverId)
             ->where('operation', PublicEndpointOperationType::Disable->value)
             ->first();
 
         if (! $operation instanceof PublicEndpointOperation) {
-            $this->clearRemovalOperation();
+            $this->clearDisableOperation();
             $this->endpointError =
-                'وضعیت عملیات حذف دامنه در دسترس نیست. صفحه را بروزرسانی کنید.';
+                'وضعیت عملیات غیرفعال‌سازی دامنه در دسترس نیست. صفحه را بروزرسانی کنید.';
 
             return;
         }
@@ -261,32 +259,85 @@ final class Index extends Component
             return;
         }
 
-        $this->clearRemovalOperation();
+        $this->clearDisableOperation();
 
         if ($operation->status === PublicEndpointOperationStatus::Failed) {
-            $this->endpointError = $this->removeOperationFailureMessage(
+            $this->endpointError = $this->disableOperationFailureMessage(
                 $operation->failure_code,
             );
 
             return;
         }
 
-        $applicationType = $operation->application_type;
         $endpoint = PublicEndpoint::query()
             ->whereKey($operation->public_endpoint_id)
             ->where('server_id', $this->serverId)
             ->first();
 
-        if ($endpoint?->isActive() === true) {
+        if (! $endpoint instanceof PublicEndpoint || ! $endpoint->isDisabled()) {
             $this->endpointError =
-                'حذف دامنه کامل نشد. وضعیت دامنه و سرور را بروزرسانی کنید.';
+                'غیرفعال‌سازی دامنه کامل نشد. وضعیت دامنه و سرور را بروزرسانی کنید.';
 
             return;
         }
 
-        $endpoint?->delete();
+        $this->markEndpointDisabled($operation->application_type);
+        $this->selectedApplication = null;
+        $this->showSetup = false;
+        $this->showDrawer = false;
+        $this->endpointError = null;
+    }
 
-        $this->markEndpointDisabled($applicationType);
+    public function deleteEndpoint(
+        int $endpointId,
+        ServerMutationGuard $serverMutationGuard,
+    ): void {
+        $this->endpointError = null;
+
+        try {
+            $deleted = DB::transaction(
+                function () use (
+                    $endpointId,
+                    $serverMutationGuard,
+                ): bool {
+                    $server = Server::query()
+                        ->ownedBy($this->authenticatedUser())
+                        ->whereKey($this->serverId)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    $endpoint = PublicEndpoint::query()
+                        ->where('server_id', $server->getKey())
+                        ->whereKey($endpointId)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    if (! $endpoint->isDisabled()) {
+                        return false;
+                    }
+
+                    $serverMutationGuard->ensureAvailable(
+                        $server,
+                    );
+
+                    return (bool) $endpoint->delete();
+                },
+                attempts: 3,
+            );
+        } catch (ServerMutationInProgressException) {
+            $this->endpointError =
+                'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.';
+
+            return;
+        }
+
+        if (! $deleted) {
+            $this->endpointError =
+                'برای حذف اتصال دامنه، ابتدا دسترسی عمومی آن را غیرفعال کنید.';
+
+            return;
+        }
+
         $this->selectedApplication = null;
         $this->showSetup = false;
         $this->showDrawer = false;
@@ -438,6 +489,7 @@ final class Index extends Component
             ]);
             $endpoint->domain = $normalized;
             $endpoint->activated_at ??= now();
+            $endpoint->disabled_at = null;
             $endpoint->save();
         } catch (InvalidPublicEndpointDomainException|QueryException $exception) {
             report($exception);
@@ -451,9 +503,11 @@ final class Index extends Component
         return $this->endpoints()
             ->map(function (PublicEndpoint $endpoint): array {
                 $type = $endpoint->application_type;
-                $state = $endpoint->isActive()
-                    ? $this->activeEndpointState($endpoint)
-                    : 'pending';
+                $state = match (true) {
+                    $endpoint->isActive() => $this->activeEndpointState($endpoint),
+                    $endpoint->isDisabled() => 'disabled',
+                    default => 'pending',
+                };
 
                 return [
                     'id' => (int) $endpoint->getKey(),
@@ -597,28 +651,7 @@ final class Index extends Component
             : 'misconfigured';
     }
 
-    private function cleanupSucceededRemovals(): void
-    {
-        $operations = PublicEndpointOperation::query()
-            ->where('user_id', $this->authenticatedUser()->getKey())
-            ->where('server_id', $this->serverId)
-            ->where('operation', PublicEndpointOperationType::Disable->value)
-            ->where('status', PublicEndpointOperationStatus::Succeeded->value)
-            ->get();
-
-        foreach ($operations as $operation) {
-            $endpoint = PublicEndpoint::query()
-                ->whereKey($operation->public_endpoint_id)
-                ->where('server_id', $this->serverId)
-                ->first();
-
-            if ($endpoint !== null && ! $endpoint->isActive()) {
-                $endpoint->delete();
-            }
-        }
-    }
-
-    private function syncActiveRemovalOperation(): void
+    private function syncActiveDisableOperation(): void
     {
         $operation = PublicEndpointOperation::query()
             ->where('user_id', $this->authenticatedUser()->getKey())
@@ -629,21 +662,21 @@ final class Index extends Component
             ->first();
 
         if (! $operation instanceof PublicEndpointOperation) {
-            $this->clearRemovalOperation();
+            $this->clearDisableOperation();
 
             return;
         }
 
-        $this->removalOperationId = (int) $operation->getKey();
-        $this->removalEndpointId = (int) $operation->public_endpoint_id;
-        $this->removalOperationActive = true;
+        $this->disableOperationId = (int) $operation->getKey();
+        $this->disableEndpointId = (int) $operation->public_endpoint_id;
+        $this->disableOperationActive = true;
     }
 
-    private function clearRemovalOperation(): void
+    private function clearDisableOperation(): void
     {
-        $this->removalOperationId = null;
-        $this->removalEndpointId = null;
-        $this->removalOperationActive = false;
+        $this->disableOperationId = null;
+        $this->disableEndpointId = null;
+        $this->disableOperationActive = false;
     }
 
     private function markEndpointDisabled(ApplicationType $type): void
@@ -671,21 +704,21 @@ final class Index extends Component
         );
     }
 
-    private function removeOperationFailureMessage(?string $failureCode): string
+    private function disableOperationFailureMessage(?string $failureCode): string
     {
         $failure = $failureCode === null
             ? null
             : PublicEndpointOperationFailure::tryFrom($failureCode);
 
         return match ($failure) {
-            PublicEndpointOperationFailure::ExistingConfiguration => 'پیکربندی دامنه روی سرور با endpoint ثبت‌شده هم‌خوان نیست. برای جلوگیری از حذف تنظیمات ناشناخته عملیات متوقف شد.',
+            PublicEndpointOperationFailure::ExistingConfiguration => 'پیکربندی دامنه روی سرور با اتصال ثبت‌شده هم‌خوان نیست. برای جلوگیری از تغییر ناخواسته، غیرفعال‌سازی متوقف شد.',
             PublicEndpointOperationFailure::OperationInProgress => 'یک عملیات دامنه دیگر روی سرور در حال اجرا است. پس از پایان آن دوباره تلاش کنید.',
-            PublicEndpointOperationFailure::EnvironmentUnavailable => 'ابزارها یا فایل‌های لازم برای حذف امن دامنه در دسترس نیستند.',
+            PublicEndpointOperationFailure::EnvironmentUnavailable => 'اتصال SSH یا ابزارهای لازم برای غیرفعال‌سازی امن دامنه در دسترس نیست.',
             PublicEndpointOperationFailure::CandidateValidation,
             PublicEndpointOperationFailure::Mutation,
             PublicEndpointOperationFailure::Verification,
-            PublicEndpointOperationFailure::Preflight => 'حذف دامنه کامل نشد. وضعیت برنامه و Caddy را بروزرسانی و دوباره بررسی کنید.',
-            null => 'حذف دامنه با خطا مواجه شد. وضعیت سرور را بروزرسانی و دوباره تلاش کنید.',
+            PublicEndpointOperationFailure::Preflight => 'غیرفعال‌سازی دامنه کامل نشد. وضعیت برنامه و Caddy را بروزرسانی و دوباره بررسی کنید.',
+            null => 'غیرفعال‌سازی دامنه با خطا مواجه شد. وضعیت سرور را بروزرسانی و دوباره تلاش کنید.',
         };
     }
 

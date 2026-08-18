@@ -157,12 +157,12 @@ final class DomainIndexTest extends TestCase
             'domain' => 'automation.example.com',
         ]);
 
-        $this->assertNotNull(
-            PublicEndpoint::query()
-                ->where('application_type', ApplicationType::N8n->value)
-                ->firstOrFail()
-                ->activated_at,
-        );
+        $endpoint = PublicEndpoint::query()
+            ->where('application_type', ApplicationType::N8n->value)
+            ->firstOrFail();
+
+        $this->assertNotNull($endpoint->activated_at);
+        $this->assertNull($endpoint->disabled_at);
     }
 
     public function test_existing_marzban_endpoint_keeps_n8n_available_for_new_domain(): void
@@ -191,7 +191,7 @@ final class DomainIndexTest extends TestCase
             ->assertSee('n8n');
     }
 
-    public function test_active_n8n_endpoint_removal_is_queued_and_polled(): void
+    public function test_active_n8n_endpoint_can_be_disabled_without_deleting_connection(): void
     {
         Queue::fake();
 
@@ -214,8 +214,9 @@ final class DomainIndexTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(DomainsIndex::class, ['server' => $server])
             ->call('loadDomains')
-            ->call('removeEndpoint', (int) $endpoint->getKey())
-            ->assertSet('removalOperationActive', true)
+            ->assertSee('غیرفعال‌کردن')
+            ->call('disableEndpoint', (int) $endpoint->getKey())
+            ->assertSet('disableOperationActive', true)
             ->assertSet('endpointError', null);
 
         $this->assertSame(0, $n8n->disableCalls);
@@ -251,19 +252,23 @@ final class DomainIndexTest extends TestCase
             $operation->status,
         );
         $this->assertNull($endpoint->activated_at);
+        $this->assertNotNull($endpoint->disabled_at);
 
         $component
-            ->call('pollRemovalOperation')
-            ->assertSet('removalOperationActive', false)
+            ->call('pollDisableOperation')
+            ->assertSet('disableOperationActive', false)
             ->assertSet('showDrawer', false)
-            ->assertSet('endpointError', null);
+            ->assertSet('endpointError', null)
+            ->assertSee('فعال‌سازی دوباره')
+            ->assertSee('حذف اتصال');
 
-        $this->assertDatabaseMissing('public_endpoints', [
+        $this->assertDatabaseHas('public_endpoints', [
             'id' => $endpoint->getKey(),
+            'domain' => 'automation.example.com',
         ]);
     }
 
-    public function test_active_application_operation_blocks_endpoint_removal(): void
+    public function test_active_application_operation_blocks_endpoint_disable(): void
     {
         Queue::fake();
 
@@ -294,8 +299,8 @@ final class DomainIndexTest extends TestCase
         Livewire::actingAs($user)
             ->test(DomainsIndex::class, ['server' => $server])
             ->call('loadDomains')
-            ->call('removeEndpoint', (int) $endpoint->getKey())
-            ->assertSet('removalOperationActive', false)
+            ->call('disableEndpoint', (int) $endpoint->getKey())
+            ->assertSet('disableOperationActive', false)
             ->assertSet(
                 'endpointError',
                 'یک عملیات دیگر روی این سرور در حال انجام است. پس از پایان آن دوباره تلاش کنید.',
@@ -303,6 +308,63 @@ final class DomainIndexTest extends TestCase
 
         $this->assertSame(0, $n8n->disableCalls);
         $this->assertDatabaseCount('public_endpoint_operations', 0);
+        Queue::assertNotPushed(RunPublicEndpointOperationJob::class);
+    }
+
+    public function test_disabled_endpoint_survives_new_mount_and_offers_reactivation(): void
+    {
+        $user = $this->createUser('09173432214');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+            'disabled_at' => now(),
+        ]);
+
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->assertSee('automation.example.com')
+            ->assertSee('غیرفعال')
+            ->assertSee('فعال‌سازی دوباره')
+            ->assertSee('حذف اتصال');
+
+        $endpoint->refresh();
+        $this->assertTrue($endpoint->isDisabled());
+    }
+
+    public function test_disabled_endpoint_can_be_deleted_without_remote_mutation(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09173432215');
+        $server = $this->createServer($user);
+        [$marzban, $n8n] = $this->drivers();
+
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+            'disabled_at' => now(),
+        ]);
+
+        $this->bindDrivers($marzban, $n8n);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('loadDomains')
+            ->call('deleteEndpoint', (int) $endpoint->getKey())
+            ->assertSet('endpointError', null);
+
+        $this->assertDatabaseMissing('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
+        $this->assertSame(0, $n8n->disableCalls);
         Queue::assertNotPushed(RunPublicEndpointOperationJob::class);
     }
 
@@ -373,6 +435,27 @@ final class DomainIndexTest extends TestCase
             'id' => $endpoint->getKey(),
         ]);
         $this->assertSame(0, $n8n->disableCalls);
+    }
+
+    public function test_disabled_endpoint_cannot_be_cancelled_as_pending(): void
+    {
+        $user = $this->createUser('09173432216');
+        $server = $this->createServer($user);
+
+        $endpoint = PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+            'disabled_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(DomainsIndex::class, ['server' => $server])
+            ->call('cancelPendingEndpoint', (int) $endpoint->getKey());
+
+        $this->assertDatabaseHas('public_endpoints', [
+            'id' => $endpoint->getKey(),
+        ]);
     }
 
     public function test_domains_workspace_rejects_a_foreign_server(): void

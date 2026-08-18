@@ -5,7 +5,7 @@
     'openUrl' => null,
     'applicationUrl' => null,
     'manageEndpointId' => null,
-    'removing' => false,
+    'disabling' => false,
 ])
 
 @php
@@ -18,7 +18,7 @@
         : null;
 
     $presentation = \App\Support\PublicEndpoint\PublicEndpointStatusPresentation::for(
-        $removing ? 'removing' : $state,
+        $disabling ? 'disabling' : $state,
     );
 
     $tone = match ($presentation['tone']) {
@@ -68,7 +68,7 @@
         <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex min-w-0 items-start gap-3.5">
                 <div class="flex size-10 shrink-0 items-center justify-center rounded-xl {{ $tone['icon'] }}">
-                    @if ($presentation['state'] === 'removing' || $presentation['state'] === 'checking')
+                    @if ($presentation['state'] === 'disabling' || $presentation['state'] === 'checking')
                         <span class="loading loading-spinner loading-xs"></span>
                     @else
                         <x-icon
@@ -103,6 +103,11 @@
                             <span class="inline-flex items-center gap-1.5 text-success">
                                 <x-icon name="lucide.shield-check" class="!size-3.5" />
                                 HTTPS فعال
+                            </span>
+                        @elseif ($presentation['state'] === 'disabled')
+                            <span class="inline-flex items-center gap-1.5 text-warning">
+                                <x-icon name="lucide.shield-off" class="!size-3.5" />
+                                HTTPS غیرفعال
                             </span>
                         @endif
                     </div>
@@ -156,7 +161,7 @@
 
                 @if ($applicationUrl !== null)
                     <x-button
-                        label="مشاهده برنامه"
+                        label="مدیریت برنامه"
                         icon="lucide.package-open"
                         :link="$applicationUrl"
                         wire:navigate
@@ -164,16 +169,22 @@
                     />
                 @endif
 
-                @if (
-                    $manageEndpointId !== null
-                    && ! in_array($presentation['state'], ['pending', 'removing'], true)
-                )
+                @if ($presentation['state'] === 'enabled' && $manageEndpointId !== null)
                     <x-button
-                        label="حذف دامنه"
+                        label="غیرفعال‌کردن"
+                        icon="lucide.power"
+                        wire:click="disableEndpoint({{ (int) $manageEndpointId }})"
+                        spinner="disableEndpoint"
+                        wire:confirm="دسترسی عمومی و HTTPS دامنه {{ $domain }} غیرفعال شود؟ اتصال دامنه در Coreflare حفظ می‌شود، DNS تغییر نمی‌کند و می‌توانید بعداً دوباره آن را فعال کنید."
+                        class="btn-warning btn-outline btn-sm rounded-xl"
+                    />
+                @elseif ($presentation['state'] === 'disabled' && $manageEndpointId !== null)
+                    <x-button
+                        label="حذف اتصال"
                         icon="lucide.unlink"
-                        wire:click="removeEndpoint({{ (int) $manageEndpointId }})"
-                        spinner="removeEndpoint"
-                        wire:confirm="دامنه {{ $domain }} از {{ $application }} حذف شود؟ برنامه روی سرور باقی می‌ماند اما دسترسی عمومی این دامنه و HTTPS آن غیرفعال می‌شود."
+                        wire:click="deleteEndpoint({{ (int) $manageEndpointId }})"
+                        spinner="deleteEndpoint"
+                        wire:confirm="اتصال دامنه {{ $domain }} از {{ $application }} حذف شود؟ این کار اتصال ثبت‌شده در Coreflare را حذف می‌کند و رکوردهای DNS را تغییر نمی‌دهد."
                         class="btn-error btn-outline btn-sm rounded-xl"
                     />
                 @endif

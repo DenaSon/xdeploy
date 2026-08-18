@@ -4,8 +4,8 @@
 >
     <div
         wire:init="loadDomains"
-        @if ($removalOperationActive)
-            wire:poll.2s="pollRemovalOperation"
+        @if ($disableOperationActive)
+            wire:poll.2s="pollDisableOperation"
         @endif
         class="space-y-5"
     >
@@ -39,7 +39,7 @@
                     />
 
                     <x-button
-                        label="افزودن دامنه"
+                        label="اتصال دامنه جدید"
                         icon="lucide.plus"
                         wire:click="openDomainDrawer"
                         :disabled="! $canAddDomain"
@@ -65,7 +65,7 @@
             </div>
         @endif
 
-        @if ($removalOperationActive)
+        @if ($disableOperationActive)
             <div
                 role="status"
                 class="flex items-start gap-3 rounded-2xl border border-info/20 bg-info/5 px-5 py-4"
@@ -73,7 +73,7 @@
                 <span class="loading loading-spinner loading-sm mt-0.5 text-info"></span>
 
                 <p class="text-sm leading-7 text-base-content/60">
-                    حذف دامنه روی سرور در پس‌زمینه در حال انجام است. تا پایان این عملیات، تغییر دیگری روی سرور شروع نمی‌شود.
+                    دسترسی عمومی و HTTPS دامنه در پس‌زمینه در حال غیرفعال‌شدن است. اتصال دامنه حفظ می‌شود و تا پایان این عملیات، تغییر دیگری روی سرور شروع نمی‌شود.
                 </p>
             </div>
         @endif
@@ -120,7 +120,7 @@
                     </div>
 
                     <x-button
-                        label="تلاش دوباره"
+                        label="بررسی دوباره"
                         icon="lucide.refresh-cw"
                         wire:click="refreshDomains"
                         spinner="refreshDomains"
@@ -146,7 +146,7 @@
                     </p>
 
                     <x-button
-                        label="مشاهده برنامه‌ها"
+                        label="مدیریت برنامه‌ها"
                         icon="lucide.package-open"
                         :link="route('panel.servers.applications.index', ['server' => $server])"
                         wire:navigate
@@ -162,7 +162,7 @@
                     </p>
 
                     <x-button
-                        label="افزودن دامنه"
+                        label="اتصال دامنه جدید"
                         icon="lucide.plus"
                         wire:click="openDomainDrawer"
                         :disabled="! $canAddDomain"
@@ -181,14 +181,14 @@
                         :open-url="$endpoint['open_url']"
                         :application-url="$endpoint['application_url']"
                         :manage-endpoint-id="$endpoint['id']"
-                        :removing="$removalOperationActive && $removalEndpointId === $endpoint['id']"
+                        :disabling="$disableOperationActive && $disableEndpointId === $endpoint['id']"
                     />
                 @endforeach
             </div>
 
             @if (! $canAddDomain)
                 <p class="px-1 text-xs leading-6 text-base-content/40">
-                    هر برنامه در نسخه فعلی xDeploy می‌تواند یک دامنه عمومی داشته باشد. برای دامنه جدید، برنامه دیگری باید نصب و بدون endpoint باشد.
+                    هر برنامه در نسخه فعلی Coreflare می‌تواند یک دامنه عمومی داشته باشد. برای دامنه جدید، برنامه دیگری باید نصب و بدون endpoint باشد.
                 </p>
             @endif
         @endif
@@ -241,7 +241,7 @@
                                     </p>
 
                                     <p class="mt-3 text-sm leading-7 text-base-content/50">
-                                        برای جایگزینی دامنه، ابتدا endpoint فعلی را از کارت دامنه حذف و سپس دامنه جدید را اضافه کنید.
+                                        برای جایگزینی دامنه، ابتدا دسترسی عمومی دامنه فعلی را غیرفعال کنید و سپس اتصال آن را حذف کنید.
                                     </p>
                                 </div>
                             </div>
@@ -274,17 +274,17 @@
                             :key="'public-endpoint-setup-'.$serverId.'-'.$selectedApplicationMeta['type']"
                         />
 
-                        @if ($selectedEndpoint !== null && ! $selectedEndpoint->isActive())
+                        @if ($selectedEndpoint?->isPending())
                             <div class="flex items-center justify-between gap-4 border-t border-base-300 pt-4">
                                 <p class="text-xs leading-6 text-base-content/40">
-                                    لغو اتصال فقط تا قبل از فعال‌شدن HTTPS امکان‌پذیر است.
+                                    راه‌اندازی را فقط پیش از فعال‌شدن HTTPS می‌توانید لغو کنید.
                                 </p>
 
                                 <x-button
-                                    label="لغو اتصال"
+                                    label="لغو راه‌اندازی"
                                     icon="lucide.unlink"
                                     wire:click="cancelPendingEndpoint({{ $selectedEndpoint->getKey() }})"
-                                    wire:confirm="اتصال این دامنه لغو شود؟"
+                                    wire:confirm="راه‌اندازی این دامنه لغو شود؟"
                                     class="btn-error btn-outline btn-sm shrink-0 rounded-xl"
                                 />
                             </div>
@@ -359,7 +359,7 @@
                         @if ($availableApplications !== [])
                             <div class="flex justify-end border-t border-base-300 pt-4">
                                 <x-button
-                                    label="ادامه"
+                                    label="تنظیم دامنه"
                                     icon="lucide.arrow-left"
                                     wire:click="continueDomainSetup"
                                     :disabled="$selectedApplication === null"
