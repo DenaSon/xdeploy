@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Integrations\Telegram\Jobs;
 
+use App\Application\Notifications\NotificationPreferenceService;
+use App\Application\Notifications\NotificationTopic;
 use App\Infrastructure\Integrations\Telegram\TelegramBotClient;
 use App\Models\TelegramConnection;
 use Illuminate\Bus\Queueable;
@@ -29,6 +31,7 @@ final class DeliverTelegramNotification implements ShouldBeEncrypted, ShouldQueu
 
     public function __construct(
         public readonly int $userId,
+        public readonly NotificationTopic $topic,
         #[SensitiveParameter]
         public readonly string $text,
     ) {
@@ -43,9 +46,17 @@ final class DeliverTelegramNotification implements ShouldBeEncrypted, ShouldQueu
         return [15, 60, 180];
     }
 
-    public function handle(TelegramBotClient $telegram): void
-    {
-        if (! $telegram->configured()) {
+    public function handle(
+        TelegramBotClient $telegram,
+        NotificationPreferenceService $preferences,
+    ): void {
+        if (
+            ! $telegram->configured()
+            || ! $preferences->telegramEnabledForUserId(
+                $this->userId,
+                $this->topic,
+            )
+        ) {
             return;
         }
 
