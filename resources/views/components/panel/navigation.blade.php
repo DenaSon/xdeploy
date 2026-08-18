@@ -86,7 +86,7 @@
         @endif
 
         <x-menu-item
-            title="اتصال‌ها"
+            title="یکپارچه‌سازی‌ها"
             icon="lucide.link-2"
             :link="route('panel.integrations.index')"
             :active="request()->routeIs('panel.integrations.*')"
