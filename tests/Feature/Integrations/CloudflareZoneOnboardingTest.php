@@ -305,7 +305,7 @@ final class CloudflareZoneOnboardingTest extends TestCase
         );
     }
 
-    private function accountsResponse(string $accountId): \Illuminate\Http\Client\Response
+    private function accountsResponse(string $accountId)
     {
         return Http::response([
             'success' => true,
@@ -318,7 +318,7 @@ final class CloudflareZoneOnboardingTest extends TestCase
     }
 
     /** @param list<array<string, mixed>> $zones */
-    private function zonesResponse(array $zones): \Illuminate\Http\Client\Response
+    private function zonesResponse(array $zones)
     {
         return Http::response([
             'success' => true,
