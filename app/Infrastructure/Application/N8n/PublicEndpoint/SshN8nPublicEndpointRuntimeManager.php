@@ -10,6 +10,7 @@ use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Infrastructure\Application\N8n\PublicEndpoint\DTOs\N8nRuntimeConfiguration;
 use App\Infrastructure\Application\N8n\PublicEndpoint\DTOs\N8nRuntimeMutation;
 use App\Support\SSH\SSHTimeout;
+use Illuminate\Support\Facades\Log;
 
 final readonly class SshN8nPublicEndpointRuntimeManager
 {
@@ -85,6 +86,18 @@ candidate_dir=''
 backup_dir=''
 mutation_started=0
 workflow_finished=0
+readiness_attempts=0
+readiness_http_code=''
+readiness_container_running=0
+verification_attempts=0
+verification_http_code=''
+verification_container_running=0
+recovery_attempted=0
+recovery_restored=0
+recovery_recovered=0
+recovery_readiness_attempts=0
+recovery_readiness_http_code=''
+recovery_container_running=0
 
 emit_failure() {
     stage="$1"
@@ -95,6 +108,13 @@ emit_failure() {
     printf 'stage=%s\n' "$stage"
     printf 'configuration_restored=%s\n' "$restored"
     printf 'services_recovered=%s\n' "$recovered"
+    printf 'verification_attempts=%s\n' "$verification_attempts"
+    printf 'verification_http_code=%s\n' "$verification_http_code"
+    printf 'verification_container_running=%s\n' "$verification_container_running"
+    printf 'recovery_attempted=%s\n' "$recovery_attempted"
+    printf 'recovery_readiness_attempts=%s\n' "$recovery_readiness_attempts"
+    printf 'recovery_readiness_http_code=%s\n' "$recovery_readiness_http_code"
+    printf 'recovery_container_running=%s\n' "$recovery_container_running"
 }
 
 compose() {
@@ -107,16 +127,45 @@ container_running() {
         [ "$(docker inspect --format '{{.State.Running}}' "$container_id" 2>/dev/null)" = 'true' ]
 }
 
-local_runtime_ready() {
-    http_code="$(
+runtime_readiness_probe() {
+    readiness_http_code=''
+    readiness_container_running=0
+
+    if ! container_running; then
+        return 1
+    fi
+
+    readiness_container_running=1
+    readiness_http_code="$(
         curl --silent --show-error --output /dev/null \
-            --write-out '%{http_code}' --connect-timeout 3 --max-time 8 \
-            'http://127.0.0.1:5678/' 2>/dev/null
+            --write-out '%{http_code}' --connect-timeout 1 --max-time 1 \
+            'http://127.0.0.1:5678/healthz/readiness' 2>/dev/null || true
     )"
-    case "$http_code" in
-        2??|3??) return 0 ;;
-        *) return 1 ;;
-    esac
+
+    [ "$readiness_http_code" = '200' ]
+}
+
+wait_for_runtime_readiness() {
+    readiness_attempts=0
+    readiness_http_code=''
+    readiness_container_running=0
+    attempt=1
+
+    while [ "$attempt" -le 30 ]; do
+        readiness_attempts="$attempt"
+
+        if runtime_readiness_probe; then
+            return 0
+        fi
+
+        if [ "$attempt" -lt 30 ]; then
+            sleep 2
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    return 1
 }
 
 atomic_restore() {
@@ -127,24 +176,35 @@ atomic_restore() {
 }
 
 compensate() {
-    restored=0
-    recovered=0
+    recovery_attempted=1
+    recovery_restored=0
+    recovery_recovered=0
+    recovery_readiness_attempts=0
+    recovery_readiness_http_code=''
+    recovery_container_running=0
 
     if [ -n "$backup_dir" ] && [ -r "$backup_dir/.env" ]; then
         if atomic_restore "$backup_dir/.env" "$env_file"; then
-            restored=1
-            if compose up -d --force-recreate >/dev/null 2>&1 && container_running && local_runtime_ready; then
-                recovered=1
+            recovery_restored=1
+
+            if compose up -d --force-recreate >/dev/null 2>&1; then
+                if wait_for_runtime_readiness; then
+                    recovery_recovered=1
+                fi
+
+                recovery_readiness_attempts="$readiness_attempts"
+                recovery_readiness_http_code="$readiness_http_code"
+                recovery_container_running="$readiness_container_running"
             fi
         fi
     fi
 
-    if [ "$restored" -eq 1 ] && [ "$recovered" -eq 1 ]; then
+    if [ "$recovery_restored" -eq 1 ] && [ "$recovery_recovered" -eq 1 ]; then
         rm -f "$transaction_file"
         rm -rf "$backup_dir"
     fi
 
-    printf '%s|%s' "$restored" "$recovered"
+    return 0
 }
 
 cleanup() {
@@ -286,39 +346,32 @@ mutation_started=1
 
 install -m 600 "$candidate_env" "${env_file}.xdeploy-new.$$" &&
     mv -f "${env_file}.xdeploy-new.$$" "$env_file" || {
-        recovery="$(compensate)"
+        compensate
         workflow_finished=1
-        emit_failure mutation "${recovery%%|*}" "${recovery#*|}"
+        emit_failure mutation "$recovery_restored" "$recovery_recovered"
         exit 72
     }
 
 if ! compose up -d --force-recreate >/dev/null 2>&1; then
-    recovery="$(compensate)"
+    compensate
     workflow_finished=1
-    emit_failure mutation "${recovery%%|*}" "${recovery#*|}"
+    emit_failure mutation "$recovery_restored" "$recovery_recovered"
     exit 72
 fi
 
-verified=0
-attempt=1
-while [ "$attempt" -le 15 ]; do
-    if container_running && local_runtime_ready; then
-        verified=1
-        break
-    fi
-    sleep 2
-    attempt=$((attempt + 1))
-done
+if ! wait_for_runtime_readiness; then
+    verification_attempts="$readiness_attempts"
+    verification_http_code="$readiness_http_code"
+    verification_container_running="$readiness_container_running"
 
-if [ "$verified" -ne 1 ]; then
-    recovery="$(compensate)"
+    compensate
     workflow_finished=1
-    restored="${recovery%%|*}"
-    recovered="${recovery#*|}"
-    emit_failure verification "$restored" "$recovered"
-    if [ "$restored" -eq 1 ] && [ "$recovered" -eq 1 ]; then
+    emit_failure verification "$recovery_restored" "$recovery_recovered"
+
+    if [ "$recovery_restored" -eq 1 ] && [ "$recovery_recovered" -eq 1 ]; then
         exit 73
     fi
+
     exit 74
 fi
 
@@ -487,7 +540,13 @@ BASH;
         $values = $this->parseKeyValues($result->output);
 
         if (! $result->successful()) {
-            $recoveryAttempted = ($values['configuration_restored'] ?? '0') === '1'
+            $this->logRuntimeFailure(
+                values: $values,
+                exitCode: $result->exitCode,
+            );
+
+            $recoveryAttempted = ($values['recovery_attempted'] ?? '0') === '1'
+                || ($values['configuration_restored'] ?? '0') === '1'
                 || ($values['services_recovered'] ?? '0') === '1';
             $recovered = ($values['configuration_restored'] ?? '0') === '1'
                 && ($values['services_recovered'] ?? '0') === '1';
@@ -521,6 +580,91 @@ BASH;
             backupToken: $token,
             configurationChanged: $changed,
         );
+    }
+
+    /** @param array<string, string> $values */
+    private function logRuntimeFailure(array $values, int $exitCode): void
+    {
+        $configurationRestored = $this->diagnosticBoolean(
+            $values['configuration_restored'] ?? null,
+        );
+        $servicesRecovered = $this->diagnosticBoolean(
+            $values['services_recovered'] ?? null,
+        );
+
+        $context = [
+            'stage' => $this->diagnosticStage($values['stage'] ?? null),
+            'exit_code' => $exitCode,
+            'verification_attempts' => $this->diagnosticInteger(
+                $values['verification_attempts'] ?? null,
+            ),
+            'verification_http_code' => $this->diagnosticHttpCode(
+                $values['verification_http_code'] ?? null,
+            ),
+            'verification_container_running' => $this->diagnosticBoolean(
+                $values['verification_container_running'] ?? null,
+            ),
+            'recovery_attempted' => $this->diagnosticBoolean(
+                $values['recovery_attempted'] ?? null,
+            ),
+            'configuration_restored' => $configurationRestored,
+            'services_recovered' => $servicesRecovered,
+            'recovery_readiness_attempts' => $this->diagnosticInteger(
+                $values['recovery_readiness_attempts'] ?? null,
+            ),
+            'recovery_readiness_http_code' => $this->diagnosticHttpCode(
+                $values['recovery_readiness_http_code'] ?? null,
+            ),
+            'recovery_container_running' => $this->diagnosticBoolean(
+                $values['recovery_container_running'] ?? null,
+            ),
+        ];
+
+        if ($configurationRestored && $servicesRecovered) {
+            Log::warning(
+                'public_endpoint.n8n.runtime_verification_failed',
+                $context,
+            );
+
+            return;
+        }
+
+        Log::error(
+            'public_endpoint.n8n.runtime_verification_failed',
+            $context,
+        );
+    }
+
+    private function diagnosticStage(?string $value): string
+    {
+        return in_array(
+            $value,
+            ['environment', 'candidate', 'busy', 'mutation', 'verification'],
+            true,
+        ) ? $value : 'unknown';
+    }
+
+    private function diagnosticBoolean(?string $value): bool
+    {
+        return $value === '1';
+    }
+
+    private function diagnosticInteger(?string $value): int
+    {
+        if ($value === null || preg_match('/^\d{1,4}$/', $value) !== 1) {
+            return 0;
+        }
+
+        return min((int) $value, 9999);
+    }
+
+    private function diagnosticHttpCode(?string $value): ?string
+    {
+        if ($value === null || preg_match('/^\d{3}$/', $value) !== 1) {
+            return null;
+        }
+
+        return $value;
     }
 
     /** @return array<string, string> */
