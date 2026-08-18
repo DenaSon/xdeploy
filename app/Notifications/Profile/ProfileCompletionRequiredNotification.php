@@ -6,6 +6,7 @@ namespace App\Notifications\Profile;
 
 use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
 use App\Application\Integrations\Telegram\TelegramMessage;
+use App\Application\Notifications\NotificationTopic;
 use App\Infrastructure\Integrations\Telegram\TelegramChannel;
 use Illuminate\Notifications\Notification;
 
@@ -20,6 +21,11 @@ final class ProfileCompletionRequiredNotification extends Notification implement
             'database',
             TelegramChannel::class,
         ];
+    }
+
+    public function telegramTopic(): NotificationTopic
+    {
+        return NotificationTopic::Account;
     }
 
     /**
