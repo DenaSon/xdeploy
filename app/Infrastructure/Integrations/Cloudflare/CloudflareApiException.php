@@ -33,6 +33,9 @@ final class CloudflareApiException extends RuntimeException
         public readonly string $reason,
         string $message,
         ?Throwable $previous = null,
+        public readonly ?int $httpStatus = null,
+        public readonly int|string|null $remoteCode = null,
+        public readonly ?string $remoteMessage = null,
     ) {
         parent::__construct(
             $message,

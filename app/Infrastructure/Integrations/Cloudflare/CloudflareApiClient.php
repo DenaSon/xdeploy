@@ -8,6 +8,7 @@ use App\Domain\Integration\Cloudflare\CloudflareZoneStatus;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use SensitiveParameter;
 
 final class CloudflareApiClient
@@ -364,10 +365,18 @@ final class CloudflareApiClient
                         $query,
                     );
 
-                return $this->validated($response);
+                return $this->validated(
+                    response: $response,
+                    method: 'GET',
+                    path: $path,
+                );
             } catch (ConnectionException $exception) {
                 if ($attempt === self::READ_ATTEMPTS) {
-                    throw $this->connectionFailure($exception);
+                    throw $this->connectionFailure(
+                        exception: $exception,
+                        method: 'GET',
+                        path: $path,
+                    );
                 }
 
                 usleep(self::READ_RETRY_DELAY_MICROSECONDS);
@@ -392,6 +401,8 @@ final class CloudflareApiClient
     ): Response {
         $this->ensureAccessToken($accessToken);
 
+        $method = strtoupper($method);
+
         $request = Http::withToken($accessToken)
             ->acceptJson()
             ->asJson()
@@ -404,20 +415,38 @@ final class CloudflareApiClient
 
         try {
             return $this->validated(
-                $request->send(
-                    strtoupper($method),
+                response: $request->send(
+                    $method,
                     $this->url($path),
                     $options,
                 ),
+                method: $method,
+                path: $path,
             );
         } catch (ConnectionException $exception) {
-            throw $this->connectionFailure($exception);
+            throw $this->connectionFailure(
+                exception: $exception,
+                method: $method,
+                path: $path,
+            );
         }
     }
 
     private function connectionFailure(
         ConnectionException $exception,
+        string $method,
+        string $path,
     ): CloudflareApiException {
+        Log::warning(
+            'cloudflare.api.connection_failed',
+            [
+                'method' => strtoupper($method),
+                'path' => $path,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ],
+        );
+
         return new CloudflareApiException(
             CloudflareApiException::CONNECTION_FAILED,
             'Cloudflare API connection failed.',
@@ -425,44 +454,105 @@ final class CloudflareApiClient
         );
     }
 
-    private function validated(Response $response): Response
+    private function validated(
+        Response $response,
+        string $method,
+        string $path,
+    ): Response {
+        if (
+            $response->successful()
+            && $response->json('success') !== false
+        ) {
+            return $response;
+        }
+
+        [$remoteCode, $remoteMessage] = $this->remoteError($response);
+        $reason = $this->errorReason($response->status());
+
+        Log::warning(
+            'cloudflare.api.request_failed',
+            array_filter(
+                [
+                    'method' => strtoupper($method),
+                    'path' => $path,
+                    'http_status' => $response->status(),
+                    'remote_code' => $remoteCode,
+                    'remote_message' => $remoteMessage,
+                ],
+                static fn (mixed $value): bool => $value !== null,
+            ),
+        );
+
+        throw new CloudflareApiException(
+            reason: $reason,
+            message: $this->errorMessage($reason),
+            httpStatus: $response->status(),
+            remoteCode: $remoteCode,
+            remoteMessage: $remoteMessage,
+        );
+    }
+
+    /** @return array{0: int|string|null, 1: string|null} */
+    private function remoteError(Response $response): array
     {
-        if ($response->status() === 401) {
-            throw new CloudflareApiException(
-                CloudflareApiException::UNAUTHORIZED,
-                'Cloudflare rejected the access token.',
-            );
+        $errors = $response->json('errors');
+
+        if (! is_array($errors)) {
+            return [null, null];
         }
 
-        if ($response->status() === 403) {
-            throw new CloudflareApiException(
-                CloudflareApiException::FORBIDDEN,
-                'Cloudflare rejected the requested permission.',
-            );
+        foreach ($errors as $error) {
+            if (! is_array($error)) {
+                continue;
+            }
+
+            $code = $error['code'] ?? null;
+
+            if (! is_int($code) && ! is_string($code)) {
+                $code = null;
+            }
+
+            if (is_string($code)) {
+                $code = trim($code);
+                $code = $code === '' ? null : $code;
+            }
+
+            $message = $this->string($error['message'] ?? null);
+
+            if ($message !== null) {
+                $message = preg_replace('/[\r\n\t]+/u', ' ', $message)
+                    ?? $message;
+                $message = substr($message, 0, 1000);
+            }
+
+            if ($code !== null || $message !== null) {
+                return [$code, $message];
+            }
         }
 
-        if ($response->status() === 429) {
-            throw new CloudflareApiException(
-                CloudflareApiException::RATE_LIMITED,
-                'Cloudflare rate limit reached.',
-            );
-        }
+        return [null, null];
+    }
 
-        if (! $response->successful()) {
-            throw new CloudflareApiException(
-                CloudflareApiException::REMOTE_ERROR,
-                'Cloudflare API request failed.',
-            );
-        }
+    private function errorReason(int $status): string
+    {
+        return match ($status) {
+            401 => CloudflareApiException::UNAUTHORIZED,
+            403 => CloudflareApiException::FORBIDDEN,
+            429 => CloudflareApiException::RATE_LIMITED,
+            400, 404, 409, 422 => CloudflareApiException::INVALID_REQUEST,
+            default => CloudflareApiException::REMOTE_ERROR,
+        };
+    }
 
-        if ($response->json('success') === false) {
-            throw new CloudflareApiException(
-                CloudflareApiException::REMOTE_ERROR,
-                'Cloudflare API reported an unsuccessful response.',
-            );
-        }
-
-        return $response;
+    private function errorMessage(string $reason): string
+    {
+        return match ($reason) {
+            CloudflareApiException::UNAUTHORIZED => 'Cloudflare rejected the access token.',
+            CloudflareApiException::FORBIDDEN => 'Cloudflare rejected the requested permission.',
+            CloudflareApiException::RATE_LIMITED => 'Cloudflare rate limit reached.',
+            CloudflareApiException::INVALID_REQUEST => 'Cloudflare rejected the request.',
+            default => 'Cloudflare API request failed.',
+        };
     }
 
     /** @return array<string, mixed> */
