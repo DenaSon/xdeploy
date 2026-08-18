@@ -229,9 +229,7 @@
             @if (! $cloudflareConfigured)
                 <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
                     <x-icon name="lucide.settings-2" class="mt-1 !size-3.5 shrink-0 text-warning" />
-                    <span>
-                        اتصال Cloudflare هنوز در محیط Coreflare پیکربندی نشده است.
-                    </span>
+                    <span>اتصال Cloudflare هنوز در محیط Coreflare پیکربندی نشده است.</span>
                 </div>
             @elseif (! $cloudflareReadConfigured)
                 <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
@@ -247,6 +245,79 @@
                 <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
                     <x-icon name="lucide.shield-alert" class="mt-1 !size-3.5 shrink-0 text-warning" />
                     <span>اتصال فعلی همه دسترسی‌های موردنیاز را ندارد. از «جزئیات اتصال» مجوزهای Cloudflare را به‌روزرسانی کنید.</span>
+                </div>
+            @endif
+        </div>
+    </section>
+
+    <section class="overflow-hidden rounded-3xl border border-base-300/80 bg-base-100">
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex min-w-0 items-start gap-3.5">
+                    <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-info/10 text-info">
+                        <x-icon name="lucide.send" class="!size-5 stroke-[1.8]" />
+                    </span>
+
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-base font-semibold">Telegram</h2>
+
+                            @if ($telegramConnected)
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-success/[0.08] px-2 py-1 text-[11px] font-medium text-success">
+                                    <span class="size-1.5 rounded-full bg-success"></span>
+                                    متصل
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-base-200/70 px-2 py-1 text-[11px] font-medium text-base-content/45">
+                                    <span class="size-1.5 rounded-full bg-base-content/25"></span>
+                                    متصل نیست
+                                </span>
+                            @endif
+                        </div>
+
+                        <p class="mt-1 max-w-2xl text-sm leading-7 text-base-content/50">
+                            اعلان‌های مهم سرورها، پشتیبانی و حساب کاربری را مستقیم در Telegram دریافت کنید.
+                        </p>
+
+                        @if ($telegramConnected)
+                            <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-base-content/40">
+                                @if ($telegramUsername)
+                                    <span dir="ltr">{{ '@'.$telegramUsername }}</span>
+                                @endif
+
+                                @if ($telegramConnectedAt)
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <x-icon name="lucide.clock-3" class="!size-3.5" />
+                                        متصل‌شده {{ $telegramConnectedAt->diffForHumans() }}
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="shrink-0">
+                    @if (! $telegramConfigured)
+                        <span class="rounded-xl bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                            نیازمند پیکربندی
+                        </span>
+                    @else
+                        <a
+                            href="{{ route('panel.integrations.telegram.overview') }}"
+                            wire:navigate
+                            class="btn btn-primary btn-sm rounded-xl px-4"
+                        >
+                            <x-icon name="lucide.arrow-left" class="!size-4" />
+                            {{ $telegramConnected ? 'مدیریت Telegram' : 'راه‌اندازی Telegram' }}
+                        </a>
+                    @endif
+                </div>
+            </div>
+
+            @if (! $telegramConfigured)
+                <div class="mt-5 flex items-start gap-2.5 rounded-2xl bg-warning/[0.07] px-4 py-3 text-xs leading-6 text-base-content/60">
+                    <x-icon name="lucide.settings-2" class="mt-1 !size-3.5 shrink-0 text-warning" />
+                    <span>Telegram هنوز در محیط Coreflare پیکربندی نشده است.</span>
                 </div>
             @endif
         </div>
