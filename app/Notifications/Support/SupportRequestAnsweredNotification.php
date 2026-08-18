@@ -6,6 +6,7 @@ namespace App\Notifications\Support;
 
 use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
 use App\Application\Integrations\Telegram\TelegramMessage;
+use App\Application\Notifications\NotificationTopic;
 use App\Infrastructure\Integrations\Telegram\TelegramChannel;
 use Illuminate\Notifications\Notification;
 
@@ -26,6 +27,11 @@ final class SupportRequestAnsweredNotification extends Notification implements S
             'database',
             TelegramChannel::class,
         ];
+    }
+
+    public function telegramTopic(): NotificationTopic
+    {
+        return NotificationTopic::Support;
     }
 
     /**
@@ -61,27 +67,18 @@ final class SupportRequestAnsweredNotification extends Notification implements S
     {
         return [
             'kind' => 'support_request_answered',
-
             'title' => 'پاسخ جدید پشتیبانی',
-
             'message' => sprintf(
                 'برای درخواست «%s» پاسخ جدیدی ثبت شد.',
                 $this->subject,
             ),
-
             'icon' => 'lucide.message-circle-reply',
-
             'tone' => 'info',
-
             'support_request_id' => $this->supportRequestId,
-
             'action_label' => 'مشاهده درخواست',
-
             'action_url' => route(
                 'panel.support.show',
-                [
-                    'supportRequestId' => $this->supportRequestId,
-                ],
+                ['supportRequestId' => $this->supportRequestId],
                 absolute: false,
             ),
         ];
