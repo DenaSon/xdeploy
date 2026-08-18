@@ -45,7 +45,6 @@ final readonly class CreateTelegramLinkAction
 
                 TelegramLinkChallenge::query()
                     ->where('user_id', $user->getKey())
-                    ->whereNull('consumed_at')
                     ->delete();
 
                 TelegramLinkChallenge::query()->create([
