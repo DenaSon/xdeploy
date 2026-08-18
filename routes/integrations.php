@@ -49,7 +49,7 @@ Route::middleware(['web', 'auth'])
             ->middleware('throttle:10,1')
             ->name('integrations.cloudflare.disconnect');
 
-        Route::get(
+        Route::post(
             '/integrations/telegram/connect',
             [TelegramConnectionController::class, 'connect'],
         )
