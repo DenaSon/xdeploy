@@ -326,7 +326,8 @@ final class CloudflareIntegrationTest extends TestCase
             ->get(route('panel.integrations.index'))
             ->assertOk()
             ->assertSee('Cloudflare')
-            ->assertSee('DNS Write فعال')
+            ->assertSee('ورود به Cloudflare')
+            ->assertSee('جزئیات اتصال')
             ->assertDontSee('never-render-access-token')
             ->assertDontSee('never-render-refresh-token');
     }
