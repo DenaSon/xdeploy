@@ -101,4 +101,28 @@ return [
         ),
     ],
 
+    'telegram' => [
+        'enabled' => env('TELEGRAM_ENABLED', false),
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
+        'link_ttl_seconds' => (int) env(
+            'TELEGRAM_LINK_TTL_SECONDS',
+            600,
+        ),
+        'api_base_url' => env(
+            'TELEGRAM_API_BASE_URL',
+            'https://api.telegram.org',
+        ),
+        'connect_timeout' => (int) env(
+            'TELEGRAM_CONNECT_TIMEOUT',
+            5,
+        ),
+        'timeout' => (int) env(
+            'TELEGRAM_TIMEOUT',
+            10,
+        ),
+    ],
+
 ];

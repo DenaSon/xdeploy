@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Integrations\CloudflareConnectionController;
+use App\Http\Controllers\Integrations\TelegramConnectionController;
 use App\Livewire\Integrations\Cloudflare\Overview as CloudflareOverview;
 use App\Livewire\Integrations\Cloudflare\Zones as CloudflareZones;
 use App\Livewire\Integrations\Index as IntegrationsIndex;
@@ -47,4 +48,18 @@ Route::middleware(['web', 'auth'])
         )
             ->middleware('throttle:10,1')
             ->name('integrations.cloudflare.disconnect');
+
+        Route::post(
+            '/integrations/telegram/connect',
+            [TelegramConnectionController::class, 'connect'],
+        )
+            ->middleware('throttle:10,1')
+            ->name('integrations.telegram.connect');
+
+        Route::delete(
+            '/integrations/telegram',
+            [TelegramConnectionController::class, 'disconnect'],
+        )
+            ->middleware('throttle:10,1')
+            ->name('integrations.telegram.disconnect');
     });
