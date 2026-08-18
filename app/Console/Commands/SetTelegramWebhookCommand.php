@@ -24,7 +24,20 @@ final class SetTelegramWebhookCommand extends Command
             return self::FAILURE;
         }
 
-        $webhookUrl = route('integrations.telegram.webhook');
+        $configuredWebhookUrl = config(
+            'services.telegram.webhook_url',
+        );
+        $webhookUrl = is_string($configuredWebhookUrl)
+            ? trim($configuredWebhookUrl)
+            : '';
+
+        if ($webhookUrl === '') {
+            $this->error(
+                'Telegram webhook URL is not configured.',
+            );
+
+            return self::FAILURE;
+        }
 
         if (! str_starts_with($webhookUrl, 'https://')) {
             $this->error(
