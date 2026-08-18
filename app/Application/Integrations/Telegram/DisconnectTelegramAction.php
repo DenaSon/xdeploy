@@ -26,7 +26,6 @@ final class DisconnectTelegramAction
 
                 TelegramLinkChallenge::query()
                     ->where('user_id', $user->getKey())
-                    ->whereNull('consumed_at')
                     ->delete();
             },
             3,
