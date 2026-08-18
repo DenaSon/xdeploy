@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Notifications\Profile;
 
+use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
+use App\Application\Integrations\Telegram\TelegramMessage;
+use App\Infrastructure\Integrations\Telegram\TelegramChannel;
 use Illuminate\Notifications\Notification;
 
-final class ProfileCompletionRequiredNotification extends Notification
+final class ProfileCompletionRequiredNotification extends Notification implements SendsTelegramNotification
 {
     /**
      * @return list<string>
@@ -15,6 +18,7 @@ final class ProfileCompletionRequiredNotification extends Notification
     {
         return [
             'database',
+            TelegramChannel::class,
         ];
     }
 
@@ -32,6 +36,13 @@ final class ProfileCompletionRequiredNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return $this->payload();
+    }
+
+    public function toTelegram(object $notifiable): TelegramMessage
+    {
+        return TelegramMessage::fromNotificationPayload(
+            $this->payload(),
+        );
     }
 
     /**

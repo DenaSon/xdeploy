@@ -125,6 +125,68 @@ final class TelegramBotClient
         }
     }
 
+    public function sendMessage(
+        #[SensitiveParameter]
+        string $chatId,
+        #[SensitiveParameter]
+        string $text,
+    ): void {
+        if (! $this->configured()) {
+            throw new TelegramBotException(
+                'Telegram integration is not configured.',
+            );
+        }
+
+        if (
+            preg_match('/\A[1-9][0-9]{0,19}\z/D', $chatId) !== 1
+        ) {
+            throw new TelegramBotException(
+                'Telegram chat is invalid.',
+            );
+        }
+
+        if (
+            trim($text) === ''
+            || mb_strlen($text) > 4096
+        ) {
+            throw new TelegramBotException(
+                'Telegram message is invalid.',
+            );
+        }
+
+        $url = sprintf(
+            '%s/bot%s/sendMessage',
+            rtrim($this->configString('api_base_url'), '/'),
+            $this->configString('bot_token'),
+        );
+
+        try {
+            $response = Http::connectTimeout($this->connectTimeout())
+                ->timeout($this->requestTimeout())
+                ->asJson()
+                ->post(
+                    $url,
+                    [
+                        'chat_id' => $chatId,
+                        'text' => $text,
+                    ],
+                );
+        } catch (ConnectionException) {
+            throw new TelegramBotException(
+                'Telegram API connection failed.',
+            );
+        }
+
+        if (
+            ! $response->successful()
+            || $response->json('ok') !== true
+        ) {
+            throw new TelegramBotException(
+                'Telegram message delivery failed.',
+            );
+        }
+    }
+
     private function configString(string $key): string
     {
         $value = config("services.telegram.{$key}");
