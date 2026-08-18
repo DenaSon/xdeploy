@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Notifications\Cloud;
 
+use App\Application\Integrations\Telegram\Contracts\SendsTelegramNotification;
+use App\Application\Integrations\Telegram\TelegramMessage;
+use App\Infrastructure\Integrations\Telegram\TelegramChannel;
 use Illuminate\Notifications\Notification;
 
-final class CloudServerTerminatedNotification extends Notification
+final class CloudServerTerminatedNotification extends Notification implements SendsTelegramNotification
 {
     public function __construct(
         public readonly int $serverId,
@@ -23,6 +26,7 @@ final class CloudServerTerminatedNotification extends Notification
     ): array {
         return [
             'database',
+            TelegramChannel::class,
         ];
     }
 
@@ -42,6 +46,14 @@ final class CloudServerTerminatedNotification extends Notification
         object $notifiable,
     ): array {
         return $this->payload();
+    }
+
+    public function toTelegram(
+        object $notifiable,
+    ): TelegramMessage {
+        return TelegramMessage::fromNotificationPayload(
+            $this->payload(),
+        );
     }
 
     /**
