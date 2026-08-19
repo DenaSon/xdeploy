@@ -42,14 +42,14 @@
     "
 >
 
-<div class="flex min-h-screen flex-col">
+<div class="flex min-h-dvh flex-col">
 
     {{-- Public Header --}}
     <x-public.header />
 
 
     {{-- Page Content --}}
-    <main class="flex-1">
+    <main class="min-w-0 flex-1">
         {{ $slot }}
     </main>
 
