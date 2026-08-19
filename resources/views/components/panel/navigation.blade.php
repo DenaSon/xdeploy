@@ -85,61 +85,69 @@
             />
         @endif
 
-        <x-menu-item
-            title="یکپارچه‌سازی‌ها"
-            icon="lucide.link-2"
-            :link="route('panel.integrations.index')"
-            :active="request()->routeIs('panel.integrations.*')"
-            wire:navigate
+        <x-menu-sub
+            title="اتصالات"
+            icon="lucide.plug"
+            :open="request()->routeIs('panel.integrations.*')"
+            class="text-sm text-base-content/65"
+            icon-classes="!size-[18px] stroke-[1.7]"
+        >
+            <x-menu-item
+                title="Cloudflare"
+                icon="lucide.cloud"
+                :link="route('panel.integrations.cloudflare.overview')"
+                :active="request()->routeIs('panel.integrations.cloudflare.*')"
+                wire:navigate
 
-            class="
-                rounded-xl
-                text-sm
-                text-base-content/65
-                transition-colors duration-200
-                hover:bg-base-200
-                hover:text-base-content
-            "
+                class="
+                    rounded-xl
+                    text-sm
+                    text-base-content/60
+                    transition-colors duration-200
+                    hover:bg-base-200
+                    hover:text-base-content
+                "
 
-            active-bg-color="
-                !bg-primary/10
-                !text-primary
-                !font-medium
-            "
+                active-bg-color="
+                    !bg-primary/10
+                    !text-primary
+                    !font-medium
+                "
 
-            icon-classes="
-                !size-[18px]
-                stroke-[1.7]
-            "
-        />
+                icon-classes="
+                    !size-4
+                    stroke-[1.7]
+                "
+            />
 
-        <x-menu-item
-            title="پشتیبانی"
-            icon="lucide.headset"
-            :link="route('panel.support.index')"
-            :active="request()->routeIs('panel.support.*')"
-            wire:navigate
+            <x-menu-item
+                title="Telegram"
+                icon="lucide.send"
+                :link="route('panel.integrations.telegram.overview')"
+                :active="request()->routeIs('panel.integrations.telegram.*')"
+                wire:navigate
 
-            class="
-                rounded-xl
-                text-sm
-                text-base-content/65
-                transition-colors duration-200
-                hover:bg-base-200
-                hover:text-base-content
-            "
+                class="
+                    rounded-xl
+                    text-sm
+                    text-base-content/60
+                    transition-colors duration-200
+                    hover:bg-base-200
+                    hover:text-base-content
+                "
 
-            active-bg-color="
-                !bg-primary/10
-                !text-primary
-                !font-medium
-            "
+                active-bg-color="
+                    !bg-primary/10
+                    !text-primary
+                    !font-medium
+                "
 
-            icon-classes="
-                !size-[18px]
-                stroke-[1.7]
-            "
-        />
+                icon-classes="
+                    !size-4
+                    stroke-[1.7]
+                "
+            />
+        </x-menu-sub>
 
         <x-menu-sub
             title="راهنما"
@@ -210,6 +218,36 @@
             icon="lucide.shield-check"
             :link="route('panel.security')"
             :active="request()->routeIs('panel.security*')"
+            wire:navigate
+
+            class="
+                rounded-xl
+                text-sm
+                text-base-content/65
+                transition-colors duration-200
+                hover:bg-base-200
+                hover:text-base-content
+            "
+
+            active-bg-color="
+                !bg-primary/10
+                !text-primary
+                !font-medium
+            "
+
+            icon-classes="
+                !size-[18px]
+                stroke-[1.7]
+            "
+        />
+
+        <x-menu-separator />
+
+        <x-menu-item
+            title="پشتیبانی"
+            icon="lucide.headset"
+            :link="route('panel.support.index')"
+            :active="request()->routeIs('panel.support.*')"
             wire:navigate
 
             class="
