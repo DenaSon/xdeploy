@@ -2,7 +2,7 @@
     'server',
 ])
 
-@inject('cloudServerCapabilities', 'App\Application\Cloud\Servers\CloudServerCapabilityResolver')
+@inject('cloudServerCapabilities', 'App\\Application\\Cloud\\Servers\\CloudServerCapabilityResolver')
 
 @php
     $isActive = $server->isActive();
@@ -74,7 +74,7 @@
     $canUseConsole = $server->isCloudProvisioned()
         && $cloudServerCapabilities->supports(
             server: $server,
-            capability: \App\Domain\Cloud\Contracts\CloudServerConsoleInterface::class,
+            capability: \\App\\Domain\\Cloud\\Contracts\\CloudServerConsoleInterface::class,
         );
 
     if ($canUseConsole) {
@@ -135,19 +135,21 @@
         shadow-base-content/[0.015]
     "
 >
-    {{-- Desktop context --}}
+    {{-- Server context / desktop navigation --}}
     <div
         class="
             flex
             items-center
             justify-between
-            gap-5
+            gap-3
 
-            px-4 py-2.5
+            px-3 py-2.5
 
-            sm:px-5
+            sm:px-4
 
-            lg:min-h-[58px]
+            xl:min-h-[58px]
+            xl:gap-5
+            xl:px-5
         "
     >
         {{-- Desktop navigation --}}
@@ -157,7 +159,7 @@
                 hidden
                 min-w-0
 
-                lg:block
+                xl:block
             "
         >
             <div
@@ -241,17 +243,19 @@
                 shrink-0
                 items-center gap-2.5
 
-                lg:max-w-[34%]
+                xl:max-w-[34%]
             "
         >
             {{-- Server icon --}}
             <div
                 @class([
                     '
-                        flex size-9 shrink-0
+                        flex size-8 shrink-0
                         items-center justify-center
 
                         rounded-xl
+
+                        sm:size-9
                     ',
                     '
                         bg-primary/[0.08]
@@ -288,10 +292,12 @@
                             min-w-0
                             truncate
 
-                            text-sm
+                            text-[13px]
                             font-semibold
                             tracking-tight
                             text-base-content
+
+                            sm:text-sm
                         "
                     >
                         {{ $server->name }}
@@ -372,18 +378,24 @@
         class="
             border-t
             border-base-300/60
+            bg-base-200/20
 
-            lg:hidden
+            xl:hidden
         "
     >
         <div
             class="
                 overflow-x-auto
+                overscroll-x-contain
+                scroll-smooth
 
-                px-2 py-2
+                px-2 py-1.5
 
                 [scrollbar-width:none]
+                [-webkit-overflow-scrolling:touch]
                 [&::-webkit-scrollbar]:hidden
+
+                sm:px-3
             "
         >
             <div
@@ -401,36 +413,43 @@
 
                         @if($item['active'])
                             x-ref="activeTab"
-                        aria-current="page"
+                            aria-current="page"
                         @endif
 
                         @class([
                             '
                                 inline-flex
+                                min-h-10
                                 shrink-0
                                 items-center gap-1.5
 
                                 rounded-xl
 
-                                px-3 py-2
+                                px-2.5 py-1.5
 
-                                text-xs
+                                text-[11px]
                                 font-medium
 
-                                transition-colors
+                                transition-all
                                 duration-150
+
+                                sm:px-3
+                                sm:text-xs
                             ',
 
                             '
-                                bg-primary/10
+                                bg-primary/[0.08]
                                 font-semibold
                                 text-primary
+
+                                ring-1
+                                ring-primary/15
                             ' => $item['active'],
 
                             '
-                                text-base-content/60
+                                text-base-content/55
 
-                                hover:bg-base-200/70
+                                hover:bg-base-200/80
                                 hover:text-base-content
                             ' => ! $item['active'],
                         ])
@@ -439,11 +458,13 @@
                             :name="$item['icon']"
                             @class([
                                 '
-                                    !size-4
+                                    !size-3.5
                                     stroke-[1.8]
+
+                                    sm:!size-4
                                 ',
                                 'text-primary' => $item['active'],
-                                'text-base-content/55' => ! $item['active'],
+                                'text-base-content/50' => ! $item['active'],
                             ])
                         />
 
