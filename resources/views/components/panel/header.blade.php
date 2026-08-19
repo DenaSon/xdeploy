@@ -9,7 +9,7 @@
 
 <header
     {{ $attributes->class([
-        'relative z-40',
+        'relative z-10 lg:z-40',
         'flex h-12 items-center justify-between',
         'rounded-2xl',
         'border border-base-300/60',
@@ -51,7 +51,6 @@
         @endif
 
         @if ($showBuyVpsCta)
-            <div class="aura text-success/70 bg-success/8">
             <a
                 data-panel-buy-vps-cta
                 href="{{ route('panel.servers.buy') }}"
@@ -69,7 +68,6 @@
 
                 <span>راه‌اندازی</span>
             </a>
-            </div>
         @endif
 
     </div>
