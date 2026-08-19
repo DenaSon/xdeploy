@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\Servers\ConfirmSupportPasskeyController;
 use App\Http\Controllers\Admin\Servers\RevealSupportCredentialController;
 use App\Http\Controllers\Admin\Servers\SupportPasskeyOptionsController;
+use App\Http\Controllers\Admin\Users\StartUserImpersonationController;
 use App\Http\Controllers\Support\ShowSupportMessageAttachmentController;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Admin\Documentation\Articles\Create as AdminDocumentationArticlesCreate;
@@ -66,6 +67,10 @@ Route::middleware([
                     ->name('users.index');
                 Route::livewire('/users/{user}', AdminUsersShow::class)
                     ->name('users.show');
+                Route::post(
+                    '/users/{user}/impersonate',
+                    StartUserImpersonationController::class,
+                )->name('users.impersonate');
 
                 Route::livewire('/servers', AdminServersIndex::class)
                     ->name('servers.index');
