@@ -46,6 +46,13 @@
             border-top-right-radius: 0;
         }
 
+        .cloud-purchase-page
+        [data-buy-content]
+        :where(button, select)[data-loading] {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
         @media (max-width: 1279px) {
             .cloud-purchase-page
             [data-buy-content] > [dir="rtl"] {
@@ -167,7 +174,108 @@
             }
         }
 
+        @media (max-width: 639px) {
+            .cloud-purchase-page [data-buy-provider-row]
+            [data-provider-option] {
+                min-height: 4.25rem;
+                padding: 0.625rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.grid > main > section > div {
+                gap: 0.625rem;
+                padding: 0.875rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectRegionGroup"] {
+                min-height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            select[wire\:change^="selectRegion"] {
+                height: 2.75rem;
+                min-height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            div:has(> button[wire\:click^="selectPeriod"]) {
+                gap: 0.375rem;
+                padding: 0.375rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectPeriod"] {
+                min-height: 3.75rem;
+                padding: 0.5rem 0.25rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectPeriod"] > div:first-of-type {
+                white-space: nowrap;
+                font-size: 0.75rem;
+                line-height: 1rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            select[wire\:change^="selectSize"] {
+                height: 2.75rem;
+                min-height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            .tooltip[data-tip] > div {
+                flex-direction: column;
+                gap: 0.25rem;
+                padding: 0.625rem 0.25rem;
+                text-align: center;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            .tooltip[data-tip] > div > div {
+                min-width: 0;
+                text-align: center;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            input[name="server_image"] + span {
+                height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            div:has(> [wire\:click="decreaseDisk"]) {
+                height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            :where(
+                [wire\:click="decreaseDisk"],
+                [wire\:click="increaseDisk"]
+            ) {
+                min-width: 2.75rem;
+                min-height: 2.75rem;
+            }
+        }
+
         @media (max-width: 359px) {
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectPeriod"] > span:first-child {
+                display: none;
+            }
+
             .cloud-purchase-page
             [data-buy-content] > [dir="rtl"]
             > div.fixed.inset-x-0.bottom-0 > div {
@@ -243,12 +351,12 @@
             aria-label="بازگشت به سرورها"
             class="
                 btn-ghost btn-sm
-                min-h-8 h-8
-                rounded-lg
-                px-2.5
+                h-11 min-h-11
+                rounded-lg px-3
                 text-xs font-medium
                 text-base-content/45
                 hover:text-base-content
+                sm:h-8 sm:min-h-8 sm:px-2.5
             "
         />
     </div>
