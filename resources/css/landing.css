@@ -1,0 +1,42 @@
+/*
+|--------------------------------------------------------------------------
+| Landing typography
+|--------------------------------------------------------------------------
+|
+| Keep Persian copy on Yekan while rendering LTR labels and numeric values
+| with the platform UI font. On iOS this resolves to San Francisco, which
+| produces more balanced Latin digits than the Persian display font.
+|
+*/
+
+.landing-page [dir="ltr"],
+.landing-page .numeric-value {
+    direction: ltr;
+    unicode-bidi: isolate;
+
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Text",
+        "Segoe UI",
+        system-ui,
+        sans-serif;
+
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "kern" 1, "tnum" 1;
+}
+
+.landing-page .font-mono,
+.landing-page .technical-value {
+    font-family:
+        ui-monospace,
+        "SFMono-Regular",
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        "Courier New",
+        monospace;
+
+    font-variant-numeric: tabular-nums;
+}
