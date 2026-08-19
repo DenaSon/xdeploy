@@ -7,7 +7,7 @@
         @if($initialLoadComplete)
             wire:poll.visible.30s="refreshRuntime"
         @endif
-        class="space-y-4"
+        class="space-y-3.5 sm:space-y-4"
     >
         {{-- Dashboard status --}}
         <div
@@ -16,7 +16,7 @@
                 items-center justify-end
                 gap-2
                 text-[11px]
-                text-base-content/35
+                text-base-content/45
             "
         >
             <div
@@ -82,8 +82,8 @@
                     '
                         rounded-2xl
                         border
-                        px-4 py-4
-                        sm:px-5
+                        px-4 py-3.5
+                        sm:px-5 sm:py-4
                     ',
                     'border-warning/20 bg-warning/5' =>
                         $hasSnapshot,
@@ -93,7 +93,7 @@
             >
                 <div
                     class="
-                        flex flex-col gap-4
+                        flex flex-col gap-3.5
                         sm:flex-row
                         sm:items-center
                         sm:justify-between
@@ -108,9 +108,10 @@
                         <div
                             @class([
                                 '
-                                    flex size-10 shrink-0
+                                    flex size-9 shrink-0
                                     items-center justify-center
                                     rounded-xl
+                                    sm:size-10
                                 ',
                                 'bg-warning/10 text-warning' =>
                                     $hasSnapshot,
@@ -122,7 +123,7 @@
                                 :name="$hasSnapshot
                                     ? 'lucide.cloud-off'
                                     : 'lucide.server-off'"
-                                class="!size-5 stroke-[1.8]"
+                                class="!size-4.5 stroke-[1.8] sm:!size-5"
                             />
                         </div>
 
@@ -173,65 +174,17 @@
         @endif
 
 
-        {{-- No data + connection failed --}}
+        {{-- Dashboard content --}}
         @if(
-            $initialLoadComplete
-            && ! $hasSnapshot
-            && $connectionErrorMessage !== null
+            ! $initialLoadComplete
+            || $hasSnapshot
+            || $connectionErrorMessage === null
         )
             <section
                 class="
-                    rounded-2xl
-                    border border-base-300
-                    bg-base-100
-                    px-5 py-12
-                    text-center
-                "
-            >
-                <div
-                    class="
-                        mx-auto
-                        flex size-12
-                        items-center justify-center
-                        rounded-2xl
-                        bg-base-200
-                        text-base-content/45
-                    "
-                >
-                    <x-icon
-                        name="lucide.activity"
-                        class="!size-5"
-                    />
-                </div>
-
-                <h3
-                    class="
-                        mt-4
-                        text-sm font-semibold
-                        text-base-content
-                    "
-                >
-                    اطلاعات زنده در دسترس نیست
-                </h3>
-
-                <p
-                    class="
-                        mx-auto mt-1.5
-                        max-w-md
-                        text-xs leading-6
-                        text-base-content/45
-                    "
-                >
-                    پس از برقراری اتصال SSH، اطلاعات داشبورد
-                    در یک مرحله دریافت و نمایش داده می‌شود.
-                </p>
-            </section>
-
-        @else
-            <section
-                class="
                     grid grid-cols-1
-                    gap-5
+                    gap-4
+                    sm:gap-5
                     xl:grid-cols-12
                     xl:items-start
                     xl:gap-6
@@ -241,7 +194,8 @@
                 <div
                     class="
                         min-w-0
-                        space-y-5
+                        space-y-4
+                        sm:space-y-5
                         xl:col-span-8
                         xl:space-y-6
                     "
@@ -322,14 +276,12 @@
 
 
                 {{-- Operational status --}}
-                {{-- Operational status --}}
                 <aside
                     class="
-        min-w-0
-        space-y-4
-
-        xl:col-span-4
-    "
+                        min-w-0
+                        space-y-4
+                        xl:col-span-4
+                    "
                 >
                     {{-- Services --}}
                     @if(isset($sectionErrors['services']))

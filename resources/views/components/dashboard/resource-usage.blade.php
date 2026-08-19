@@ -113,7 +113,7 @@
             'used' => $memory['used'],
             'available' => $memory['available'],
             'total' => $memory['total'],
-           'availableLabel' => 'در دسترس',
+            'availableLabel' => 'در دسترس',
         ],
 
         [
@@ -135,29 +135,32 @@
 >
     {{-- Header --}}
     <header
-        class="flex items-start gap-3
+        class="flex items-start gap-2.5
                border-b border-base-300
-               px-5 py-4 sm:px-6"
+               px-4 py-3.5
+               sm:gap-3 sm:px-6 sm:py-4"
     >
         <div
-            class="flex size-9 shrink-0 items-center
+            class="flex size-8 shrink-0 items-center
                    justify-center rounded-xl
-                   bg-base-200/70"
+                   bg-base-200/70
+                   sm:size-9"
         >
             <x-icon
                 name="lucide.gauge"
-                class="size-4.5 text-base-content/65"
+                class="size-4 text-base-content/65 sm:size-4.5"
             />
         </div>
 
-        <div>
-            <h2 class="font-semibold text-base-content">
+        <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-base-content sm:text-base">
                 مصرف منابع
             </h2>
 
             <p
-                class="mt-0.5 text-sm
-                       text-base-content/50"
+                class="mt-0.5 text-xs
+                       text-base-content/50
+                       sm:text-sm"
             >
                 وضعیت حافظه، فضای دیسک و بار سیستم
             </p>
@@ -179,21 +182,22 @@
 
             <div
                 @class([
-                    'min-w-0 px-5 py-5 sm:px-6',
+                    'min-w-0 px-4 py-4 sm:px-6 sm:py-5',
                     'border-b border-base-300 lg:border-b-0 lg:border-l'
                         => $index === 0,
                 ])
             >
                 {{-- Resource title --}}
                 <div
-                    class="flex items-start justify-between gap-4"
+                    class="flex items-start justify-between gap-3 sm:gap-4"
                 >
-                    <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex min-w-0 items-center gap-2.5 sm:gap-3">
 
                         <div
-                            class="flex size-9 shrink-0
+                            class="flex size-8 shrink-0
                                    items-center justify-center
-                                   rounded-lg bg-base-200/60"
+                                   rounded-lg bg-base-200/60
+                                   sm:size-9"
                         >
                             <x-icon
                                 :name="$resource['icon']"
@@ -211,8 +215,9 @@
                             </h3>
 
                             <p
-                                class="mt-0.5 text-xs
-                                       text-base-content/45"
+                                class="mt-0.5 text-[11px]
+                                       text-base-content/45
+                                       sm:text-xs"
                             >
                                 {{ $resource['description'] }}
                             </p>
@@ -231,7 +236,7 @@
                 </div>
 
                 {{-- Usage bar --}}
-                <div class="mt-5">
+                <div class="mt-4 sm:mt-5">
 
                     <div
                         class="h-2 overflow-hidden rounded-full
@@ -253,83 +258,73 @@
 
                 {{-- Resource values --}}
                 <div
-                    class="mt-5 grid grid-cols-3
-           divide-x divide-x-reverse
-           divide-base-300"
+                    class="mt-4 grid grid-cols-3
+                           divide-x divide-x-reverse
+                           divide-base-300
+                           sm:mt-5"
                 >
-                    <div class="min-w-0 px-3 text-center first:pr-0">
+                    <div class="min-w-0 px-1.5 text-center first:pr-0 sm:px-3">
                         <p
-                            class="text-xs leading-5
-                   text-base-content/45"
+                            class="text-[10px] leading-5
+                                   text-base-content/45
+                                   sm:text-xs"
                         >
                             استفاده‌شده
                         </p>
 
                         <p
                             dir="ltr"
+                            title="{{ $resource['used'] }}"
                             class="technical-value mt-1.5
-                   truncate text-sm font-medium
-                   text-base-content"
+                                   truncate text-xs font-medium
+                                   text-base-content
+                                   sm:text-sm"
                         >
                             {{ $resource['used'] }}
                         </p>
                     </div>
 
-                    <div class="min-w-0 px-3 text-center">
+                    <div class="min-w-0 px-1.5 text-center sm:px-3">
                         <p
-                            class="text-xs leading-5
-                   text-base-content/45"
+                            class="text-[10px] leading-5
+                                   text-base-content/45
+                                   sm:text-xs"
                         >
                             {{ $resource['availableLabel'] }}
                         </p>
 
                         <p
                             dir="ltr"
+                            title="{{ $resource['available'] }}"
                             class="technical-value mt-1.5
-                   truncate text-sm font-medium
-                   text-base-content"
+                                   truncate text-xs font-medium
+                                   text-base-content
+                                   sm:text-sm"
                         >
                             {{ $resource['available'] }}
                         </p>
                     </div>
 
-                    <div class="min-w-0 px-3 text-center last:pl-0">
+                    <div class="min-w-0 px-1.5 text-center last:pl-0 sm:px-3">
                         <p
-                            class="text-xs leading-5
-                   text-base-content/45"
+                            class="text-[10px] leading-5
+                                   text-base-content/45
+                                   sm:text-xs"
                         >
                             مجموع
                         </p>
 
                         <p
                             dir="ltr"
+                            title="{{ $resource['total'] }}"
                             class="technical-value mt-1.5
-                   truncate text-sm font-medium
-                   text-base-content"
+                                   truncate text-xs font-medium
+                                   text-base-content
+                                   sm:text-sm"
                         >
                             {{ $resource['total'] }}
                         </p>
                     </div>
-                </div>
-
-                {{-- Total --}}
-                <div
-                    class="mt-5 flex items-center justify-between
-                           border-t border-base-300 pt-4"
-                >
-                    <span
-                        class="text-xs text-base-content/45"
-                    >
-                        مجموع
-                    </span>
-
-                    <span
-                        class="technical-value text-xs
-                               font-medium text-base-content/70"
-                        dir="ltr"
-                    >
-                        {{ $resource['total'] }}
-                    </span>
                 </div>
 
             </div>
@@ -340,15 +335,17 @@
     {{-- Load Average --}}
     <div
         class="border-t border-base-300
-               px-5 py-5 sm:px-6"
+               px-4 py-4
+               sm:px-6 sm:py-5"
     >
         <div
-            class="flex items-center gap-3"
+            class="flex items-center gap-2.5 sm:gap-3"
         >
             <div
-                class="flex size-9 shrink-0 items-center
+                class="flex size-8 shrink-0 items-center
                        justify-center rounded-lg
-                       bg-base-200/60"
+                       bg-base-200/60
+                       sm:size-9"
             >
                 <x-icon
                     name="lucide.activity"
@@ -356,7 +353,7 @@
                 />
             </div>
 
-            <div>
+            <div class="min-w-0">
                 <h3
                     class="text-sm font-semibold
                            text-base-content"
@@ -365,8 +362,9 @@
                 </h3>
 
                 <p
-                    class="mt-0.5 text-xs
-                           text-base-content/45"
+                    class="mt-0.5 text-[11px]
+                           text-base-content/45
+                           sm:text-xs"
                 >
                     میانگین بار پردازشی در بازه‌های زمانی مختلف
                 </p>
@@ -374,25 +372,29 @@
         </div>
 
         <div
-            class="mt-5 grid grid-cols-3
+            class="mt-4 grid grid-cols-3
                    divide-x divide-x-reverse
-                   divide-base-300"
+                   divide-base-300
+                   sm:mt-5"
         >
             <div
                 class="flex flex-col items-center
-                       justify-center px-3 text-center"
+                       justify-center px-2 text-center
+                       sm:px-3"
             >
                 <p
-                    class="technical-value text-base
-                           font-semibold text-base-content"
+                    class="technical-value text-sm
+                           font-semibold text-base-content
+                           sm:text-base"
                     dir="ltr"
                 >
                     {{ $loadAverage['oneMinute'] }}
                 </p>
 
                 <p
-                    class="mt-1 text-xs
-                           text-base-content/45"
+                    class="mt-1 text-[11px]
+                           text-base-content/45
+                           sm:text-xs"
                 >
                     ۱ دقیقه
                 </p>
@@ -400,19 +402,22 @@
 
             <div
                 class="flex flex-col items-center
-                       justify-center px-3 text-center"
+                       justify-center px-2 text-center
+                       sm:px-3"
             >
                 <p
-                    class="technical-value text-base
-                           font-semibold text-base-content"
+                    class="technical-value text-sm
+                           font-semibold text-base-content
+                           sm:text-base"
                     dir="ltr"
                 >
                     {{ $loadAverage['fiveMinutes'] }}
                 </p>
 
                 <p
-                    class="mt-1 text-xs
-                           text-base-content/45"
+                    class="mt-1 text-[11px]
+                           text-base-content/45
+                           sm:text-xs"
                 >
                     ۵ دقیقه
                 </p>
@@ -420,19 +425,22 @@
 
             <div
                 class="flex flex-col items-center
-                       justify-center px-3 text-center"
+                       justify-center px-2 text-center
+                       sm:px-3"
             >
                 <p
-                    class="technical-value text-base
-                           font-semibold text-base-content"
+                    class="technical-value text-sm
+                           font-semibold text-base-content
+                           sm:text-base"
                     dir="ltr"
                 >
                     {{ $loadAverage['fifteenMinutes'] }}
                 </p>
 
                 <p
-                    class="mt-1 text-xs
-                           text-base-content/45"
+                    class="mt-1 text-[11px]
+                           text-base-content/45
+                           sm:text-xs"
                 >
                     ۱۵ دقیقه
                 </p>

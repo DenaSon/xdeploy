@@ -12,21 +12,23 @@
 >
     {{-- Header --}}
     <header
-        class="flex items-start justify-between gap-4
+        class="flex items-start justify-between gap-3
                border-b border-base-300
-               px-5 py-4 sm:px-6"
+               px-4 py-3.5
+               sm:gap-4 sm:px-6 sm:py-4"
     >
-        <div class="flex min-w-0 items-start gap-3">
+        <div class="flex min-w-0 items-start gap-2.5 sm:gap-3">
 
             @if ($icon)
                 <div
-                    class="flex size-9 shrink-0 items-center
+                    class="flex size-8 shrink-0 items-center
                            justify-center rounded-xl
-                           bg-base-200/70"
+                           bg-base-200/70
+                           sm:size-9"
                 >
                     <x-icon
                         :name="$icon"
-                        class="size-4.5 text-base-content/65"
+                        class="size-4 text-base-content/65 sm:size-4.5"
                     />
                 </div>
             @endif
@@ -34,8 +36,8 @@
             <div class="min-w-0">
 
                 <h2
-                    class="truncate text-base font-semibold
-                           text-base-content"
+                    class="truncate text-sm font-semibold
+                           text-base-content sm:text-base"
                 >
                     {{ $title }}
                 </h2>
@@ -43,8 +45,9 @@
                 @if ($subtitle)
                     <p
                         class="mt-0.5 line-clamp-2
-                               text-sm leading-5
-                               text-base-content/50"
+                               text-xs leading-5
+                               text-base-content/50
+                               sm:text-sm"
                     >
                         {{ $subtitle }}
                     </p>
@@ -62,7 +65,7 @@
     </header>
 
     {{-- Content --}}
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-4 py-4 sm:px-6 sm:py-5">
         {{ $slot }}
     </div>
 </section>
