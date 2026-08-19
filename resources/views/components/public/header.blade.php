@@ -154,7 +154,7 @@
                             hover:bg-base-200/60 hover:text-base-content
                         "
                     >
-                        نحوه عملکرد
+                        مسیر راه‌اندازی
                     </a>
 
                     <span
