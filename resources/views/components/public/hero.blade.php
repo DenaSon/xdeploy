@@ -64,89 +64,90 @@
     <div
         aria-hidden="true"
         x-data="{
-            text: 'Coreflare',
-            output: '',
-            index: 0,
-            timeout: null,
+        text: 'Coreflare',
+        output: '',
+        index: 0,
+        timeout: null,
 
-            start() {
-                if (
-                    window.matchMedia(
-                        '(prefers-reduced-motion: reduce)'
-                    ).matches
-                ) {
-                    this.output = this.text;
+        init() {
+            this.start();
+        },
 
-                    return;
-                }
-
-                this.output = '';
-                this.index = 0;
-
-                this.write();
-            },
-
-            write() {
-                if (this.index >= this.text.length) {
-                    this.timeout = setTimeout(() => {
-                        this.start();
-                    }, 24000);
-
-                    return;
-                }
-
-                this.output += this.text.charAt(this.index);
-
-                this.index++;
-
-                this.timeout = setTimeout(() => {
-                    this.write();
-                }, 88);
+        destroy() {
+            if (this.timeout) {
+                clearTimeout(this.timeout);
             }
-        }"
-        x-init="
-            start();
+        },
 
-            $cleanup(() => {
-                if (timeout) {
-                    clearTimeout(timeout);
-                }
-            });
-        "
+        start() {
+            if (
+                window.matchMedia(
+                    '(prefers-reduced-motion: reduce)'
+                ).matches
+            ) {
+                this.output = this.text;
+
+                return;
+            }
+
+            this.output = '';
+            this.index = 0;
+
+            this.write();
+        },
+
+        write() {
+            if (this.index >= this.text.length) {
+                this.timeout = setTimeout(() => {
+                    this.start();
+                }, 24000);
+
+                return;
+            }
+
+            this.output += this.text.charAt(this.index);
+
+            this.index++;
+
+            this.timeout = setTimeout(() => {
+                this.write();
+            }, 88);
+        }
+    }"
         class="
-            pointer-events-none
-            absolute
-            inset-x-0
-            top-14
-            -z-10
+        pointer-events-none
+        absolute
+        inset-x-0
+        top-14
+        -z-10
 
-            hidden
-            select-none
-            overflow-hidden
+        hidden
+        select-none
+        overflow-hidden
 
-            lg:block
-        "
+        lg:block
+    "
     >
         <div
             dir="ltr"
             class="
-                mx-auto
-                w-full max-w-7xl
+            mx-auto
+            w-full max-w-7xl
 
-                px-8
-                text-center
+            px-8
+            text-center
 
-                text-[6.25rem]
-                font-semibold
-                leading-none
-                tracking-[-0.065em]
+            text-[6.25rem]
+            font-semibold
+            leading-none
+            tracking-[-0.065em]
 
-                text-base-content/[0.045]
+            text-base-content/[0.045]
 
-                xl:text-[7.25rem]
+            xl:text-[7.25rem]
 
-                dark:text-base-content/[0.055]
-            "
+            dark:text-base-content/[0.055]
+        "
         >
             <span x-text="output"></span>
         </div>
