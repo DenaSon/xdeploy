@@ -22,6 +22,10 @@
         ? 'پنل مدیریت'
         : 'شروع استفاده';
 
+    $compactPrimaryLabel = $isAuthenticated
+        ? 'پنل'
+        : 'شروع';
+
     $primaryIcon = $isAuthenticated
         ? 'lucide.layout-dashboard'
         : 'lucide.arrow-left';
@@ -66,9 +70,12 @@
     <div
         class="
             mx-auto
-            flex h-16 w-full max-w-7xl
+            flex h-14 w-full max-w-7xl
             items-center
-            px-4 sm:px-6 lg:px-8
+            px-3
+
+            sm:h-16 sm:px-6
+            lg:px-8
         "
     >
         {{-- Brand --}}
@@ -76,27 +83,46 @@
             href="{{ route('home') }}"
             wire:navigate
             aria-label="{{ $productName }}"
-            class="group flex min-w-0 shrink-0 items-center gap-2.5"
+            class="
+                group
+                flex min-w-0 shrink-0
+                items-center gap-2
+
+                sm:gap-2.5
+            "
         >
             <span
                 class="
-                    flex size-9 shrink-0 items-center justify-center
+                    flex size-8 shrink-0
+                    items-center justify-center
                     rounded-xl
                     bg-primary/10 text-primary
                     ring-1 ring-primary/10
                     transition-all duration-200
                     group-hover:bg-primary/15 group-hover:ring-primary/15
+
+                    sm:size-9
                 "
             >
                 <x-icon
                     name="lucide.server-cog"
-                    class="!size-[18px] stroke-[1.8]"
+                    class="
+                        !size-4 stroke-[1.8]
+                        sm:!size-[18px]
+                    "
                 />
             </span>
 
             <span
                 dir="ltr"
-                class="truncate text-[15px] font-semibold tracking-tight text-base-content"
+                class="
+                    max-w-[4.75rem] truncate
+                    text-sm font-semibold
+                    tracking-tight text-base-content
+
+                    sm:max-w-none
+                    sm:text-[15px]
+                "
             >
                 {{ $productName }}
             </span>
@@ -223,7 +249,14 @@
         <div class="flex-1"></div>
 
         {{-- Actions --}}
-        <div class="flex shrink-0 items-center gap-2">
+        <div
+            class="
+                flex shrink-0
+                items-center gap-1
+
+                sm:gap-2
+            "
+        >
             @if($showPublicNavigation)
                 <div
                     class="relative lg:hidden"
@@ -238,6 +271,7 @@
                         aria-label="بازکردن راهنما"
                         class="
                             btn btn-square btn-ghost btn-sm
+                            h-9 min-h-9 w-9
                             rounded-xl text-base-content/50
                             hover:bg-base-200/70 hover:text-base-content
                         "
@@ -259,12 +293,17 @@
                         x-transition:leave-end="opacity-0 -translate-y-1"
                         style="display: none;"
                         class="
-                            fixed inset-x-4 top-[4.5rem] z-50
-                            max-h-[calc(100vh-5.5rem)] overflow-hidden rounded-2xl
+                            fixed inset-x-3 top-16 z-50
+                            max-h-[calc(100dvh-4.75rem)]
+                            overflow-hidden rounded-2xl
                             border border-base-300/80
                             bg-base-100/95
                             shadow-xl shadow-base-content/[0.08]
                             backdrop-blur-xl
+
+                            sm:inset-x-4
+                            sm:top-[4.5rem]
+                            sm:max-h-[calc(100dvh-5.5rem)]
                         "
                     >
                         <x-public.guidance-menu
@@ -275,14 +314,33 @@
             @endif
 
             <x-button
+                :label="$compactPrimaryLabel"
+                :icon="$primaryIcon"
+                :link="$primaryUrl"
+                wire:navigate
+                class="
+                    btn-primary btn-sm
+                    h-9 min-h-9
+                    rounded-xl px-3
+                    text-xs font-medium
+                    shadow-sm shadow-primary/10
+
+                    sm:hidden
+                "
+            />
+
+            <x-button
                 :label="$primaryLabel"
                 :icon="$primaryIcon"
                 :link="$primaryUrl"
                 wire:navigate
                 class="
                     btn-primary btn-sm
+                    hidden
                     rounded-xl px-4 font-medium
                     shadow-sm shadow-primary/10
+
+                    sm:inline-flex
                 "
             />
 
@@ -296,6 +354,7 @@
             <x-theme-toggle
                 class="
                     btn btn-square btn-ghost btn-sm
+                    h-9 min-h-9 w-9
                     rounded-xl text-base-content/50
                     hover:bg-base-200/70 hover:text-base-content
                 "
