@@ -4,7 +4,7 @@
 >
     <div
         wire:init="loadConsole"
-        class="space-y-4"
+        class="space-y-3 sm:space-y-4"
     >
         {{-- Console --}}
         <section
@@ -18,34 +18,34 @@
             {{-- Header --}}
             <div
                 class="
-                    flex flex-col gap-3
+                    flex items-center
+                    justify-between gap-3
                     border-b border-base-300
-                    px-4 py-3.5
-                    sm:flex-row
-                    sm:items-center
-                    sm:justify-between
-                    sm:px-5
+                    px-3 py-3
+                    sm:px-5 sm:py-3.5
                 "
             >
-                <div class="flex min-w-0 items-center gap-3">
+                <div class="flex min-w-0 items-center gap-2.5 sm:gap-3">
                     <div
                         class="
-                            flex size-9 shrink-0
+                            flex size-8 shrink-0
                             items-center justify-center
                             rounded-xl
                             bg-base-200
                             text-base-content/55
+                            sm:size-9
                         "
                     >
                         <x-icon
                             name="lucide.monitor"
-                            class="!size-4.5"
+                            class="!size-4 sm:!size-4.5"
                         />
                     </div>
 
                     <div class="min-w-0">
                         <h2
                             class="
+                                truncate
                                 text-sm font-semibold
                                 text-base-content
                             "
@@ -55,9 +55,10 @@
 
                         <p
                             class="
-                                mt-0.5
-                                text-[11px]
+                                mt-0.5 truncate
+                                text-[10px]
                                 text-base-content/40
+                                sm:text-[11px]
                             "
                         >
                             دسترسی مستقیم به کنسول VPS
@@ -71,10 +72,12 @@
                     wire:click="loadConsole"
                     spinner="loadConsole"
                     class="
-                        btn-outline btn-sm
-                        self-start
-                        rounded-xl
-                        sm:self-auto
+                        btn-primary btn-soft btn-sm
+                        h-9 min-h-9 shrink-0
+                        rounded-xl px-3
+                        text-xs
+                        data-loading:pointer-events-none
+                        data-loading:opacity-60
                     "
                 />
             </div>
@@ -84,10 +87,11 @@
                 <div
                     class="
                         flex
-                        min-h-[52vh]
+                        min-h-[280px]
                         items-center justify-center
-                        px-4 py-12
-                        sm:px-5
+                        px-3 py-8
+                        sm:min-h-[420px]
+                        sm:px-5 sm:py-12
                     "
                 >
                     <div
@@ -96,7 +100,8 @@
                             rounded-2xl
                             border border-error/15
                             bg-error/[0.04]
-                            p-5
+                            p-4
+                            sm:p-5
                         "
                     >
                         <div class="flex items-start gap-3">
@@ -158,26 +163,26 @@
                 <div
                     class="
                         relative
-                        h-[60vh]
-                        min-h-[460px]
-                        max-h-[720px]
+                        h-[clamp(18rem,58dvh,42rem)]
                         overflow-hidden
                         bg-neutral
+                        sm:h-[clamp(28rem,60vh,45rem)]
                     "
                 >
-                    {{-- xDeploy overlay / hides provider toolbar --}}
+                    {{-- Coreflare overlay / hides provider toolbar --}}
                     <div
                         aria-hidden="true"
                         class="
                             absolute
                             inset-x-0 top-0 z-10
-                            flex h-11
+                            flex h-10
                             items-center
                             justify-between
                             border-b border-white/10
                             bg-neutral
-                            px-4
+                            px-3
                             text-neutral-content
+                            sm:h-11 sm:px-4
                         "
                     >
                         <div class="flex items-center gap-2">
@@ -208,7 +213,7 @@
                                 text-neutral-content/30
                             "
                         >
-                            xDeploy Console
+                            Coreflare Console
                         </div>
                     </div>
 
@@ -232,14 +237,14 @@
                 <div
                     class="
                         flex
-                        h-[60vh]
-                        min-h-[460px]
-                        max-h-[720px]
+                        h-[clamp(18rem,58dvh,42rem)]
                         items-center justify-center
                         bg-neutral
-                        px-5
+                        px-4
                         text-center
                         text-neutral-content
+                        sm:h-[clamp(28rem,60vh,45rem)]
+                        sm:px-5
                     "
                 >
                     <div>
@@ -281,7 +286,8 @@
         <section
             class="
                 grid grid-cols-1
-                gap-3
+                gap-2.5
+                sm:gap-3
                 lg:grid-cols-2
             "
         >
@@ -293,6 +299,8 @@
                     alert-soft
                     items-start
                     rounded-2xl
+                    p-3.5
+                    sm:p-4
                 "
             >
                 <x-icon
@@ -320,6 +328,8 @@
                     alert-soft
                     items-start
                     rounded-2xl
+                    p-3.5
+                    sm:p-4
                 "
             >
                 <x-icon
@@ -347,6 +357,8 @@
                     alert-soft
                     items-start
                     rounded-2xl
+                    p-3.5
+                    sm:p-4
                     lg:col-span-2
                 "
             >

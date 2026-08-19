@@ -4,7 +4,7 @@
 
 <div
     {{ $attributes->class([
-        'min-w-0 space-y-5',
+        'min-w-0 space-y-4 sm:space-y-5',
     ]) }}
 >
     {{-- Server workspace navigation --}}
