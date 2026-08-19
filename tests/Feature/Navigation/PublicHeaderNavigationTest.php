@@ -59,7 +59,7 @@ final class PublicHeaderNavigationTest extends TestCase
         $this->get(route('home'))
             ->assertOk()
             ->assertSee('راهنما')
-            ->assertSee('نحوه عملکرد')
+            ->assertSee('مسیر راه‌اندازی')
             ->assertSee('قابلیت‌ها')
             ->assertSee('آموزش‌ها')
             ->assertSee('مدیریت سرور')
