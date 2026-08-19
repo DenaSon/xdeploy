@@ -72,6 +72,84 @@
 
     {{-- Main content --}}
     <x-slot:content>
+        @php
+            $panelUser = auth()->user();
+            $impersonationSession = app(
+                \App\Support\Admin\AdminImpersonationSession::class,
+            );
+            $isImpersonating = $panelUser instanceof \App\Models\User
+                && $impersonationSession->isActiveFor($panelUser);
+        @endphp
+
+        @if($isImpersonating)
+            <div
+                role="status"
+                class="
+                    mb-3
+                    flex flex-col gap-3
+                    rounded-2xl
+                    border border-info/20
+                    bg-info/[0.06]
+                    px-4 py-3
+                    sm:flex-row
+                    sm:items-center
+                    sm:justify-between
+                "
+            >
+                <div class="flex min-w-0 items-center gap-3">
+                    <div
+                        class="
+                            flex size-8 shrink-0
+                            items-center justify-center
+                            rounded-xl
+                            bg-info/10
+                            text-info
+                        "
+                    >
+                        <x-icon
+                            name="lucide.eye"
+                            class="!size-4"
+                        />
+                    </div>
+
+                    <div class="min-w-0">
+                        <div
+                            class="text-xs font-semibold text-base-content"
+                        >
+                            حالت مشاهده کاربر
+                        </div>
+
+                        <div
+                            class="mt-0.5 truncate text-xs text-base-content/55"
+                        >
+                            شما وارد حساب
+                            {{ $panelUser->displayName() ?? $panelUser->phone }}
+                            شده‌اید.
+                        </div>
+                    </div>
+                </div>
+
+                <form
+                    method="POST"
+                    action="{{ route('panel.impersonation.stop') }}"
+                    class="shrink-0"
+                >
+                    @csrf
+
+                    <button
+                        type="submit"
+                        class="btn btn-sm btn-outline rounded-xl"
+                    >
+                        <x-icon
+                            name="lucide.undo-2"
+                            class="!size-4"
+                        />
+
+                        <span>بازگشت به مدیریت</span>
+                    </button>
+                </form>
+            </div>
+        @endif
 
         <x-panel.header />
 
