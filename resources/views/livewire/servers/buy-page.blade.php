@@ -45,6 +45,259 @@
             border-top-left-radius: 0;
             border-top-right-radius: 0;
         }
+
+        .cloud-purchase-page
+        [data-buy-content]
+        :where(button, select)[data-loading] {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        @media (max-width: 1279px) {
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"] {
+                padding-bottom:
+                    calc(
+                        7rem
+                        + env(safe-area-inset-bottom, 0px)
+                    );
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0 {
+                right: 0.75rem;
+                bottom:
+                    calc(
+                        0.75rem
+                        + env(safe-area-inset-bottom, 0px)
+                    );
+                left: 0.75rem;
+
+                border-top: 0;
+                background: transparent;
+                padding: 0;
+
+                -webkit-backdrop-filter: none;
+                backdrop-filter: none;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0 > div {
+                border: 1px solid var(--color-base-300);
+                border-radius: 1rem;
+
+                background:
+                    color-mix(
+                        in srgb,
+                        var(--color-base-100) 94%,
+                        transparent
+                    );
+
+                padding: 0.75rem 0.875rem;
+
+                box-shadow:
+                    0 18px 44px
+                    color-mix(
+                        in srgb,
+                        var(--color-base-content) 12%,
+                        transparent
+                    );
+
+                -webkit-backdrop-filter: blur(18px);
+                backdrop-filter: blur(18px);
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            > div > div.min-w-0.flex-1 > div:first-child {
+                margin-bottom: 0.125rem;
+
+                color:
+                    color-mix(
+                        in srgb,
+                        var(--color-base-content) 50%,
+                        transparent
+                    );
+
+                font-size: 0.625rem;
+                font-weight: 500;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            span[dir="ltr"] {
+                overflow: visible;
+
+                font-family:
+                    ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    Monaco,
+                    Consolas,
+                    "Liberation Mono",
+                    "Courier New",
+                    monospace;
+
+                font-size: 1.125rem;
+                font-weight: 700;
+                line-height: 1.35;
+                letter-spacing: -0.025em;
+
+                text-overflow: clip;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            [wire\:click="purchase"] {
+                min-width: 7.5rem;
+                min-height: 2.75rem;
+
+                border-radius: 0.875rem;
+                padding-inline: 1rem;
+
+                font-size: 0.875rem;
+                font-weight: 600;
+
+                box-shadow:
+                    0 6px 18px
+                    color-mix(
+                        in srgb,
+                        var(--color-primary) 20%,
+                        transparent
+                    );
+            }
+        }
+
+        @media (max-width: 639px) {
+            .cloud-purchase-page [data-buy-provider-row]
+            [data-provider-option] {
+                min-height: 4.25rem;
+                padding: 0.625rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.grid > main > section > div {
+                gap: 0.625rem;
+                padding: 0.875rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectRegionGroup"] {
+                min-height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            select[wire\:change^="selectRegion"] {
+                height: 2.75rem;
+                min-height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            div:has(> button[wire\:click^="selectPeriod"]) {
+                gap: 0.375rem;
+                padding: 0.375rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectPeriod"] {
+                min-height: 3.75rem;
+                padding: 0.5rem 0.25rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectPeriod"] > div:first-of-type {
+                white-space: nowrap;
+                font-size: 0.75rem;
+                line-height: 1rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            select[wire\:change^="selectSize"] {
+                height: 2.75rem;
+                min-height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            .tooltip[data-tip] > div {
+                flex-direction: column;
+                gap: 0.25rem;
+                padding: 0.625rem 0.25rem;
+                text-align: center;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            .tooltip[data-tip] > div > div {
+                min-width: 0;
+                text-align: center;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            input[name="server_image"] + span {
+                height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            div:has(> [wire\:click="decreaseDisk"]) {
+                height: 2.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content]
+            :where(
+                [wire\:click="decreaseDisk"],
+                [wire\:click="increaseDisk"]
+            ) {
+                min-width: 2.75rem;
+                min-height: 2.75rem;
+            }
+        }
+
+        @media (max-width: 359px) {
+            .cloud-purchase-page
+            [data-buy-content]
+            button[wire\:click^="selectPeriod"] > span:first-child {
+                display: none;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0 > div {
+                gap: 0.5rem;
+                padding: 0.625rem 0.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            span[dir="ltr"] {
+                font-size: 1rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            [wire\:click="purchase"] {
+                min-width: 6.75rem;
+                padding-inline: 0.75rem;
+            }
+        }
     </style>
 
     @if(! $customDiskEnabled)
@@ -98,12 +351,12 @@
             aria-label="بازگشت به سرورها"
             class="
                 btn-ghost btn-sm
-                min-h-8 h-8
-                rounded-lg
-                px-2.5
+                h-11 min-h-11
+                rounded-lg px-3
                 text-xs font-medium
                 text-base-content/45
                 hover:text-base-content
+                sm:h-8 sm:min-h-8 sm:px-2.5
             "
         />
     </div>
