@@ -66,29 +66,32 @@
 >
     {{-- Header --}}
     <header
-        class="flex items-start gap-3
+        class="flex items-start gap-2.5
                border-b border-base-300
-               px-5 py-4 sm:px-6"
+               px-4 py-3.5
+               sm:gap-3 sm:px-6 sm:py-4"
     >
         <div
-            class="flex size-9 shrink-0 items-center
+            class="flex size-8 shrink-0 items-center
                    justify-center rounded-xl
-                   bg-base-200/70"
+                   bg-base-200/70
+                   sm:size-9"
         >
             <x-icon
                 name="lucide.cpu"
-                class="size-4.5 text-base-content/65"
+                class="size-4 text-base-content/65 sm:size-4.5"
             />
         </div>
 
-        <div>
-            <h2 class="font-semibold text-base-content">
+        <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-base-content sm:text-base">
                 پردازنده
             </h2>
 
             <p
-                class="mt-0.5 text-sm
-                       text-base-content/50"
+                class="mt-0.5 text-xs
+                       text-base-content/50
+                       sm:text-sm"
             >
                 مشخصات پردازنده و معماری سیستم
             </p>
@@ -102,19 +105,20 @@
         {{-- Processor model --}}
         <div
             class="min-w-0 border-b border-base-300
-                   px-5 py-5
-                   sm:px-6
+                   px-4 py-4
+                   sm:px-6 sm:py-5
                    lg:col-span-7
                    lg:border-b-0
                    lg:border-l"
         >
             <div
-                class="flex items-start gap-3"
+                class="flex items-start gap-2.5 sm:gap-3"
             >
                 <div
-                    class="flex size-9 shrink-0 items-center
+                    class="flex size-8 shrink-0 items-center
                            justify-center rounded-lg
-                           bg-base-200/60"
+                           bg-base-200/60
+                           sm:size-9"
                 >
                     <x-icon
                         name="lucide.microchip"
@@ -125,19 +129,21 @@
                 <div class="min-w-0 flex-1">
 
                     <p
-                        class="text-xs font-medium
-                               text-base-content/45"
+                        class="text-[11px] font-medium
+                               text-base-content/45
+                               sm:text-xs"
                     >
                         مدل پردازنده
                     </p>
 
                     <p
                         dir="ltr"
-                        class="technical-value mt-2
+                        title="{{ $model }}"
+                        class="technical-value mt-1.5
                                break-words text-left
                                text-sm font-medium
                                leading-6 text-base-content
-                               sm:text-base"
+                               sm:mt-2 sm:text-base"
                     >
                         {{ $model }}
                     </p>
@@ -158,34 +164,38 @@
                 <div
                     class="flex min-w-0 flex-col
                            items-center justify-center
-                           px-3 py-5 text-center"
+                           px-2 py-4 text-center
+                           sm:px-3 sm:py-5"
                 >
                     <div
-                        class="flex size-8 items-center
+                        class="flex size-7 items-center
                                justify-center rounded-lg
-                               bg-base-200/60"
+                               bg-base-200/60
+                               sm:size-8"
                     >
                         <x-icon
                             :name="$item['icon']"
-                            class="size-4 text-base-content/45"
+                            class="size-3.5 text-base-content/45 sm:size-4"
                         />
                     </div>
 
                     <p
                         @class([
-                            'mt-3 truncate text-sm font-semibold text-base-content sm:text-base',
+                            'mt-2.5 truncate text-sm font-semibold text-base-content sm:mt-3 sm:text-base',
                             'technical-value' => $item['technical'],
                         ])
                         @if ($item['technical'])
                             dir="ltr"
+                            title="{{ $item['value'] }}"
                         @endif
                     >
                         {{ $item['value'] }}
                     </p>
 
                     <p
-                        class="mt-1 text-xs
-                               text-base-content/45"
+                        class="mt-1 text-[11px]
+                               text-base-content/45
+                               sm:text-xs"
                     >
                         {{ $item['label'] }}
                     </p>
