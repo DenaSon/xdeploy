@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Impersonation\StopUserImpersonationController;
 use App\Http\Controllers\Profile\GoogleEmailEnrollmentController;
 use App\Http\Controllers\Servers\RevealServerCredentialController;
 use App\Http\Controllers\Support\ShowSupportMessageAttachmentController;
@@ -58,6 +59,11 @@ Route::middleware(['web', 'auth'])
     ->prefix('panel')
     ->as('panel.')
     ->group(function (): void {
+        Route::post(
+            '/impersonation/stop',
+            StopUserImpersonationController::class,
+        )->name('impersonation.stop');
+
         Route::livewire(
             '/notifications',
             NotificationsIndex::class,

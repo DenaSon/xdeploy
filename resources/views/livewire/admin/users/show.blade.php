@@ -5,6 +5,27 @@
         icon="lucide.user-round"
     >
         <x-slot:actions>
+            @if(! $user->isAdmin())
+                <form
+                    method="POST"
+                    action="{{ route('admin.users.impersonate', $user) }}"
+                >
+                    @csrf
+
+                    <button
+                        type="submit"
+                        class="btn btn-soft btn-primary btn-sm rounded-xl"
+                    >
+                        <x-icon
+                            name="lucide.log-in"
+                            class="!size-4"
+                        />
+
+                        <span>ورود به حساب کاربر</span>
+                    </button>
+                </form>
+            @endif
+
             <x-button
                 label="بازگشت به کاربران"
                 icon="lucide.arrow-right"
