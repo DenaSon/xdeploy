@@ -24,16 +24,18 @@
                         btn
                         btn-square
                         btn-ghost
-                        btn-sm
 
                         relative
 
+                        h-10 min-h-10 w-10
                         rounded-xl
 
                         text-base-content/55
 
                         hover:bg-base-200/70
                         hover:text-base-content
+
+                        sm:h-8 sm:min-h-8 sm:w-8
                     "
                 >
                     <x-icon
