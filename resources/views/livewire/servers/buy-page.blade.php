@@ -45,6 +45,151 @@
             border-top-left-radius: 0;
             border-top-right-radius: 0;
         }
+
+        @media (max-width: 1279px) {
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"] {
+                padding-bottom:
+                    calc(
+                        7rem
+                        + env(safe-area-inset-bottom, 0px)
+                    );
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0 {
+                right: 0.75rem;
+                bottom:
+                    calc(
+                        0.75rem
+                        + env(safe-area-inset-bottom, 0px)
+                    );
+                left: 0.75rem;
+
+                border-top: 0;
+                background: transparent;
+                padding: 0;
+
+                -webkit-backdrop-filter: none;
+                backdrop-filter: none;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0 > div {
+                border: 1px solid var(--color-base-300);
+                border-radius: 1rem;
+
+                background:
+                    color-mix(
+                        in srgb,
+                        var(--color-base-100) 94%,
+                        transparent
+                    );
+
+                padding: 0.75rem 0.875rem;
+
+                box-shadow:
+                    0 18px 44px
+                    color-mix(
+                        in srgb,
+                        var(--color-base-content) 12%,
+                        transparent
+                    );
+
+                -webkit-backdrop-filter: blur(18px);
+                backdrop-filter: blur(18px);
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            > div > div.min-w-0.flex-1 > div:first-child {
+                margin-bottom: 0.125rem;
+
+                color:
+                    color-mix(
+                        in srgb,
+                        var(--color-base-content) 50%,
+                        transparent
+                    );
+
+                font-size: 0.625rem;
+                font-weight: 500;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            span[dir="ltr"] {
+                overflow: visible;
+
+                font-family:
+                    ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    Monaco,
+                    Consolas,
+                    "Liberation Mono",
+                    "Courier New",
+                    monospace;
+
+                font-size: 1.125rem;
+                font-weight: 700;
+                line-height: 1.35;
+                letter-spacing: -0.025em;
+
+                text-overflow: clip;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            [wire\:click="purchase"] {
+                min-width: 7.5rem;
+                min-height: 2.75rem;
+
+                border-radius: 0.875rem;
+                padding-inline: 1rem;
+
+                font-size: 0.875rem;
+                font-weight: 600;
+
+                box-shadow:
+                    0 6px 18px
+                    color-mix(
+                        in srgb,
+                        var(--color-primary) 20%,
+                        transparent
+                    );
+            }
+        }
+
+        @media (max-width: 359px) {
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0 > div {
+                gap: 0.5rem;
+                padding: 0.625rem 0.75rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            span[dir="ltr"] {
+                font-size: 1rem;
+            }
+
+            .cloud-purchase-page
+            [data-buy-content] > [dir="rtl"]
+            > div.fixed.inset-x-0.bottom-0
+            [wire\:click="purchase"] {
+                min-width: 6.75rem;
+                padding-inline: 0.75rem;
+            }
+        }
     </style>
 
     @if(! $customDiskEnabled)
