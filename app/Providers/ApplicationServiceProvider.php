@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Application\PublicEndpoint\Drivers\MarzbanPublicEndpointDriver;
 use App\Application\PublicEndpoint\Drivers\N8nPublicEndpointDriver;
+use App\Application\PublicEndpoint\Drivers\WordPressPublicEndpointDriver;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\AmneziaWg\AmneziaWgApplication;
 use App\Domain\Application\Contracts\ApplicationInterface;
@@ -20,6 +21,8 @@ use App\Domain\Application\N8n\N8nApplication;
 use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointGateway;
 use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointInterruptedOperationRecovery;
 use App\Domain\Application\Registry\ApplicationRegistry;
+use App\Domain\Application\WordPress\PublicEndpoint\WordPressPublicEndpointGateway;
+use App\Domain\Application\WordPress\PublicEndpoint\WordPressPublicEndpointInterruptedOperationRecovery;
 use App\Domain\Application\WordPress\WordPressApplication;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsDisabler;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsInterruptedOperationRecovery;
@@ -27,6 +30,8 @@ use App\Infrastructure\Application\Marzban\SshMarzbanAdminGateway;
 use App\Infrastructure\Application\Marzban\SshMarzbanHttpsGateway;
 use App\Infrastructure\Application\N8n\PublicEndpoint\SshN8nPublicEndpointGateway;
 use App\Infrastructure\Application\N8n\PublicEndpoint\SshN8nPublicEndpointInterruptedOperationRecovery;
+use App\Infrastructure\Application\WordPress\PublicEndpoint\SshWordPressPublicEndpointGateway;
+use App\Infrastructure\Application\WordPress\PublicEndpoint\SshWordPressPublicEndpointInterruptedOperationRecovery;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
@@ -70,6 +75,16 @@ final class ApplicationServiceProvider extends ServiceProvider
             SshN8nPublicEndpointInterruptedOperationRecovery::class,
         );
 
+        $this->app->bind(
+            WordPressPublicEndpointGateway::class,
+            SshWordPressPublicEndpointGateway::class,
+        );
+
+        $this->app->bind(
+            WordPressPublicEndpointInterruptedOperationRecovery::class,
+            SshWordPressPublicEndpointInterruptedOperationRecovery::class,
+        );
+
         /*
          * Applications contain lifecycle-scoped SSH dependencies.
          *
@@ -88,6 +103,7 @@ final class ApplicationServiceProvider extends ServiceProvider
             fn (Application $app): PublicEndpointDriverRegistry => new PublicEndpointDriverRegistry([
                 $app->make(MarzbanPublicEndpointDriver::class),
                 $app->make(N8nPublicEndpointDriver::class),
+                $app->make(WordPressPublicEndpointDriver::class),
             ]),
         );
     }

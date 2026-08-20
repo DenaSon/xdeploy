@@ -6,6 +6,7 @@ namespace Tests\Unit\Providers;
 
 use App\Application\PublicEndpoint\Drivers\MarzbanPublicEndpointDriver;
 use App\Application\PublicEndpoint\Drivers\N8nPublicEndpointDriver;
+use App\Application\PublicEndpoint\Drivers\WordPressPublicEndpointDriver;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
 use App\Domain\Application\AmneziaWg\AmneziaWgApplication;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
@@ -76,10 +77,11 @@ final class ApplicationServiceProviderTest extends TestCase
             $registry->find(ApplicationType::N8n),
         );
 
-        $this->assertFalse(
-            $registry->supports(ApplicationType::WordPress),
+        $this->assertInstanceOf(
+            WordPressPublicEndpointDriver::class,
+            $registry->find(ApplicationType::WordPress),
         );
 
-        $this->assertCount(2, $registry->all());
+        $this->assertCount(3, $registry->all());
     }
 }

@@ -89,6 +89,40 @@ final class WordPressInstallerAssetTest extends TestCase
         );
     }
 
+    public function test_installer_exposes_a_managed_reverse_proxy_configuration_hook(): void
+    {
+        $contents = $this->installerContents();
+
+        self::assertStringContainsString(
+            'XDEPLOY_WORDPRESS_PUBLIC_URL: \${XDEPLOY_WORDPRESS_PUBLIC_URL:-}',
+            $contents,
+        );
+        self::assertStringContainsString(
+            'WORDPRESS_CONFIG_EXTRA: >-',
+            $contents,
+        );
+        self::assertStringContainsString(
+            "getenv('XDEPLOY_WORDPRESS_PUBLIC_URL')",
+            $contents,
+        );
+        self::assertStringContainsString(
+            'define(\'WP_HOME\', \$\$xdeployPublicUrl);',
+            $contents,
+        );
+        self::assertStringContainsString(
+            'define(\'WP_SITEURL\', \$\$xdeployPublicUrl);',
+            $contents,
+        );
+        self::assertStringContainsString(
+            "define('FORCE_SSL_ADMIN', true);",
+            $contents,
+        );
+        self::assertStringNotContainsString(
+            'wp-config.php',
+            $contents,
+        );
+    }
+
     public function test_installer_generates_and_preserves_private_database_credentials(): void
     {
         $contents = $this->installerContents();

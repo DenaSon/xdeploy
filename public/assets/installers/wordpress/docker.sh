@@ -183,6 +183,13 @@ services:
       WORDPRESS_DB_USER: \${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: \${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: \${WORDPRESS_DB_NAME}
+      XDEPLOY_WORDPRESS_PUBLIC_URL: \${XDEPLOY_WORDPRESS_PUBLIC_URL:-}
+      WORDPRESS_CONFIG_EXTRA: >-
+        if ((\$\$xdeployPublicUrl = getenv('XDEPLOY_WORDPRESS_PUBLIC_URL')) !== false && \$\$xdeployPublicUrl !== '') {
+          define('WP_HOME', \$\$xdeployPublicUrl);
+          define('WP_SITEURL', \$\$xdeployPublicUrl);
+          define('FORCE_SSL_ADMIN', true);
+        }
     ports:
       - "127.0.0.1:8080:80"
     volumes:

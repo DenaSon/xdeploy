@@ -81,21 +81,104 @@
             </div>
         </div>
 
-        <span
-            class="inline-flex w-fit items-center
-                   gap-1.5 rounded-full
-                   border border-success/20
-                   bg-success/10
-                   px-2.5 py-1
-                   text-xs font-medium
-                   text-success"
-        >
+        @if ($publicUrl !== null)
             <span
-                class="size-1.5 rounded-full
-                       bg-success"
-            ></span>
+                class="inline-flex w-fit items-center
+                       gap-1.5 rounded-full
+                       border border-success/20
+                       bg-success/10
+                       px-2.5 py-1
+                       text-xs font-medium
+                       text-success"
+            >
+                <span
+                    class="size-1.5 rounded-full
+                           bg-success"
+                ></span>
 
-            دسترسی عمومی غیرفعال
-        </span>
+                دسترسی عمومی فعال
+            </span>
+        @else
+            <span
+                class="inline-flex w-fit items-center
+                       gap-1.5 rounded-full
+                       border border-base-300
+                       bg-base-200/60
+                       px-2.5 py-1
+                       text-xs font-medium
+                       text-base-content/50"
+            >
+                <span
+                    class="size-1.5 rounded-full
+                           bg-base-content/30"
+                ></span>
+
+                دسترسی عمومی غیرفعال
+            </span>
+        @endif
     </div>
+
+    @if ($publicUrl !== null)
+        <div
+            class="flex flex-col gap-3
+                   border-t border-base-300
+                   px-5 py-4
+                   sm:flex-row
+                   sm:items-center
+                   sm:justify-between
+                   sm:px-6"
+        >
+            <div
+                class="flex min-w-0 items-center gap-3"
+            >
+                <div
+                    class="flex size-8 shrink-0
+                           items-center justify-center
+                           rounded-lg
+                           bg-success/10"
+                >
+                    <x-icon
+                        name="lucide.globe-lock"
+                        class="size-4 text-success"
+                    />
+                </div>
+
+                <div class="min-w-0">
+                    <p
+                        class="text-xs
+                               text-base-content/40"
+                    >
+                        آدرس عمومی امن
+                    </p>
+
+                    <a
+                        href="{{ $publicUrl }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        dir="ltr"
+                        class="technical-value mt-0.5 block
+                               truncate text-left text-sm font-medium
+                               text-primary hover:underline"
+                    >
+                        {{ $publicUrl }}
+                    </a>
+                </div>
+            </div>
+
+            <a
+                href="{{ $publicUrl }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-primary btn-sm
+                       w-fit rounded-xl"
+            >
+                <x-icon
+                    name="lucide.external-link"
+                    class="size-4"
+                />
+
+                باز کردن سایت
+            </a>
+        </div>
+    @endif
 </section>

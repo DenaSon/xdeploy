@@ -12,6 +12,7 @@ use App\Domain\Server\Services\PrivilegedCommandExecutor;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsInterruptedOperationRecovery;
 use App\Infrastructure\Application\N8n\PublicEndpoint\SshN8nPublicEndpointInterruptedOperationRecovery;
+use App\Infrastructure\Application\WordPress\PublicEndpoint\SshWordPressPublicEndpointInterruptedOperationRecovery;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\DTOs\SSHResult;
 use App\Models\Server;
@@ -114,6 +115,64 @@ final class InterruptedOperationRecoveryTest extends TestCase
             remoteExitCode: 75,
         );
         $recovery = new SshN8nPublicEndpointInterruptedOperationRecovery(
+            $this->privileged($ssh),
+        );
+
+        try {
+            $recovery->recover();
+            self::fail('Expected an interrupted operation recovery exception.');
+        } catch (PublicEndpointOperationException $exception) {
+            self::assertSame(
+                PublicEndpointOperationFailure::OperationInProgress,
+                $exception->failure,
+            );
+        }
+    }
+
+    public function test_wordpress_recovery_restores_only_the_managed_environment_before_recreating_wordpress(): void
+    {
+        $ssh = new InterruptedRecoveryFakeSshConnection;
+        $recovery = new SshWordPressPublicEndpointInterruptedOperationRecovery(
+            $this->privileged($ssh),
+        );
+
+        $recovery->recover();
+
+        $command = $ssh->remoteCommand();
+
+        self::assertStringContainsString(
+            "lock_file='/var/lock/xdeploy-wordpress-public-endpoint.lock'",
+            $command,
+        );
+        self::assertStringContainsString(
+            "app_dir='/opt/xdeploy/apps/wordpress'",
+            $command,
+        );
+        self::assertStringContainsString(
+            'cp -p "$backup_dir/.env" "$temporary"',
+            $command,
+        );
+        self::assertStringContainsString(
+            'compose up -d --no-deps --force-recreate wordpress',
+            $command,
+        );
+        self::assertStringContainsString(
+            'rm -f "$transaction_file"',
+            $command,
+        );
+        self::assertTrue(
+            strpos($command, 'flock -n 9')
+            < strpos($command, 'if [ ! -e "$transaction_file" ]'),
+        );
+        self::assertTrue($ssh->remoteCommandSensitive());
+    }
+
+    public function test_wordpress_recovery_preserves_real_lock_contention_as_operation_in_progress(): void
+    {
+        $ssh = new InterruptedRecoveryFakeSshConnection(
+            remoteExitCode: 75,
+        );
+        $recovery = new SshWordPressPublicEndpointInterruptedOperationRecovery(
             $this->privileged($ssh),
         );
 

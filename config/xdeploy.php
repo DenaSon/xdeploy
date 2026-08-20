@@ -121,7 +121,7 @@ return [
 
                 'sha256' => env(
                     'XDEPLOY_WORDPRESS_DOCKER_SHA256',
-                    'a22256e1740869383aaeaf7e695d2e915925fdbf93bd7ae6ec493085b97e8ff5',
+                    '95710328f6d574c90ff25d742989940a5f6528fca23ce4287121ed01ce820238',
                 ),
 
             ],

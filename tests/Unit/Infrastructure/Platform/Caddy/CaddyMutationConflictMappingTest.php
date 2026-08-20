@@ -11,6 +11,7 @@ use App\Domain\PublicEndpoint\Enums\PublicEndpointOperationFailure;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsDisabler;
 use App\Infrastructure\Application\Marzban\SshMarzbanHttpsGateway;
 use App\Infrastructure\Application\N8n\PublicEndpoint\SshN8nPublicEndpointGateway;
+use App\Infrastructure\Application\WordPress\PublicEndpoint\SshWordPressPublicEndpointGateway;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -33,6 +34,18 @@ final class CaddyMutationConflictMappingTest extends TestCase
     {
         $mapped = $this->invokeMapper(
             SshN8nPublicEndpointGateway::class,
+        );
+
+        self::assertSame(
+            PublicEndpointOperationFailure::ExistingConfiguration,
+            $mapped->failure,
+        );
+    }
+
+    public function test_wordpress_maps_caddy_ownership_conflicts_to_existing_configuration(): void
+    {
+        $mapped = $this->invokeMapper(
+            SshWordPressPublicEndpointGateway::class,
         );
 
         self::assertSame(

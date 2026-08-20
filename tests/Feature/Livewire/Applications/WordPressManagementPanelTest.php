@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Applications;
 
+use App\Domain\Application\Shared\Enums\ApplicationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Livewire\Applications\WordPress\ManagementPanel;
+use App\Models\PublicEndpoint;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -48,6 +50,28 @@ final class WordPressManagementPanelTest extends TestCase
                 ManagementPanel::class,
                 ['serverId' => $server->getKey()],
             );
+    }
+
+    public function test_owner_can_open_the_active_wordpress_public_url(): void
+    {
+        $user = $this->createUser('09120000084');
+        $server = $this->createServer($user, '192.0.2.84');
+
+        PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::WordPress,
+            'domain' => 'blog.example.com',
+            'activated_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(
+                ManagementPanel::class,
+                ['serverId' => $server->getKey()],
+            )
+            ->assertSet('publicUrl', 'https://blog.example.com/')
+            ->assertSee('دسترسی عمومی فعال')
+            ->assertSee('https://blog.example.com/');
     }
 
     private function createUser(string $phone): User
