@@ -21,6 +21,7 @@ final class CloudflareConnectionFailureTest extends TestCase
         parent::setUp();
 
         config([
+            'services.cloudflare_oauth.enabled' => true,
             'services.cloudflare_api.base_url' => 'https://api.cloudflare.com/client/v4',
             'services.cloudflare_api.connect_timeout' => 5,
             'services.cloudflare_api.timeout' => 15,
