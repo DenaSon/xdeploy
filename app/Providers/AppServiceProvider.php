@@ -9,6 +9,7 @@ use App\Application\Support\Contracts\SupportImageProcessorInterface;
 use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Infrastructure\Support\LaravelSupportImageProcessor;
+use App\Livewire\Applications\WordPress\ManagementPanel as WordPressManagementPanel;
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
 use App\Models\Page;
@@ -41,6 +42,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->registerPublicDocumentationNavigationCacheInvalidation();
         $this->registerPublicFooterNavigationCacheInvalidation();
+
+        Livewire::component(
+            'applications.wordpress.management-panel',
+            WordPressManagementPanel::class,
+        );
 
         Livewire::addPersistentMiddleware([
             EnsureUserIsAdmin::class,
