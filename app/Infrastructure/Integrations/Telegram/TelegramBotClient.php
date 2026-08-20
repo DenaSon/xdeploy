@@ -130,6 +130,8 @@ final class TelegramBotClient
         string $chatId,
         #[SensitiveParameter]
         string $text,
+        ?string $buttonText = null,
+        ?string $buttonUrl = null,
     ): void {
         if (! $this->configured()) {
             throw new TelegramBotException(
@@ -154,6 +156,38 @@ final class TelegramBotClient
             );
         }
 
+        if (($buttonText === null) !== ($buttonUrl === null)) {
+            throw new TelegramBotException(
+                'Telegram message action is invalid.',
+            );
+        }
+
+        $payload = [
+            'chat_id' => $chatId,
+            'text' => $text,
+        ];
+
+        if ($buttonText !== null && $buttonUrl !== null) {
+            if (
+                trim($buttonText) === ''
+                || mb_strlen($buttonText) > 64
+                || ! $this->validActionUrl($buttonUrl)
+            ) {
+                throw new TelegramBotException(
+                    'Telegram message action is invalid.',
+                );
+            }
+
+            $payload['reply_markup'] = [
+                'inline_keyboard' => [[
+                    [
+                        'text' => $buttonText,
+                        'url' => $buttonUrl,
+                    ],
+                ]],
+            ];
+        }
+
         $url = sprintf(
             '%s/bot%s/sendMessage',
             rtrim($this->configString('api_base_url'), '/'),
@@ -164,13 +198,7 @@ final class TelegramBotClient
             $response = Http::connectTimeout($this->connectTimeout())
                 ->timeout($this->requestTimeout())
                 ->asJson()
-                ->post(
-                    $url,
-                    [
-                        'chat_id' => $chatId,
-                        'text' => $text,
-                    ],
-                );
+                ->post($url, $payload);
         } catch (ConnectionException) {
             throw new TelegramBotException(
                 'Telegram API connection failed.',
@@ -272,5 +300,17 @@ final class TelegramBotClient
             && ! isset($parts['user'])
             && ! isset($parts['pass'])
             && ! isset($parts['fragment']);
+    }
+
+    private function validActionUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+
+        return is_array($parts)
+            && in_array($parts['scheme'] ?? null, ['http', 'https'], true)
+            && is_string($parts['host'] ?? null)
+            && ($parts['host'] ?? '') !== ''
+            && ! isset($parts['user'])
+            && ! isset($parts['pass']);
     }
 }
