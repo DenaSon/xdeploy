@@ -1,17 +1,15 @@
 ---
 name: xdeploy
-description: Develop, review, debug, test, and make product or architecture decisions for the xDeploy Laravel server management platform.
+description: Develop, review, debug, test, and make product or architecture decisions for Coreflare, the Laravel server and application management platform in DenaSon/xdeploy.
 ---
 
-# xDeploy
+# Coreflare
 
-Use this skill whenever working on the xDeploy project.
+Use this skill whenever working on Coreflare or its legacy technical repository `DenaSon/xdeploy`.
 
-xDeploy is a Laravel-based Server & Application Management Platform.
+Coreflare is a Laravel-based Server & Application Management Platform. Its purpose is to make VPS purchase, connection, inspection, application installation, management, integrations, and cloud-server lifecycle operations simple and reliable while keeping infrastructure complexity behind clear product workflows.
 
-Its purpose is to make VPS purchase, connection, inspection, application installation,
-management, and cloud-server lifecycle operations simple and reliable for the user,
-while keeping infrastructure complexity behind clear product workflows.
+The technical skill identifier/path remains `xdeploy` for compatibility. Product-facing prose should use **Coreflare** unless an existing persisted/runtime/config identifier literally remains `xdeploy`.
 
 ---
 
@@ -19,32 +17,31 @@ while keeping infrastructure complexity behind clear product workflows.
 
 Do not treat this skill as a replacement for the project source of truth.
 
-Before making significant product, architecture, persistence, security, or lifecycle decisions,
-inspect the relevant current implementation.
+Before significant product, architecture, persistence, security, identity, integration, or lifecycle decisions, inspect the relevant current implementation and tests.
 
 Authority order:
 
 1. Current production-intent code
 2. Automated tests
-3. Current migrations
+3. Current migrations / physical schema
 4. Controlled E2E verification when external systems are involved
 5. `XDOC-001` for product, MVP, user journey, and launch decisions
-6. `XDOC-117` for technical and architectural decisions
-7. `XDESIGN-001` for visual and UI language
-8. Historical documents
+6. `XDOC-119` for Identity, Authentication, Account Security, Admin Security, Sensitive Re-Authentication, Recovery, and authentication-security invariants
+7. `XDOC-117` for general technical and architectural decisions
+8. `XDESIGN-001` for visual and UI language
+9. Historical documents
+
+`XDOC-118` is specialized Livewire 4 adoption guidance and does not replace the general architecture baseline.
 
 If documentation and current code disagree, investigate the difference before changing behavior.
 
-Do not copy large amounts of volatile implementation detail into this skill.
-
-Stable engineering rules belong here.
-Current implementation detail belongs in code, tests, and the active baseline documents.
+Stable engineering rules belong here. Volatile implementation detail belongs in code, tests, migrations, and active baseline documents.
 
 ---
 
 # Product Principles
 
-xDeploy should make complex infrastructure feel simple.
+Coreflare should make complex infrastructure feel simple.
 
 Prefer:
 
@@ -58,14 +55,14 @@ Prefer:
 
 Avoid:
 
-- Turning xDeploy into a generic SSH terminal
+- Turning Coreflare into a generic SSH terminal
 - Generic infrastructure orchestration without a real product need
 - Building abstractions for hypothetical future features
 - Exposing raw infrastructure complexity to users
 
 Before proposing a feature or major refactor ask:
 
-> Does this materially improve the current xDeploy product or launch reliability?
+> Does this materially improve the current Coreflare product or launch reliability?
 
 If not, keep it out of the critical path.
 
@@ -86,14 +83,13 @@ Primary stack:
 - Linux
 - SSH
 
-Prefer Laravel-native solutions before custom infrastructure when Laravel already provides
-a good solution.
+Prefer Laravel-native solutions before custom infrastructure when Laravel already provides a good solution.
 
 ---
 
 # Architecture
 
-xDeploy is a Modular Monolith with Domain-Oriented boundaries.
+Coreflare is a Modular Monolith with Domain-Oriented boundaries.
 
 Primary flow:
 
@@ -104,39 +100,17 @@ Presentation
 → Infrastructure
 → External systems
 
-Main code locations:
-
 ## `app/Application`
 
-Owns:
+Owns use cases, actions, workflow orchestration, transaction boundaries, cross-domain coordination, queue entry points, and integration coordination.
 
-- Use cases
-- Actions
-- Workflow orchestration
-- Transaction boundaries
-- Cross-domain coordination
-- Queue entry points
-
-Application code coordinates work.
-
-It should not contain low-level provider, SSH, HTTP, shell, or filesystem implementation details.
+Application code coordinates work. It should not contain low-level provider, SSH, HTTP, shell, or filesystem implementation details.
 
 ## `app/Domain`
 
-Owns:
+Owns business concepts, rules, contracts, DTOs, enums, value objects, policies, exceptions, and invariants.
 
-- Business concepts
-- Business rules
-- Contracts
-- DTOs
-- Enums
-- Value Objects
-- Domain policies
-- Domain exceptions
-- Invariants
-
-Do not place Laravel-specific infrastructure concerns in Domain code unless already established
-by project convention.
+Do not place Laravel-specific infrastructure concerns in Domain code unless already established by project convention.
 
 ## `app/Infrastructure`
 
@@ -148,6 +122,7 @@ Owns implementation details such as:
 - Cloud Provider APIs
 - Payment gateways
 - SMS providers
+- Cloudflare / Telegram provider protocol details
 - Remote application gateways
 - External services
 
@@ -159,24 +134,15 @@ Do not introduce repository abstractions around Eloquent without a concrete arch
 
 ## Presentation
 
-Controllers, Livewire components, routes, and Blade should handle:
+Controllers, Livewire components, routes, and Blade should handle user interaction, UI validation, presentation state, calling application use cases, and product-friendly messaging.
 
-- User interaction
-- UI validation
-- Presentation state
-- Calling application use cases
-- Product-friendly messaging
-
-Do not place business logic, SSH commands, Provider payloads, or infrastructure mutation directly
-inside Livewire or Blade.
+Do not place business logic, SSH commands, provider payloads, or infrastructure mutation directly inside Livewire or Blade.
 
 ---
 
-# Domain Boundaries
+# Domain and Feature Boundaries
 
-Preserve the current conceptual boundaries.
-
-Important concepts include:
+Preserve the current conceptual boundaries. Important concepts include:
 
 - Application
 - Platform
@@ -186,84 +152,35 @@ Important concepts include:
 - Billing
 - Authentication
 - User
+- Integration
 
-Do not introduce a new Domain merely to organize files.
+`Integration` is a real implementation boundary for focused external integrations such as Cloudflare and Telegram. Do not turn it into a generic iPaaS or workflow-automation engine without multiple real consumers and a validated need.
 
-A new Domain requires a real distinct business concept.
+Do not introduce a new Domain merely to organize files. A new Domain requires a distinct business concept.
 
 ---
 
 # Application vs Platform
 
-This distinction is fundamental.
+Applications are user-facing software, for example Marzban, n8n, and AmneziaWG.
 
-Applications are user-facing software.
-
-Examples:
-
-- Marzban
-- n8n
-- AmneziaWG
-
-Platforms are internal reusable infrastructure.
-
-Examples:
-
-- Docker
-- Docker Compose
-- Caddy
+Platforms are internal reusable infrastructure, for example Docker, Docker Compose, and Caddy.
 
 Invariant:
 
 Application != Platform
 
-An Application declares its requirements.
-
-It does not own or duplicate installation of shared Platforms.
-
-Example:
-
-n8n
-→ requires Docker Compose
-
-Public exposure of n8n
-→ may require Caddy
-
-But:
-
-n8n
-!= owner of Docker
-!= owner of Caddy
+An Application declares requirements. It does not own or duplicate installation of shared Platforms.
 
 ---
 
-# Caddy
+# Caddy and PublicEndpoint
 
-Caddy is a shared first-class Platform.
+Caddy is a shared first-class Platform. It is not owned by Marzban or n8n and is not an Application.
 
-Invariant:
+Applications that need Domain/HTTPS should use shared PublicEndpoint and Caddy boundaries. Do not add Application-specific Caddy installation logic or overwrite unrelated external Caddy configuration.
 
-Caddy is not owned by Marzban.
-Caddy is not owned by n8n.
-Caddy is not an Application.
-
-Applications that need Domain/HTTPS should use the shared PublicEndpoint and Caddy boundaries.
-
-Do not add Application-specific Caddy installation logic.
-
-Do not overwrite the entire Caddy configuration when the managed site abstraction can be used.
-
-External or unknown configuration should be detected and preserved safely.
-
----
-
-# PublicEndpoint
-
-PublicEndpoint is a shared capability for Application exposure through Domain/HTTPS.
-
-Application-specific behavior belongs behind its driver or gateway.
-
-Typical flow:
+Typical PublicEndpoint flow:
 
 Resolve owned Server
 → inspect Application
@@ -277,6 +194,8 @@ Resolve owned Server
 → verify final state
 
 Do not report endpoint success before the actual post-condition is verified.
+
+Persisted PublicEndpoint lifecycle may represent product/workflow state such as Pending, Active, and Disabled. It does **not** replace remote runtime truth. Inspect Caddy/Application reality where operational truth matters.
 
 AmneziaWG is not a PublicEndpoint consumer in the current architecture.
 
@@ -297,34 +216,19 @@ Examples:
 - AmneziaWG runtime peer telemetry
 - SSH availability
 
-Do not turn remote runtime state into authoritative database state unless the product explicitly
-requires persisted workflow or product metadata.
+Do not turn remote runtime state into authoritative database state unless the product explicitly requires persisted workflow or product metadata.
 
 Important invariant:
 
 Unknown != NotInstalled
 
-Failure to inspect a remote system does not prove absence.
-
-Never turn an inspection error into a false `NotInstalled`, `Stopped`, or empty state.
+Failure to inspect a remote system does not prove absence. Never turn an inspection error into a false `NotInstalled`, `Stopped`, or empty state.
 
 ---
 
 # Safe Remote Operations
 
-Treat every remote operation as unreliable.
-
-Always consider:
-
-- Connection failure
-- Timeout
-- Partial execution
-- Exit code
-- Permissions
-- Duplicate execution
-- Retry safety
-- Idempotency
-- Ambiguous remote state
+Treat every remote operation as unreliable. Consider connection failure, timeout, partial execution, exit code, permissions, duplicate execution, retry safety, idempotency, and ambiguous remote state.
 
 Preferred mutation pattern:
 
@@ -332,36 +236,24 @@ Precondition
 → Mutation
 → Post-condition verification
 
-Never assume success merely because a command produced output.
-
-Prefer structured execution results including output and exit status.
+Never assume success merely because a command or API call returned output.
 
 After ambiguous mutation failure:
 
 Inspect remote reality
 → reconcile state
 
-Do not blindly repeat remote mutations.
+Do not blindly repeat remote or billable mutations.
 
 ---
 
 # SSH
 
-SSH state is scoped to the current request or job lifecycle.
-
-Do not make stateful SSH connections global singletons.
+SSH state is scoped to the current request or job lifecycle. Do not make stateful SSH connections global singletons.
 
 Infrastructure-specific SSH logic stays behind contracts.
 
-Sensitive commands and output must never expose secrets.
-
-For sensitive execution:
-
-- Hide command body
-- Hide sensitive output excerpts
-- Avoid logging generated credentials
-- Avoid logging client configuration
-- Avoid logging provider secrets
+Sensitive commands and output must never expose secrets. Hide command bodies and sensitive output excerpts when necessary; never log generated credentials, client configuration, provider secrets, or private keys.
 
 User-controlled shell input must be validated or safely escaped.
 
@@ -371,14 +263,12 @@ User-controlled shell input must be validated or safely escaped.
 
 Operational readiness is not equivalent to simple network reachability.
 
-Conceptually:
-
 Reachable
 + Authenticated
 + Command-capable
 + Supported OS
 + Required privileges
-  = Ready
+= Ready
 
 Do not bypass established readiness checks before remote mutation.
 
@@ -386,52 +276,43 @@ Do not bypass established readiness checks before remote mutation.
 
 # Commercial vs Operational State
 
-Never mix these concepts:
+Never mix:
 
 Commercial Order State
-!=
-Server Operational Readiness
-!=
-Cloud Service Lifetime
+!= Server Operational Readiness
+!= Cloud Service Lifetime
 
 A valid state is:
 
 Order = Fulfilled
 Server = Inactive
 
-Provider resource delivery may succeed even when SSH is temporarily unavailable.
+Provider resource delivery may succeed while SSH is temporarily unavailable. Do not mark a commercially fulfilled order as failed merely because Coreflare cannot currently connect through SSH.
 
-Do not mark a commercially fulfilled order as failed merely because xDeploy cannot currently
-connect through SSH.
-
-Likewise:
-
-Order Expired
-!=
-Cloud Server Service Expired
-
-Order history represents commercial truth.
-
-Server status represents operational manageability.
-
-Service lifetime represents the lifetime of a cloud resource.
+Order history represents commercial truth. Server status represents operational manageability. Service lifetime represents cloud-resource lifetime.
 
 ---
 
-# Cloud Operations
+# Multi-Provider Cloud Operations
 
-Cloud Provider details remain behind Cloud contracts and Infrastructure adapters.
+Cloud Provider details remain behind Cloud contracts and Infrastructure adapters. Do not leak provider-specific payload structures into Presentation or generic Domain code.
 
-Do not leak Provider-specific payload structures into Presentation or generic Domain code.
+Coreflare uses provider identity, registry/capability routing, and persisted resource ownership. Keep these semantics distinct:
 
-For billable Provider mutations such as VPS creation:
+- `enabled = true` means a provider is operationally available for resources it owns.
+- `purchase_enabled = true` means the provider may accept new purchases.
+- Purchase availability must be enforced in Application/backend code, not only hidden in UI.
+- Existing Server lifecycle routes through persisted provider ownership, not the current default provider or purchasable set.
+- Provider capabilities may differ; do not expose unsupported operations as if all providers were identical.
+
+For billable provider mutations such as VPS creation:
 
 - Avoid blind retries
 - Preserve provider correlation
 - Recover using real provider state
 - Keep operations idempotent where possible
 
-Provider `ACTIVE` does not imply xDeploy Server `active`.
+Provider `ACTIVE` does not imply Coreflare Server `active`.
 
 ---
 
@@ -442,8 +323,7 @@ Cloud-created and manually-added Servers have different lifecycle semantics.
 Manual Server deletion:
 
 local soft delete
-!=
-remote VPS deletion
+!= remote VPS deletion
 
 Cloud-created Server expiration:
 
@@ -456,14 +336,86 @@ Expired
 
 Provider deletion must happen before local correlation is removed.
 
-If Provider deletion fails:
+If Provider deletion fails, preserve the Server record and provider correlation, persist safe failure metadata, and allow retry/reconciliation. Provider `Not Found` may represent the desired terminal state during termination.
 
-- Preserve Server record
-- Preserve Provider correlation
-- Persist safe failure metadata
-- Allow retry or reconciliation
+---
 
-Provider `Not Found` may represent the desired terminal state during termination.
+# External Integrations
+
+Provider-specific OAuth, API, webhook, and protocol semantics stop at the Infrastructure boundary unless a stable Domain vocabulary is genuinely shared.
+
+Current focused integrations include Cloudflare and Telegram.
+
+Rules:
+
+- Persist external secrets only when required.
+- Encrypt secret-bearing persistence at rest.
+- Hide secrets from serialization.
+- Never raw-log access tokens, refresh tokens, bot/link secrets, or provider credentials.
+- Keep temporary challenge/link state purpose-bound and time-bounded.
+- Keep connection state, user preference state, and delivery outcome conceptually separate.
+- Do not create a generic integration framework before multiple real consumers justify it.
+
+---
+
+# Notification Preferences
+
+Notification preferences are persisted Product State when implemented.
+
+Do not conflate:
+
+Preference enabled
+!= Integration connected
+!= Notification delivery succeeded
+
+A missing preference row may intentionally mean the product default; preserve the current service semantics rather than inventing a different default in UI.
+
+---
+
+# Support Requests and Attachments
+
+Support Requests are a focused product capability, not a generic helpdesk platform.
+
+Preserve tenant isolation on request, Server context, message, and attachment reads/writes.
+
+Support attachments are deliberately bounded. Keep upload validation, normalization, ownership/admin authorization, private delivery, and no-store/nosniff behavior intact.
+
+Do not use attachment support as justification for a generic media library or helpdesk automation subsystem.
+
+---
+
+# Identity and Security
+
+Identity, Authentication, Account Security, Admin Security, Sensitive Re-Authentication, Recovery, and authentication-security invariants are canonical in `XDOC-119`.
+
+General rules:
+
+- Never log plaintext secrets.
+- Never expose secrets through public serialization.
+- Validate ownership before every user-owned resource operation.
+- Validate authorization in backend code, not only UI.
+- Encrypt required secret-bearing persistence.
+- Use private/no-store responses for sensitive downloads where appropriate.
+- Avoid unsafe shell interpolation.
+- Sanitize infrastructure failure messages before exposing them to users.
+
+Current product identity principles include Phone + OTP bootstrap/fallback and optional Passkey for returning authentication. A verified Google email is an optional verified account attribute unless XDOC-119 explicitly promotes it to a login or recovery method.
+
+## Admin Impersonation
+
+Controlled Admin user impersonation is a purpose-built exception, not generic identity switching.
+
+Invariant:
+
+- Start requires protected Admin authorization and the established Admin Passkey gate.
+- Self-target and Admin-target impersonation are rejected.
+- The target session does not inherit Admin privilege.
+- Original Admin identity is kept only in controlled session state required for restoration.
+- Identity transitions regenerate the session ID.
+- Stop must verify the original account still exists and is still Admin before restoration.
+- Impersonation is distinct from Support Access and must not share sensitive-grant semantics implicitly.
+
+Do not claim durable impersonation audit history unless the implementation actually persists it.
 
 ---
 
@@ -482,71 +434,25 @@ Short DB transaction
 
 Use row locks only around short critical state transitions.
 
-Never hold a transaction while:
-
-- Waiting for SSH
-- Calling Cloud APIs
-- Calling Payment gateways
-- Running installers
-- Waiting for remote application operations
+Never hold a transaction while waiting for SSH, calling Cloud APIs, calling payment gateways, running installers, or waiting for remote application operations.
 
 ---
 
-# Application Operations
+# Application Operations and Queue Safety
 
-Long-running Application install/uninstall operations should use the established queued operation
-model.
+Long-running Application install/uninstall/lifecycle operations should use the established queued operation model. Do not create a second competing mechanism for the same workflow.
 
-Conceptually:
+Application workflow state may be persisted. Application runtime truth remains remote.
 
-Presentation
-→ ApplicationOperation
-→ Queue
-→ ApplicationManager
-→ Requirements
-→ Platform/System dependencies
-→ Application mutation
-→ Verification
-→ terminal operation state
+Remote or billable mutations should not be blindly retried. For ambiguous failures, inspect current state first.
 
-Do not create a second competing mechanism for the same workflow.
-
-Do not start competing SSH runtime inspection while an active Application mutation is running.
-
-Application workflow state may be persisted.
-
-Application runtime truth remains remote.
-
----
-
-# Queue Safety
-
-Remote or billable mutations should not be blindly retried.
-
-A retry is safe only when the operation semantics make it safe.
-
-For ambiguous failures:
-
-Inspect current state first.
-
-Queue workers and Scheduler are production-critical parts of xDeploy.
-
-Do not design a workflow that depends on them without considering:
-
-- Idempotency
-- Duplicate dispatch
-- Worker restart
-- Timeout
-- Failure persistence
-- Recovery
+Queue workers and Scheduler are production-critical. Consider idempotency, duplicate dispatch, worker restart, timeout, failure persistence, and recovery.
 
 ---
 
 # Installer Delivery
 
-Applications and Platforms should not care how installer assets are delivered.
-
-Use the existing installer source abstraction.
+Applications and Platforms should not care how installer assets are delivered. Use the existing installer source abstraction.
 
 Production installer rules:
 
@@ -556,55 +462,27 @@ Production installer rules:
 - Cleanup
 - Verification before execution
 
-Never use:
-
-`curl | sh`
-
-Do not execute an installer before validating its integrity.
+Never use `curl | sh`.
 
 Unsupported operating systems should fail before installer execution.
 
 ---
 
-# Security
+# Reverse Proxy / HTTPS
 
-Security-sensitive areas include:
+Coreflare may run behind Cloudflare or another TLS-terminating reverse proxy.
 
-- Server credentials
-- SSH keys
-- Provider tokens
-- Payment secrets
-- OTP codes
-- Shell arguments
-- VNC URLs
-- VPN client configurations
-- Private keys
-- Preshared keys
+Generated URLs and redirects must preserve the visitor's HTTPS context through correctly trusted forwarded headers.
 
-Rules:
+`APP_URL=https://...` is not a substitute for correct proxy handling.
 
-- Never log plaintext secrets
-- Never expose secrets through public serialization
-- Validate ownership before every user-owned resource operation
-- Validate authorization in backend code, not only UI
-- Encrypt required secret-bearing persistence
-- Use no-store/private responses for secret downloads when appropriate
-- Avoid unsafe shell interpolation
-- Sanitize infrastructure failure messages before exposing them to users
-
-Ownership checks must remain authoritative even if routes or UI already imply ownership.
+If forwarded headers are trusted broadly, infrastructure must control the proxy/origin boundary so arbitrary direct clients cannot spoof trusted forwarding context.
 
 ---
 
 # Livewire
 
-Livewire components should primarily manage:
-
-- UI state
-- Validation
-- User interaction
-- Application action invocation
-- Polling or deferred loading
+Livewire components should primarily manage UI state, validation, user interaction, application action invocation, polling, or deferred loading.
 
 Do not perform infrastructure work directly inside Livewire.
 
@@ -613,55 +491,23 @@ Prefer:
 First paint from local data
 → deferred remote inspection
 
-A page should not block its initial HTML render on SSH unless there is a strong product reason.
-
-When an existing successful snapshot is available:
-
-Keep it visible during refresh.
-
-Do not replace valid stale data with empty or unknown state merely because refresh failed.
+When an existing successful snapshot is available, keep it visible during refresh. Do not replace valid stale data with empty/unknown state merely because refresh failed.
 
 ---
 
 # UI & Product Copy
 
-xDeploy is Persian-first and RTL-first.
+Coreflare is Persian-first and RTL-first. For visual decisions follow `XDESIGN-001`.
 
-For visual decisions follow `XDESIGN-001`.
+Core direction: Calm Infrastructure.
 
-Core direction:
-
-Calm Infrastructure
-
-Prefer:
-
-- Minimal surfaces
-- Clear hierarchy
-- Semantic state
-- Soft borders
-- Restrained color
-- Lucide icons
-- Technical values in LTR
-- Product-friendly Persian copy
+Prefer minimal surfaces, clear hierarchy, semantic state, soft borders, restrained color, Lucide icons, technical values in LTR, and product-friendly Persian copy.
 
 Prefer Mary UI / DaisyUI before building custom UI primitives.
 
-Custom components are appropriate when they encode a real reusable xDeploy pattern.
+Avoid decorative complexity, excessive shadows/gradients, neon infrastructure UI, too many badges, raw technical errors, fake progress, or UI that invents backend capability.
 
-Avoid:
-
-- Decorative complexity
-- Excessive shadows
-- Excessive gradients
-- Neon infrastructure UI
-- Too many badges
-- Raw technical errors
-- Fake progress
-- Red for normal lifecycle completion
-
-UI state must reflect actual backend/product semantics.
-
-Do not invent backend capabilities through design.
+Product-facing naming should use **Coreflare**. Preserve literal legacy `xdeploy` identifiers only where compatibility/migration requires them.
 
 ---
 
@@ -673,12 +519,7 @@ Expected Domain / Validation Failure
 Infrastructure Failure
 Unexpected Programming Failure
 
-Expected failures should become product-friendly messages.
-
-Infrastructure details belong in logs.
-
-Unexpected programming failures should remain observable and should not be silently converted into
-fake expected states.
+Expected failures should become product-friendly messages. Infrastructure details belong in logs. Unexpected programming failures should remain observable and should not be silently converted into fake expected states.
 
 Never expose raw Provider or SSH exceptions directly to the user.
 
@@ -691,11 +532,11 @@ For meaningful changes:
 - Preserve existing tests
 - Add focused tests for changed behavior
 - Test business invariants
-- Test authorization
+- Test authorization and tenant isolation
 - Test failure paths
 - Test duplicate/idempotency behavior where relevant
 - Test post-condition verification
-- Test unsupported states
+- Test unsupported states/capabilities
 - Test remote boundaries through fakes/contracts where appropriate
 
 Use:
@@ -707,10 +548,9 @@ Feature tests
 → application behavior + persistence + Laravel integration
 
 Controlled E2E
-→ real VPS / Provider / Payment / Application behavior when external reality matters
+→ real VPS / Provider / Payment / external Integration / Application behavior when external reality matters
 
-Do not replace Controlled E2E confidence with mocked tests when the feature depends on real
-external behavior.
+Do not replace Controlled E2E confidence with mocked tests when the feature depends on real external behavior.
 
 After architecture-sensitive changes:
 
@@ -718,60 +558,38 @@ Focused tests
 → full regression
 → Controlled E2E when external behavior changed
 
+Do not claim CI green for a commit unless the exact relevant workflow run has been verified.
+
 ---
 
 # Review Workflow
 
-When reviewing xDeploy code:
+When reviewing Coreflare code:
 
-1. Inspect the current implementation.
-2. Inspect relevant tests.
+1. Inspect current implementation.
+2. Inspect relevant tests and migrations.
 3. Identify the actual problem.
-4. Check the relevant Product or Technical baseline when needed.
+4. Check the relevant canonical baseline (`XDOC-001`, `XDOC-119`, `XDOC-117`) when needed.
 5. Verify ownership and security boundaries.
 6. Verify remote-state semantics.
 7. Verify mutation and retry safety.
-8. Check project conventions.
-9. Recommend the smallest effective change.
-10. Add or adjust tests where meaningful.
-11. Mention larger refactors separately.
+8. Verify provider/integration capability boundaries where relevant.
+9. Check project conventions.
+10. Recommend the smallest effective change.
+11. Add or adjust tests where meaningful.
+12. Mention larger refactors separately.
 
 Do not turn every review into a refactor.
 
-Distinguish between:
-
-- Bug
-- Security issue
-- Architecture violation
-- Reliability improvement
-- Product improvement
-- Optional cleanup
+Distinguish between bug, security issue, architecture violation, reliability improvement, product improvement, and optional cleanup.
 
 ---
 
 # Engineering Style
 
-Prefer:
+Prefer simple code, existing project conventions, Laravel-native solutions, explicit behavior, small focused classes, strong boundaries around external side effects, testable code, and production-safe operations.
 
-1. Simple code
-2. Existing project conventions
-3. Laravel-native solutions
-4. Explicit behavior
-5. Small focused classes
-6. Strong boundaries where external side effects exist
-7. Testable code
-8. Production-safe operations
-
-Avoid:
-
-- Premature abstraction
-- Generic repositories
-- God interfaces
-- Hidden side effects
-- Large refactors without measurable value
-- Generic engines before multiple real consumers exist
-- Clever code that reduces readability
-- Parallel architecture for an existing solved problem
+Avoid premature abstraction, generic repositories, god interfaces, hidden side effects, large refactors without measurable value, generic engines before multiple real consumers exist, clever code that reduces readability, or parallel architecture for an already-solved problem.
 
 Abstractions should follow real consumers, not imagined future ones.
 
@@ -787,7 +605,7 @@ When multiple approaches exist, use:
 
 **Trade-off:** the meaningful downside or cost
 
-Prefer concrete recommendations over presenting many equivalent alternatives.
+Prefer concrete recommendations over many equivalent alternatives.
 
 ---
 
@@ -812,7 +630,7 @@ Expand from real usage and evidence.
 
 For state:
 
-Commercial truth, operational readiness, and resource lifetime are separate concerns.
+Commercial truth, operational readiness, persisted workflow state, and remote runtime truth are separate concerns.
 
 For infrastructure:
 
