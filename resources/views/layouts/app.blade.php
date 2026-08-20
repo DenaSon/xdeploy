@@ -66,7 +66,7 @@
 </x-main>
 
 {{--  TOAST area --}}
-<x-toast />
+<x-global-toast />
 </body>
 
 

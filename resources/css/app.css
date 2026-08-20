@@ -598,6 +598,59 @@ input[inputmode="decimal"] {
 
 /*
 |--------------------------------------------------------------------------
+| Global Toast
+|--------------------------------------------------------------------------
+|
+| DaisyUI centers toast-center with a physical negative translation while
+| its inline inset is direction-aware. On RTL viewports that combination can
+| move the toast outside the screen. Mobile uses bounded inline gutters;
+| larger viewports use an explicit physical center independent of direction.
+|
+*/
+
+.toast.toast-center {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    inset-inline: 0.75rem;
+
+    width: auto;
+    max-width: none;
+
+    translate: 0 0;
+}
+
+.toast.toast-center > .alert {
+    width: 100%;
+    min-width: 0;
+}
+
+.toast.toast-center > .alert:has(> :nth-child(2)) {
+    grid-template-columns: auto minmax(0, 1fr);
+}
+
+.toast.toast-center .alert > .grid {
+    min-width: 0;
+}
+
+.toast.toast-center .alert > .grid > * {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+@media (min-width: 640px) {
+    .toast.toast-center {
+        inset-inline: auto;
+        left: 50%;
+        right: auto;
+
+        width: min(28rem, calc(100vw - 2rem));
+
+        translate: -50% 0;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | Motion
 |--------------------------------------------------------------------------
 */

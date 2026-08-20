@@ -9,7 +9,9 @@ use App\Application\Billing\Actions\CreateOrderAction;
 use App\Application\Billing\Actions\CreatePaymentAction;
 use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Domain\Billing\DTOs\PurchasePriceData;
+use App\Domain\Billing\Exceptions\OrderNotPayableException;
 use App\Domain\Billing\Exceptions\OrderQuoteExpiredException;
+use App\Domain\Billing\Exceptions\PaymentInitiationInProgressException;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
@@ -417,12 +419,19 @@ final class Buy extends Component
         $this->recalculateQuote();
     }
 
+    public function retryQuote(): void
+    {
+        $this->pendingOrderId = null;
+
+        $this->recalculateQuote();
+    }
+
     public function purchase(
         CreateOrderAction $createOrder,
         CreatePaymentAction $createPayment,
     ): mixed {
         if (! $this->selectionIsValid()) {
-            $this->error(
+            $this->warning(
                 'اطلاعات خرید کامل نیست',
                 'لطفاً ارائه‌دهنده، منطقه، پلن، سیستم‌عامل و دوره پرداخت را انتخاب کنید.',
             );
@@ -434,11 +443,6 @@ final class Buy extends Component
             $this->recalculateQuote();
 
             if ($this->quote === []) {
-                $this->error(
-                    'قیمت در دسترس نیست',
-                    'در حال حاضر امکان دریافت قیمت این پیکربندی وجود ندارد. لطفاً دوباره تلاش کنید.',
-                );
-
                 return null;
             }
         }
@@ -446,8 +450,12 @@ final class Buy extends Component
         $user = $this->authenticatedUser();
         $provider = $this->providerType();
 
-        try {
-            if ($this->pendingOrderId === null) {
+        /*
+         * Keep order creation separate from payment initiation so the UI
+         * never claims an Order was preserved before persistence is known.
+         */
+        if ($this->pendingOrderId === null) {
+            try {
                 $order = $createOrder->execute(
                     user: $user,
                     region: $this->regionId,
@@ -460,8 +468,21 @@ final class Buy extends Component
 
                 $this->pendingOrderId =
                     $order->getKey();
-            }
+            } catch (Throwable $exception) {
+                report(
+                    $exception,
+                );
 
+                $this->error(
+                    'ساخت سفارش انجام نشد',
+                    'پرداختی آغاز نشده است. پیش از تلاش مجدد، فهرست سفارش‌ها را بررسی کنید.',
+                );
+
+                return null;
+            }
+        }
+
+        try {
             $payment = $createPayment->execute(
                 user: $user,
                 orderId: $this->pendingOrderId,
@@ -480,6 +501,22 @@ final class Buy extends Component
             $this->warning(
                 'پیش‌فاکتور منقضی شد',
                 'قیمت سفارش به‌روزرسانی شد. لطفاً پرداخت را دوباره آغاز کنید.',
+            );
+
+            return null;
+        } catch (PaymentInitiationInProgressException) {
+            $this->info(
+                'پرداخت در حال آماده‌سازی است',
+                'لطفاً چند لحظه صبر کنید و سپس دوباره تلاش کنید.',
+            );
+
+            return null;
+        } catch (OrderNotPayableException) {
+            $this->pendingOrderId = null;
+
+            $this->warning(
+                'سفارش قابل پرداخت نیست',
+                'وضعیت سفارش تغییر کرده است. فهرست سفارش‌ها را بررسی کنید.',
             );
 
             return null;

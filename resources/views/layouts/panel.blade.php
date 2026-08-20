@@ -235,9 +235,7 @@
 {{-- Global UI --}}
 <x-components.panel.offline-indicator />
 
-<x-toast
-    position="toast-top toast-center"
-/>
+<x-global-toast />
 
 </body>
 </html>
