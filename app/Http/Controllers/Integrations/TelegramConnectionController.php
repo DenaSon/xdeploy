@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Integrations;
 
 use App\Application\Integrations\Telegram\CreateTelegramLinkAction;
 use App\Application\Integrations\Telegram\DisconnectTelegramAction;
+use App\Application\Integrations\Telegram\Jobs\SendTelegramBotMessage;
 use App\Infrastructure\Integrations\Telegram\TelegramBotException;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -36,9 +37,16 @@ final class TelegramConnectionController
         Request $request,
         DisconnectTelegramAction $disconnect,
     ): RedirectResponse {
-        $disconnect->execute(
+        $chatId = $disconnect->execute(
             $this->user($request),
         );
+
+        if ($chatId !== null) {
+            SendTelegramBotMessage::dispatch(
+                $chatId,
+                "🔕 Telegram از Coreflare جدا شد\n\nارسال اعلان‌های Coreflare به این حساب متوقف شد.",
+            );
+        }
 
         return to_route('panel.integrations.index')
             ->with(
