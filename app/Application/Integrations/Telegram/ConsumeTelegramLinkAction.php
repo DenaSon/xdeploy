@@ -14,12 +14,12 @@ final class ConsumeTelegramLinkAction
     /**
      * @param  array<string, mixed>  $update
      */
-    public function execute(array $update): bool
+    public function execute(array $update): TelegramLinkOutcome
     {
         $link = $this->linkFromUpdate($update);
 
         if ($link === null) {
-            return false;
+            return new TelegramLinkOutcome(TelegramLinkStatus::Ignored);
         }
 
         $tokenHash = hash('sha256', $link['token']);
@@ -30,7 +30,10 @@ final class ConsumeTelegramLinkAction
         );
 
         if ($challengeOwnerId === null) {
-            return false;
+            return new TelegramLinkOutcome(
+                TelegramLinkStatus::InvalidOrExpired,
+                $link['chat_id'],
+            );
         }
 
         return DB::transaction(
@@ -38,7 +41,7 @@ final class ConsumeTelegramLinkAction
                 $link,
                 $tokenHash,
                 $challengeOwnerId,
-            ): bool {
+            ): TelegramLinkOutcome {
                 User::query()
                     ->whereKey($challengeOwnerId)
                     ->lockForUpdate()
@@ -55,7 +58,10 @@ final class ConsumeTelegramLinkAction
                     || $challenge->consumed_at !== null
                     || $challenge->expires_at->lessThanOrEqualTo(now())
                 ) {
-                    return false;
+                    return new TelegramLinkOutcome(
+                        TelegramLinkStatus::InvalidOrExpired,
+                        $link['chat_id'],
+                    );
                 }
 
                 $conflictingConnection = TelegramConnection::query()
@@ -76,13 +82,18 @@ final class ConsumeTelegramLinkAction
                         'consumed_at' => now(),
                     ])->save();
 
-                    return false;
+                    return new TelegramLinkOutcome(
+                        TelegramLinkStatus::Conflict,
+                        $link['chat_id'],
+                    );
                 }
 
                 $connection = TelegramConnection::query()
                     ->where('user_id', $challengeOwnerId)
                     ->lockForUpdate()
                     ->first();
+
+                $status = TelegramLinkStatus::Connected;
 
                 if (! $connection instanceof TelegramConnection) {
                     TelegramConnection::query()->create([
@@ -107,6 +118,10 @@ final class ConsumeTelegramLinkAction
                             ? $connection->connected_at
                             : now(),
                     ])->save();
+
+                    if (! $sameIdentity) {
+                        $status = TelegramLinkStatus::Relinked;
+                    }
                 }
 
                 $challenge->forceFill([
@@ -118,7 +133,10 @@ final class ConsumeTelegramLinkAction
                     ->whereKeyNot($challenge->getKey())
                     ->delete();
 
-                return true;
+                return new TelegramLinkOutcome(
+                    $status,
+                    $link['chat_id'],
+                );
             },
             3,
         );
