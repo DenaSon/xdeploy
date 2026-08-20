@@ -29,9 +29,6 @@
 | Keep the canonical "light" and "dark" theme names because Mary UI's
 | theme-toggle works with them.
 |
-| Light is the default theme.
-| Dark is automatically preferred when the operating system prefers dark.
-|
 */
 
 @plugin "daisyui" {
@@ -45,8 +42,10 @@
 |--------------------------------------------------------------------------
 |
 | Visual direction:
-| Calm Infrastructure
-| Minimal / precise / premium / trustworthy
+| Evergreen Infrastructure
+|
+| Deep jade green, quiet neutral surfaces,
+| precise contrast and restrained semantic colors.
 |
 */
 
@@ -62,12 +61,15 @@
     |--------------------------------------------------------------------------
     | Base Surfaces
     |--------------------------------------------------------------------------
+    |
+    | Neutral with a very subtle green undertone.
+    |
     */
 
     --color-base-100: #ffffff;
-    --color-base-200: #f7f8fa;
-    --color-base-300: #e5e7eb;
-    --color-base-content: #111827;
+    --color-base-200: #f5f8f6;
+    --color-base-300: #e1e8e4;
+    --color-base-content: #17201c;
 
 
     /*
@@ -76,25 +78,24 @@
     |--------------------------------------------------------------------------
     |
     | Primary:
-    | Deep security teal used for primary actions, navigation accents,
-    | focus states and the main Coreflare brand identity.
+    | Coreflare Evergreen.
     |
     | Accent:
-    | Emerald companion color used sparingly for supporting emphasis.
+    | Muted moss companion. Used selectively.
     |
     */
 
-    --color-primary: #0f766e;
-    --color-primary-content: #ffffff;
+    --color-primary: #0d7a57;
+    --color-primary-content: #f6fff9;
 
-    --color-secondary: #64748b;
+    --color-secondary: #69756f;
     --color-secondary-content: #ffffff;
 
-    --color-accent: #15803d;
+    --color-accent: #627b3f;
     --color-accent-content: #ffffff;
 
-    --color-neutral: #1f2937;
-    --color-neutral-content: #f9fafb;
+    --color-neutral: #25302b;
+    --color-neutral-content: #f8faf9;
 
 
     /*
@@ -102,22 +103,20 @@
     | Semantic States
     |--------------------------------------------------------------------------
     |
-    | Semantic colors intentionally remain distinct from the brand color.
-    | Primary communicates brand/action.
-    | Success communicates operational success.
+    | Keep semantic success visually separate from the brand green.
     |
     */
 
-    --color-info: #2563eb;
+    --color-info: #316fa8;
     --color-info-content: #ffffff;
 
-    --color-success: #16a34a;
+    --color-success: #2e7d32;
     --color-success-content: #ffffff;
 
-    --color-warning: #d97706;
+    --color-warning: #b7791f;
     --color-warning-content: #ffffff;
 
-    --color-error: #dc2626;
+    --color-error: #c94a4a;
     --color-error-content: #ffffff;
 
 
@@ -146,10 +145,6 @@
     |--------------------------------------------------------------------------
     | Border & Effects
     |--------------------------------------------------------------------------
-    |
-    | Coreflare principle:
-    | Border before Shadow.
-    |
     */
 
     --border: 1px;
@@ -163,11 +158,10 @@
 | Coreflare — Dark Theme
 |--------------------------------------------------------------------------
 |
-| Dark mode intentionally avoids pure black.
-| Surfaces retain visible hierarchy without becoming a hacker-style UI.
+| Dark mode uses green-charcoal surfaces instead of blue-gray or pure black.
 |
-| The primary brand color becomes lighter in dark mode to preserve
-| contrast and accessibility against dark infrastructure surfaces.
+| Primary becomes brighter in dark mode, but remains controlled enough
+| for dashboards and long sessions.
 |
 */
 
@@ -185,10 +179,10 @@
     |--------------------------------------------------------------------------
     */
 
-    --color-base-100: #151821;
-    --color-base-200: #0f1117;
-    --color-base-300: #252a35;
-    --color-base-content: #e5e7eb;
+    --color-base-100: #151b18;
+    --color-base-200: #0f1412;
+    --color-base-300: #27312d;
+    --color-base-content: #e8eee9;
 
 
     /*
@@ -197,17 +191,17 @@
     |--------------------------------------------------------------------------
     */
 
-    --color-primary: #5eead4;
-    --color-primary-content: #042f2e;
+    --color-primary: #57d79e;
+    --color-primary-content: #08281b;
 
-    --color-secondary: #94a3b8;
-    --color-secondary-content: #0f172a;
+    --color-secondary: #9ba8a2;
+    --color-secondary-content: #111714;
 
-    --color-accent: #4ade80;
-    --color-accent-content: #052e16;
+    --color-accent: #a7c96a;
+    --color-accent-content: #17200b;
 
-    --color-neutral: #2b3340;
-    --color-neutral-content: #f8fafc;
+    --color-neutral: #2b3531;
+    --color-neutral-content: #f1f5f3;
 
 
     /*
@@ -216,17 +210,17 @@
     |--------------------------------------------------------------------------
     */
 
-    --color-info: #60a5fa;
-    --color-info-content: #0b1b2a;
+    --color-info: #6ca8dc;
+    --color-info-content: #0b1d2c;
 
-    --color-success: #22c55e;
-    --color-success-content: #052e16;
+    --color-success: #66c77b;
+    --color-success-content: #0b2511;
 
-    --color-warning: #f59e0b;
-    --color-warning-content: #2a1600;
+    --color-warning: #e2b85b;
+    --color-warning-content: #281b04;
 
-    --color-error: #f87171;
-    --color-error-content: #450a0a;
+    --color-error: #e47a7a;
+    --color-error-content: #350d0d;
 
 
     /*
@@ -298,6 +292,26 @@
         "Segoe UI Emoji",
         "Segoe UI Symbol",
         "Noto Color Emoji";
+
+    /*
+    |--------------------------------------------------------------------------
+    | Latin / Numeric Font
+    |--------------------------------------------------------------------------
+    |
+    | On Apple devices this resolves to San Francisco.
+    |
+    */
+
+    --font-latin:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Text",
+        "SF Pro Display",
+        "Helvetica Neue",
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
 }
 
 
@@ -305,14 +319,10 @@
 |--------------------------------------------------------------------------
 | Dark Variant
 |--------------------------------------------------------------------------
-|
-| Required for Mary UI theme-toggle and manual dark mode switching.
-|
-| Mary toggles the `.dark` class.
-|
 */
 
 @custom-variant dark (&:where(.dark, .dark *));
+
 
 [x-cloak] {
     display: none !important;
@@ -321,7 +331,7 @@
 
 /*
 |--------------------------------------------------------------------------
-| Base
+| Base Typography
 |--------------------------------------------------------------------------
 */
 
@@ -331,7 +341,8 @@ html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 
-    font-feature-settings: "kern";
+    font-feature-settings:
+        "kern" 1;
 }
 
 body {
@@ -341,11 +352,126 @@ body {
 
 /*
 |--------------------------------------------------------------------------
-| Global Border
+| Latin & English Values
 |--------------------------------------------------------------------------
 |
-| Keep component borders aligned with the active daisyUI theme.
+| Any explicitly LTR content uses the native platform UI font.
 |
+| On iPhone:
+| -apple-system → San Francisco
+|
+| This avoids uneven Latin digits rendered by Yekan.
+|
+*/
+
+[dir="ltr"] {
+    font-family: var(--font-latin);
+
+    font-variant-numeric:
+        lining-nums
+        tabular-nums;
+
+    font-feature-settings:
+        "kern" 1,
+        "lnum" 1,
+        "tnum" 1;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Numeric Values
+|--------------------------------------------------------------------------
+|
+| Use for:
+| percentages, prices, counters, RAM, CPU, storage and statistics.
+|
+| Example:
+|
+| <span class="numeric-value">24%</span>
+|
+*/
+
+@utility numeric-value {
+    direction: ltr;
+    unicode-bidi: isolate;
+
+    font-family: var(--font-latin);
+
+    font-variant-numeric:
+        lining-nums
+        tabular-nums;
+
+    font-feature-settings:
+        "kern" 1,
+        "lnum" 1,
+        "tnum" 1;
+
+    letter-spacing: -0.01em;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Numeric Inputs
+|--------------------------------------------------------------------------
+*/
+
+input[type="number"],
+input[inputmode="numeric"],
+input[inputmode="decimal"] {
+    direction: ltr;
+
+    font-family: var(--font-latin);
+
+    font-variant-numeric:
+        lining-nums
+        tabular-nums;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Technical Values
+|--------------------------------------------------------------------------
+|
+| IP, domain, URL, port, version, hash and technical identifiers.
+|
+| Example:
+|
+| <span class="technical-value">185.10.10.20</span>
+|
+*/
+
+@utility technical-value {
+    direction: ltr;
+    unicode-bidi: isolate;
+
+    font-family:
+        ui-monospace,
+        "SFMono-Regular",
+        "SF Mono",
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        "Courier New",
+        monospace;
+
+    font-variant-numeric:
+        lining-nums
+        tabular-nums;
+
+    font-feature-settings:
+        "lnum" 1,
+        "tnum" 1;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Global Border
+|--------------------------------------------------------------------------
 */
 
 @layer base {
@@ -361,32 +487,41 @@ body {
 
 /*
 |--------------------------------------------------------------------------
-| Technical Values
+| Selection
 |--------------------------------------------------------------------------
 |
-| Utility for IP, domain, URL, port, versions and other LTR technical values.
-|
-| Example:
-|
-| <span class="technical-value">185.10.10.20</span>
+| Small brand detail without adding visual noise.
 |
 */
 
-@utility technical-value {
-    direction: ltr;
-    unicode-bidi: isolate;
+::selection {
+    color: var(--color-primary-content);
 
-    font-family:
-        ui-monospace,
-        SFMono-Regular,
-        Menlo,
-        Monaco,
-        Consolas,
-        "Liberation Mono",
-        "Courier New",
-        monospace;
+    background:
+        color-mix(
+            in srgb,
+            var(--color-primary) 78%,
+            transparent
+        );
+}
 
-    font-variant-numeric: tabular-nums;
+
+/*
+|--------------------------------------------------------------------------
+| Focus
+|--------------------------------------------------------------------------
+|
+| Keep keyboard focus aligned with the Coreflare brand.
+|
+*/
+
+:focus-visible {
+    outline-color:
+        color-mix(
+            in srgb,
+            var(--color-primary) 70%,
+            transparent
+        );
 }
 
 
@@ -465,9 +600,6 @@ body {
 |--------------------------------------------------------------------------
 | Motion
 |--------------------------------------------------------------------------
-|
-| Respect operating-system accessibility preferences.
-|
 */
 
 @media (prefers-reduced-motion: reduce) {
