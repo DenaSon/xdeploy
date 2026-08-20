@@ -46,7 +46,7 @@
                 $overview['operatingSystem'] ?? null,
             ),
             'icon' => 'lucide.monitor-cog',
-            'technical' => false,
+            'technical' => true,
         ],
 
         [

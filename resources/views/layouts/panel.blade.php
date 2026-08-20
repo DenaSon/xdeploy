@@ -42,6 +42,7 @@
         font-sans
         text-base-content
         antialiased
+        [&_.drawer-side]:z-50
     "
 >
 
