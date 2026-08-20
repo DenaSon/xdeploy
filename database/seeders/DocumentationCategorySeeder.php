@@ -41,7 +41,7 @@ final class DocumentationCategorySeeder extends Seeder
                 'is_published' => true,
             ],
             [
-                'title' => 'حساب و یکپارچه‌سازی‌ها',
+                'title' => 'حساب تنظیمات',
                 'slug' => 'account-integrations',
                 'description' => 'راهنمای تنظیمات حساب، امنیت و Passkey، اعلان‌ها و اتصال Coreflare به سرویس‌هایی مانند Cloudflare و Telegram.',
                 'sort_order' => 50,
