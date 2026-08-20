@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Application\Applications\Operations;
 
+use App\Application\Applications\Operations\Exceptions\ApplicationUninstallBlockedByPublicEndpointException;
 use App\Application\Applications\Operations\QueueApplicationOperationAction;
 use App\Application\Applications\Operations\RunApplicationOperationJob;
 use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
@@ -106,6 +107,167 @@ final class QueueApplicationOperationActionTest extends TestCase
                     ->count(),
             );
         }
+    }
+
+    public function test_active_public_endpoint_blocks_application_uninstall(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000009');
+        $server = $this->createServer($user, '192.0.2.20');
+        $endpoint = $this->createEndpoint(
+            server: $server,
+            type: ApplicationType::N8n,
+            domain: 'automation.example.com',
+        );
+
+        $endpoint->forceFill([
+            'activated_at' => now(),
+        ])->save();
+
+        $this->expectException(
+            ApplicationUninstallBlockedByPublicEndpointException::class,
+        );
+
+        try {
+            app(QueueApplicationOperationAction::class)->execute(
+                user: $user,
+                server: $server,
+                applicationType: ApplicationType::N8n,
+                operationType: ApplicationOperationType::Uninstall,
+            );
+        } finally {
+            $this->assertDatabaseCount(
+                'application_operations',
+                0,
+            );
+
+            Queue::assertNotPushed(
+                RunApplicationOperationJob::class,
+            );
+        }
+    }
+
+    public function test_pending_public_endpoint_blocks_application_uninstall(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000010');
+        $server = $this->createServer($user, '192.0.2.21');
+
+        $this->createEndpoint(
+            server: $server,
+            type: ApplicationType::N8n,
+            domain: 'pending.example.com',
+        );
+
+        $this->expectException(
+            ApplicationUninstallBlockedByPublicEndpointException::class,
+        );
+
+        app(QueueApplicationOperationAction::class)->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Uninstall,
+        );
+    }
+
+    public function test_disabled_public_endpoint_allows_application_uninstall(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000011');
+        $server = $this->createServer($user, '192.0.2.22');
+        $endpoint = $this->createEndpoint(
+            server: $server,
+            type: ApplicationType::N8n,
+            domain: 'disabled.example.com',
+        );
+
+        $endpoint->forceFill([
+            'disabled_at' => now(),
+        ])->save();
+
+        $operation = app(
+            QueueApplicationOperationAction::class,
+        )->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Uninstall,
+        );
+
+        self::assertSame(
+            ApplicationOperationStatus::Pending,
+            $operation->status,
+        );
+
+        Queue::assertPushed(
+            RunApplicationOperationJob::class,
+        );
+    }
+
+    public function test_active_endpoint_does_not_block_non_uninstall_lifecycle_operations(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000012');
+        $server = $this->createServer($user, '192.0.2.23');
+        $endpoint = $this->createEndpoint(
+            server: $server,
+            type: ApplicationType::N8n,
+            domain: 'active.example.com',
+        );
+
+        $endpoint->forceFill([
+            'activated_at' => now(),
+        ])->save();
+
+        $operation = app(
+            QueueApplicationOperationAction::class,
+        )->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Restart,
+        );
+
+        self::assertSame(
+            ApplicationOperationStatus::Pending,
+            $operation->status,
+        );
+    }
+
+    public function test_active_endpoint_for_another_application_does_not_block_uninstall(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000013');
+        $server = $this->createServer($user, '192.0.2.24');
+        $endpoint = $this->createEndpoint(
+            server: $server,
+            type: ApplicationType::Marzban,
+            domain: 'panel.example.com',
+        );
+
+        $endpoint->forceFill([
+            'activated_at' => now(),
+        ])->save();
+
+        $operation = app(
+            QueueApplicationOperationAction::class,
+        )->execute(
+            user: $user,
+            server: $server,
+            applicationType: ApplicationType::N8n,
+            operationType: ApplicationOperationType::Uninstall,
+        );
+
+        self::assertSame(
+            ApplicationOperationStatus::Pending,
+            $operation->status,
+        );
     }
 
     public function test_an_active_operation_blocks_a_different_application_on_the_same_server(): void

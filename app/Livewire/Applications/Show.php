@@ -6,6 +6,7 @@ namespace App\Livewire\Applications;
 
 use App\Application\Applications\Actions\GetApplicationCatalogItemAction;
 use App\Application\Applications\Manager\ApplicationManager;
+use App\Application\Applications\Operations\Exceptions\ApplicationUninstallBlockedByPublicEndpointException;
 use App\Application\Applications\Operations\QueueApplicationOperationAction;
 use App\Application\Server\Operations\Exceptions\ServerMutationInProgressException;
 use App\Domain\Application\Shared\DTOs\ApplicationInfo;
@@ -361,6 +362,9 @@ final class Show extends Component
                 $operationType === ApplicationOperationType::Install
                     && $operationFailureCode === 'package_manager_busy' => 'بروزرسانی‌های اولیه سیستم‌عامل هنوز در حال اجرا هستند و مدیر بسته‌ها در زمان مجاز آزاد نشد. چند دقیقه بعد دوباره نصب را اجرا کنید.',
 
+                $operationType === ApplicationOperationType::Uninstall
+                    && $operationFailureCode === 'active_public_endpoint' => 'ابتدا دامنه این برنامه را غیرفعال یا درخواست اتصال آن را لغو کنید، سپس برنامه را حذف کنید.',
+
                 default => match ($operationType) {
                     ApplicationOperationType::Install => sprintf(
                         'نصب %s با خطا مواجه شد.',
@@ -464,6 +468,9 @@ final class Show extends Component
             );
 
             $this->setOperationState($operation);
+        } catch (ApplicationUninstallBlockedByPublicEndpointException) {
+            $this->processing = false;
+            $this->errorMessage = 'ابتدا دامنه این برنامه را غیرفعال یا درخواست اتصال آن را لغو کنید، سپس برنامه را حذف کنید.';
         } catch (ServerMutationInProgressException) {
             $this->syncActiveOperation();
 

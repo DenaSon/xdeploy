@@ -103,6 +103,23 @@ BASH,
 
     abstract protected function composeService(): string;
 
+    /**
+     * Return the Compose services that must move through the lifecycle
+     * together for this Application.
+     *
+     * Existing single-service Applications keep their current behavior by
+     * default. Multi-service Applications may opt in without changing the
+     * public Application contracts or existing subclasses.
+     *
+     * @return list<string>
+     */
+    protected function requiredComposeServices(): array
+    {
+        return [
+            $this->composeService(),
+        ];
+    }
+
     abstract protected function composeFile(): string;
 
     abstract protected function composeEnvFile(): string;
@@ -174,6 +191,42 @@ BASH,
 
     private function resolveContainerState(): ApplicationState
     {
+        $services = $this->requiredComposeServices();
+
+        if ($services === []) {
+            return ApplicationState::Unknown;
+        }
+
+        $runningServices = 0;
+
+        foreach ($services as $service) {
+            $state = $this->resolveComposeServiceState(
+                $service,
+            );
+
+            if ($state === ApplicationState::Unknown) {
+                return ApplicationState::Unknown;
+            }
+
+            if ($state === ApplicationState::Running) {
+                $runningServices++;
+            }
+        }
+
+        if ($runningServices === count($services)) {
+            return ApplicationState::Running;
+        }
+
+        if ($runningServices === 0) {
+            return ApplicationState::Installed;
+        }
+
+        return ApplicationState::Unknown;
+    }
+
+    private function resolveComposeServiceState(
+        string $service,
+    ): ApplicationState {
         $command = sprintf(
             <<<'BASH'
 timeout --signal=TERM 8 \
@@ -184,7 +237,7 @@ docker ps \
     --format "{{.ID}}"
 BASH,
             $this->composeProject(),
-            $this->composeService(),
+            $service,
         );
 
         for (

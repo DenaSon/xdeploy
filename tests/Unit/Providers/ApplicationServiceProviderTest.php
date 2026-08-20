@@ -7,6 +7,7 @@ namespace Tests\Unit\Providers;
 use App\Application\PublicEndpoint\Drivers\MarzbanPublicEndpointDriver;
 use App\Application\PublicEndpoint\Drivers\N8nPublicEndpointDriver;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
+use App\Domain\Application\AmneziaWg\AmneziaWgApplication;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Marzban\MarzbanApplication;
 use App\Domain\Application\N8n\N8nApplication;
@@ -21,15 +22,40 @@ final class ApplicationServiceProviderTest extends TestCase
             ApplicationRegistryInterface::class,
         );
 
-        $this->assertInstanceOf(
-            MarzbanApplication::class,
-            $registry->find(ApplicationType::Marzban),
+        $expectedApplications = [
+            ApplicationType::Marzban->value => MarzbanApplication::class,
+            ApplicationType::N8n->value => N8nApplication::class,
+            ApplicationType::AmneziaWg->value => AmneziaWgApplication::class,
+        ];
+
+        $applicationTypes = array_map(
+            static fn (ApplicationType $type): string => $type->value,
+            ApplicationType::cases(),
         );
 
-        $this->assertInstanceOf(
-            N8nApplication::class,
-            $registry->find(ApplicationType::N8n),
+        $registeredTypes = array_keys($expectedApplications);
+
+        sort($applicationTypes);
+        sort($registeredTypes);
+
+        $this->assertSame(
+            $applicationTypes,
+            $registeredTypes,
         );
+
+        $this->assertCount(
+            count(ApplicationType::cases()),
+            $registry->all(),
+        );
+
+        foreach ($expectedApplications as $type => $applicationClass) {
+            $this->assertInstanceOf(
+                $applicationClass,
+                $registry->find(
+                    ApplicationType::from($type),
+                ),
+            );
+        }
     }
 
     public function test_public_endpoint_registry_contains_supported_drivers(): void

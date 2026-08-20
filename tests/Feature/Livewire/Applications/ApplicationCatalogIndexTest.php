@@ -90,8 +90,8 @@ final class ApplicationCatalogIndexTest extends TestCase
         );
 
         ApplicationCatalogItem::query()->create([
-            'slug' => 'wordpress',
-            'name' => 'WordPress',
+            'slug' => 'unsupported-app',
+            'name' => 'Unsupported App',
             'short_description' => 'Unsupported catalog row for this test.',
             'description' => null,
             'icon' => 'lucide.globe',
@@ -110,7 +110,7 @@ final class ApplicationCatalogIndexTest extends TestCase
                 ),
             )
             ->assertOk()
-            ->assertDontSee('WordPress');
+            ->assertDontSee('Unsupported App');
     }
 
     public function test_catalog_index_rejects_a_foreign_server(): void

@@ -14,18 +14,34 @@ final class ApplicationManagementPanelResolverTest extends TestCase
     {
         $resolver = new ApplicationManagementPanelResolver;
 
-        self::assertSame(
-            'applications.marzban.management-panel',
-            $resolver->resolve(
-                ApplicationType::Marzban,
-            ),
+        $expectedPanels = [
+            ApplicationType::Marzban->value => 'applications.marzban.management-panel',
+            ApplicationType::N8n->value => 'applications.n8n.management-panel',
+            ApplicationType::AmneziaWg->value => 'applications.amnezia-wg.management-panel',
+        ];
+
+        $applicationTypes = array_map(
+            static fn (ApplicationType $type): string => $type->value,
+            ApplicationType::cases(),
         );
 
+        $panelTypes = array_keys($expectedPanels);
+
+        sort($applicationTypes);
+        sort($panelTypes);
+
         self::assertSame(
-            'applications.n8n.management-panel',
-            $resolver->resolve(
-                ApplicationType::N8n,
-            ),
+            $applicationTypes,
+            $panelTypes,
         );
+
+        foreach ($expectedPanels as $type => $panel) {
+            self::assertSame(
+                $panel,
+                $resolver->resolve(
+                    ApplicationType::from($type),
+                ),
+            );
+        }
     }
 }

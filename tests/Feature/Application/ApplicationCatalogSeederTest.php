@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Application;
 
 use App\Application\Applications\Actions\ListApplicationCatalogAction;
+use App\Domain\Application\Shared\Enums\ApplicationType;
 use Database\Seeders\ApplicationCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,16 +26,22 @@ final class ApplicationCatalogSeederTest extends TestCase
             )
             ->execute();
 
+        $expectedSlugs = array_map(
+            static fn (ApplicationType $type): string => $type->value,
+            ApplicationType::cases(),
+        );
+
+        $actualSlugs = array_column(
+            $catalog,
+            'slug',
+        );
+
+        sort($expectedSlugs);
+        sort($actualSlugs);
+
         $this->assertSame(
-            [
-                'marzban',
-                'n8n',
-                'amneziawg',
-            ],
-            array_column(
-                $catalog,
-                'slug',
-            ),
+            $expectedSlugs,
+            $actualSlugs,
         );
 
         $this->assertDatabaseHas(

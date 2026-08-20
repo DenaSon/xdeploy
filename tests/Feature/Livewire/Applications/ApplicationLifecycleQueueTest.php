@@ -105,6 +105,38 @@ final class ApplicationLifecycleQueueTest extends TestCase
         Queue::assertNotPushed(RunApplicationOperationJob::class);
     }
 
+    public function test_active_endpoint_blocks_uninstall_with_a_clear_message(): void
+    {
+        Queue::fake();
+
+        $user = $this->createUser('09120000053');
+        $server = $this->createServer($user, '192.0.2.53');
+        $this->createCatalogItem();
+
+        PublicEndpoint::query()->create([
+            'server_id' => $server->getKey(),
+            'application_type' => ApplicationType::N8n,
+            'domain' => 'automation.example.com',
+            'activated_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(Show::class, [
+                'server' => $server,
+                'application' => ApplicationType::N8n->value,
+            ])
+            ->call('uninstall')
+            ->assertSet('operationActive', false)
+            ->assertSet('processing', false)
+            ->assertSet(
+                'errorMessage',
+                'ابتدا دامنه این برنامه را غیرفعال یا درخواست اتصال آن را لغو کنید، سپس برنامه را حذف کنید.',
+            );
+
+        $this->assertDatabaseCount('application_operations', 0);
+        Queue::assertNotPushed(RunApplicationOperationJob::class);
+    }
+
     /**
      * @return iterable<string, array{string, ApplicationOperationType}>
      */

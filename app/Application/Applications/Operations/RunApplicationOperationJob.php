@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Applications\Operations;
 
 use App\Application\Applications\Manager\ApplicationManager;
+use App\Application\Applications\Operations\Exceptions\ApplicationUninstallBlockedByPublicEndpointException;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
 use App\Domain\Application\Shared\Exceptions\ApplicationInstallationException;
 use App\Domain\Server\Exceptions\SystemPackageManagerBusyException;
@@ -197,6 +198,15 @@ final class RunApplicationOperationJob implements ShouldQueue
             )
         ) {
             return 'package_manager_busy';
+        }
+
+        if (
+            $this->exceptionChainContains(
+                $exception,
+                ApplicationUninstallBlockedByPublicEndpointException::class,
+            )
+        ) {
+            return 'active_public_endpoint';
         }
 
         if (

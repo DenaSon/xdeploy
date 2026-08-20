@@ -9,6 +9,7 @@ use App\Application\Applications\Actions\RestartApplicationAction;
 use App\Application\Applications\Actions\StartApplicationAction;
 use App\Application\Applications\Actions\StopApplicationAction;
 use App\Application\Applications\Actions\UninstallApplicationAction;
+use App\Application\Applications\Operations\ApplicationUninstallGuard;
 use App\Application\Applications\Operations\Contracts\ApplicationOperationProgressReporter;
 use App\Application\Server\Actions\ConnectServerAction;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
@@ -30,6 +31,7 @@ final readonly class ApplicationManager
         private StartApplicationAction $startApplicationAction,
         private StopApplicationAction $stopApplicationAction,
         private RestartApplicationAction $restartApplicationAction,
+        private ApplicationUninstallGuard $applicationUninstallGuard,
     ) {}
 
     public function inspect(
@@ -85,8 +87,14 @@ final readonly class ApplicationManager
         $this->onServer(
             user: $user,
             server: $server,
-            operation: fn (Server $ownedServer) => $this->uninstallApplicationAction
-                ->execute($type),
+            operation: function (Server $ownedServer) use ($type): void {
+                $this->applicationUninstallGuard->ensureAllowed(
+                    server: $ownedServer,
+                    applicationType: $type,
+                );
+
+                $this->uninstallApplicationAction->execute($type);
+            },
         );
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Application\Applications\Operations;
 
+use App\Application\Applications\Operations\Exceptions\ApplicationUninstallBlockedByPublicEndpointException;
 use App\Application\Applications\Operations\RunApplicationOperationJob;
 use App\Domain\Application\Shared\Enums\ApplicationOperationStatus;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
@@ -116,6 +117,36 @@ final class ApplicationOperationLifecycleTest extends TestCase
 
         self::assertSame(
             'package_manager_busy',
+            $operation->failure_code,
+        );
+    }
+
+    public function test_active_public_endpoint_failure_uses_specific_failure_code(): void
+    {
+        $operation = $this->createOperation();
+
+        self::assertTrue(
+            $operation->markRunning(),
+        );
+
+        (new RunApplicationOperationJob(
+            (int) $operation->getKey(),
+        ))->failed(
+            new RuntimeException(
+                'wrapped public endpoint guard failure',
+                previous: new ApplicationUninstallBlockedByPublicEndpointException,
+            ),
+        );
+
+        $operation->refresh();
+
+        self::assertSame(
+            ApplicationOperationStatus::Failed,
+            $operation->status,
+        );
+
+        self::assertSame(
+            'active_public_endpoint',
             $operation->failure_code,
         );
     }

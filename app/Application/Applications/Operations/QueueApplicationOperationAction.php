@@ -20,6 +20,7 @@ final readonly class QueueApplicationOperationAction
 {
     public function __construct(
         private ServerMutationGuard $serverMutationGuard,
+        private ApplicationUninstallGuard $applicationUninstallGuard,
     ) {}
 
     public function execute(
@@ -49,6 +50,16 @@ final readonly class QueueApplicationOperationAction
                 $this->serverMutationGuard->ensureAvailable(
                     $ownedServer,
                 );
+
+                if (
+                    $operationType
+                    === ApplicationOperationType::Uninstall
+                ) {
+                    $this->applicationUninstallGuard->ensureAllowed(
+                        server: $ownedServer,
+                        applicationType: $applicationType,
+                    );
+                }
 
                 return ApplicationOperation::query()->create([
                     'user_id' => $user->getKey(),
