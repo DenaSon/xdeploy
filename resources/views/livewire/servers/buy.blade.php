@@ -1,9 +1,12 @@
 <div
     dir="rtl"
     wire:init="loadCatalog"
+    data-livewire-request-context="initialization"
+    data-livewire-request-feedback="inline"
 
     x-data="{
         catalogReady: false,
+        catalogLoadFailed: false,
         minimumDelayPassed: false,
         showInitialLoader: true,
 
@@ -18,6 +21,7 @@
 
         markCatalogReady() {
             this.catalogReady = true;
+            this.catalogLoadFailed = false;
             this.finishInitialLoader();
         },
     }"
@@ -37,6 +41,18 @@
             minimumDelayPassed = true;
             finishInitialLoader();
         }, 1200);
+    "
+
+    x-on:xdeploy-livewire-request-failed.window="
+        const actions = $event.detail?.actions ?? [];
+
+        if (
+            actions.includes('loadCatalog')
+            || actions.includes('reloadCatalog')
+        ) {
+            catalogLoadFailed = true;
+            showInitialLoader = false;
+        }
     "
 
     class="pb-24 xl:pb-0"
@@ -103,7 +119,7 @@
                         text-base-content/70
                     "
                 >
-
+                    در حال دریافت پلن‌ها
                 </div>
 
                 <div
@@ -118,19 +134,6 @@
             </div>
         </div>
     </div>
-    <div
-        wire:offline
-        class="
-            mb-3 rounded-xl
-            border border-warning/20
-            bg-warning/5
-            px-3 py-2
-            text-xs text-warning
-        "
-    >
-        اتصال اینترنت برقرار نیست. پس از برقراری مجدد اتصال می‌توانید فرایند خرید را ادامه دهید.
-    </div>
-
     <header
         class="
             mb-4 flex items-center
@@ -194,7 +197,76 @@
     </header>
 
     @if(! $catalogLoaded)
+        <section
+            x-cloak
+            x-show="catalogLoadFailed"
+            style="display: none;"
+            class="
+                rounded-2xl
+                border border-warning/20
+                bg-base-100
+                px-5 py-9
+                text-center
+            "
+            role="status"
+            aria-live="polite"
+        >
+            <div
+                class="
+                    mx-auto flex size-11
+                    items-center justify-center
+                    rounded-xl
+                    bg-warning/10
+                    text-warning
+                "
+            >
+                <x-icon
+                    name="lucide.wifi-off"
+                    class="!size-5"
+                />
+            </div>
+
+            <h2
+                class="
+                    mt-3 font-semibold
+                    text-base-content
+                "
+            >
+                بارگذاری اطلاعات کامل نشد
+            </h2>
+
+            <p
+                class="
+                    mx-auto mt-1.5
+                    max-w-md text-sm
+                    leading-6
+                    text-base-content/50
+                "
+            >
+                دریافت اطلاعات کامل نشد. وضعیت اتصال را بررسی کنید و دوباره تلاش کنید.
+            </p>
+
+            <x-button
+                label="تلاش دوباره"
+                icon="lucide.refresh-cw"
+                wire:click="reloadCatalog"
+                wire:target="reloadCatalog"
+                data-livewire-request-context="initialization"
+                data-livewire-request-feedback="inline"
+                x-on:click="
+                    catalogLoadFailed = false;
+                    showInitialLoader = true;
+                "
+                spinner
+                class="
+                    btn-primary btn-sm
+                    mt-4 rounded-xl
+                "
+            />
+        </section>
+
         <div
+            x-show="! catalogLoadFailed"
             class="
                 grid grid-cols-1 gap-4
                 xl:grid-cols-[minmax(0,1fr)_320px]
@@ -294,6 +366,8 @@
                 icon="lucide.refresh-cw"
                 wire:click="reloadCatalog"
                 wire:target="reloadCatalog"
+                data-livewire-request-context="initialization"
+                data-livewire-request-feedback="inline"
                 spinner
                 class="
                     btn-primary btn-sm
@@ -1387,14 +1461,31 @@
                         @if($quoteError)
                             <div
                                 class="
-                                    mb-3 rounded-lg
-                                    bg-error/5
+                                    mb-3 flex items-center
+                                    justify-between gap-2
+                                    rounded-lg
+                                    bg-warning/5
                                     px-2.5 py-2
                                     text-[11px]
-                                    leading-5 text-error
+                                    leading-5 text-warning
                                 "
                             >
-                                {{ $quoteError }}
+                                <span class="min-w-0">
+                                    {{ $quoteError }}
+                                </span>
+
+                                <button
+                                    type="button"
+                                    wire:click="retryQuote"
+                                    wire:target="retryQuote"
+                                    class="
+                                        shrink-0 font-medium
+                                        underline-offset-2
+                                        hover:underline
+                                    "
+                                >
+                                    تلاش دوباره
+                                </button>
                             </div>
                         @endif
 
@@ -1549,9 +1640,27 @@
 
                     <div
                         wire:loading.remove
-                        wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk"
+                        wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk,retryQuote"
                     >
-                        @if($quote !== [])
+                        @if($quoteError)
+                            <button
+                                type="button"
+                                wire:click="retryQuote"
+                                wire:target="retryQuote"
+                                class="
+                                    flex items-center gap-1
+                                    text-xs font-medium
+                                    text-warning
+                                "
+                            >
+                                <x-icon
+                                    name="lucide.refresh-cw"
+                                    class="!size-3.5"
+                                />
+
+                                تلاش دوباره برای قیمت
+                            </button>
+                        @elseif($quote !== [])
                             <div
                                 class="
                                     flex min-w-0
@@ -1595,7 +1704,7 @@
 
                     <div
                         wire:loading
-                        wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk"
+                        wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk,retryQuote"
                         class="
                             flex items-center gap-1.5
                             text-[10px]

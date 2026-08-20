@@ -90,9 +90,7 @@
 
 </x-main>
 
-<x-toast
-    position="toast-top toast-center"
-/>
+<x-global-toast />
 
 </body>
 </html>

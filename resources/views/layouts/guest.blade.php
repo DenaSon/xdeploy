@@ -123,7 +123,7 @@
 
 
 {{-- Global Toast --}}
-<x-toast position="toast-top toast-center" />
+<x-global-toast />
 
 
 @livewireScripts
