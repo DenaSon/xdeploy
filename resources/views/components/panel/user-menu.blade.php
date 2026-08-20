@@ -9,7 +9,13 @@
 
         <x-button
             icon="lucide.user"
-            class="btn-ghost"
+            aria-label="منوی حساب کاربری"
+            class="
+                btn-ghost
+                max-sm:h-10 max-sm:min-h-10
+                max-sm:min-w-10 max-sm:rounded-xl
+                max-sm:px-2
+            "
             responsive
         >
 
