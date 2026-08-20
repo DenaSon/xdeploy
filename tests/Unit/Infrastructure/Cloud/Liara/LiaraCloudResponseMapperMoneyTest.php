@@ -11,7 +11,7 @@ final class LiaraCloudResponseMapperMoneyTest extends TestCase
 {
     public function test_it_normalizes_decimal_toman_prices_without_losing_expected_precision(): void
     {
-        $mapper = new LiaraCloudResponseMapper();
+        $mapper = new LiaraCloudResponseMapper;
 
         $method = new \ReflectionMethod(
             LiaraCloudResponseMapper::class,

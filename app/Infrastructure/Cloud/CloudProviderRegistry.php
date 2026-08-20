@@ -110,6 +110,7 @@ final readonly class CloudProviderRegistry implements CloudProviderRegistryInter
 
     /**
      * @template TCapability of object
+     *
      * @param  class-string<TCapability>  $capability
      * @return TCapability
      */

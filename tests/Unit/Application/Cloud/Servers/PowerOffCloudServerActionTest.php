@@ -41,7 +41,7 @@ final class PowerOffCloudServerActionTest extends TestCase
             )
             ->willReturn($lifecycle);
 
-        $server = new Server();
+        $server = new Server;
         $server->forceFill([
             'cloud_provider' => 'liara',
             'cloud_region' => 'iran',

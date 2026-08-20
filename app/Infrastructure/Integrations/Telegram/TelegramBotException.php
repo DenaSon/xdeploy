@@ -6,6 +6,4 @@ namespace App\Infrastructure\Integrations\Telegram;
 
 use RuntimeException;
 
-final class TelegramBotException extends RuntimeException
-{
-}
+final class TelegramBotException extends RuntimeException {}

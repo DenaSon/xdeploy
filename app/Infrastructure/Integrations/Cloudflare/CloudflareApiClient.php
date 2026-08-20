@@ -174,7 +174,7 @@ final class CloudflareApiClient
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     public function createDnsRecord(
@@ -199,7 +199,7 @@ final class CloudflareApiClient
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     public function updateDnsRecord(
@@ -262,7 +262,7 @@ final class CloudflareApiClient
     }
 
     /**
-     * @param array<string, scalar> $query
+     * @param  array<string, scalar>  $query
      * @return list<array<string, mixed>>
      */
     private function collect(
@@ -344,7 +344,7 @@ final class CloudflareApiClient
     }
 
     /**
-     * @param array<string, scalar> $query
+     * @param  array<string, scalar>  $query
      */
     private function get(
         string $path,
@@ -390,7 +390,7 @@ final class CloudflareApiClient
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function mutate(
         string $method,

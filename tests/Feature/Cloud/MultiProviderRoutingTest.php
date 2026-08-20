@@ -28,11 +28,20 @@ final class MultiProviderRoutingTest extends TestCase
         {
             public function __construct(private object $calls) {}
 
-            public function listRegions(): array { return []; }
+            public function listRegions(): array
+            {
+                return [];
+            }
 
-            public function listSizes(string $region): array { return []; }
+            public function listSizes(string $region): array
+            {
+                return [];
+            }
 
-            public function listImages(string $region): array { return []; }
+            public function listImages(string $region): array
+            {
+                return [];
+            }
 
             public function powerOn(string $region, string $serverId): void
             {

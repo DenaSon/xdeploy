@@ -21,8 +21,7 @@ final class SubmitCloudRootDiskResizeActionTest extends TestCase
         $resizer->expects($this->once())
             ->method('resizeRootDisk')
             ->with($this->callback(
-                static fn (ResizeCloudRootDiskData $data): bool =>
-                    $data->regionId === 'region-a'
+                static fn (ResizeCloudRootDiskData $data): bool => $data->regionId === 'region-a'
                     && $data->serverId === 'server-1'
                     && $data->targetDiskGiB === 80,
             ));
@@ -33,7 +32,7 @@ final class SubmitCloudRootDiskResizeActionTest extends TestCase
             ->with(CloudProviderType::Arvan, CloudServerResizerInterface::class)
             ->willReturn($resizer);
 
-        $server = new Server();
+        $server = new Server;
         $server->forceFill([
             'cloud_provider' => 'arvan',
             'cloud_region' => 'region-a',

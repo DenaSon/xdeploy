@@ -65,8 +65,8 @@ final class CloudflareScopes
     }
 
     /**
-     * @param array<int, mixed> $granted
-     * @param list<string>|null $required
+     * @param  array<int, mixed>  $granted
+     * @param  list<string>|null  $required
      * @return list<string>
      */
     public static function missing(

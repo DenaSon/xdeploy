@@ -18,8 +18,7 @@ final class TelegramWebhookCommandTest extends TestCase
             'services.telegram.bot_token' => '123456:ci-telegram-bot-token',
             'services.telegram.bot_username' => 'CoreflareTestBot',
             'services.telegram.webhook_secret' => 'ci_telegram_webhook_secret_123',
-            'services.telegram.webhook_url'
-                => 'https://coreflare.test/api/integrations/telegram/webhook',
+            'services.telegram.webhook_url' => 'https://coreflare.test/api/integrations/telegram/webhook',
             'services.telegram.link_ttl_seconds' => 600,
             'services.telegram.api_base_url' => 'https://api.telegram.test',
             'services.telegram.connect_timeout' => 5,
@@ -66,8 +65,7 @@ final class TelegramWebhookCommandTest extends TestCase
     public function test_command_fails_closed_when_public_webhook_url_is_not_https(): void
     {
         config([
-            'services.telegram.webhook_url'
-                => 'http://localhost:8000/api/integrations/telegram/webhook',
+            'services.telegram.webhook_url' => 'http://localhost:8000/api/integrations/telegram/webhook',
         ]);
 
         Http::fake();

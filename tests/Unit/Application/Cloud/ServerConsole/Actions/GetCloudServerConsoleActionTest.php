@@ -45,7 +45,7 @@ final class GetCloudServerConsoleActionTest extends TestCase
             )
             ->willReturn($console);
 
-        $server = new Server();
+        $server = new Server;
         $server->forceFill([
             'cloud_provider' => 'arvan',
             'cloud_region' => 'eu-west1-a',

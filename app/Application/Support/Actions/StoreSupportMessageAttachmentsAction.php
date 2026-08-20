@@ -27,7 +27,7 @@ final readonly class StoreSupportMessageAttachmentsAction
     ) {}
 
     /**
-     * @param array<int, UploadedFile> $files
+     * @param  array<int, UploadedFile>  $files
      * @return Collection<int, SupportMessageAttachment>
      */
     public function execute(
@@ -142,7 +142,7 @@ final readonly class StoreSupportMessageAttachmentsAction
     }
 
     /**
-     * @param array<int, UploadedFile> $files
+     * @param  array<int, UploadedFile>  $files
      */
     private function validateFiles(array $files): void
     {

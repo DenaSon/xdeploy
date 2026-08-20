@@ -184,7 +184,7 @@ final class CloudflareOAuthClient
     }
 
     /**
-     * @param array<int, mixed> $fallbackScopes
+     * @param  array<int, mixed>  $fallbackScopes
      */
     private function tokenSet(
         Response $response,
@@ -224,7 +224,7 @@ final class CloudflareOAuthClient
     }
 
     /**
-     * @param array<int, mixed> $fallbackScopes
+     * @param  array<int, mixed>  $fallbackScopes
      * @return list<string>
      */
     private function responseScopes(
@@ -254,7 +254,7 @@ final class CloudflareOAuthClient
     }
 
     /**
-     * @param array<int, mixed> $scopes
+     * @param  array<int, mixed>  $scopes
      * @return list<string>
      */
     private function normalizeScopes(array $scopes): array

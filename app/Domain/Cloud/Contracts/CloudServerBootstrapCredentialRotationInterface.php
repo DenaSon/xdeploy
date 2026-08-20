@@ -8,6 +8,4 @@ namespace App\Domain\Cloud\Contracts;
  * Marks providers whose initial password is a bootstrap credential that
  * Coreflare must rotate after SSH becomes reachable.
  */
-interface CloudServerBootstrapCredentialRotationInterface
-{
-}
+interface CloudServerBootstrapCredentialRotationInterface {}

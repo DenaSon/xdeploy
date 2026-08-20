@@ -22,6 +22,7 @@ use App\Support\Cloud\CloudProviderPublicIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
+use Mockery\MockInterface;
 use Tests\Support\CloudProviderRegistryStub;
 use Tests\TestCase;
 
@@ -375,7 +376,7 @@ final class BuyTest extends TestCase
     }
 
     /**
-     * @return CloudCatalogReaderInterface&\Mockery\MockInterface
+     * @return CloudCatalogReaderInterface&MockInterface
      */
     private function catalogMock(
         CloudRegionData $region,

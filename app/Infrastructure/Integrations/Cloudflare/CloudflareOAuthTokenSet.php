@@ -7,7 +7,7 @@ namespace App\Infrastructure\Integrations\Cloudflare;
 final readonly class CloudflareOAuthTokenSet
 {
     /**
-     * @param list<string> $scopes
+     * @param  list<string>  $scopes
      */
     public function __construct(
         public string $accessToken,

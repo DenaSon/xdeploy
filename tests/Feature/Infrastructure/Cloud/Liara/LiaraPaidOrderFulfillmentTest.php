@@ -46,7 +46,7 @@ final class LiaraPaidOrderFulfillmentTest extends TestCase
                 connectTimeout: 5,
                 requestTimeout: 15,
             ),
-            mapper: new LiaraCloudResponseMapper(),
+            mapper: new LiaraCloudResponseMapper,
         );
 
         $this->app->instance(

@@ -20,7 +20,7 @@ final readonly class CloudflareAccessTokenService
     ) {}
 
     /**
-     * @param list<string> $requiredScopes
+     * @param  list<string>  $requiredScopes
      */
     public function token(
         IntegrationConnection $connection,
@@ -86,7 +86,7 @@ final readonly class CloudflareAccessTokenService
     }
 
     /**
-     * @param list<string> $requiredScopes
+     * @param  list<string>  $requiredScopes
      */
     public function hasScopes(
         IntegrationConnection $connection,
@@ -103,7 +103,7 @@ final readonly class CloudflareAccessTokenService
     }
 
     /**
-     * @param list<string> $requiredScopes
+     * @param  list<string>  $requiredScopes
      */
     private function ensureScopes(
         IntegrationConnection $connection,

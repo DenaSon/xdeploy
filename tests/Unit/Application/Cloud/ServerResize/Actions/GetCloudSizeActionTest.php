@@ -41,7 +41,7 @@ final class GetCloudSizeActionTest extends TestCase
             ->with(CloudProviderType::Liara, CloudServerResizeCatalogInterface::class)
             ->willReturn($catalog);
 
-        $server = new Server();
+        $server = new Server;
         $server->forceFill([
             'cloud_provider' => 'liara',
             'cloud_region' => 'iran',

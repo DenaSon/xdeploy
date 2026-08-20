@@ -45,7 +45,7 @@ final class CalculateCloudDiskPriceActionTest extends TestCase
             ->with(CloudProviderType::Arvan, CloudServerResizeCatalogInterface::class)
             ->willReturn($catalog);
 
-        $server = new Server();
+        $server = new Server;
         $server->forceFill([
             'cloud_provider' => 'arvan',
             'cloud_region' => 'region-a',

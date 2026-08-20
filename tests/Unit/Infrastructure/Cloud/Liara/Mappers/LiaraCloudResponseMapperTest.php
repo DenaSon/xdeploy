@@ -334,6 +334,6 @@ final class LiaraCloudResponseMapperTest extends TestCase
 
     private function mapper(): LiaraCloudResponseMapper
     {
-        return new LiaraCloudResponseMapper();
+        return new LiaraCloudResponseMapper;
     }
 }

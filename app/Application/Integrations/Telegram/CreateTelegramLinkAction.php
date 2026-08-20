@@ -14,8 +14,7 @@ final readonly class CreateTelegramLinkAction
 {
     public function __construct(
         private TelegramBotClient $telegram,
-    ) {
-    }
+    ) {}
 
     public function execute(User $user): string
     {

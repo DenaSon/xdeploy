@@ -21,7 +21,7 @@ final readonly class ReplyToSupportRequestAsUserAction
     ) {}
 
     /**
-     * @param array<int, UploadedFile> $attachments
+     * @param  array<int, UploadedFile>  $attachments
      */
     public function execute(
         User $user,

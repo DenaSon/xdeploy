@@ -351,6 +351,7 @@ final class CheckCloudProviderCommand extends Command
 
     /**
      * @template T of object
+     *
      * @param  list<T>  $items
      * @return T
      */

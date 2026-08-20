@@ -183,8 +183,7 @@ final class SshN8nPublicEndpointRuntimeManagerTest extends TestCase
             ->once()
             ->with(
                 'public_endpoint.n8n.runtime_verification_failed',
-                Mockery::on(fn (array $context): bool =>
-                    $context['stage'] === 'mutation'
+                Mockery::on(fn (array $context): bool => $context['stage'] === 'mutation'
                     && $context['exit_code'] === 72
                     && $context['recovery_attempted'] === true
                     && $context['configuration_restored'] === false

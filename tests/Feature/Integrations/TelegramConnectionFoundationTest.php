@@ -363,7 +363,7 @@ final class TelegramConnectionFoundationTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function telegramWebhook(array $payload)
     {
@@ -371,8 +371,7 @@ final class TelegramConnectionFoundationTest extends TestCase
             route('integrations.telegram.webhook'),
             $payload,
             [
-                'X-Telegram-Bot-Api-Secret-Token'
-                    => 'ci_telegram_webhook_secret_123',
+                'X-Telegram-Bot-Api-Secret-Token' => 'ci_telegram_webhook_secret_123',
             ],
         );
     }

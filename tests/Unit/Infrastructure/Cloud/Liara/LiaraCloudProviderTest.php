@@ -428,7 +428,7 @@ final class LiaraCloudProviderTest extends TestCase
                 connectTimeout: 5,
                 requestTimeout: 15,
             ),
-            mapper: new LiaraCloudResponseMapper(),
+            mapper: new LiaraCloudResponseMapper,
         );
     }
 }

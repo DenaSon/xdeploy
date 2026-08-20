@@ -246,7 +246,7 @@ final class CloudflareZoneOnboardingTest extends TestCase
     }
 
     /**
-     * @param list<string>|null $scopes
+     * @param  list<string>|null  $scopes
      */
     private function userWithConnection(?array $scopes = null): User
     {

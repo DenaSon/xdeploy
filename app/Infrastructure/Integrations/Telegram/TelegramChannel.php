@@ -18,8 +18,7 @@ final readonly class TelegramChannel
     public function __construct(
         private TelegramBotClient $telegram,
         private NotificationPreferenceService $preferences,
-    ) {
-    }
+    ) {}
 
     public function send(
         object $notifiable,

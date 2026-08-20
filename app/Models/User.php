@@ -126,7 +126,7 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * Scope users by phone, email, or profile name.
      *
-     * @param Builder<User> $query
+     * @param  Builder<User>  $query
      * @return Builder<User>
      */
     public function scopeMatchesIdentity(

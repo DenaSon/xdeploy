@@ -21,8 +21,7 @@ final class SubmitCloudServerResizeActionTest extends TestCase
         $resizer->expects($this->once())
             ->method('resizeServer')
             ->with($this->callback(
-                static fn (ResizeCloudServerData $data): bool =>
-                    $data->regionId === 'iran'
+                static fn (ResizeCloudServerData $data): bool => $data->regionId === 'iran'
                     && $data->serverId === 'liara-vm-123'
                     && $data->targetSizeId === 'target-plan'
                     && $data->targetDiskGiB === 40,
@@ -34,7 +33,7 @@ final class SubmitCloudServerResizeActionTest extends TestCase
             ->with(CloudProviderType::Liara, CloudServerResizerInterface::class)
             ->willReturn($resizer);
 
-        $server = new Server();
+        $server = new Server;
         $server->forceFill([
             'cloud_provider' => 'liara',
             'cloud_region' => 'iran',

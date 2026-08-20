@@ -283,7 +283,7 @@ final class CloudflareZoneFoundationTest extends TestCase
     }
 
     /**
-     * @param list<string>|null $scopes
+     * @param  list<string>|null  $scopes
      */
     private function connection(?array $scopes = null): IntegrationConnection
     {

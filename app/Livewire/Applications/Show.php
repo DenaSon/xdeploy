@@ -359,8 +359,7 @@ final class Show extends Component
         if (! $this->sshUnavailable) {
             $this->errorMessage = match (true) {
                 $operationType === ApplicationOperationType::Install
-                    && $operationFailureCode === 'package_manager_busy'
-                        => 'بروزرسانی‌های اولیه سیستم‌عامل هنوز در حال اجرا هستند و مدیر بسته‌ها در زمان مجاز آزاد نشد. چند دقیقه بعد دوباره نصب را اجرا کنید.',
+                    && $operationFailureCode === 'package_manager_busy' => 'بروزرسانی‌های اولیه سیستم‌عامل هنوز در حال اجرا هستند و مدیر بسته‌ها در زمان مجاز آزاد نشد. چند دقیقه بعد دوباره نصب را اجرا کنید.',
 
                 default => match ($operationType) {
                     ApplicationOperationType::Install => sprintf(

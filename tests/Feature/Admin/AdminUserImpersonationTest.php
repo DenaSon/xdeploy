@@ -28,8 +28,7 @@ final class AdminUserImpersonationTest extends TestCase
             ->assertRedirect(route('panel.servers.index'))
             ->assertSessionHas(
                 AdminImpersonationSession::SESSION_KEY,
-                static fn (mixed $state): bool =>
-                    is_array($state)
+                static fn (mixed $state): bool => is_array($state)
                     && ($state['admin_user_id'] ?? null) === $admin->id
                     && ($state['target_user_id'] ?? null) === $user->id,
             );

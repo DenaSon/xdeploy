@@ -138,6 +138,7 @@ final readonly class ProvisionCloudServerAction
                 );
             } catch (CloudResourceNotFoundException) {
                 $this->waitBeforeNextAttempt($attempt);
+
                 continue;
             }
 

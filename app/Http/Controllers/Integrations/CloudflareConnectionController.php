@@ -200,7 +200,7 @@ final class CloudflareConnectionController
     }
 
     /**
-     * @param array<int, mixed> $tokens
+     * @param  array<int, mixed>  $tokens
      * @return array{attempts: int, successes: int}
      */
     private function revokeTokensBestEffort(

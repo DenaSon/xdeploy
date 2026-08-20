@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 final class ConsumeTelegramLinkAction
 {
     /**
-     * @param array<string, mixed> $update
+     * @param  array<string, mixed>  $update
      */
     public function execute(array $update): bool
     {
@@ -125,7 +125,7 @@ final class ConsumeTelegramLinkAction
     }
 
     /**
-     * @param array<string, mixed> $update
+     * @param  array<string, mixed>  $update
      * @return array{
      *     token: string,
      *     chat_id: string,

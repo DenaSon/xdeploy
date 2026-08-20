@@ -12,14 +12,13 @@ final readonly class TelegramMessage
 
     private function __construct(
         public string $text,
-    ) {
-    }
+    ) {}
 
     /**
      * Build a plain-text Telegram message from the same public presentation
      * fields used by database notifications. Internal metadata is ignored.
      *
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public static function fromNotificationPayload(array $payload): self
     {

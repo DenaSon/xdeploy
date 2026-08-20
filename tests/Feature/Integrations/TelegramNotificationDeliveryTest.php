@@ -51,7 +51,7 @@ final class TelegramNotificationDeliveryTest extends TestCase
             new CloudServerExpiringSoonNotification(1, 'VPS-1', now()->addDay()->toIso8601String()),
             new CloudServerTerminatedNotification(1, 'VPS-1', now()->subDay()->toIso8601String(), now()->toIso8601String()),
             new CloudServerTerminationFailedNotification(1, 'VPS-1', now()->subDay()->toIso8601String(), 3),
-            new ProfileCompletionRequiredNotification(),
+            new ProfileCompletionRequiredNotification,
             new SupportRequestAnsweredNotification(1, 'درخواست آزمایشی'),
         ];
 
@@ -76,7 +76,7 @@ final class TelegramNotificationDeliveryTest extends TestCase
         $user = User::factory()->create();
         $this->connectTelegram($user, '123456789');
 
-        $user->notify(new ProfileCompletionRequiredNotification());
+        $user->notify(new ProfileCompletionRequiredNotification);
 
         self::assertDatabaseCount('notifications', 1);
 
@@ -109,7 +109,7 @@ final class TelegramNotificationDeliveryTest extends TestCase
             false,
         );
 
-        $user->notify(new ProfileCompletionRequiredNotification());
+        $user->notify(new ProfileCompletionRequiredNotification);
 
         self::assertDatabaseCount('notifications', 1);
         Queue::assertNotPushed(DeliverTelegramNotification::class);
@@ -121,7 +121,7 @@ final class TelegramNotificationDeliveryTest extends TestCase
 
         $user = User::factory()->create();
 
-        $user->notify(new ProfileCompletionRequiredNotification());
+        $user->notify(new ProfileCompletionRequiredNotification);
 
         self::assertDatabaseCount('notifications', 1);
         Queue::assertNotPushed(DeliverTelegramNotification::class);
@@ -136,7 +136,7 @@ final class TelegramNotificationDeliveryTest extends TestCase
         $user = User::factory()->create();
         $this->connectTelegram($user, '123456789');
 
-        $user->notify(new ProfileCompletionRequiredNotification());
+        $user->notify(new ProfileCompletionRequiredNotification);
 
         self::assertDatabaseCount('notifications', 1);
         Queue::assertNotPushed(DeliverTelegramNotification::class);
