@@ -20,6 +20,7 @@ final class CloudflareDisconnectTest extends TestCase
         parent::setUp();
 
         config([
+            'services.cloudflare_oauth.enabled' => true,
             'services.cloudflare_oauth.client_id' => 'cloudflare-client-id',
             'services.cloudflare_oauth.client_secret' => 'cloudflare-client-secret',
             'services.cloudflare_oauth.authorization_endpoint' => 'https://dash.cloudflare.com/oauth2/auth',

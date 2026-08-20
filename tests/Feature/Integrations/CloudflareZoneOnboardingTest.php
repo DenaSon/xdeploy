@@ -30,6 +30,7 @@ final class CloudflareZoneOnboardingTest extends TestCase
         $this->zoneId = str_repeat('c', 32);
 
         config([
+            'services.cloudflare_oauth.enabled' => true,
             'services.cloudflare_oauth.client_id' => 'cloudflare-client-id',
             'services.cloudflare_oauth.client_secret' => 'cloudflare-client-secret',
             'services.cloudflare_oauth.scopes' => $this->fullScopes(),
