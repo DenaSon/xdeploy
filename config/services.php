@@ -44,6 +44,7 @@ return [
     ],
 
     'cloudflare_oauth' => [
+        'enabled' => env('CLOUDFLARE_INTEGRATION_ENABLED', false),
         'client_id' => env('CLOUDFLARE_OAUTH_CLIENT_ID'),
         'client_secret' => env('CLOUDFLARE_OAUTH_CLIENT_SECRET'),
         'authorization_endpoint' => env(

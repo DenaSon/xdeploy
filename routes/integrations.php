@@ -19,36 +19,39 @@ Route::middleware(['web', 'auth'])
             IntegrationsIndex::class,
         )->name('integrations.index');
 
-        Route::livewire(
-            '/integrations/cloudflare',
-            CloudflareOverview::class,
-        )->name('integrations.cloudflare.overview');
+        Route::middleware('integration.cloudflare')
+            ->group(function (): void {
+                Route::livewire(
+                    '/integrations/cloudflare',
+                    CloudflareOverview::class,
+                )->name('integrations.cloudflare.overview');
 
-        Route::livewire(
-            '/integrations/cloudflare/zones',
-            CloudflareZones::class,
-        )->name('integrations.cloudflare.zones');
+                Route::livewire(
+                    '/integrations/cloudflare/zones',
+                    CloudflareZones::class,
+                )->name('integrations.cloudflare.zones');
 
-        Route::get(
-            '/integrations/cloudflare/connect',
-            [CloudflareConnectionController::class, 'redirect'],
-        )
-            ->middleware('throttle:10,1')
-            ->name('integrations.cloudflare.redirect');
+                Route::get(
+                    '/integrations/cloudflare/connect',
+                    [CloudflareConnectionController::class, 'redirect'],
+                )
+                    ->middleware('throttle:10,1')
+                    ->name('integrations.cloudflare.redirect');
 
-        Route::get(
-            '/integrations/cloudflare/callback',
-            [CloudflareConnectionController::class, 'callback'],
-        )
-            ->middleware('throttle:20,1')
-            ->name('integrations.cloudflare.callback');
+                Route::get(
+                    '/integrations/cloudflare/callback',
+                    [CloudflareConnectionController::class, 'callback'],
+                )
+                    ->middleware('throttle:20,1')
+                    ->name('integrations.cloudflare.callback');
 
-        Route::delete(
-            '/integrations/cloudflare',
-            [CloudflareConnectionController::class, 'disconnect'],
-        )
-            ->middleware('throttle:10,1')
-            ->name('integrations.cloudflare.disconnect');
+                Route::delete(
+                    '/integrations/cloudflare',
+                    [CloudflareConnectionController::class, 'disconnect'],
+                )
+                    ->middleware('throttle:10,1')
+                    ->name('integrations.cloudflare.disconnect');
+            });
 
         Route::livewire(
             '/integrations/telegram',

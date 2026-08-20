@@ -30,6 +30,7 @@
         </div>
     @endif
 
+    @if ($cloudflareEnabled)
     <section
         x-data="{ detailsOpen: false }"
         class="overflow-hidden rounded-3xl border border-base-300/80 bg-base-100"
@@ -249,6 +250,7 @@
             @endif
         </div>
     </section>
+    @endif
 
     <section class="overflow-hidden rounded-3xl border border-base-300/80 bg-base-100">
         <div class="p-5 sm:p-6">

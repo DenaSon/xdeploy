@@ -92,33 +92,35 @@
             class="text-sm text-base-content/65"
             icon-classes="!size-[18px] stroke-[1.7]"
         >
-            <x-menu-item
-                title="Cloudflare"
-                icon="lucide.cloud"
-                :link="route('panel.integrations.cloudflare.overview')"
-                :active="request()->routeIs('panel.integrations.cloudflare.*')"
-                wire:navigate
+            @if (config('services.cloudflare_oauth.enabled', false))
+                <x-menu-item
+                    title="Cloudflare"
+                    icon="lucide.cloud"
+                    :link="route('panel.integrations.cloudflare.overview')"
+                    :active="request()->routeIs('panel.integrations.cloudflare.*')"
+                    wire:navigate
 
-                class="
-                    rounded-xl
-                    text-sm
-                    text-base-content/60
-                    transition-colors duration-200
-                    hover:bg-base-200
-                    hover:text-base-content
-                "
+                    class="
+                        rounded-xl
+                        text-sm
+                        text-base-content/60
+                        transition-colors duration-200
+                        hover:bg-base-200
+                        hover:text-base-content
+                    "
 
-                active-bg-color="
-                    !bg-primary/10
-                    !text-primary
-                    !font-medium
-                "
+                    active-bg-color="
+                        !bg-primary/10
+                        !text-primary
+                        !font-medium
+                    "
 
-                icon-classes="
-                    !size-4
-                    stroke-[1.7]
-                "
-            />
+                    icon-classes="
+                        !size-4
+                        stroke-[1.7]
+                    "
+                />
+            @endif
 
             <x-menu-item
                 title="Telegram"

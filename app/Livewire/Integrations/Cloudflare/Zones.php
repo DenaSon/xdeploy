@@ -55,6 +55,14 @@ final class Zones extends Component
 
     public ?string $pendingDeleteZoneId = null;
 
+    public function boot(): void
+    {
+        abort_unless(
+            config('services.cloudflare_oauth.enabled', false) === true,
+            404,
+        );
+    }
+
     public function mount(): void
     {
         $connection = $this->connection();

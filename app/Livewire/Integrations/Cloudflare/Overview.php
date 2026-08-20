@@ -72,6 +72,14 @@ final class Overview extends Component
 
     public string $dnsComment = '';
 
+    public function boot(): void
+    {
+        abort_unless(
+            config('services.cloudflare_oauth.enabled', false) === true,
+            404,
+        );
+    }
+
     public function mount(): void
     {
         $this->manageableDnsTypes = CloudflareDnsRecordTypes::manageable();

@@ -25,7 +25,36 @@ final class Index extends Component
         TelegramBotClient $telegram,
     ): View {
         $user = $this->user();
+        $cloudflareEnabled = config(
+            'services.cloudflare_oauth.enabled',
+            false,
+        ) === true;
+        $cloudflareData = $cloudflareEnabled
+            ? $this->cloudflareData($user, $cloudflare)
+            : [];
 
+        $telegramConnection = TelegramConnection::query()
+            ->ownedBy($user)
+            ->first();
+
+        return view(
+            'livewire.integrations.index',
+            [
+                'cloudflareEnabled' => $cloudflareEnabled,
+                ...$cloudflareData,
+                'telegramConfigured' => $telegram->configured(),
+                'telegramConnected' => $telegramConnection !== null,
+                'telegramConnectedAt' => $telegramConnection?->connected_at,
+                'telegramUsername' => $telegramConnection?->username,
+            ],
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function cloudflareData(
+        User $user,
+        CloudflareOAuthClient $cloudflare,
+    ): array {
         $connection = IntegrationConnection::query()
             ->ownedBy($user)
             ->where(
@@ -37,7 +66,6 @@ final class Index extends Component
         $scopes = is_array($connection?->scopes)
             ? $connection->scopes
             : [];
-
         $missingReadScopes = CloudflareScopes::missing(
             $scopes,
             CloudflareScopes::read(),
@@ -50,42 +78,29 @@ final class Index extends Component
             $scopes,
             CloudflareScopes::zoneManagement(),
         );
-
-        $configuredScopes = $cloudflare->scopes();
         $zoneManagementConfigured = CloudflareScopes::missing(
-            $configuredScopes,
+            $cloudflare->scopes(),
             CloudflareScopes::zoneManagement(),
         ) === [];
 
-        $telegramConnection = TelegramConnection::query()
-            ->ownedBy($user)
-            ->first();
-
-        return view(
-            'livewire.integrations.index',
-            [
-                'cloudflareConfigured' => $cloudflare->configured(),
-                'cloudflareReadConfigured' => $cloudflare->configuredForRead(),
-                'cloudflareDnsWriteConfigured' => $cloudflare->configuredForDnsWrite(),
-                'cloudflareZoneManagementConfigured' => $zoneManagementConfigured,
-                'cloudflareConnected' => $connection !== null,
-                'cloudflareReadReady' => $connection !== null
-                    && $missingReadScopes === [],
-                'cloudflareDnsWriteReady' => $connection !== null
-                    && $missingDnsWriteScopes === [],
-                'cloudflareZoneManagementReady' => $connection !== null
-                    && $missingZoneManagementScopes === [],
-                'cloudflareConnectedAt' => $connection?->connected_at,
-                'cloudflareScopes' => $scopes,
-                'cloudflareMissingReadScopes' => $missingReadScopes,
-                'cloudflareMissingDnsWriteScopes' => $missingDnsWriteScopes,
-                'cloudflareMissingZoneManagementScopes' => $missingZoneManagementScopes,
-                'telegramConfigured' => $telegram->configured(),
-                'telegramConnected' => $telegramConnection !== null,
-                'telegramConnectedAt' => $telegramConnection?->connected_at,
-                'telegramUsername' => $telegramConnection?->username,
-            ],
-        );
+        return [
+            'cloudflareConfigured' => $cloudflare->configured(),
+            'cloudflareReadConfigured' => $cloudflare->configuredForRead(),
+            'cloudflareDnsWriteConfigured' => $cloudflare->configuredForDnsWrite(),
+            'cloudflareZoneManagementConfigured' => $zoneManagementConfigured,
+            'cloudflareConnected' => $connection !== null,
+            'cloudflareReadReady' => $connection !== null
+                && $missingReadScopes === [],
+            'cloudflareDnsWriteReady' => $connection !== null
+                && $missingDnsWriteScopes === [],
+            'cloudflareZoneManagementReady' => $connection !== null
+                && $missingZoneManagementScopes === [],
+            'cloudflareConnectedAt' => $connection?->connected_at,
+            'cloudflareScopes' => $scopes,
+            'cloudflareMissingReadScopes' => $missingReadScopes,
+            'cloudflareMissingDnsWriteScopes' => $missingDnsWriteScopes,
+            'cloudflareMissingZoneManagementScopes' => $missingZoneManagementScopes,
+        ];
     }
 
     private function user(): User
