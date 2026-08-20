@@ -7,18 +7,101 @@ namespace Tests\Feature\Infrastructure\SSH;
 use App\Infrastructure\SSH\Contracts\SSHConnectionInterface;
 use App\Infrastructure\SSH\Services\SSHConnection;
 use App\Models\Server;
-use Illuminate\Support\Facades\Log;
+use Monolog\Handler\TestHandler;
+use Monolog\LogRecord;
+use PHPUnit\Framework\Attributes\DataProvider;
 use phpseclib3\Net\SSH2;
 use ReflectionProperty;
 use Tests\TestCase;
 
 final class SSHCommandLoggingSecurityTest extends TestCase
 {
-    public function test_sensitive_command_body_is_hidden_even_in_local_environment(): void
+    #[DataProvider('applicationEnvironments')]
+    public function test_sensitive_command_body_is_never_logged(
+        string $environment,
+    ): void
     {
-        $this->app->instance('env', 'local');
-        Log::spy();
+        $this->app->instance('env', $environment);
 
+        $secretCommand = "printf '%s' 'command-secret-{$environment}'";
+
+        $connection = $this->connectedConnection(
+            command: $secretCommand,
+            output: '',
+            exitCode: 0,
+        );
+
+        $records = $this->captureLogRecords(
+            static fn () => $connection->executeWithResult(
+                command: $secretCommand,
+                sensitive: true,
+            ),
+        );
+
+        $started = $this->recordFor(
+            records: $records,
+            message: 'ssh.command.started',
+        );
+
+        self::assertSame('[hidden]', $started->context['command'] ?? null);
+        self::assertTrue($started->context['sensitive'] ?? false);
+        $this->assertRecordsDoNotContain(
+            records: $records,
+            sensitiveValue: $secretCommand,
+        );
+    }
+
+    public function test_sensitive_command_output_excerpt_is_never_logged(): void
+    {
+        $secretCommand = "printf '%s' 'command-secret'";
+        $secretOutput = 'generated-password=output-secret';
+
+        $connection = $this->connectedConnection(
+            command: $secretCommand,
+            output: $secretOutput,
+            exitCode: 1,
+        );
+
+        $records = $this->captureLogRecords(
+            static fn () => $connection->executeWithResult(
+                command: $secretCommand,
+                sensitive: true,
+            ),
+        );
+
+        $completed = $this->recordFor(
+            records: $records,
+            message: 'ssh.command.completed',
+        );
+
+        self::assertFalse($completed->context['successful'] ?? true);
+        self::assertTrue($completed->context['sensitive'] ?? false);
+        self::assertArrayNotHasKey(
+            'output_excerpt',
+            $completed->context,
+        );
+        $this->assertRecordsDoNotContain(
+            records: $records,
+            sensitiveValue: $secretOutput,
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function applicationEnvironments(): array
+    {
+        return [
+            'local' => ['local'],
+            'production' => ['production'],
+        ];
+    }
+
+    private function connectedConnection(
+        string $command,
+        string $output,
+        int $exitCode,
+    ): SSHConnection {
         $connection = app(
             SSHConnectionInterface::class,
         );
@@ -27,8 +110,6 @@ final class SSHCommandLoggingSecurityTest extends TestCase
             SSHConnection::class,
             $connection,
         );
-
-        $secretCommand = "printf '%s' 'super-secret-value'";
 
         $server = new Server([
             'host' => '192.0.2.20',
@@ -46,12 +127,12 @@ final class SSHCommandLoggingSecurityTest extends TestCase
         $ssh->method('isAuthenticated')
             ->willReturn(true);
         $ssh->method('exec')
-            ->with($secretCommand)
-            ->willReturn('');
+            ->with($command)
+            ->willReturn($output);
         $ssh->method('isTimeout')
             ->willReturn(false);
         $ssh->method('getExitStatus')
-            ->willReturn(0);
+            ->willReturn($exitCode);
 
         (new ReflectionProperty(
             SSHConnection::class,
@@ -69,31 +150,64 @@ final class SSHCommandLoggingSecurityTest extends TestCase
             $ssh,
         );
 
-        $connection->executeWithResult(
-            command: $secretCommand,
-            sensitive: true,
-        );
+        return $connection;
+    }
 
-        Log::shouldHaveReceived('info')
-            ->withArgs(
-                static function (
-                    string $message,
-                    array $context,
-                ) use ($secretCommand): bool {
-                    if ($message !== 'ssh.command.started') {
-                        return false;
-                    }
+    /**
+     * @return list<LogRecord>
+     */
+    private function captureLogRecords(callable $callback): array
+    {
+        $handler = new TestHandler;
+        $logger = logger()->getLogger();
+        $logger->pushHandler($handler);
 
-                    return ($context['command'] ?? null) === '[hidden]'
-                        && ($context['sensitive'] ?? null) === true
-                        && ! str_contains(
-                            json_encode(
-                                $context,
-                                JSON_THROW_ON_ERROR,
-                            ),
-                            $secretCommand,
-                        );
-                },
+        try {
+            $callback();
+
+            return $handler->getRecords();
+        } finally {
+            $logger->popHandler();
+        }
+    }
+
+    /**
+     * @param  list<LogRecord>  $records
+     */
+    private function recordFor(
+        array $records,
+        string $message,
+    ): LogRecord {
+        foreach ($records as $record) {
+            if ($record->message === $message) {
+                return $record;
+            }
+        }
+
+        self::fail("Expected log record [{$message}] was not emitted.");
+    }
+
+    /**
+     * @param  list<LogRecord>  $records
+     */
+    private function assertRecordsDoNotContain(
+        array $records,
+        string $sensitiveValue,
+    ): void {
+        foreach ($records as $record) {
+            $serializedRecord = json_encode(
+                [
+                    'message' => $record->message,
+                    'context' => $record->context,
+                ],
+                JSON_THROW_ON_ERROR,
             );
+
+            self::assertStringNotContainsString(
+                $sensitiveValue,
+                $serializedRecord,
+                "Sensitive value leaked through log [{$record->message}].",
+            );
+        }
     }
 }
