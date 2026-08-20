@@ -20,6 +20,7 @@ use App\Domain\Application\N8n\N8nApplication;
 use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointGateway;
 use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointInterruptedOperationRecovery;
 use App\Domain\Application\Registry\ApplicationRegistry;
+use App\Domain\Application\WordPress\WordPressApplication;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsDisabler;
 use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsInterruptedOperationRecovery;
 use App\Infrastructure\Application\Marzban\SshMarzbanAdminGateway;
@@ -102,6 +103,7 @@ final class ApplicationServiceProvider extends ServiceProvider
             $app->make(MarzbanApplication::class),
             $app->make(N8nApplication::class),
             $app->make(AmneziaWgApplication::class),
+            $app->make(WordPressApplication::class),
         ];
     }
 }

@@ -52,5 +52,19 @@ final class ApplicationCatalogSeeder extends Seeder
                 'sort_order' => 30,
             ],
         );
+
+        ApplicationCatalogItem::query()->updateOrCreate(
+            [
+                'slug' => 'wordpress',
+            ],
+            [
+                'name' => 'WordPress',
+                'short_description' => 'سامانه مدیریت محتوا برای ساخت و مدیریت وب‌سایت',
+                'description' => 'WordPress یک سامانه مدیریت محتوای متن‌باز برای راه‌اندازی وب‌سایت، وبلاگ و فروشگاه اینترنتی است. xDeploy آن را همراه با پایگاه داده اختصاصی و فضای ذخیره‌سازی پایدار روی سرور اجرا می‌کند.',
+                'icon' => 'lucide.newspaper',
+                'is_published' => true,
+                'sort_order' => 40,
+            ],
+        );
     }
 }

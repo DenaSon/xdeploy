@@ -20,6 +20,7 @@ enum SoftwareType: string
     case Xray = 'xray';
     case N8n = 'n8n';
     case AmneziaWg = 'amneziawg';
+    case WordPress = 'wordpress';
 
     public function label(): string
     {
@@ -35,6 +36,7 @@ enum SoftwareType: string
             self::Xray => 'Xray',
             self::N8n => 'n8n',
             self::AmneziaWg => 'AmneziaWG',
+            self::WordPress => 'WordPress',
         };
     }
 }

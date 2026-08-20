@@ -53,5 +53,15 @@ final class ApplicationCatalogSeederTest extends TestCase
                 'sort_order' => 30,
             ],
         );
+
+        $this->assertDatabaseHas(
+            'applications',
+            [
+                'slug' => 'wordpress',
+                'name' => 'WordPress',
+                'is_published' => true,
+                'sort_order' => 40,
+            ],
+        );
     }
 }

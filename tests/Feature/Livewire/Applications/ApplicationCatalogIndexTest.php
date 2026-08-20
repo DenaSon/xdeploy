@@ -9,6 +9,7 @@ use App\Domain\Server\Enums\ServerStatus;
 use App\Models\ApplicationCatalogItem;
 use App\Models\Server;
 use App\Models\User;
+use Database\Seeders\ApplicationCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LogicException;
 use Tests\TestCase;
@@ -16,6 +17,35 @@ use Tests\TestCase;
 final class ApplicationCatalogIndexTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_catalog_index_lists_the_published_wordpress_capability(): void
+    {
+        $user = $this->createUser(
+            '09173432100',
+        );
+
+        $server = $this->createServer(
+            $user,
+        );
+
+        $this->seed(
+            ApplicationCatalogSeeder::class,
+        );
+
+        $this
+            ->actingAs($user)
+            ->get(
+                route(
+                    'panel.servers.applications.index',
+                    [
+                        'server' => $server,
+                    ],
+                ),
+            )
+            ->assertOk()
+            ->assertSee('WordPress')
+            ->assertSee('سامانه مدیریت محتوا برای ساخت و مدیریت وب‌سایت');
+    }
 
     public function test_catalog_index_renders_without_resolving_an_ssh_connection(): void
     {

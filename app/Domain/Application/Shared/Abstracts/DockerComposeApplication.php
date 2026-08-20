@@ -120,6 +120,36 @@ BASH,
         ];
     }
 
+    /**
+     * Return required services whose Docker health check must be healthy
+     * before the Application is considered running.
+     *
+     * Existing Applications remain running-state compatible because health
+     * verification is opt-in.
+     *
+     * @return list<string>
+     */
+    protected function requiredHealthyComposeServices(): array
+    {
+        return [];
+    }
+
+    /**
+     * Number of runtime inspections allowed after a lifecycle mutation.
+     *
+     * Multi-service Applications with health checks may override this budget
+     * without slowing existing single-service Applications.
+     */
+    protected function stateCheckAttempts(): int
+    {
+        return self::STATE_CHECK_ATTEMPTS;
+    }
+
+    protected function stateCheckDelayMicroseconds(): int
+    {
+        return self::STATE_CHECK_DELAY_MICROSECONDS;
+    }
+
     abstract protected function composeFile(): string;
 
     abstract protected function composeEnvFile(): string;
@@ -162,9 +192,14 @@ BASH,
         string $exception,
         string $message,
     ): void {
+        $attempts = max(
+            1,
+            $this->stateCheckAttempts(),
+        );
+
         for (
             $attempt = 1;
-            $attempt <= self::STATE_CHECK_ATTEMPTS;
+            $attempt <= $attempts;
             $attempt++
         ) {
             if (
@@ -176,10 +211,13 @@ BASH,
 
             if (
                 $attempt
-                < self::STATE_CHECK_ATTEMPTS
+                < $attempts
             ) {
                 usleep(
-                    self::STATE_CHECK_DELAY_MICROSECONDS,
+                    max(
+                        0,
+                        $this->stateCheckDelayMicroseconds(),
+                    ),
                 );
             }
         }
@@ -192,8 +230,15 @@ BASH,
     private function resolveContainerState(): ApplicationState
     {
         $services = $this->requiredComposeServices();
+        $healthyServices = $this->requiredHealthyComposeServices();
 
-        if ($services === []) {
+        if (
+            $services === []
+            || array_diff(
+                $healthyServices,
+                $services,
+            ) !== []
+        ) {
             return ApplicationState::Unknown;
         }
 
@@ -210,6 +255,19 @@ BASH,
 
             if ($state === ApplicationState::Running) {
                 $runningServices++;
+
+                if (
+                    in_array(
+                        $service,
+                        $healthyServices,
+                        true,
+                    )
+                    && $this->resolveComposeServiceHealthState(
+                        $service,
+                    ) !== ApplicationState::Running
+                ) {
+                    return ApplicationState::Unknown;
+                }
             }
         }
 
@@ -219,6 +277,65 @@ BASH,
 
         if ($runningServices === 0) {
             return ApplicationState::Installed;
+        }
+
+        return ApplicationState::Unknown;
+    }
+
+    private function resolveComposeServiceHealthState(
+        string $service,
+    ): ApplicationState {
+        $command = sprintf(
+            <<<'BASH'
+container_id="$(
+    timeout --signal=TERM 8 \
+    docker ps \
+        --filter "label=com.docker.compose.project=%s" \
+        --filter "label=com.docker.compose.service=%s" \
+        --filter "status=running" \
+        --format "{{.ID}}" \
+        | head -n 1
+)"
+
+test -n "$container_id"
+
+timeout --signal=TERM 8 \
+docker inspect \
+    --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+    "$container_id"
+BASH,
+            $this->composeProject(),
+            $service,
+        );
+
+        for (
+            $attempt = 1;
+            $attempt <= self::CONTAINER_INSPECTION_ATTEMPTS;
+            $attempt++
+        ) {
+            try {
+                $result = $this->privileged->executeWithResult(
+                    command: $command,
+                    timeout: SSHTimeout::QUICK,
+                );
+
+                if ($result->successful()) {
+                    return trim($result->output) === 'healthy'
+                        ? ApplicationState::Running
+                        : ApplicationState::Unknown;
+                }
+            } catch (Throwable) {
+                // Retry transient Docker or SSH inspection failures.
+            }
+
+            if (
+                $attempt
+                < self::CONTAINER_INSPECTION_ATTEMPTS
+            ) {
+                usleep(
+                    self::CONTAINER_INSPECTION_DELAY_MICROSECONDS,
+                );
+            }
         }
 
         return ApplicationState::Unknown;

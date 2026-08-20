@@ -12,6 +12,7 @@ use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Marzban\MarzbanApplication;
 use App\Domain\Application\N8n\N8nApplication;
 use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\Application\WordPress\WordPressApplication;
 use Tests\TestCase;
 
 final class ApplicationServiceProviderTest extends TestCase
@@ -26,6 +27,7 @@ final class ApplicationServiceProviderTest extends TestCase
             ApplicationType::Marzban->value => MarzbanApplication::class,
             ApplicationType::N8n->value => N8nApplication::class,
             ApplicationType::AmneziaWg->value => AmneziaWgApplication::class,
+            ApplicationType::WordPress->value => WordPressApplication::class,
         ];
 
         $applicationTypes = array_map(
@@ -72,6 +74,10 @@ final class ApplicationServiceProviderTest extends TestCase
         $this->assertInstanceOf(
             N8nPublicEndpointDriver::class,
             $registry->find(ApplicationType::N8n),
+        );
+
+        $this->assertFalse(
+            $registry->supports(ApplicationType::WordPress),
         );
 
         $this->assertCount(2, $registry->all());

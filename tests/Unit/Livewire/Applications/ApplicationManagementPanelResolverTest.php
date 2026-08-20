@@ -18,6 +18,7 @@ final class ApplicationManagementPanelResolverTest extends TestCase
             ApplicationType::Marzban->value => 'applications.marzban.management-panel',
             ApplicationType::N8n->value => 'applications.n8n.management-panel',
             ApplicationType::AmneziaWg->value => 'applications.amnezia-wg.management-panel',
+            ApplicationType::WordPress->value => 'applications.wordpress.management-panel',
         ];
 
         $applicationTypes = array_map(
