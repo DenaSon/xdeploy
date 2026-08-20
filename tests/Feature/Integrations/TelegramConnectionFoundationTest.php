@@ -8,6 +8,7 @@ use App\Models\TelegramConnection;
 use App\Models\TelegramLinkChallenge;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 final class TelegramConnectionFoundationTest extends TestCase
@@ -17,6 +18,8 @@ final class TelegramConnectionFoundationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Queue::fake();
 
         config([
             'services.telegram.enabled' => true,

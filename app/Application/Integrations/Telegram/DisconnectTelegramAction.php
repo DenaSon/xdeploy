@@ -11,14 +11,19 @@ use Illuminate\Support\Facades\DB;
 
 final class DisconnectTelegramAction
 {
-    public function execute(User $user): void
+    public function execute(User $user): ?string
     {
-        DB::transaction(
-            static function () use ($user): void {
+        return DB::transaction(
+            static function () use ($user): ?string {
                 User::query()
                     ->whereKey($user->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                $chatId = TelegramConnection::query()
+                    ->where('user_id', $user->getKey())
+                    ->lockForUpdate()
+                    ->value('chat_id');
 
                 TelegramConnection::query()
                     ->where('user_id', $user->getKey())
@@ -27,6 +32,8 @@ final class DisconnectTelegramAction
                 TelegramLinkChallenge::query()
                     ->where('user_id', $user->getKey())
                     ->delete();
+
+                return is_string($chatId) ? $chatId : null;
             },
             3,
         );
