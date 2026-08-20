@@ -35,6 +35,20 @@ final class WordPressManagementPanelTest extends TestCase
             ->assertSee('دسترسی عمومی غیرفعال');
     }
 
+    public function test_wordpress_management_panel_alias_resolves(): void
+    {
+        $user = $this->createUser('09120000085');
+        $server = $this->createServer($user, '192.0.2.85');
+
+        Livewire::actingAs($user)
+            ->test(
+                'applications.wordpress.management-panel',
+                ['serverId' => $server->getKey()],
+            )
+            ->assertSet('serverId', $server->getKey())
+            ->assertSee('آمادگی WordPress');
+    }
+
     public function test_management_panel_rejects_a_foreign_server(): void
     {
         $owner = $this->createUser('09120000082');
