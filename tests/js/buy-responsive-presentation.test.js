@@ -5,6 +5,8 @@ import test from 'node:test';
 const css = readProjectFile('resources/css/buy.css');
 const buy = readProjectFile('resources/views/livewire/servers/buy.blade.php');
 const buyPage = readProjectFile('resources/views/livewire/servers/buy-page.blade.php');
+const app = readProjectFile('resources/js/app.js');
+const guard = readProjectFile('resources/js/buy-responsive-guard.js');
 
 test('the bottom purchase bar is mobile-only at the rendered markup boundary', () => {
     assert.match(buy, /data-buy-mobile-action/);
@@ -45,6 +47,18 @@ test('the stylesheet fallback keeps the same 768px contract', () => {
         css,
         /@media \(min-width: 768px\)[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 320px;/,
     );
+});
+
+test('a runtime guard suppresses a morphed mobile action on desktop', () => {
+    assert.match(app, /import '\.\/buy-responsive-guard\.js';/);
+    assert.match(guard, /\(max-width: 767px\)/);
+    assert.match(guard, /\[data-buy-mobile-action\]/);
+    assert.match(
+        guard,
+        /style\.setProperty\([\s\S]*?'display',[\s\S]*?'none',[\s\S]*?'important'/,
+    );
+    assert.match(guard, /MutationObserver/);
+    assert.match(guard, /livewire:navigated/);
 });
 
 test('the mobile purchase bar respects the bottom safe area', () => {
