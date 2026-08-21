@@ -69,9 +69,6 @@ final class BuyProviderPresentationTest extends TestCase
                 'data-buy-workspace',
             )
             ->assertSeeHtml(
-                'data-buy-workspace-toolbar',
-            )
-            ->assertSeeHtml(
                 'data-buy-provider-row',
             )
             ->assertSeeHtml(
@@ -92,8 +89,11 @@ final class BuyProviderPresentationTest extends TestCase
             ->assertSeeHtml(
                 'data-provider-switch-overlay',
             )
+            ->assertDontSeeHtml(
+                'data-buy-desktop-placeholder',
+            )
             ->assertSee(
-                'سرور جدید',
+                'خرید VPS',
             )
             ->assertSee(
                 'در حال تغییر زیرساخت',
