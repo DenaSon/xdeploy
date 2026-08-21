@@ -25,5 +25,20 @@
                 icon-classes="!size-[18px] stroke-[1.7]"
             />
         @endforeach
+
+        @if(
+            config('log-viewer.enabled')
+            && \Illuminate\Support\Facades\Route::has('log-viewer.index')
+        )
+            <x-menu-item
+                title="لاگ‌ها"
+                icon="lucide.file-search"
+                :link="route('log-viewer.index')"
+                :active="request()->routeIs('log-viewer.*')"
+                class="rounded-xl text-sm text-base-content/65 transition-colors duration-200 hover:bg-base-200 hover:text-base-content"
+                active-bg-color="!bg-primary/10 !text-primary !font-medium"
+                icon-classes="!size-[18px] stroke-[1.7]"
+            />
+        @endif
     </x-menu>
 </nav>
