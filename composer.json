@@ -20,6 +20,7 @@
         "laravel/tinker": "^3.0",
         "livewire/livewire": "*",
         "mallardduck/blade-lucide-icons": "^1.26",
+        "opcodesio/log-viewer": "^3.24",
         "phpseclib/phpseclib": "^3.0",
         "robsontenorio/mary": "^2.8",
         "zarinpal/zarinpal-php-sdk": "*"
