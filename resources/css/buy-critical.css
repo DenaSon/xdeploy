@@ -12,7 +12,6 @@
 [data-buy-mobile-action] {
     display: none !important;
 }
-
 [data-buy-desktop-summary],
 [data-buy-desktop-placeholder] {
     display: none !important;
@@ -53,4 +52,3 @@
         padding-bottom: 0 !important;
     }
 }
-

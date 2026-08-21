@@ -28,4 +28,3 @@ document.addEventListener(
         once: true,
     },
 );
-

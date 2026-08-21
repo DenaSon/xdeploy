@@ -21,4 +21,3 @@ function readProjectFile(path) {
         'utf8',
     );
 }
-
