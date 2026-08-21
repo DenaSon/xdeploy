@@ -55,8 +55,15 @@ final class SupportRequestAnsweredNotification extends Notification implements S
     public function toTelegram(
         object $notifiable,
     ): TelegramMessage {
+        $payload = $this->payload();
+        $payload['action_label'] = 'مشاهده درخواست‌های پشتیبانی';
+        $payload['action_url'] = route(
+            'panel.support.index',
+            absolute: false,
+        );
+
         return TelegramMessage::fromNotificationPayload(
-            $this->payload(),
+            $payload,
         );
     }
 

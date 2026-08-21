@@ -225,6 +225,31 @@ final class SupportUiTest extends TestCase
         );
     }
 
+    public function test_support_answer_telegram_notification_links_to_support_index(): void
+    {
+        config([
+            'app.url' => 'https://coreflare.test',
+        ]);
+
+        $notification = new SupportRequestAnsweredNotification(
+            supportRequestId: 123,
+            subject: 'درخواست تست',
+        );
+
+        $message = $notification->toTelegram(
+            User::factory()->create(),
+        );
+
+        self::assertStringEndsWith(
+            'مشاهده درخواست‌های پشتیبانی: https://coreflare.test/panel/support',
+            $message->text,
+        );
+        self::assertStringNotContainsString(
+            '/panel/support/123',
+            $message->text,
+        );
+    }
+
     private function createSupportRequest(
         User $user,
         string $subject,
