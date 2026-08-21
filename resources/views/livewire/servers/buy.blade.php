@@ -43,6 +43,8 @@
         }, 1200);
     "
 
+    data-buy-form
+
     x-on:xdeploy-livewire-request-failed.window="
         const actions = $event.detail?.actions ?? [];
 
@@ -55,8 +57,58 @@
         }
     "
 
-    class="pb-24 xl:pb-0"
+    class="pb-24 md:pb-0"
 >
+    <style>
+        /*
+         * Critical Buy responsive contract lives with the rendered markup.
+         * This keeps the purchase CTA correct even if a Vite/Tailwind asset
+         * is stale or a responsive utility is omitted from a generated build.
+         */
+        .cloud-purchase-page [data-buy-mobile-action] {
+            display: block !important;
+        }
+
+        .cloud-purchase-page [data-buy-desktop-summary],
+        .cloud-purchase-page [data-buy-desktop-placeholder] {
+            display: none !important;
+        }
+
+        .cloud-purchase-page [data-buy-layout],
+        .cloud-purchase-page [data-buy-provider-layout] {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .cloud-purchase-page [data-buy-form] {
+            padding-bottom:
+                calc(
+                    6rem
+                    + env(safe-area-inset-bottom, 0px)
+                ) !important;
+        }
+
+        @media (min-width: 768px) {
+            .cloud-purchase-page [data-buy-mobile-action] {
+                display: none !important;
+            }
+
+            .cloud-purchase-page [data-buy-desktop-summary],
+            .cloud-purchase-page [data-buy-desktop-placeholder] {
+                display: block !important;
+            }
+
+            .cloud-purchase-page [data-buy-layout],
+            .cloud-purchase-page [data-buy-provider-layout] {
+                grid-template-columns:
+                    minmax(0, 1fr) 320px !important;
+            }
+
+            .cloud-purchase-page [data-buy-form] {
+                padding-bottom: 0 !important;
+            }
+        }
+    </style>
+
     {{-- Initial page loader --}}
     <div
         x-show="showInitialLoader"
@@ -267,9 +319,10 @@
 
         <div
             x-show="! catalogLoadFailed"
+            data-buy-layout
             class="
                 grid grid-cols-1 gap-4
-                xl:grid-cols-[minmax(0,1fr)_320px]
+                md:grid-cols-[minmax(0,1fr)_320px]
             "
         >
             <section
@@ -308,11 +361,12 @@
             </section>
 
             <aside
+                data-buy-desktop-summary
                 class="
                     hidden h-72 rounded-2xl
                     border border-base-300
                     bg-base-100
-                    xl:block
+                    md:block
                 "
             ></aside>
         </div>
@@ -377,9 +431,10 @@
         </section>
     @else
         <div
+            data-buy-layout
             class="
                 grid grid-cols-1 gap-4
-                xl:grid-cols-[minmax(0,1fr)_320px]
+                md:grid-cols-[minmax(0,1fr)_320px]
             "
         >
             <main class="min-w-0">
@@ -1287,7 +1342,10 @@
             </main>
 
             {{-- Desktop summary --}}
-            <aside class="hidden xl:block">
+            <aside
+                data-buy-desktop-summary
+                class="hidden md:block"
+            >
                 <div
                     class="
                         sticky top-5
@@ -1611,6 +1669,7 @@
 
         {{-- Mobile action bar --}}
         <div
+            data-buy-mobile-action
             class="
                 fixed inset-x-0 bottom-0
                 z-40
@@ -1618,7 +1677,7 @@
                 bg-base-100/95
                 px-3 py-2.5
                 backdrop-blur
-                xl:hidden
+                md:hidden
             "
         >
             <div
