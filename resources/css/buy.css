@@ -46,7 +46,9 @@ div:has(> [wire\:click="decreaseDisk"]) {
 
 .cloud-purchase-page
 [data-buy-content] > [dir="rtl"]
-> div.grid > aside {
+> div.grid > aside,
+.cloud-purchase-page
+> div.grid > div[aria-hidden="true"] {
     display: none;
 }
 
@@ -170,6 +172,12 @@ div:has(> [wire\:click="decreaseDisk"]) {
 }
 
 @media (min-width: 1280px) {
+    .cloud-purchase-page > div.grid,
+    .cloud-purchase-page
+    [data-buy-content] > [dir="rtl"] > div.grid {
+        grid-template-columns: minmax(0, 1fr) 320px;
+    }
+
     .cloud-purchase-page
     [data-buy-content] > [dir="rtl"] {
         padding-bottom: 0;
@@ -177,7 +185,9 @@ div:has(> [wire\:click="decreaseDisk"]) {
 
     .cloud-purchase-page
     [data-buy-content] > [dir="rtl"]
-    > div.grid > aside {
+    > div.grid > aside,
+    .cloud-purchase-page
+    > div.grid > div[aria-hidden="true"] {
         display: block;
     }
 
