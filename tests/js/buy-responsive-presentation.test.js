@@ -19,7 +19,7 @@ test('the bottom purchase bar is mobile-only at the rendered markup boundary', (
     assert.match(buy, /data-buy-desktop-summary/);
     assert.match(
         buy,
-        /\[data-buy-mobile-action\][\s\S]*?display:\s*none\s*!important;[\s\S]*?@media \(max-width: 767px\)[\s\S]*?\[data-buy-mobile-action\][\s\S]*?display:\s*block\s*!important;/,
+        /@media \(min-width: 768px\)[\s\S]*?\[data-buy-mobile-action\][\s\S]*?display:\s*none\s*!important;/,
     );
     assert.match(
         buy,
@@ -55,34 +55,15 @@ test('the stylesheet fallback keeps the same 768px contract', () => {
     );
 });
 
-test('the mobile action is opt-in and Livewire-morph safe', () => {
+test('the mobile action viewport visibility is CSS-owned', () => {
     assert.doesNotMatch(app, /buy-responsive-guard/);
     assert.equal(existsSync(guardPath), false);
 
-    assert.match(
-        buy,
-        /data-buy-mobile-action[\s\S]*?wire:ignore\.self/,
-    );
-    assert.match(
-        buy,
-        /x-show\.important="isMobileViewport"/,
-    );
-    assert.match(
-        buy,
-        /style="display:\s*none\s*!important;"/,
-    );
-    assert.match(
-        buy,
-        /window\.matchMedia\([\s\S]*?\(max-width: 767px\)/,
-    );
-    assert.match(
-        buy,
-        /addEventListener\([\s\S]*?'change',[\s\S]*?mobileMediaQueryListener/,
-    );
-    assert.match(
-        buy,
-        /removeEventListener\([\s\S]*?'change',[\s\S]*?mobileMediaQueryListener/,
-    );
+    assert.match(buy, /data-buy-mobile-action/);
+    assert.doesNotMatch(buy, /mobileMediaQuery/);
+    assert.doesNotMatch(buy, /isMobileViewport/);
+    assert.doesNotMatch(buy, /x-show\.important=/);
+    assert.doesNotMatch(buy, /wire:ignore\.self/);
 });
 
 test('the mobile purchase bar respects the bottom safe area', () => {
