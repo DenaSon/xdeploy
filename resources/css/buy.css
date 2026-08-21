@@ -4,8 +4,8 @@
 |--------------------------------------------------------------------------
 |
 | Keep purchase-page presentation in one stylesheet. The desktop summary and
-| the mobile/tablet action bar are intentionally mutually exclusive and do
-| not depend only on generated responsive utility classes.
+| the mobile action bar are intentionally mutually exclusive and do not depend
+| only on generated responsive utility classes.
 |
 */
 
@@ -42,6 +42,11 @@ div:has(> [wire\:click="decreaseDisk"]) {
 |--------------------------------------------------------------------------
 | Critical responsive visibility
 |--------------------------------------------------------------------------
+|
+| The bottom purchase bar is mobile-only. Tablet/desktop widths render the
+| sticky order summary instead. This avoids treating a narrow desktop browser
+| window (for example ~996px) as the mobile purchase experience.
+|
 */
 
 .cloud-purchase-page
@@ -58,7 +63,7 @@ div:has(> [wire\:click="decreaseDisk"]) {
     display: none;
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 767px) {
     .cloud-purchase-page
     [data-buy-content] > [dir="rtl"] {
         padding-bottom:
@@ -171,7 +176,7 @@ div:has(> [wire\:click="decreaseDisk"]) {
     }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 768px) {
     .cloud-purchase-page > div.grid,
     .cloud-purchase-page
     [data-buy-content] > [dir="rtl"] > div.grid {
