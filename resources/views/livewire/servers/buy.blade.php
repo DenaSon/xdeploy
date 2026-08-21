@@ -66,7 +66,7 @@
          * is stale or a responsive utility is omitted from a generated build.
          */
         .cloud-purchase-page [data-buy-mobile-action] {
-            display: block !important;
+            display: none !important;
         }
 
         .cloud-purchase-page [data-buy-desktop-summary],
@@ -87,11 +87,13 @@
                 ) !important;
         }
 
-        @media (min-width: 768px) {
+        @media (max-width: 767px) {
             .cloud-purchase-page [data-buy-mobile-action] {
-                display: none !important;
+                display: block !important;
             }
+        }
 
+        @media (min-width: 768px) {
             .cloud-purchase-page [data-buy-desktop-summary],
             .cloud-purchase-page [data-buy-desktop-placeholder] {
                 display: block !important;
@@ -1670,6 +1672,46 @@
         {{-- Mobile action bar --}}
         <div
             data-buy-mobile-action
+            wire:ignore.self
+            x-data="{
+                mobileMediaQuery: null,
+                mobileMediaQueryListener: null,
+                isMobileViewport: false,
+
+                init() {
+                    this.mobileMediaQuery = window.matchMedia(
+                        '(max-width: 767px)',
+                    );
+
+                    this.mobileMediaQueryListener = (event) => {
+                        this.isMobileViewport = event.matches;
+                    };
+
+                    this.mobileMediaQueryListener(
+                        this.mobileMediaQuery,
+                    );
+
+                    this.mobileMediaQuery.addEventListener(
+                        'change',
+                        this.mobileMediaQueryListener,
+                    );
+                },
+
+                destroy() {
+                    if (
+                        this.mobileMediaQuery
+                        && this.mobileMediaQueryListener
+                    ) {
+                        this.mobileMediaQuery.removeEventListener(
+                            'change',
+                            this.mobileMediaQueryListener,
+                        );
+                    }
+                },
+            }"
+            x-show.important="isMobileViewport"
+            x-cloak
+            style="display: none !important;"
             class="
                 fixed inset-x-0 bottom-0
                 z-40
@@ -1802,3 +1844,4 @@
         </div>
     @endif
 </div>
+

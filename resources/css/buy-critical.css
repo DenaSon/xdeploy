@@ -10,7 +10,7 @@
 */
 
 [data-buy-mobile-action] {
-    display: block !important;
+    display: none !important;
 }
 
 [data-buy-desktop-summary],
@@ -31,11 +31,13 @@
         ) !important;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 767px) {
     [data-buy-mobile-action] {
-        display: none !important;
+        display: block !important;
     }
+}
 
+@media (min-width: 768px) {
     [data-buy-desktop-summary],
     [data-buy-desktop-placeholder] {
         display: block !important;
@@ -51,3 +53,4 @@
         padding-bottom: 0 !important;
     }
 }
+

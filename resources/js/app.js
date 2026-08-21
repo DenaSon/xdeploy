@@ -5,7 +5,6 @@ import '../css/admin-markdown.css';
 import '../css/buy.css';
 import '../css/buy-critical.css';
 import '../css/landing.css';
-import './buy-responsive-guard.js';
 import './passkeys.js';
 
 import {
@@ -29,3 +28,4 @@ document.addEventListener(
         once: true,
     },
 );
+
