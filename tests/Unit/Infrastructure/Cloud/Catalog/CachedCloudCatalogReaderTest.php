@@ -110,10 +110,11 @@ final class CachedCloudCatalogReaderTest extends TestCase
     public function test_it_uses_the_bounded_purchase_catalog_source_on_a_cache_miss(): void
     {
         $cloud = Mockery::mock(
-            CloudProviderInterface::class,
-        );
-        $cloud->shouldImplement(
-            CloudPurchaseCatalogSourceInterface::class,
+            sprintf(
+                '%s, %s',
+                CloudProviderInterface::class,
+                CloudPurchaseCatalogSourceInterface::class,
+            ),
         );
 
         $cloud->shouldNotReceive('listRegions');

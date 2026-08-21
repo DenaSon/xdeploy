@@ -133,15 +133,16 @@ final class BuyTest extends TestCase
         );
 
         /*
-         * Quote calculation remains authoritative and provider-backed.
-         * This test only verifies that the Livewire purchase screen can
-         * load its catalog and settle on a valid initial selection.
+         * The preview reuses the loaded size snapshot while custom-disk
+         * pricing still uses the bounded purchase transport. Order creation
+         * performs the authoritative provider-backed calculation separately.
          */
         $cloud = Mockery::mock(
-            CloudProviderInterface::class,
-        );
-        $cloud->shouldImplement(
-            CloudPurchasePricingSourceInterface::class,
+            sprintf(
+                '%s, %s',
+                CloudProviderInterface::class,
+                CloudPurchasePricingSourceInterface::class,
+            ),
         );
         $cloud->shouldNotReceive('listSizes');
         $cloud
@@ -246,7 +247,6 @@ final class BuyTest extends TestCase
             ->assertSee(
                 'تومان',
             );
-
     }
 
     public function test_user_can_switch_provider_and_receive_a_fresh_provider_scoped_catalog_and_quote(): void
