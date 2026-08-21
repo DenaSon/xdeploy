@@ -1,0 +1,102 @@
+/*
+|--------------------------------------------------------------------------
+| Coreflare Theme Contract
+|--------------------------------------------------------------------------
+|
+| Keep the effective light/dark tokens deterministic even while Mary UI's
+| theme toggle uses the canonical DaisyUI `light` / `dark` names.
+|
+| This stylesheet is loaded after the main DaisyUI output, so the product
+| palette remains authoritative instead of falling back to DaisyUI's built-in
+| light palette.
+|
+*/
+
+:root,
+[data-theme="light"] {
+    color-scheme: light;
+
+    --color-base-100: #ffffff;
+    --color-base-200: #f5f8f6;
+    --color-base-300: #e1e8e4;
+    --color-base-content: #17201c;
+
+    --color-primary: #0d7a57;
+    --color-primary-content: #f6fff9;
+
+    --color-secondary: #69756f;
+    --color-secondary-content: #ffffff;
+
+    --color-accent: #627b3f;
+    --color-accent-content: #ffffff;
+
+    --color-neutral: #25302b;
+    --color-neutral-content: #f8faf9;
+
+    --color-info: #316fa8;
+    --color-info-content: #ffffff;
+
+    --color-success: #2e7d32;
+    --color-success-content: #ffffff;
+
+    --color-warning: #b7791f;
+    --color-warning-content: #ffffff;
+
+    --color-error: #c94a4a;
+    --color-error-content: #ffffff;
+
+    --radius-selector: 0.75rem;
+    --radius-field: 0.75rem;
+    --radius-box: 1rem;
+
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+
+    --border: 1px;
+    --depth: 0;
+    --noise: 0;
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-base-100: #151b18;
+    --color-base-200: #0f1412;
+    --color-base-300: #27312d;
+    --color-base-content: #e8eee9;
+
+    --color-primary: #57d79e;
+    --color-primary-content: #08281b;
+
+    --color-secondary: #9ba8a2;
+    --color-secondary-content: #111714;
+
+    --color-accent: #a7c96a;
+    --color-accent-content: #17200b;
+
+    --color-neutral: #2b3531;
+    --color-neutral-content: #f1f5f3;
+
+    --color-info: #6ca8dc;
+    --color-info-content: #0b1d2c;
+
+    --color-success: #66c77b;
+    --color-success-content: #0b2511;
+
+    --color-warning: #e2b85b;
+    --color-warning-content: #281b04;
+
+    --color-error: #e47a7a;
+    --color-error-content: #350d0d;
+
+    --radius-selector: 0.75rem;
+    --radius-field: 0.75rem;
+    --radius-box: 1rem;
+
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+
+    --border: 1px;
+    --depth: 0;
+    --noise: 0;
+}
