@@ -1,9 +1,9 @@
 <div
     dir="rtl"
     wire:init="loadCatalog"
+    data-buy-form
     data-livewire-request-context="initialization"
     data-livewire-request-feedback="inline"
-
     x-data="{
         catalogReady: false,
         catalogLoadFailed: false,
@@ -11,10 +11,7 @@
         showInitialLoader: true,
 
         finishInitialLoader() {
-            if (
-                this.catalogReady
-                && this.minimumDelayPassed
-            ) {
+            if (this.catalogReady && this.minimumDelayPassed) {
                 this.showInitialLoader = false;
             }
         },
@@ -25,7 +22,6 @@
             this.finishInitialLoader();
         },
     }"
-
     x-init="
         if ($wire.catalogLoaded) {
             markCatalogReady();
@@ -42,9 +38,6 @@
             finishInitialLoader();
         }, 1200);
     "
-
-    data-buy-form
-
     x-on:xdeploy-livewire-request-failed.window="
         const actions = $event.detail?.actions ?? [];
 
@@ -56,109 +49,38 @@
             showInitialLoader = false;
         }
     "
-
-    class="pb-24 md:pb-0"
 >
-    <style>
-        /*
-         * Critical Buy responsive contract lives with the rendered markup.
-         * This keeps the purchase CTA correct even if a Vite/Tailwind asset
-         * is stale or a responsive utility is omitted from a generated build.
-         */
-        .cloud-purchase-page [data-buy-mobile-action] {
-            display: block !important;
-        }
-
-        .cloud-purchase-page [data-buy-desktop-summary],
-        .cloud-purchase-page [data-buy-desktop-placeholder] {
-            display: none !important;
-        }
-
-        .cloud-purchase-page [data-buy-layout],
-        .cloud-purchase-page [data-buy-provider-layout] {
-            grid-template-columns: minmax(0, 1fr) !important;
-        }
-
-        .cloud-purchase-page [data-buy-form] {
-            padding-bottom:
-                calc(
-                    6rem
-                    + env(safe-area-inset-bottom, 0px)
-                ) !important;
-        }
-
-        @media (min-width: 768px) {
-            .cloud-purchase-page [data-buy-mobile-action] {
-                display: none !important;
-            }
-
-            .cloud-purchase-page [data-buy-desktop-summary],
-            .cloud-purchase-page [data-buy-desktop-placeholder] {
-                display: block !important;
-            }
-
-            .cloud-purchase-page [data-buy-layout],
-            .cloud-purchase-page [data-buy-provider-layout] {
-                grid-template-columns:
-                    minmax(0, 1fr) 320px !important;
-            }
-
-            .cloud-purchase-page [data-buy-form] {
-                padding-bottom: 0 !important;
-            }
-        }
-    </style>
-
-    {{-- Initial page loader --}}
+    {{-- Initial catalog loader --}}
     <div
         x-show="showInitialLoader"
-        x-transition:leave="
-            transition
-            ease-out
-            duration-300
-        "
-        x-transition:leave-start="
-            opacity-100
-        "
-        x-transition:leave-end="
-            opacity-0
-        "
+        x-transition:leave="transition ease-out duration-300"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
         class="
-        opacity-60
             fixed inset-0 z-70
-            flex items-center
-            justify-center
+            flex items-center justify-center
             bg-base-100/90
+            opacity-60
             backdrop-blur-[2px]
         "
         role="status"
         aria-live="polite"
         aria-label="در حال آماده‌سازی اطلاعات سرور"
     >
-        <div
-            class="
-                flex flex-col
-                items-center
-                gap-3
-            "
-        >
+        <div class="flex flex-col items-center gap-3">
             <div
                 class="
                     flex size-14
-                    items-center
-                    justify-center
+                    items-center justify-center
                     rounded-2xl
                     border border-base-300
-                    bg-base-100
-                    shadow-sm
+                    bg-base-100 shadow-sm
                 "
             >
                 <span
                     class="
-                        loading
-                        loading-spinner
-                        loading-md
-                        text-primary
+                        loading loading-spinner
+                        loading-md text-primary
                     "
                 ></span>
             </div>
@@ -166,8 +88,7 @@
             <div class="text-center">
                 <div
                     class="
-                        text-sm
-                        font-medium
+                        text-sm font-medium
                         text-base-content/70
                     "
                 >
@@ -176,83 +97,21 @@
 
                 <div
                     class="
-                        mt-1
-                        text-[11px]
+                        mt-1 text-[11px]
                         text-base-content/35
                     "
                 >
-                  Loading...
+                    Loading...
                 </div>
             </div>
         </div>
     </div>
-    <header
-        class="
-            mb-4 flex items-center
-            justify-between gap-3
-        "
-    >
-        <div class="min-w-0">
-            <div class="flex items-center gap-2.5">
-                <div
-                    class="
-                        flex size-9 shrink-0
-                        items-center justify-center
-                        rounded-xl
-                        border border-primary/15
-                        bg-primary/5
-                        text-primary
-                    "
-                >
-                    <x-icon
-                        name="lucide.cloud"
-                        class="!size-4.5"
-                    />
-                </div>
-
-                <div class="min-w-0">
-                    <h1
-                        class="
-                            text-xl font-semibold
-                            tracking-tight
-                            text-base-content
-                        "
-                    >
-                        خرید VPS
-                    </h1>
-
-                    <p
-                        class="
-                            mt-0.5 truncate
-                            text-xs
-                            text-base-content/45
-                            sm:text-sm
-                        "
-                    >
-                        پیکربندی موردنظر را انتخاب کنید؛ Coreflare پس از پرداخت، فرایند ساخت و آماده‌سازی VPS را آغاز می‌کند.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <x-button
-            icon="lucide.arrow-right"
-            :link="route('panel.servers.index')"
-            wire:navigate
-            aria-label="بازگشت به سرورها"
-            class="
-                btn-ghost btn-square btn-sm
-                rounded-xl
-                text-base-content/50
-            "
-        />
-    </header>
 
     @if(! $catalogLoaded)
         <section
             x-cloak
             x-show="catalogLoadFailed"
-            style="display: none;"
+            style="display: none"
             class="
                 rounded-2xl
                 border border-warning/20
@@ -268,8 +127,7 @@
                     mx-auto flex size-11
                     items-center justify-center
                     rounded-xl
-                    bg-warning/10
-                    text-warning
+                    bg-warning/10 text-warning
                 "
             >
                 <x-icon
@@ -290,8 +148,8 @@
             <p
                 class="
                     mx-auto mt-1.5
-                    max-w-md text-sm
-                    leading-6
+                    max-w-md
+                    text-sm leading-6
                     text-base-content/50
                 "
             >
@@ -319,9 +177,9 @@
 
         <div
             x-show="! catalogLoadFailed"
-            data-buy-layout
+            data-buy-skeleton
             class="
-                grid grid-cols-1 gap-4
+                grid gap-4
                 md:grid-cols-[minmax(0,1fr)_320px]
             "
         >
@@ -329,14 +187,13 @@
                 class="
                     rounded-2xl
                     border border-base-300
-                    bg-base-100
-                    p-4
+                    bg-base-100 p-4
                 "
             >
                 <div class="space-y-5 animate-pulse">
                     <div>
                         <div class="h-3 w-24 rounded bg-base-300"></div>
-                        <div class="mt-2 h-10 rounded-xl bg-base-200"></div>
+                        <div class="mt-2 h-11 rounded-xl bg-base-200"></div>
                     </div>
 
                     <div>
@@ -350,7 +207,7 @@
 
                     <div>
                         <div class="h-3 w-16 rounded bg-base-300"></div>
-                        <div class="mt-2 h-20 rounded-xl bg-base-200"></div>
+                        <div class="mt-2 h-24 rounded-xl bg-base-200"></div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -361,13 +218,14 @@
             </section>
 
             <aside
-                data-buy-desktop-summary
                 class="
-                    hidden h-72 rounded-2xl
+                    hidden h-72
+                    rounded-2xl
                     border border-base-300
                     bg-base-100
                     md:block
                 "
+                aria-hidden="true"
             ></aside>
         </div>
     @elseif($catalogError && $regions === [])
@@ -385,8 +243,7 @@
                     mx-auto flex size-11
                     items-center justify-center
                     rounded-xl
-                    bg-error/10
-                    text-error
+                    bg-error/10 text-error
                 "
             >
                 <x-icon
@@ -407,8 +264,8 @@
             <p
                 class="
                     mx-auto mt-1.5
-                    max-w-md text-sm
-                    leading-6
+                    max-w-md
+                    text-sm leading-6
                     text-base-content/50
                 "
             >
@@ -431,9 +288,35 @@
         </section>
     @else
         <div
-            data-buy-layout
             class="
-                grid grid-cols-1 gap-4
+                mb-3 flex items-start gap-2
+                rounded-xl
+                border border-base-300
+                bg-base-100
+                px-3 py-2.5
+                text-xs leading-5
+                text-base-content/55
+                md:hidden
+            "
+            data-buy-mobile-notice
+        >
+            <x-icon
+                name="lucide.monitor"
+                class="
+                    mt-0.5 !size-3.5
+                    shrink-0 text-base-content/40
+                "
+            />
+
+            <span>
+                در این مرحله، ثبت و پرداخت سفارش از نمایش دسکتاپ انجام می‌شود.
+            </span>
+        </div>
+
+        <div
+            data-buy-main-layout
+            class="
+                grid gap-4
                 md:grid-cols-[minmax(0,1fr)_320px]
             "
         >
@@ -476,160 +359,142 @@
                             </div>
                         </div>
 
-                        <div class="min-w-0">
+                        <div
+                            class="
+                                flex min-w-0
+                                flex-col gap-2
+                                sm:flex-row sm:items-center
+                            "
+                        >
                             <div
                                 class="
-                                    flex flex-col gap-2
-                                    sm:flex-row
-                                    sm:items-center
+                                    inline-grid shrink-0
+                                    grid-cols-2 gap-1
+                                    rounded-xl
+                                    bg-base-200/70 p-1
                                 "
                             >
+                                <button
+                                    type="button"
+                                    wire:click="selectRegionGroup('iran')"
+                                    wire:target="selectRegionGroup,selectRegion"
+                                    wire:loading.attr="disabled"
+                                    @disabled(
+                                        ($regionGroupCounts['iran'] ?? 0) === 0
+                                    )
+                                    @class([
+                                        '
+                                            btn btn-sm
+                                            h-11 min-h-11
+                                            cursor-pointer
+                                            rounded-lg border-0
+                                            px-3 text-xs font-medium
+                                            sm:h-8 sm:min-h-8
+                                        ',
+                                        'btn-primary text-primary-content' =>
+                                            $regionGroup === 'iran',
+                                        'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
+                                            $regionGroup !== 'iran',
+                                        'opacity-40 cursor-not-allowed' =>
+                                            ($regionGroupCounts['iran'] ?? 0) === 0,
+                                    ])
+                                >
+                                    ایران
+                                </button>
 
+                                <button
+                                    type="button"
+                                    wire:click="selectRegionGroup('international')"
+                                    wire:target="selectRegionGroup,selectRegion"
+                                    wire:loading.attr="disabled"
+                                    @disabled(
+                                        ($regionGroupCounts['international'] ?? 0) === 0
+                                    )
+                                    @class([
+                                        '
+                                            btn btn-sm
+                                            h-11 min-h-11
+                                            cursor-pointer
+                                            rounded-lg border-0
+                                            px-3 text-xs font-medium
+                                            sm:h-8 sm:min-h-8
+                                        ',
+                                        'btn-primary text-primary-content' =>
+                                            $regionGroup === 'international',
+                                        'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
+                                            $regionGroup !== 'international',
+                                        'opacity-40 cursor-not-allowed' =>
+                                            ($regionGroupCounts['international'] ?? 0) === 0,
+                                    ])
+                                >
+                                    آلمان
+                                </button>
+                            </div>
 
+                            <div class="relative min-w-0 flex-1">
+                                <select
+                                    wire:change="selectRegion($event.target.value)"
+                                    wire:target="selectRegionGroup,selectRegion"
+                                    wire:loading.attr="disabled"
+                                    class="
+                                        select select-bordered
+                                        h-11 min-h-11 w-full
+                                        cursor-pointer rounded-xl
+                                        border-base-300
+                                        bg-base-100 text-sm
+                                        focus:outline-none
+                                        sm:h-10 sm:min-h-10
+                                    "
+                                >
+                                    @foreach($visibleRegions as $region)
+                                        <option
+                                            value="{{ $region['id'] }}"
+                                            @selected(
+                                                $regionId === $region['id']
+                                            )
+                                        >
+                                            {{ $this->regionDisplayName($region) }}
+                                        </option>
+                                    @endforeach
+                                </select>
 
                                 <div
+                                    wire:loading
+                                    wire:target="selectRegionGroup,selectRegion"
                                     class="
-        inline-grid shrink-0
-        grid-cols-2 gap-1
-        rounded-xl
-        bg-base-200/70
-        p-1
-    "
+                                        pointer-events-none
+                                        absolute inset-y-0 left-3
+                                        flex items-center
+                                    "
                                 >
-                                    <button
-                                        type="button"
-                                        wire:click="selectRegionGroup('iran')"
-                                        wire:target="selectRegionGroup,selectRegion"
-                                        wire:loading.attr="disabled"
-                                        @disabled(
-                                            ($regionGroupCounts['iran'] ?? 0) === 0
-                                        )
-                                        @class([
-                                            '
-                                                btn btn-sm
-                                                cursor-pointer
-                                                rounded-lg
-                                                border-0
-                                                px-3
-                                                text-xs font-medium
-                                            ',
-                                            'btn-primary text-primary-content' =>
-                                                $regionGroup === 'iran',
-
-                                            'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
-                                                $regionGroup !== 'iran',
-
-                                            'opacity-40 cursor-not-allowed' =>
-                                                ($regionGroupCounts['iran'] ?? 0) === 0,
-                                        ])
-                                    >
-                                        ایران
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        wire:click="selectRegionGroup('international')"
-                                        wire:target="selectRegionGroup,selectRegion"
-                                        wire:loading.attr="disabled"
-                                        @disabled(
-                                            ($regionGroupCounts['international'] ?? 0) === 0
-                                        )
-                                        @class([
-                                            '
-                                                btn btn-sm
-                                                cursor-pointer
-                                                rounded-lg
-                                                border-0
-                                                px-3
-                                                text-xs font-medium
-                                            ',
-                                            'btn-primary text-primary-content' =>
-                                                $regionGroup === 'international',
-
-                                            'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
-                                                $regionGroup !== 'international',
-
-                                            'opacity-40 cursor-not-allowed' =>
-                                                ($regionGroupCounts['international'] ?? 0) === 0,
-                                        ])
-                                    >
-                                        آلمان
-                                    </button>
-                                </div>
-
-
-
-
-
-                                <div class="relative min-w-0 flex-1">
-                                    <select
-                                        wire:change="selectRegion($event.target.value)"
-                                        wire:target="selectRegionGroup,selectRegion"
-                                        wire:loading.attr="disabled"
+                                    <span
                                         class="
-                                            select select-bordered
-                                            cursor-pointer
-                                            h-10 min-h-10 w-full
-                                            rounded-xl
-                                            border-base-300
-                                            bg-base-100
-                                            text-sm
-                                            focus:outline-none
+                                            loading loading-spinner
+                                            loading-xs text-primary
                                         "
-                                    >
-                                        @foreach($visibleRegions as $region)
-                                            <option
-                                                value="{{ $region['id'] }}"
-                                                @selected(
-                                                    $regionId === $region['id']
-                                                )
-                                            >
-                                                {{ $this->regionDisplayName($region) }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-
-                                    <div
-                                        wire:loading
-                                        wire:target="selectRegionGroup,selectRegion"
-                                        class="
-                                            pointer-events-none
-                                            absolute inset-y-0 left-3
-                                            flex items-center
-                                        "
-                                    >
-                                        <span
-                                            class="
-                                                loading
-                                                loading-spinner
-                                                loading-xs
-                                                text-primary
-                                            "
-                                        ></span>
-                                    </div>
+                                    ></span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {{-- Duration --}}
-
+                    {{-- Billing period --}}
                     <div
                         class="
-        grid gap-3
-        border-b border-base-300
-        p-4
-        lg:grid-cols-[140px_minmax(0,1fr)]
-        lg:items-center
-    "
+                            grid gap-3
+                            border-b border-base-300
+                            p-4
+                            lg:grid-cols-[140px_minmax(0,1fr)]
+                            lg:items-center
+                        "
                     >
                         <div>
                             <div
                                 class="
-                flex items-center gap-2
-                text-sm font-semibold
-                text-base-content
-            "
+                                    flex items-center gap-2
+                                    text-sm font-semibold
+                                    text-base-content
+                                "
                             >
                                 مدت استفاده
 
@@ -637,20 +502,17 @@
                                     wire:loading
                                     wire:target="selectPeriod"
                                     class="
-                    loading
-                    loading-spinner
-                    loading-xs
-                    text-primary
-                "
+                                        loading loading-spinner
+                                        loading-xs text-primary
+                                    "
                                 ></span>
                             </div>
 
                             <div
                                 class="
-                mt-0.5
-                text-xs
-                text-base-content/40
-            "
+                                    mt-0.5 text-xs
+                                    text-base-content/40
+                                "
                             >
                                 دوره پرداخت
                             </div>
@@ -658,11 +520,10 @@
 
                         <div
                             class="
-            grid grid-cols-3 gap-1.5
-            rounded-xl
-            bg-base-200/55
-            p-1.5
-        "
+                                grid grid-cols-3 gap-1.5
+                                rounded-xl
+                                bg-base-200/55 p-1.5
+                            "
                         >
                             @foreach($periods as $periodOption)
                                 <button
@@ -677,14 +538,11 @@
                                             btn h-auto min-h-14
                                             cursor-pointer
                                             flex-col gap-0.5
-                                            rounded-lg
-                                            border
+                                            rounded-lg border
                                             px-2 py-2
                                             text-center
-                                            transition-all
-                                            duration-150
+                                            transition-all duration-150
                                         ',
-
                                         '
                                             btn-primary
                                             border-primary
@@ -692,7 +550,6 @@
                                             ring-2 ring-primary/15
                                             shadow-sm
                                         ' => $period === $periodOption['id'],
-
                                         '
                                             btn-ghost
                                             border-transparent
@@ -706,29 +563,28 @@
                                     @if($period === $periodOption['id'])
                                         <span
                                             class="
-                            absolute
-                            left-2 top-2
-                            flex size-4
-                            items-center justify-center
-                            rounded-full
-                            bg-primary-content/15
-                        "
+                                                absolute left-2 top-2
+                                                flex size-4
+                                                items-center justify-center
+                                                rounded-full
+                                                bg-primary-content/15
+                                            "
                                         >
-                        <x-icon
-                            name="lucide.check"
-                            class="
-                                !size-3
-                                text-primary-content
-                            "
-                        />
-                    </span>
+                                            <x-icon
+                                                name="lucide.check"
+                                                class="
+                                                    !size-3
+                                                    text-primary-content
+                                                "
+                                            />
+                                        </span>
                                     @endif
 
                                     <div
                                         class="
-                        text-xs font-semibold
-                        sm:text-sm
-                    "
+                                            text-xs font-semibold
+                                            sm:text-sm
+                                        "
                                     >
                                         {{ $periodOption['label'] }}
                                     </div>
@@ -742,7 +598,6 @@
                                             ',
                                             'text-primary-content/70' =>
                                                 $period === $periodOption['id'],
-
                                             'text-base-content/35' =>
                                                 $period !== $periodOption['id'],
                                         ])
@@ -755,25 +610,22 @@
                     </div>
 
                     {{-- Plan --}}
-
-
                     <div
                         class="
-        grid gap-3
-        border-b border-base-300
-        p-4
-        lg:grid-cols-[140px_minmax(0,1fr)]
-        lg:items-start
-    "
+                            grid gap-3
+                            border-b border-base-300
+                            p-4
+                            lg:grid-cols-[140px_minmax(0,1fr)]
+                            lg:items-start
+                        "
                     >
-                        {{-- Section label --}}
                         <div>
                             <div
                                 class="
-                flex items-center gap-2
-                text-sm font-semibold
-                text-base-content
-            "
+                                    flex items-center gap-2
+                                    text-sm font-semibold
+                                    text-base-content
+                                "
                             >
                                 پلن
 
@@ -781,27 +633,23 @@
                                     wire:loading
                                     wire:target="selectSize"
                                     class="
-                    loading
-                    loading-spinner
-                    loading-xs
-                    text-primary
-                "
+                                        loading loading-spinner
+                                        loading-xs text-primary
+                                    "
                                 ></span>
                             </div>
 
                             <div
                                 class="
-                mt-0.5
-                text-xs
-                text-base-content/40
-            "
+                                    mt-0.5 text-xs
+                                    text-base-content/40
+                                "
                             >
                                 منابع سرور
                             </div>
                         </div>
 
                         <div class="min-w-0">
-                            {{-- Plan selector --}}
                             <div
                                 class="relative"
                                 wire:loading.class="opacity-60"
@@ -812,19 +660,18 @@
                                     wire:target="selectSize"
                                     wire:loading.attr="disabled"
                                     class="
-                    select select-bordered
-                    h-10 min-h-10 w-full
-                    cursor-pointer
-                    rounded-xl
-                    border-base-300
-                    bg-base-100
-                    text-sm font-medium
-                    transition-colors
-                    duration-150
-                    hover:border-primary/30
-                    focus:border-primary
-                    focus:outline-none
-                "
+                                        select select-bordered
+                                        h-11 min-h-11 w-full
+                                        cursor-pointer rounded-xl
+                                        border-base-300
+                                        bg-base-100
+                                        text-sm font-medium
+                                        transition-colors duration-150
+                                        hover:border-primary/30
+                                        focus:border-primary
+                                        focus:outline-none
+                                        sm:h-10 sm:min-h-10
+                                    "
                                 >
                                     @foreach($sizes as $size)
                                         <option
@@ -844,57 +691,51 @@
                                     wire:loading
                                     wire:target="selectSize"
                                     class="
-                    pointer-events-none
-                    absolute inset-y-0 left-3
-                    flex items-center
-                "
+                                        pointer-events-none
+                                        absolute inset-y-0 left-3
+                                        flex items-center
+                                    "
                                 >
-                <span
-                    class="
-                        loading
-                        loading-spinner
-                        loading-xs
-                        text-primary
-                    "
-                ></span>
+                                    <span
+                                        class="
+                                            loading loading-spinner
+                                            loading-xs text-primary
+                                        "
+                                    ></span>
                                 </div>
                             </div>
 
-                            {{-- Selected plan details --}}
                             @if($selectedSize)
                                 <div
                                     aria-live="polite"
                                     class="
-                    mt-2.5
-                    overflow-hidden
-                    rounded-xl
-                    border border-primary/15
-                    bg-primary/[0.045]
-                "
+                                        mt-2.5 overflow-hidden
+                                        rounded-xl
+                                        border border-primary/15
+                                        bg-primary/[0.045]
+                                    "
                                 >
-                                    {{-- Selected plan header --}}
                                     <div
                                         class="
-                        flex items-center
-                        justify-between gap-3
-                        border-b border-primary/10
-                        px-3.5 py-2
-                    "
+                                            flex items-center
+                                            justify-between gap-3
+                                            border-b border-primary/10
+                                            px-3.5 py-2
+                                        "
                                     >
                                         <div
                                             class="
-                            flex min-w-0
-                            items-center gap-2
-                        "
+                                                flex min-w-0
+                                                items-center gap-2
+                                            "
                                         >
                                             <div
                                                 class="
-                                flex size-7 shrink-0
-                                items-center justify-center
-                                rounded-lg
-                                bg-primary/10
-                                text-primary
-                            "
+                                                    flex size-7 shrink-0
+                                                    items-center justify-center
+                                                    rounded-lg
+                                                    bg-primary/10 text-primary
+                                                "
                                             >
                                                 <x-icon
                                                     name="lucide.server"
@@ -905,183 +746,153 @@
                                             <span
                                                 dir="ltr"
                                                 class="
-                                technical-value
-                                truncate
-                                text-xs font-semibold
-                                text-base-content
-                            "
+                                                    technical-value
+                                                    truncate
+                                                    text-xs font-semibold
+                                                    text-base-content
+                                                "
                                             >
-                            {{ $selectedSize['name'] }}
-                        </span>
+                                                {{ $selectedSize['name'] }}
+                                            </span>
                                         </div>
 
                                         <span
                                             class="
-                            inline-flex
-                            shrink-0
-                            items-center gap-1
-                            text-[10px]
-                            font-medium
-                            text-primary
-                        "
+                                                inline-flex shrink-0
+                                                items-center gap-1
+                                                text-[10px] font-medium
+                                                text-primary
+                                            "
                                         >
-                        <x-icon
-                            name="lucide.circle-check"
-                            class="!size-3.5"
-                        />
+                                            <x-icon
+                                                name="lucide.circle-check"
+                                                class="!size-3.5"
+                                            />
 
-                        انتخاب‌شده
-                    </span>
+                                            انتخاب‌شده
+                                        </span>
                                     </div>
 
-                                    {{-- Resources --}}
                                     <div
                                         class="
-                        grid grid-cols-3
-                        divide-x divide-x-reverse
-                        divide-primary/10
-                    "
+                                            grid grid-cols-3
+                                            divide-x divide-x-reverse
+                                            divide-primary/10
+                                        "
                                     >
-                                        {{-- CPU --}}
                                         <div
                                             class="
-                            tooltip tooltip-top
-                            cursor-help
-                        "
-                                            data-tip="قدرت پردازشی سرور"
+                                                flex flex-col
+                                                items-center justify-center
+                                                gap-1 px-2 py-2.5
+                                                text-center
+                                                sm:flex-row sm:gap-2
+                                            "
                                         >
-                                            <div
+                                            <x-icon
+                                                name="lucide.cpu"
                                                 class="
-                                flex items-center
-                                justify-center gap-2
-                                px-2 py-2.5
-                            "
-                                            >
-                                                <x-icon
-                                                    name="lucide.cpu"
+                                                    !size-4
+                                                    text-primary/70
+                                                "
+                                            />
+
+                                            <div>
+                                                <div
+                                                    dir="ltr"
                                                     class="
-                                    !size-4
-                                    text-primary/70
-                                "
-                                                />
-
-                                                <div>
-                                                    <div
-                                                        dir="ltr"
-                                                        class="
-                                        technical-value
-                                        text-xs font-semibold
-                                        text-base-content
-                                    "
-                                                    >
-                                                        {{ $selectedSize['vcpu'] }}
-                                                    </div>
-
-                                                    <div
-                                                        class="
-                                        mt-0.5
-                                        text-[9px]
-                                        text-base-content/40
-                                    "
-                                                    >
-                                                        vCPU
-                                                    </div>
+                                                        technical-value
+                                                        text-xs font-semibold
+                                                        text-base-content
+                                                    "
+                                                >
+                                                    {{ $selectedSize['vcpu'] }}
+                                                </div>
+                                                <div
+                                                    class="
+                                                        mt-0.5 text-[9px]
+                                                        text-base-content/40
+                                                    "
+                                                >
+                                                    vCPU
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {{-- RAM --}}
                                         <div
                                             class="
-                            tooltip tooltip-top
-                            cursor-help
-                        "
-                                            data-tip="مقدار حافظه RAM"
+                                                flex flex-col
+                                                items-center justify-center
+                                                gap-1 px-2 py-2.5
+                                                text-center
+                                                sm:flex-row sm:gap-2
+                                            "
                                         >
-                                            <div
+                                            <x-icon
+                                                name="lucide.memory-stick"
                                                 class="
-                                flex items-center
-                                justify-center gap-2
-                                px-2 py-2.5
-                            "
-                                            >
-                                                <x-icon
-                                                    name="lucide.memory-stick"
+                                                    !size-4
+                                                    text-primary/70
+                                                "
+                                            />
+
+                                            <div>
+                                                <div
+                                                    dir="ltr"
                                                     class="
-                                    !size-4
-                                    text-primary/70
-                                "
-                                                />
-
-                                                <div>
-                                                    <div
-                                                        dir="ltr"
-                                                        class="
-                                        technical-value
-                                        text-xs font-semibold
-                                        text-base-content
-                                    "
-                                                    >
-                                                        {{ $selectedSize['memory_label'] }}
-                                                    </div>
-
-                                                    <div
-                                                        class="
-                                        mt-0.5
-                                        text-[9px]
-                                        text-base-content/40
-                                    "
-                                                    >
-                                                        RAM
-                                                    </div>
+                                                        technical-value
+                                                        text-xs font-semibold
+                                                        text-base-content
+                                                    "
+                                                >
+                                                    {{ $selectedSize['memory_label'] }}
+                                                </div>
+                                                <div
+                                                    class="
+                                                        mt-0.5 text-[9px]
+                                                        text-base-content/40
+                                                    "
+                                                >
+                                                    RAM
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {{-- Disk --}}
                                         <div
                                             class="
-                            tooltip tooltip-top
-                            cursor-help
-                        "
-                                            data-tip="فضای ذخیره‌سازی پایه"
+                                                flex flex-col
+                                                items-center justify-center
+                                                gap-1 px-2 py-2.5
+                                                text-center
+                                                sm:flex-row sm:gap-2
+                                            "
                                         >
-                                            <div
+                                            <x-icon
+                                                name="lucide.hard-drive"
                                                 class="
-                                flex items-center
-                                justify-center gap-2
-                                px-2 py-2.5
-                            "
-                                            >
-                                                <x-icon
-                                                    name="lucide.hard-drive"
+                                                    !size-4
+                                                    text-primary/70
+                                                "
+                                            />
+
+                                            <div>
+                                                <div
+                                                    dir="ltr"
                                                     class="
-                                    !size-4
-                                    text-primary/70
-                                "
-                                                />
-
-                                                <div>
-                                                    <div
-                                                        dir="ltr"
-                                                        class="
-                                        technical-value
-                                        text-xs font-semibold
-                                        text-base-content
-                                    "
-                                                    >
-                                                        {{ $selectedSize['disk_gib'] }} GB
-                                                    </div>
-
-                                                    <div
-                                                        class="
-                                        mt-0.5
-                                        text-[9px]
-                                        text-base-content/40
-                                    "
-                                                    >
-                                                        Disk
-                                                    </div>
+                                                        technical-value
+                                                        text-xs font-semibold
+                                                        text-base-content
+                                                    "
+                                                >
+                                                    {{ $selectedSize['disk_gib'] }} GB
+                                                </div>
+                                                <div
+                                                    class="
+                                                        mt-0.5 text-[9px]
+                                                        text-base-content/40
+                                                    "
+                                                >
+                                                    Disk
                                                 </div>
                                             </div>
                                         </div>
@@ -1091,32 +902,29 @@
                         </div>
                     </div>
 
-
-
-                    {{-- OS + Disk --}}
+                    {{-- Operating system and disk --}}
                     <div
                         class="
-        grid gap-3
-        p-4
-        lg:grid-cols-[140px_minmax(0,1fr)]
-        lg:items-center
-    "
+                            grid gap-3 p-4
+                            lg:grid-cols-[140px_minmax(0,1fr)]
+                            lg:items-center
+                        "
                     >
                         <div>
                             <div
                                 class="
-                text-sm font-semibold
-                text-base-content
-            "
+                                    text-sm font-semibold
+                                    text-base-content
+                                "
                             >
                                 سیستم
                             </div>
 
                             <div
                                 class="
-                mt-0.5 text-xs
-                text-base-content/40
-            "
+                                    mt-0.5 text-xs
+                                    text-base-content/40
+                                "
                             >
                                 سیستم‌عامل و دیسک
                             </div>
@@ -1124,29 +932,28 @@
 
                         <div
                             class="
-            grid gap-2.5
-            sm:grid-cols-[minmax(0,1fr)_180px]
-            sm:items-start
-        "
+                                grid gap-2.5
+                                sm:grid-cols-[minmax(0,1fr)_180px]
+                                sm:items-start
+                            "
                         >
-                            {{-- Operating System --}}
                             <div class="min-w-0">
                                 <div
                                     wire:loading.class="opacity-60"
                                     wire:target="imageId"
                                     class="
-            grid grid-cols-2 gap-1.5
-            transition-opacity duration-150
-            sm:grid-cols-4
-        "
+                                        grid grid-cols-2 gap-1.5
+                                        transition-opacity duration-150
+                                        sm:grid-cols-4
+                                    "
                                 >
                                     @foreach($images as $image)
                                         <label
                                             wire:key="os-{{ $image['id'] }}"
                                             class="
-                    relative min-w-0
-                    cursor-pointer
-                "
+                                                relative min-w-0
+                                                cursor-pointer
+                                            "
                                         >
                                             <input
                                                 type="radio"
@@ -1158,41 +965,36 @@
 
                                             <span
                                                 class="
-                        flex h-10 w-full min-w-0
-                        items-center justify-center
-                        rounded-lg
-                        border border-base-300
-                        bg-base-100
-                        px-2
-                        text-center
-                        text-[11px] font-medium
-                        text-base-content/55
-
-                        transition-all duration-150
-
-                        hover:border-primary/30
-                        hover:bg-primary/[0.04]
-                        hover:text-base-content
-
-                        peer-checked:border-primary
-                        peer-checked:bg-primary/10
-                        peer-checked:text-primary
-                        peer-checked:font-semibold
-
-                        peer-focus-visible:ring-2
-                        peer-focus-visible:ring-primary/20
-                    "
+                                                    flex h-11 w-full min-w-0
+                                                    items-center justify-center
+                                                    rounded-lg
+                                                    border border-base-300
+                                                    bg-base-100 px-2
+                                                    text-center
+                                                    text-[11px] font-medium
+                                                    text-base-content/55
+                                                    transition-all duration-150
+                                                    hover:border-primary/30
+                                                    hover:bg-primary/[0.04]
+                                                    hover:text-base-content
+                                                    peer-checked:border-primary
+                                                    peer-checked:bg-primary/10
+                                                    peer-checked:font-semibold
+                                                    peer-checked:text-primary
+                                                    peer-focus-visible:ring-2
+                                                    peer-focus-visible:ring-primary/20
+                                                "
                                             >
-                    <span
-                        dir="ltr"
-                        class="
-                            technical-value
-                            truncate
-                        "
-                    >
-                        {{ $image['name'] }}
-                    </span>
-                </span>
+                                                <span
+                                                    dir="ltr"
+                                                    class="
+                                                        technical-value
+                                                        truncate
+                                                    "
+                                                >
+                                                    {{ $image['name'] }}
+                                                </span>
+                                            </span>
                                         </label>
                                     @endforeach
                                 </div>
@@ -1201,119 +1003,137 @@
                                     wire:loading
                                     wire:target="imageId"
                                     class="
-            mt-1.5
-            flex items-center gap-1.5
-            text-[10px]
-            text-base-content/45
-        "
+                                        mt-1.5 flex
+                                        items-center gap-1.5
+                                        text-[10px]
+                                        text-base-content/45
+                                    "
                                 >
-        <span
-            class="
-                loading
-                loading-spinner
-                loading-xs
-                text-primary
-            "
-        ></span>
+                                    <span
+                                        class="
+                                            loading loading-spinner
+                                            loading-xs text-primary
+                                        "
+                                    ></span>
 
                                     در حال اعمال سیستم‌عامل
                                 </div>
                             </div>
 
-                            {{-- Disk --}}
-                            <div
-                                class="
-                flex h-10 items-center
-                justify-between
-                rounded-xl
-                border border-base-300
-                bg-base-100
-                px-1
-                transition-colors
-                hover:border-primary/25
-            "
-                            >
-                                <x-button
-                                    icon="lucide.minus"
-                                    wire:click="decreaseDisk"
-                                    wire:target="decreaseDisk,increaseDisk"
-                                    wire:loading.attr="disabled"
-                                    class="
-                    btn-ghost
-                    btn-square btn-sm
-                    cursor-pointer
-                    rounded-lg
-                    hover:bg-primary/10
-                    hover:text-primary
-                "
-                                    :disabled="
-                    $selectedDiskGiB
-                    <= $minimumDiskGiB
-                "
-                                />
-
+                            @if($customDiskEnabled)
                                 <div
                                     class="
-                    flex min-w-20
-                    items-center
-                    justify-center
-                "
+                                        flex h-11 items-center
+                                        justify-between
+                                        rounded-xl
+                                        border border-base-300
+                                        bg-base-100 px-1
+                                    "
                                 >
-                                    <div
-                                        wire:loading.remove
+                                    <x-button
+                                        icon="lucide.minus"
+                                        wire:click="decreaseDisk"
                                         wire:target="decreaseDisk,increaseDisk"
-                                        dir="ltr"
+                                        wire:loading.attr="disabled"
+                                        :disabled="
+                                            $selectedDiskGiB
+                                            <= $minimumDiskGiB
+                                        "
                                         class="
-                        technical-value
-                        text-center
-                        text-sm font-semibold
-                        text-base-content
-                    "
+                                            btn-ghost btn-square btn-sm
+                                            h-9 min-h-9
+                                            cursor-pointer rounded-lg
+                                            hover:bg-primary/10
+                                            hover:text-primary
+                                        "
+                                    />
+
+                                    <div
+                                        class="
+                                            flex min-w-20
+                                            items-center justify-center
+                                        "
                                     >
-                                        {{ $selectedDiskGiB }}
-                                        <span
+                                        <div
+                                            wire:loading.remove
+                                            wire:target="decreaseDisk,increaseDisk"
+                                            dir="ltr"
                                             class="
-                            text-[10px]
-                            font-normal
-                            text-base-content/40
-                        "
+                                                technical-value
+                                                text-center
+                                                text-sm font-semibold
+                                                text-base-content
+                                            "
                                         >
-                        GB
-                    </span>
+                                            {{ $selectedDiskGiB }}
+                                            <span
+                                                class="
+                                                    text-[10px]
+                                                    font-normal
+                                                    text-base-content/40
+                                                "
+                                            >
+                                                GB
+                                            </span>
+                                        </div>
+
+                                        <span
+                                            wire:loading
+                                            wire:target="decreaseDisk,increaseDisk"
+                                            class="
+                                                loading loading-spinner
+                                                loading-xs text-primary
+                                            "
+                                        ></span>
                                     </div>
 
-                                    <span
-                                        wire:loading
+                                    <x-button
+                                        icon="lucide.plus"
+                                        wire:click="increaseDisk"
                                         wire:target="decreaseDisk,increaseDisk"
+                                        wire:loading.attr="disabled"
                                         class="
-                        loading
-                        loading-spinner
-                        loading-xs
-                        text-primary
-                    "
-                                    ></span>
+                                            btn-ghost btn-square btn-sm
+                                            h-9 min-h-9
+                                            cursor-pointer rounded-lg
+                                            hover:bg-primary/10
+                                            hover:text-primary
+                                        "
+                                    />
                                 </div>
-
-                                <x-button
-                                    icon="lucide.plus"
-                                    wire:click="increaseDisk"
-                                    wire:target="decreaseDisk,increaseDisk"
-                                    wire:loading.attr="disabled"
+                            @else
+                                <div
                                     class="
-                    btn-ghost
-                    btn-square btn-sm
-                    cursor-pointer
-                    rounded-lg
-                    hover:bg-primary/10
-                    hover:text-primary
-                "
-                                />
-                            </div>
+                                        flex h-11 items-center
+                                        justify-between gap-3
+                                        rounded-xl
+                                        border border-base-300
+                                        bg-base-200/40 px-3
+                                    "
+                                >
+                                    <span
+                                        class="
+                                            text-[11px]
+                                            text-base-content/40
+                                        "
+                                    >
+                                        دیسک
+                                    </span>
+
+                                    <span
+                                        dir="ltr"
+                                        class="
+                                            technical-value
+                                            text-sm font-semibold
+                                            text-base-content
+                                        "
+                                    >
+                                        {{ $selectedDiskGiB }} GB
+                                    </span>
+                                </div>
+                            @endif
                         </div>
                     </div>
-
-
-
                 </section>
 
                 @if($catalogError)
@@ -1341,15 +1161,14 @@
                 @endif
             </main>
 
-            {{-- Desktop summary --}}
+            {{-- Desktop order summary and the only purchase action --}}
             <aside
                 data-buy-desktop-summary
                 class="hidden md:block"
             >
                 <div
                     class="
-                        sticky top-5
-                        overflow-hidden
+                        sticky top-5 overflow-hidden
                         rounded-2xl
                         border border-base-300
                         bg-base-100
@@ -1358,10 +1177,9 @@
                     <div
                         class="
                             flex items-center
-                            justify-between
+                            justify-between gap-3
                             border-b border-info/15
-                            bg-info/5
-                            px-4 py-3.5
+                            bg-info/5 px-4 py-3.5
                         "
                     >
                         <div>
@@ -1404,7 +1222,6 @@
                                 <dt class="text-base-content/35">
                                     موقعیت
                                 </dt>
-
                                 <dd
                                     class="
                                         truncate font-medium
@@ -1412,9 +1229,9 @@
                                     "
                                 >
                                     {{ $selectedRegion
-      ? $this->regionDisplayName($selectedRegion)
-      : '—'
-  }}
+                                        ? $this->regionDisplayName($selectedRegion)
+                                        : '—'
+                                    }}
                                 </dd>
                             </div>
 
@@ -1427,7 +1244,6 @@
                                 <dt class="text-base-content/35">
                                     پلن
                                 </dt>
-
                                 <dd
                                     dir="ltr"
                                     class="
@@ -1449,7 +1265,6 @@
                                 <dt class="text-base-content/35">
                                     سیستم
                                 </dt>
-
                                 <dd
                                     dir="ltr"
                                     class="
@@ -1476,7 +1291,6 @@
                                 <dt class="text-base-content/35">
                                     دیسک
                                 </dt>
-
                                 <dd
                                     dir="ltr"
                                     class="
@@ -1497,7 +1311,6 @@
                                 <dt class="text-base-content/35">
                                     دوره
                                 </dt>
-
                                 <dd
                                     class="
                                         font-medium
@@ -1509,12 +1322,7 @@
                             </div>
                         </dl>
 
-                        <div
-                            class="
-                                my-4
-                                border-t border-base-300
-                            "
-                        ></div>
+                        <div class="my-4 border-t border-base-300"></div>
 
                         @if($quoteError)
                             <div
@@ -1524,8 +1332,8 @@
                                     rounded-lg
                                     bg-warning/5
                                     px-2.5 py-2
-                                    text-[11px]
-                                    leading-5 text-warning
+                                    text-[11px] leading-5
+                                    text-warning
                                 "
                             >
                                 <span class="min-w-0">
@@ -1547,88 +1355,79 @@
                             </div>
                         @endif
 
-                        <div
-                            class="
-                                flex items-end
-                                justify-between gap-3
-                            "
-                        >
-                            <div>
-                                <div
-                                    class="
-                                        text-[11px]
-                                        text-base-content/35
-                                    "
-                                >
-                                    مبلغ نهایی
-                                </div>
+                        <div>
+                            <div
+                                class="
+                                    text-[11px]
+                                    text-base-content/35
+                                "
+                            >
+                                مبلغ نهایی
+                            </div>
 
-                                <div
-                                    wire:loading.remove
-                                    wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk"
-                                >
-                                    @if($quote !== [])
-                                        <div
-                                            class="
-                                                mt-1
-                                                flex items-baseline gap-1.5
-                                                text-base-content
-                                            "
-                                        >
-                                            <span
-                                                dir="ltr"
-                                                class="
-                                                    text-xl
-                                                    font-semibold
-                                                    tracking-tight
-                                                "
-                                            >
-                                                {{ $this->formatToman(
-                                                    (int) $quote['final_amount']
-                                                ) }}
-                                            </span>
-
-                                            <span
-                                                class="
-                                                    text-xs font-normal
-                                                    text-base-content/40
-                                                "
-                                            >
-                                                تومان
-                                            </span>
-                                        </div>
-                                    @else
-                                        <div
-                                            class="
-                                                mt-1 text-sm
-                                                text-base-content/35
-                                            "
-                                        >
-                                            —
-                                        </div>
-                                    @endif
-                                </div>
-
-                                <div
-                                    wire:loading
-                                    wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk"
-                                    class="
-                                        mt-1.5 flex
-                                        items-center gap-2
-                                        text-xs
-                                        text-base-content/35
-                                    "
-                                >
-                                    <span
+                            <div
+                                wire:loading.remove
+                                wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk,retryQuote"
+                            >
+                                @if($quote !== [])
+                                    <div
                                         class="
-                                            loading
-                                            loading-spinner
-                                            loading-xs
-                                            text-primary
+                                            mt-1 flex
+                                            items-baseline gap-1.5
+                                            text-base-content
                                         "
-                                    ></span>
-                                    به‌روزرسانی قیمت
-                                </div>
+                                    >
+                                        <span
+                                            dir="ltr"
+                                            class="
+                                                technical-value
+                                                text-xl font-semibold
+                                                tracking-tight
+                                            "
+                                        >
+                                            {{ $this->formatToman(
+                                                (int) $quote['final_amount']
+                                            ) }}
+                                        </span>
+
+                                        <span
+                                            class="
+                                                text-xs font-normal
+                                                text-base-content/40
+                                            "
+                                        >
+                                            تومان
+                                        </span>
+                                    </div>
+                                @else
+                                    <div
+                                        class="
+                                            mt-1 text-sm
+                                            text-base-content/35
+                                        "
+                                    >
+                                        —
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div
+                                wire:loading
+                                wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk,retryQuote"
+                                class="
+                                    mt-1.5 flex
+                                    items-center gap-2
+                                    text-xs
+                                    text-base-content/35
+                                "
+                            >
+                                <span
+                                    class="
+                                        loading loading-spinner
+                                        loading-xs text-primary
+                                    "
+                                ></span>
+                                به‌روزرسانی قیمت
                             </div>
                         </div>
 
@@ -1653,8 +1452,7 @@
                         <div
                             class="
                                 mt-2.5 text-center
-                                text-[10px]
-                                leading-4
+                                text-[10px] leading-4
                                 text-base-content/30
                             "
                         >
@@ -1665,140 +1463,6 @@
                     </div>
                 </div>
             </aside>
-        </div>
-
-        {{-- Mobile action bar --}}
-        <div
-            data-buy-mobile-action
-            class="
-                fixed inset-x-0 bottom-0
-                z-40
-                border-t border-base-300
-                bg-base-100/95
-                px-3 py-2.5
-                backdrop-blur
-                md:hidden
-            "
-        >
-            <div
-                class="
-                    mx-auto flex
-                    max-w-2xl
-                    items-center gap-3
-                "
-            >
-                <div class="min-w-0 flex-1">
-                    <div
-                        class="
-                            text-[9px]
-                            text-base-content/30
-                        "
-                    >
-                        مبلغ نهایی
-                    </div>
-
-                    <div
-                        wire:loading.remove
-                        wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk,retryQuote"
-                    >
-                        @if($quoteError)
-                            <button
-                                type="button"
-                                wire:click="retryQuote"
-                                wire:target="retryQuote"
-                                class="
-                                    flex items-center gap-1
-                                    text-xs font-medium
-                                    text-warning
-                                "
-                            >
-                                <x-icon
-                                    name="lucide.refresh-cw"
-                                    class="!size-3.5"
-                                />
-
-                                تلاش دوباره برای قیمت
-                            </button>
-                        @elseif($quote !== [])
-                            <div
-                                class="
-                                    flex min-w-0
-                                    items-baseline gap-1
-                                    text-base-content
-                                "
-                            >
-                                <span
-                                    dir="ltr"
-                                    class="
-                                        truncate
-                                        text-sm font-semibold
-                                    "
-                                >
-                                    {{ $this->formatToman(
-                                        (int) $quote['final_amount']
-                                    ) }}
-                                </span>
-
-                                <span
-                                    class="
-                                        shrink-0
-                                        text-[10px] font-normal
-                                        text-base-content/40
-                                    "
-                                >
-                                    تومان
-                                </span>
-                            </div>
-                        @else
-                            <div
-                                class="
-                                    text-xs
-                                    text-base-content/35
-                                "
-                            >
-                                —
-                            </div>
-                        @endif
-                    </div>
-
-                    <div
-                        wire:loading
-                        wire:target="selectRegionGroup,selectRegion,selectSize,selectPeriod,decreaseDisk,increaseDisk,retryQuote"
-                        class="
-                            flex items-center gap-1.5
-                            text-[10px]
-                            text-base-content/35
-                        "
-                    >
-                        <span
-                            class="
-                                loading
-                                loading-spinner
-                                loading-xs
-                                text-primary
-                            "
-                        ></span>
-                        به‌روزرسانی
-                    </div>
-                </div>
-
-                <x-button
-                    label="پرداخت"
-                    icon="lucide.credit-card"
-                    wire:click="purchase"
-                    wire:target="purchase"
-                    spinner
-                    :disabled="
-                        $quote === []
-                        || $catalogError !== null
-                        || $quoteError !== null
-                    "
-                    class="
-                        btn-primary btn-sm
-                        min-w-28 rounded-xl
-                    "
-                />
-            </div>
         </div>
     @endif
 </div>
