@@ -1,17 +1,25 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {
+    existsSync,
+    readFileSync,
+} from 'node:fs';
 import test from 'node:test';
 
 const css = readProjectFile('resources/css/buy.css');
 const buy = readProjectFile('resources/views/livewire/servers/buy.blade.php');
 const buyPage = readProjectFile('resources/views/livewire/servers/buy-page.blade.php');
+const app = readProjectFile('resources/js/app.js');
+const guardPath = new URL(
+    '../../resources/js/buy-responsive-guard.js',
+    import.meta.url,
+);
 
 test('the bottom purchase bar is mobile-only at the rendered markup boundary', () => {
     assert.match(buy, /data-buy-mobile-action/);
     assert.match(buy, /data-buy-desktop-summary/);
     assert.match(
         buy,
-        /@media \(min-width: 768px\)[\s\S]*?\[data-buy-mobile-action\][\s\S]*?display:\s*none\s*!important;/,
+        /\[data-buy-mobile-action\][\s\S]*?display:\s*none\s*!important;[\s\S]*?@media \(max-width: 767px\)[\s\S]*?\[data-buy-mobile-action\][\s\S]*?display:\s*block\s*!important;/,
     );
     assert.match(
         buy,
@@ -44,6 +52,36 @@ test('the stylesheet fallback keeps the same 768px contract', () => {
     assert.match(
         css,
         /@media \(min-width: 768px\)[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 320px;/,
+    );
+});
+
+test('the mobile action is opt-in and Livewire-morph safe', () => {
+    assert.doesNotMatch(app, /buy-responsive-guard/);
+    assert.equal(existsSync(guardPath), false);
+
+    assert.match(
+        buy,
+        /data-buy-mobile-action[\s\S]*?wire:ignore\.self/,
+    );
+    assert.match(
+        buy,
+        /x-show\.important="isMobileViewport"/,
+    );
+    assert.match(
+        buy,
+        /style="display:\s*none\s*!important;"/,
+    );
+    assert.match(
+        buy,
+        /window\.matchMedia\([\s\S]*?\(max-width: 767px\)/,
+    );
+    assert.match(
+        buy,
+        /addEventListener\([\s\S]*?'change',[\s\S]*?mobileMediaQueryListener/,
+    );
+    assert.match(
+        buy,
+        /removeEventListener\([\s\S]*?'change',[\s\S]*?mobileMediaQueryListener/,
     );
 });
 

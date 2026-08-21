@@ -10,8 +10,8 @@ test('critical Buy responsive CSS is loaded by the main Vite entry', () => {
 });
 
 test('critical Buy visibility does not depend on the workspace wrapper', () => {
-    assert.match(css, /\[data-buy-mobile-action\]\s*\{[\s\S]*?display:\s*block\s*!important;/);
-    assert.match(css, /@media \(min-width: 768px\)[\s\S]*?\[data-buy-mobile-action\]\s*\{[\s\S]*?display:\s*none\s*!important;/);
+    assert.match(css, /\[data-buy-mobile-action\]\s*\{[\s\S]*?display:\s*none\s*!important;/);
+    assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\[data-buy-mobile-action\]\s*\{[\s\S]*?display:\s*block\s*!important;/);
     assert.doesNotMatch(css, /\.cloud-purchase-page\s+\[data-buy-mobile-action\]/);
 });
 
