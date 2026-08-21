@@ -21,3 +21,8 @@ Schedule::job(
 )
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+Schedule::command('cloud:catalog:warm')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
