@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Cloud\Catalog;
 
-use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudPurchaseCatalogSourceInterface;
+use App\Domain\Cloud\Contracts\RefreshableCloudCatalogReaderInterface;
+use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use Closure;
+use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
+use Throwable;
+use UnexpectedValueException;
 
-final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInterface
+final readonly class CachedCloudCatalogReader implements RefreshableCloudCatalogReaderInterface
 {
     private const string CACHE_NAMESPACE =
-        'xdeploy:cloud:catalog:v1';
+        'xdeploy:cloud:catalog:v2';
 
     public function __construct(
         private CloudProviderInterface $cloud,
@@ -27,8 +33,8 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
         return $this->remember(
             resource: 'regions',
             key: 'regions',
-            resolver: fn (): array => $this->cloud
-                ->listRegions(),
+            expectedClass: CloudRegionData::class,
+            resolver: fn (): array => $this->providerRegions(),
         );
     }
 
@@ -42,10 +48,10 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
         return $this->remember(
             resource: 'sizes',
             key: "region:{$region}:sizes",
-            resolver: fn (): array => $this->cloud
-                ->listSizes(
-                    $region,
-                ),
+            expectedClass: CloudSizeData::class,
+            resolver: fn (): array => $this->providerSizes(
+                $region,
+            ),
         );
     }
 
@@ -59,10 +65,10 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
         return $this->remember(
             resource: 'images',
             key: "region:{$region}:images",
-            resolver: fn (): array => $this->cloud
-                ->listImages(
-                    $region,
-                ),
+            expectedClass: CloudImageData::class,
+            resolver: fn (): array => $this->providerImages(
+                $region,
+            ),
         );
     }
 
@@ -83,13 +89,46 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
      */
     public function refreshRegions(): array
     {
-        Cache::forget(
-            $this->cacheKey(
-                'regions',
-            ),
+        return $this->refresh(
+            resource: 'regions',
+            key: 'regions',
+            expectedClass: CloudRegionData::class,
+            resolver: fn (): array => $this->providerRegions(),
+        );
+    }
+
+    public function refreshSizes(
+        string $region,
+    ): array {
+        $region = $this->normalizeRegion(
+            $region,
         );
 
-        return $this->listRegions();
+        return $this->refresh(
+            resource: 'sizes',
+            key: "region:{$region}:sizes",
+            expectedClass: CloudSizeData::class,
+            resolver: fn (): array => $this->providerSizes(
+                $region,
+            ),
+        );
+    }
+
+    public function refreshImages(
+        string $region,
+    ): array {
+        $region = $this->normalizeRegion(
+            $region,
+        );
+
+        return $this->refresh(
+            resource: 'images',
+            key: "region:{$region}:images",
+            expectedClass: CloudImageData::class,
+            resolver: fn (): array => $this->providerImages(
+                $region,
+            ),
+        );
     }
 
     public function refreshRegion(
@@ -99,34 +138,28 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
             $region,
         );
 
-        Cache::forget(
-            $this->cacheKey(
-                "region:{$region}:sizes",
-            ),
+        $this->refreshSizes(
+            $region,
         );
 
-        Cache::forget(
-            $this->cacheKey(
-                "region:{$region}:images",
-            ),
-        );
-
-        $this->warmRegion(
+        $this->refreshImages(
             $region,
         );
     }
 
+    /**
+     * @param  class-string  $expectedClass
+     */
     private function remember(
         string $resource,
         string $key,
+        string $expectedClass,
         Closure $resolver,
     ): array {
         if (! $this->cacheEnabled()) {
-            /** @var array $value */
-            $value = $resolver();
-
-            return array_values(
-                $value,
+            return $this->resolve(
+                resolver: $resolver,
+                expectedClass: $expectedClass,
             );
         }
 
@@ -137,24 +170,216 @@ final readonly class CachedCloudCatalogReader implements CloudCatalogReaderInter
             $resource,
         );
 
-        /** @var array $value */
-        $value = Cache::flexible(
-            $this->cacheKey(
-                $key,
-            ),
-            [
-                $freshSeconds,
-                $staleSeconds,
-            ],
-            $resolver,
-            [
-                'seconds' => $this->lockSeconds(),
-            ],
+        $cacheKey = $this->cacheKey(
+            $key,
         );
+
+        $resolverStarted = false;
+        $resolverCompleted = false;
+        $resolvedValue = [];
+
+        $guardedResolver = function () use (
+            $resolver,
+            $expectedClass,
+            &$resolverStarted,
+            &$resolverCompleted,
+            &$resolvedValue,
+        ): array {
+            $resolverStarted = true;
+            $resolvedValue = $this->resolve(
+                resolver: $resolver,
+                expectedClass: $expectedClass,
+            );
+            $resolverCompleted = true;
+
+            return $resolvedValue;
+        };
+
+        try {
+            /** @var mixed $value */
+            $value = Cache::flexible(
+                $cacheKey,
+                [
+                    $freshSeconds,
+                    $staleSeconds,
+                ],
+                $guardedResolver,
+                [
+                    'seconds' => $this->lockSeconds(),
+                ],
+            );
+
+            return $this->validatedValues(
+                value: $value,
+                expectedClass: $expectedClass,
+            );
+        } catch (Throwable $exception) {
+            /*
+             * Provider and mapper failures remain authoritative and must be
+             * handled by the caller. Cache transport, persistence, or stale
+             * payload failures must not make the purchase catalog unavailable.
+             */
+            if (
+                $resolverStarted
+                && ! $resolverCompleted
+            ) {
+                throw $exception;
+            }
+
+            report(
+                $exception,
+            );
+
+            if ($resolverCompleted) {
+                return $resolvedValue;
+            }
+
+            $this->forgetBestEffort(
+                $cacheKey,
+            );
+
+            return $guardedResolver();
+        }
+    }
+
+    /**
+     * @param  class-string  $expectedClass
+     */
+    private function refresh(
+        string $resource,
+        string $key,
+        string $expectedClass,
+        Closure $resolver,
+    ): array {
+        $value = $this->resolve(
+            resolver: $resolver,
+            expectedClass: $expectedClass,
+        );
+
+        if (! $this->cacheEnabled()) {
+            return $value;
+        }
+
+        $cacheKey = $this->cacheKey(
+            $key,
+        );
+
+        [, $staleSeconds] = $this->ttl(
+            $resource,
+        );
+
+        try {
+            Cache::putMany(
+                [
+                    $cacheKey => $value,
+                    CacheRepository::FLEXIBLE_CREATED_KEY_PREFIX.$cacheKey => time(),
+                ],
+                $staleSeconds,
+            );
+        } catch (Throwable $exception) {
+            report(
+                $exception,
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  class-string  $expectedClass
+     */
+    private function resolve(
+        Closure $resolver,
+        string $expectedClass,
+    ): array {
+        /** @var mixed $value */
+        $value = $resolver();
+
+        return $this->validatedValues(
+            value: $value,
+            expectedClass: $expectedClass,
+        );
+    }
+
+    /**
+     * @param  class-string  $expectedClass
+     */
+    private function validatedValues(
+        mixed $value,
+        string $expectedClass,
+    ): array {
+        if (! is_array($value)) {
+            throw new UnexpectedValueException(
+                'Cloud catalog cache payload must be an array.',
+            );
+        }
+
+        foreach ($value as $item) {
+            if (! $item instanceof $expectedClass) {
+                throw new UnexpectedValueException(
+                    sprintf(
+                        'Cloud catalog cache payload must contain only [%s] values.',
+                        $expectedClass,
+                    ),
+                );
+            }
+        }
 
         return array_values(
             $value,
         );
+    }
+
+    private function forgetBestEffort(
+        string $cacheKey,
+    ): void {
+        foreach (
+            [
+                $cacheKey,
+                CacheRepository::FLEXIBLE_CREATED_KEY_PREFIX.$cacheKey,
+            ] as $key
+        ) {
+            try {
+                Cache::forget(
+                    $key,
+                );
+            } catch (Throwable $exception) {
+                report(
+                    $exception,
+                );
+            }
+        }
+    }
+
+    private function providerRegions(): array
+    {
+        return $this->cloud instanceof CloudPurchaseCatalogSourceInterface
+            ? $this->cloud->listPurchaseRegions()
+            : $this->cloud->listRegions();
+    }
+
+    private function providerSizes(
+        string $region,
+    ): array {
+        return $this->cloud instanceof CloudPurchaseCatalogSourceInterface
+            ? $this->cloud->listPurchaseSizes(
+                $region,
+            )
+            : $this->cloud->listSizes(
+                $region,
+            );
+    }
+
+    private function providerImages(
+        string $region,
+    ): array {
+        return $this->cloud instanceof CloudPurchaseCatalogSourceInterface
+            ? $this->cloud->listPurchaseImages(
+                $region,
+            )
+            : $this->cloud->listImages(
+                $region,
+            );
     }
 
     /**

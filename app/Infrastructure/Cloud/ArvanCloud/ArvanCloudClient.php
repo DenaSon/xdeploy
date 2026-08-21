@@ -41,11 +41,17 @@ final class ArvanCloudClient
 
     private readonly int $requestTimeout;
 
+    private readonly int $catalogConnectTimeout;
+
+    private readonly int $catalogRequestTimeout;
+
     public function __construct(
         string $baseUrl,
         string $apiKey,
         int $connectTimeout = 10,
         int $requestTimeout = 90,
+        int $catalogConnectTimeout = 3,
+        int $catalogRequestTimeout = 6,
     ) {
         $this->baseUrl = $this->normalizeBaseUrl(
             $baseUrl,
@@ -64,6 +70,16 @@ final class ArvanCloudClient
             timeout: $requestTimeout,
             name: 'request timeout',
         );
+
+        $this->catalogConnectTimeout = $this->validateTimeout(
+            timeout: $catalogConnectTimeout,
+            name: 'catalog connect timeout',
+        );
+
+        $this->catalogRequestTimeout = $this->validateTimeout(
+            timeout: $catalogRequestTimeout,
+            name: 'catalog request timeout',
+        );
     }
 
     /**
@@ -78,6 +94,43 @@ final class ArvanCloudClient
             method: self::METHOD_GET,
             path: $path,
             data: $query,
+        );
+    }
+
+    /**
+     * Read-only catalog requests are part of an interactive web flow and
+     * must finish before the surrounding Livewire request is terminated.
+     *
+     * @param  array<string, mixed>  $query
+     * @return array<array-key, mixed>
+     */
+    public function getCatalog(
+        string $path,
+        array $query = [],
+    ): array {
+        return $this->request(
+            method: self::METHOD_GET,
+            path: $path,
+            data: $query,
+            connectTimeout: $this->catalogConnectTimeout,
+            requestTimeout: $this->catalogRequestTimeout,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $payload
+     * @return array<array-key, mixed>
+     */
+    public function postCatalog(
+        string $path,
+        ?array $payload = null,
+    ): array {
+        return $this->request(
+            method: self::METHOD_POST,
+            path: $path,
+            data: $payload,
+            connectTimeout: $this->catalogConnectTimeout,
+            requestTimeout: $this->catalogRequestTimeout,
         );
     }
 
@@ -136,6 +189,8 @@ final class ArvanCloudClient
         string $method,
         string $path,
         ?array $data,
+        ?int $connectTimeout = null,
+        ?int $requestTimeout = null,
     ): array {
         $endpoint = $this->normalizePath(
             $path,
@@ -151,7 +206,10 @@ final class ArvanCloudClient
 
         try {
             $response = $this->sendRequest(
-                request: $this->pendingRequest(),
+                request: $this->pendingRequest(
+                    connectTimeout: $connectTimeout,
+                    requestTimeout: $requestTimeout,
+                ),
                 method: $method,
                 url: $url,
                 data: $data,
@@ -231,8 +289,10 @@ final class ArvanCloudClient
         };
     }
 
-    private function pendingRequest(): PendingRequest
-    {
+    private function pendingRequest(
+        ?int $connectTimeout = null,
+        ?int $requestTimeout = null,
+    ): PendingRequest {
         return Http::acceptJson()
             ->asJson()
             ->withHeaders([
@@ -242,10 +302,12 @@ final class ArvanCloudClient
                 ),
             ])
             ->connectTimeout(
-                $this->connectTimeout,
+                $connectTimeout
+                    ?? $this->connectTimeout,
             )
             ->timeout(
-                $this->requestTimeout,
+                $requestTimeout
+                    ?? $this->requestTimeout,
             )
             ->withoutRedirecting();
     }

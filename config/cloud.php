@@ -23,8 +23,8 @@ return [
     | Purchase Catalog Cache
     |--------------------------------------------------------------------------
     |
-    | این Cache فقط برای Catalog نمایشی صفحه خرید استفاده می‌شود.
-    | مسیر authoritative قیمت، سفارش، پرداخت و Provisioning مستقیم باقی می‌ماند.
+    | این Cache فقط برای Catalog و پیش‌نمایش قیمت صفحه خرید استفاده می‌شود.
+    | قیمت نهایی هنگام ثبت سفارش و مسیرهای پرداخت و Provisioning مستقیم می‌مانند.
     |
     */
 
@@ -41,6 +41,23 @@ return [
             'CLOUD_CATALOG_CACHE_LOCK_SECONDS',
             30,
         ),
+
+        /*
+         * A cache miss runs inside the Buy Livewire request. Keep catalog
+         * transport below the web request execution budget while preserving
+         * the longer provider timeout for provisioning and lifecycle calls.
+         */
+        'timeouts' => [
+            'connect' => (int) env(
+                'CLOUD_CATALOG_CONNECT_TIMEOUT',
+                3,
+            ),
+
+            'request' => (int) env(
+                'CLOUD_CATALOG_TIMEOUT',
+                6,
+            ),
+        ],
 
         'regions' => [
             'fresh_seconds' => (int) env(

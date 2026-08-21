@@ -68,6 +68,8 @@ final class CloudServiceProvider extends ServiceProvider
                 $apiKey = config('cloud.providers.arvan.api_key');
                 $connectTimeout = config('cloud.providers.arvan.timeouts.connect', 10);
                 $requestTimeout = config('cloud.providers.arvan.timeouts.request', 90);
+                $catalogConnectTimeout = config('cloud.catalog_cache.timeouts.connect', 3);
+                $catalogRequestTimeout = config('cloud.catalog_cache.timeouts.request', 6);
 
                 if (! is_string($baseUrl) || trim($baseUrl) === '') {
                     throw new CloudConfigurationException(
@@ -93,11 +95,25 @@ final class CloudServiceProvider extends ServiceProvider
                     );
                 }
 
+                if (! is_int($catalogConnectTimeout) && ! is_numeric($catalogConnectTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Cloud catalog connect timeout must be an integer.',
+                    );
+                }
+
+                if (! is_int($catalogRequestTimeout) && ! is_numeric($catalogRequestTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Cloud catalog request timeout must be an integer.',
+                    );
+                }
+
                 return new ArvanCloudClient(
                     baseUrl: trim($baseUrl),
                     apiKey: trim($apiKey),
                     connectTimeout: (int) $connectTimeout,
                     requestTimeout: (int) $requestTimeout,
+                    catalogConnectTimeout: (int) $catalogConnectTimeout,
+                    catalogRequestTimeout: (int) $catalogRequestTimeout,
                 );
             },
         );
@@ -166,6 +182,8 @@ final class CloudServiceProvider extends ServiceProvider
                 $apiToken = config('cloud.providers.liara.api_token');
                 $connectTimeout = config('cloud.providers.liara.timeouts.connect', 10);
                 $requestTimeout = config('cloud.providers.liara.timeouts.request', 90);
+                $catalogConnectTimeout = config('cloud.catalog_cache.timeouts.connect', 3);
+                $catalogRequestTimeout = config('cloud.catalog_cache.timeouts.request', 6);
 
                 if (! is_string($baseUrl) || trim($baseUrl) === '') {
                     throw new CloudConfigurationException(
@@ -191,11 +209,25 @@ final class CloudServiceProvider extends ServiceProvider
                     );
                 }
 
+                if (! is_int($catalogConnectTimeout) && ! is_numeric($catalogConnectTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Cloud catalog connect timeout must be an integer.',
+                    );
+                }
+
+                if (! is_int($catalogRequestTimeout) && ! is_numeric($catalogRequestTimeout)) {
+                    throw new CloudConfigurationException(
+                        'Cloud catalog request timeout must be an integer.',
+                    );
+                }
+
                 return new LiaraCloudClient(
                     baseUrl: trim($baseUrl),
                     apiToken: trim($apiToken),
                     connectTimeout: (int) $connectTimeout,
                     requestTimeout: (int) $requestTimeout,
+                    catalogConnectTimeout: (int) $catalogConnectTimeout,
+                    catalogRequestTimeout: (int) $catalogRequestTimeout,
                 );
             },
         );

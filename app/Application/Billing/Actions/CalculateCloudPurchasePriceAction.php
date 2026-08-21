@@ -8,9 +8,13 @@ use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Services\CloudPricingCalculator;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudPurchasePricingSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
+use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use Closure;
 use InvalidArgumentException;
 
 final readonly class CalculateCloudPurchasePriceAction
@@ -36,8 +40,87 @@ final readonly class CalculateCloudPurchasePriceAction
             $provider,
         );
 
-        $sizes = $cloud->listSizes($region);
+        return $this->calculate(
+            size: $this->findSize(
+                sizes: $cloud->listSizes(
+                    $region,
+                ),
+                region: $region,
+                sizeId: $sizeId,
+            ),
+            diskPrice: static fn (
+                string $priceRegion,
+                string $priceSizeId,
+                int $diskGiB,
+            ): CloudDiskPriceData => $pricing->calculateDiskPrice(
+                region: $priceRegion,
+                sizeId: $priceSizeId,
+                diskGiB: $diskGiB,
+            ),
+            region: $region,
+            sizeId: $sizeId,
+            selectedDiskGiB: $selectedDiskGiB,
+            period: $period,
+        );
+    }
 
+    /**
+     * @param  list<CloudSizeData>  $sizes
+     */
+    public function executeForPurchasePage(
+        array $sizes,
+        string $region,
+        string $sizeId,
+        int $selectedDiskGiB,
+        string $period,
+        CloudProviderType $provider = CloudProviderType::Arvan,
+    ): PurchasePriceData {
+        [$cloud, $pricing] = $this->providerDependencies(
+            $provider,
+        );
+
+        $diskPrice = $cloud instanceof CloudPurchasePricingSourceInterface
+            ? static fn (
+                string $priceRegion,
+                string $priceSizeId,
+                int $diskGiB,
+            ): CloudDiskPriceData => $cloud->calculatePurchaseDiskPrice(
+                region: $priceRegion,
+                sizeId: $priceSizeId,
+                diskGiB: $diskGiB,
+            )
+            : static fn (
+                string $priceRegion,
+                string $priceSizeId,
+                int $diskGiB,
+            ): CloudDiskPriceData => $pricing->calculateDiskPrice(
+                region: $priceRegion,
+                sizeId: $priceSizeId,
+                diskGiB: $diskGiB,
+            );
+
+        return $this->calculate(
+            size: $this->findSize(
+                sizes: $sizes,
+                region: $region,
+                sizeId: $sizeId,
+            ),
+            diskPrice: $diskPrice,
+            region: $region,
+            sizeId: $sizeId,
+            selectedDiskGiB: $selectedDiskGiB,
+            period: $period,
+        );
+    }
+
+    /**
+     * @param  list<CloudSizeData>  $sizes
+     */
+    private function findSize(
+        array $sizes,
+        string $region,
+        string $sizeId,
+    ): CloudSizeData {
         $size = null;
 
         foreach ($sizes as $candidate) {
@@ -54,6 +137,17 @@ final readonly class CalculateCloudPurchasePriceAction
             );
         }
 
+        return $size;
+    }
+
+    private function calculate(
+        CloudSizeData $size,
+        Closure $diskPrice,
+        string $region,
+        string $sizeId,
+        int $selectedDiskGiB,
+        string $period,
+    ): PurchasePriceData {
         $defaultDiskGiB = $size->diskGiB;
 
         if ($selectedDiskGiB < $defaultDiskGiB) {
@@ -72,16 +166,16 @@ final readonly class CalculateCloudPurchasePriceAction
             $selectedDiskHourly = '0';
             $selectedDiskMonthly = '0';
         } else {
-            $defaultDiskPrice = $pricing->calculateDiskPrice(
-                region: $region,
-                sizeId: $sizeId,
-                diskGiB: $defaultDiskGiB,
+            $defaultDiskPrice = $diskPrice(
+                $region,
+                $sizeId,
+                $defaultDiskGiB,
             );
 
-            $selectedDiskPrice = $pricing->calculateDiskPrice(
-                region: $region,
-                sizeId: $sizeId,
-                diskGiB: $selectedDiskGiB,
+            $selectedDiskPrice = $diskPrice(
+                $region,
+                $sizeId,
+                $selectedDiskGiB,
             );
 
             $defaultDiskHourly = $defaultDiskPrice->hourlyPrice->amount;
