@@ -1,0 +1,53 @@
+/*
+|--------------------------------------------------------------------------
+| Buy Critical Responsive Contract
+|--------------------------------------------------------------------------
+|
+| Target the stable Buy data attributes directly. Do not depend on the
+| optional .cloud-purchase-page wrapper because the inner Livewire fragment
+| can be morphed independently after hydration.
+|
+*/
+
+[data-buy-mobile-action] {
+    display: block !important;
+}
+
+[data-buy-desktop-summary],
+[data-buy-desktop-placeholder] {
+    display: none !important;
+}
+
+[data-buy-layout],
+[data-buy-provider-layout] {
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+[data-buy-form] {
+    padding-bottom:
+        calc(
+            6rem
+            + env(safe-area-inset-bottom, 0px)
+        ) !important;
+}
+
+@media (min-width: 768px) {
+    [data-buy-mobile-action] {
+        display: none !important;
+    }
+
+    [data-buy-desktop-summary],
+    [data-buy-desktop-placeholder] {
+        display: block !important;
+    }
+
+    [data-buy-layout],
+    [data-buy-provider-layout] {
+        grid-template-columns:
+            minmax(0, 1fr) 320px !important;
+    }
+
+    [data-buy-form] {
+        padding-bottom: 0 !important;
+    }
+}
