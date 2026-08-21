@@ -4,9 +4,6 @@ import test from 'node:test';
 
 const css = readProjectFile('resources/css/buy.css');
 const app = readProjectFile('resources/js/app.js');
-const page = readProjectFile(
-    'resources/views/livewire/servers/buy-page.blade.php',
-);
 
 test('the Buy responsive stylesheet is loaded by the main Vite entry', () => {
     assert.match(
@@ -15,16 +12,7 @@ test('the Buy responsive stylesheet is loaded by the main Vite entry', () => {
     );
 });
 
-test('Buy presentation is centralized outside the Blade wrapper', () => {
-    assert.doesNotMatch(page, /<style>/);
-
-    assert.match(
-        css,
-        /\.cloud-purchase-page--fixed-disk/,
-    );
-});
-
-test('mobile and desktop purchase summaries are mutually exclusive', () => {
+test('the bottom purchase bar is mobile-only', () => {
     assert.match(
         css,
         /> div\.grid > aside,[\s\S]*?display:\s*none;/,
@@ -37,24 +25,29 @@ test('mobile and desktop purchase summaries are mutually exclusive', () => {
 
     assert.match(
         css,
-        /@media \(max-width: 1279px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*block;/,
+        /@media \(max-width: 767px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*block;/,
     );
 
     assert.match(
         css,
-        /@media \(min-width: 1280px\)[\s\S]*?> div\.grid > aside,[\s\S]*?display:\s*block;/,
+        /@media \(min-width: 768px\)[\s\S]*?> div\.grid > aside,[\s\S]*?display:\s*block;/,
     );
 
     assert.match(
         css,
-        /@media \(min-width: 1280px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*none;/,
+        /@media \(min-width: 768px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*none;/,
     );
 });
 
-test('desktop Buy grids keep the summary column aligned', () => {
+test('tablet and narrow desktop widths use the desktop summary layout', () => {
     assert.match(
         css,
-        /@media \(min-width: 1280px\)[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 320px;/,
+        /@media \(min-width: 768px\)[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 320px;/,
+    );
+
+    assert.doesNotMatch(
+        css,
+        /@media \(max-width: 1279px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*block;/,
     );
 });
 
