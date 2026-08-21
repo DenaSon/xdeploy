@@ -21,20 +21,43 @@ const buyCriticalCssPath = new URL(
     import.meta.url,
 );
 
-test('mobile purchase CTA is isolated in its own Blade partial', () => {
+test('mobile purchase CTA has a stable root outside Buy catalog conditionals', () => {
+    assert.match(
+        buyPage,
+        /@include\([\s\S]*?livewire\.servers\.partials\.buy-mobile-cta[\s\S]*?renderStableMobileCta[\s\S]*?true[\s\S]*?\)/,
+    );
+    assert.match(
+        buyPage,
+        /buy-mobile-cta[\s\S]*?@include\('livewire\.servers\.buy'\)/,
+    );
+
+    assert.match(mobileCta, /\$renderStableMobileCta \?\? false/);
+    assert.match(mobileCta, /wire:key="buy-mobile-cta-root"/);
+    assert.match(mobileCta, /data-buy-mobile-action/);
+    assert.match(mobileCta, /dock dock-xl/);
+    assert.match(mobileCta, /md:hidden!/);
+    assert.match(mobileCta, /'hidden!' => ! \$ctaReady/);
+    assert.match(mobileCta, /\$catalogLoaded/);
+
+    assert.doesNotMatch(buyPage, /data-buy-mobile-action/);
+    assert.doesNotMatch(buy, /data-buy-mobile-action/);
+    assert.doesNotMatch(buy, /data-buy-mobile-notice/);
+});
+
+test('legacy nested include cannot emit a second mobile CTA root', () => {
     assert.match(
         buy,
         /@include\('livewire\.servers\.partials\.buy-mobile-cta'\)/,
     );
-    assert.doesNotMatch(buy, /data-buy-mobile-action/);
-    assert.doesNotMatch(buy, /data-buy-mobile-notice/);
+    assert.match(
+        mobileCta,
+        /^@if\(\$renderStableMobileCta \?\? false\)/,
+    );
 
-    assert.match(mobileCta, /data-buy-mobile-action/);
-    assert.match(mobileCta, /dock dock-xl/);
-    assert.match(mobileCta, /md:!hidden/);
-    assert.match(mobileCta, /label="پرداخت و ساخت"/);
-    assert.match(mobileCta, /wire:click="purchase"/);
-    assert.doesNotMatch(mobileCta, /fixed\s+inset-x-0\s+bottom-0/);
+    const explicitStableMounts =
+        buyPage.match(/renderStableMobileCta/g) ?? [];
+
+    assert.equal(explicitStableMounts.length, 1);
 });
 
 test('desktop and mobile purchase actions remain intentionally separate', () => {
