@@ -58,7 +58,7 @@
                 />
             </span>
 
-            <span>سرور جدید</span>
+            <span>خرید VPS</span>
         </div>
 
         <x-button
