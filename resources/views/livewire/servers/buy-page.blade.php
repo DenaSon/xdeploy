@@ -27,19 +27,18 @@
             }
         },
     }"
-    @class([
-        'cloud-purchase-page',
-        'cloud-purchase-page--fixed-disk' => ! $customDiskEnabled,
-        'cloud-purchase-page--multi-provider' => count($providers) > 1,
-    ])
+    class="space-y-3"
 >
     <div
-        data-buy-workspace-toolbar
-        class="mb-3 flex items-center justify-between gap-3"
+        class="
+            flex items-center
+            justify-between gap-3
+        "
     >
         <div
             class="
-                flex min-w-0 items-center gap-2
+                flex min-w-0
+                items-center gap-2
                 text-xs font-medium
                 text-base-content/45
             "
@@ -81,169 +80,118 @@
     </div>
 
     @if(count($providers) > 1)
-        <div
-            data-buy-provider-layout
+        <section
+            data-buy-provider-row
             class="
-                grid grid-cols-1 gap-4
-                md:grid-cols-[minmax(0,1fr)_320px]
+                rounded-2xl
+                border border-base-300
+                bg-base-100
+                p-4
             "
         >
-            <section
-                data-buy-provider-row
+            <div
                 class="
-                    overflow-hidden
-                    rounded-2xl rounded-b-none
-                    border border-b-0 border-base-300
-                    bg-base-100
+                    grid gap-3
+                    lg:grid-cols-[140px_minmax(0,1fr)]
+                    lg:items-center
                 "
             >
-                <div
-                    class="
-                        grid gap-3 p-4
-                        lg:grid-cols-[140px_minmax(0,1fr)]
-                        lg:items-center
-                    "
-                >
-                    <div>
-                        <div
-                            class="
-                                flex items-center gap-2
-                                text-sm font-semibold
-                                text-base-content
-                            "
-                        >
-                            زیرساخت
+                <div>
+                    <div
+                        class="
+                            flex items-center gap-2
+                            text-sm font-semibold
+                            text-base-content
+                        "
+                    >
+                        زیرساخت
 
-                            <span
-                                wire:loading.delay.shorter
-                                wire:target="selectProvider"
-                                class="
-                                    loading loading-spinner
-                                    loading-xs text-primary
-                                "
-                            ></span>
-                        </div>
-
-                        <div
+                        <span
+                            wire:loading.delay.shorter
+                            wire:target="selectProvider"
                             class="
-                                mt-0.5 text-xs
-                                text-base-content/40
+                                loading loading-spinner
+                                loading-xs text-primary
                             "
-                        >
-                            بستر اجرای سرور
-                        </div>
+                        ></span>
                     </div>
 
                     <div
                         class="
-                            grid w-full grid-cols-2 gap-2
-                            sm:max-w-xl
+                            mt-0.5 text-xs
+                            text-base-content/40
                         "
                     >
-                        @foreach($providers as $providerOption)
-                            @php($isSelected = $providerOption['id'] === $provider)
+                        بستر اجرای سرور
+                    </div>
+                </div>
 
-                            <button
-                                type="button"
-                                data-provider-option="{{ $providerOption['id'] }}"
-                                x-on:click="selectProvider($el.dataset.providerOption)"
-                                x-bind:disabled="switchingProvider"
-                                wire:loading.attr="disabled"
-                                wire:target="selectProvider"
-                                @class([
-                                    '
-                                        group min-w-0
-                                        cursor-pointer
-                                        rounded-xl border
-                                        px-3 py-2.5
-                                        text-right
-                                        transition-all duration-150
-                                        disabled:cursor-wait
-                                    ',
-                                    '
-                                        border-primary/45
-                                        bg-primary/[0.055]
-                                        ring-1 ring-primary/10
-                                    ' => $isSelected,
-                                    '
-                                        border-base-300 bg-base-100
-                                        hover:border-primary/30
-                                        hover:bg-primary/[0.025]
-                                    ' => ! $isSelected,
-                                ])
-                                x-bind:class="{
-                                    'border-primary/60 bg-primary/[0.065] ring-2 ring-primary/15':
-                                        switchingProvider
-                                        && pendingProvider === $el.dataset.providerOption,
-                                    'opacity-55':
-                                        switchingProvider
-                                        && pendingProvider !== $el.dataset.providerOption,
-                                }"
-                            >
-                                <div class="flex items-center gap-2.5">
-                                    <span
-                                        @class([
-                                            '
-                                                flex size-8 shrink-0
-                                                items-center justify-center
-                                                rounded-lg border
-                                            ',
-                                            '
-                                                border-primary/20
-                                                bg-primary/10 text-primary
-                                            ' => $isSelected,
-                                            '
-                                                border-base-300
-                                                bg-base-200/55
-                                                text-base-content/45
-                                            ' => ! $isSelected,
-                                        ])
-                                    >
-                                        <span
-                                            x-show="
-                                                switchingProvider
-                                                && pendingProvider === $el.closest('[data-provider-option]').dataset.providerOption
-                                            "
-                                            style="display: none"
-                                            class="
-                                                loading loading-spinner
-                                                loading-xs text-primary
-                                            "
-                                        ></span>
+                <div
+                    class="
+                        grid w-full
+                        grid-cols-1 gap-2
+                        sm:grid-cols-2
+                        lg:max-w-xl
+                    "
+                >
+                    @foreach($providers as $providerOption)
+                        @php($isSelected = $providerOption['id'] === $provider)
 
-                                        <span
-                                            x-show="
-                                                ! switchingProvider
-                                                || pendingProvider !== $el.closest('[data-provider-option]').dataset.providerOption
-                                            "
-                                        >
-                                            <x-icon
-                                                :name="$isSelected ? 'lucide.check' : 'lucide.cloud'"
-                                                class="!size-3.5"
-                                            />
-                                        </span>
-                                    </span>
-
-                                    <div class="min-w-0 flex-1">
-                                        <div
-                                            class="
-                                                truncate text-sm font-semibold
-                                                text-base-content
-                                            "
-                                        >
-                                            {{ $providerOption['label'] }}
-                                        </div>
-
-                                        <div
-                                            class="
-                                                mt-0.5 text-[10px]
-                                                text-base-content/40
-                                            "
-                                        >
-                                            {{ $isSelected ? 'انتخاب‌شده' : 'انتخاب زیرساخت' }}
-                                        </div>
-                                    </div>
-
+                        <button
+                            type="button"
+                            data-provider-option="{{ $providerOption['id'] }}"
+                            x-on:click="selectProvider($el.dataset.providerOption)"
+                            x-bind:disabled="switchingProvider"
+                            wire:loading.attr="disabled"
+                            wire:target="selectProvider"
+                            @class([
+                                '
+                                    group min-w-0
+                                    cursor-pointer
+                                    rounded-xl border
+                                    px-3 py-3
+                                    text-right
+                                    transition-all duration-150
+                                    disabled:cursor-wait
+                                ',
+                                '
+                                    border-primary/45
+                                    bg-primary/[0.055]
+                                    ring-1 ring-primary/10
+                                ' => $isSelected,
+                                '
+                                    border-base-300
+                                    bg-base-100
+                                    hover:border-primary/30
+                                    hover:bg-primary/[0.025]
+                                ' => ! $isSelected,
+                            ])
+                            x-bind:class="{
+                                'opacity-55':
+                                    switchingProvider
+                                    && pendingProvider !== $el.dataset.providerOption,
+                            }"
+                        >
+                            <div class="flex items-center gap-2.5">
+                                <span
+                                    @class([
+                                        '
+                                            flex size-8 shrink-0
+                                            items-center justify-center
+                                            rounded-lg border
+                                        ',
+                                        '
+                                            border-primary/20
+                                            bg-primary/10
+                                            text-primary
+                                        ' => $isSelected,
+                                        '
+                                            border-base-300
+                                            bg-base-200/55
+                                            text-base-content/45
+                                        ' => ! $isSelected,
+                                    ])
+                                >
                                     <span
                                         x-show="
                                             switchingProvider
@@ -251,25 +199,49 @@
                                         "
                                         style="display: none"
                                         class="
-                                            shrink-0 text-[9px]
-                                            font-medium text-primary
+                                            loading loading-spinner
+                                            loading-xs text-primary
+                                        "
+                                    ></span>
+
+                                    <span
+                                        x-show="
+                                            ! switchingProvider
+                                            || pendingProvider !== $el.closest('[data-provider-option]').dataset.providerOption
                                         "
                                     >
-                                        در حال تغییر
+                                        <x-icon
+                                            :name="$isSelected ? 'lucide.check' : 'lucide.cloud'"
+                                            class="!size-3.5"
+                                        />
                                     </span>
-                                </div>
-                            </button>
-                        @endforeach
-                    </div>
-                </div>
-            </section>
+                                </span>
 
-            <div
-                data-buy-desktop-placeholder
-                class="hidden md:block"
-                aria-hidden="true"
-            ></div>
-        </div>
+                                <div class="min-w-0 flex-1">
+                                    <div
+                                        class="
+                                            truncate text-sm font-semibold
+                                            text-base-content
+                                        "
+                                    >
+                                        {{ $providerOption['label'] }}
+                                    </div>
+
+                                    <div
+                                        class="
+                                            mt-0.5 text-[10px]
+                                            text-base-content/40
+                                        "
+                                    >
+                                        {{ $isSelected ? 'انتخاب‌شده' : 'انتخاب زیرساخت' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        </section>
     @endif
 
     <div
@@ -282,12 +254,7 @@
             data-provider-switch-overlay
             x-show="switchingProvider"
             style="display: none"
-            x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-100"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
+            x-transition.opacity.duration.150ms
             class="
                 absolute inset-0 z-50
                 flex items-start justify-center
