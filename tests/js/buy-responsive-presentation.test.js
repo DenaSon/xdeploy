@@ -5,70 +5,64 @@ import {
 } from 'node:fs';
 import test from 'node:test';
 
-const css = readProjectFile('resources/css/buy.css');
+const app = readProjectFile('resources/js/app.js');
 const buy = readProjectFile('resources/views/livewire/servers/buy.blade.php');
 const buyPage = readProjectFile('resources/views/livewire/servers/buy-page.blade.php');
-const app = readProjectFile('resources/js/app.js');
-const guardPath = new URL(
-    '../../resources/js/buy-responsive-guard.js',
+
+const buyCssPath = new URL(
+    '../../resources/css/buy.css',
+    import.meta.url,
+);
+const buyCriticalCssPath = new URL(
+    '../../resources/css/buy-critical.css',
     import.meta.url,
 );
 
-test('the bottom purchase bar is mobile-only at the rendered markup boundary', () => {
-    assert.match(buy, /data-buy-mobile-action/);
-    assert.match(buy, /data-buy-desktop-summary/);
+test('Buy no longer renders a mobile purchase CTA', () => {
+    assert.doesNotMatch(buy, /data-buy-mobile-action/);
+    assert.doesNotMatch(buy, /fixed\s+inset-x-0\s+bottom-0/);
+    assert.doesNotMatch(buy, /label="پرداخت"/);
+
+    const purchaseActions = buy.match(/wire:click="purchase"/g) ?? [];
+    assert.equal(purchaseActions.length, 1);
+});
+
+test('the only purchase action belongs to the desktop summary', () => {
     assert.match(
         buy,
-        /@media \(min-width: 768px\)[\s\S]*?\[data-buy-mobile-action\][\s\S]*?display:\s*none\s*!important;/,
+        /data-buy-desktop-summary[\s\S]*?class="hidden md:block"[\s\S]*?wire:click="purchase"/,
     );
+
+    assert.match(buy, /data-buy-mobile-notice/);
     assert.match(
         buy,
-        /@media \(min-width: 768px\)[\s\S]*?\[data-buy-desktop-summary\][\s\S]*?display:\s*block\s*!important;/,
+        /در این مرحله، ثبت و پرداخت سفارش از نمایش دسکتاپ انجام می‌شود/,
     );
 });
 
-test('Buy markup uses one tablet-and-desktop breakpoint contract', () => {
-    assert.match(buy, /class="pb-24 md:pb-0"/);
-    assert.match(buy, /class="hidden md:block"/);
-    assert.match(buy, /md:hidden/);
+test('Buy responsive layout is expressed in Tailwind markup only', () => {
+    assert.match(buy, /data-buy-main-layout/);
     assert.match(buy, /md:grid-cols-\[minmax\(0,1fr\)_320px\]/);
-    assert.doesNotMatch(buy, /xl:(?:hidden|block|pb-0|grid-cols-)/);
+    assert.doesNotMatch(buy, /<style>/);
+    assert.doesNotMatch(buy, /data-buy-layout/);
+    assert.doesNotMatch(buy, /data-buy-desktop-placeholder/);
 
-    assert.match(buyPage, /data-buy-provider-layout/);
-    assert.match(buyPage, /data-buy-desktop-placeholder/);
-    assert.match(buyPage, /md:grid-cols-\[minmax\(0,1fr\)_320px\]/);
-    assert.doesNotMatch(buyPage, /xl:(?:hidden|block|grid-cols-)/);
+    assert.doesNotMatch(buyPage, /data-buy-provider-layout/);
+    assert.doesNotMatch(buyPage, /data-buy-desktop-placeholder/);
 });
 
-test('the stylesheet fallback keeps the same 768px contract', () => {
-    assert.match(
-        css,
-        /@media \(max-width: 767px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*block;/,
-    );
-    assert.match(
-        css,
-        /@media \(min-width: 768px\)[\s\S]*?> div\.fixed\.inset-x-0\.bottom-0 \{[\s\S]*?display:\s*none;/,
-    );
-    assert.match(
-        css,
-        /@media \(min-width: 768px\)[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 320px;/,
-    );
+test('legacy Buy-specific stylesheets are removed from the frontend entry', () => {
+    assert.doesNotMatch(app, /css\/buy\.css/);
+    assert.doesNotMatch(app, /css\/buy-critical\.css/);
+    assert.equal(existsSync(buyCssPath), false);
+    assert.equal(existsSync(buyCriticalCssPath), false);
 });
 
-test('the mobile action viewport visibility is CSS-owned', () => {
-    assert.doesNotMatch(app, /buy-responsive-guard/);
-    assert.equal(existsSync(guardPath), false);
-
-    assert.match(buy, /data-buy-mobile-action/);
-    assert.doesNotMatch(buy, /mobileMediaQuery/);
-    assert.doesNotMatch(buy, /isMobileViewport/);
-    assert.doesNotMatch(buy, /x-show\.important=/);
-    assert.doesNotMatch(buy, /wire:ignore\.self/);
-});
-
-test('the mobile purchase bar respects the bottom safe area', () => {
-    assert.match(buy, /env\(safe-area-inset-bottom, 0px\)/);
-    assert.match(css, /env\(safe-area-inset-bottom, 0px\)/);
+test('fixed-disk presentation is decided in Blade instead of CSS selectors', () => {
+    assert.match(buy, /@if\(\$customDiskEnabled\)/);
+    assert.match(buy, /wire:click="decreaseDisk"/);
+    assert.match(buy, /wire:click="increaseDisk"/);
+    assert.doesNotMatch(buyPage, /cloud-purchase-page--fixed-disk/);
 });
 
 function readProjectFile(path) {
