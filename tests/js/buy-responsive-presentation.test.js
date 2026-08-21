@@ -34,10 +34,13 @@ test('mobile purchase CTA has a stable root outside Buy catalog conditionals', (
     assert.match(mobileCta, /\$renderStableMobileCta \?\? false/);
     assert.match(mobileCta, /wire:key="buy-mobile-cta-root"/);
     assert.match(mobileCta, /data-buy-mobile-action/);
-    assert.match(mobileCta, /dock dock-xl/);
+    assert.match(mobileCta, /fixed! inset-x-0 bottom-0/);
     assert.match(mobileCta, /md:hidden!/);
     assert.match(mobileCta, /'hidden!' => ! \$ctaReady/);
     assert.match(mobileCta, /\$catalogLoaded/);
+    assert.match(mobileCta, /label="پرداخت"/);
+    assert.doesNotMatch(mobileCta, /dock dock-xl/);
+    assert.doesNotMatch(mobileCta, /label="پرداخت و ساخت"/);
 
     assert.doesNotMatch(buyPage, /data-buy-mobile-action/);
     assert.doesNotMatch(buy, /data-buy-mobile-action/);
