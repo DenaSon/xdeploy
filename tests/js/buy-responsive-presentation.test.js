@@ -8,6 +8,9 @@ import test from 'node:test';
 const app = readProjectFile('resources/js/app.js');
 const buy = readProjectFile('resources/views/livewire/servers/buy.blade.php');
 const buyPage = readProjectFile('resources/views/livewire/servers/buy-page.blade.php');
+const mobileCta = readProjectFile(
+    'resources/views/livewire/servers/partials/buy-mobile-cta.blade.php',
+);
 
 const buyCssPath = new URL(
     '../../resources/css/buy.css',
@@ -18,26 +21,43 @@ const buyCriticalCssPath = new URL(
     import.meta.url,
 );
 
-test('Buy no longer renders a mobile purchase CTA', () => {
+test('mobile purchase CTA is isolated in its own Blade partial', () => {
+    assert.match(
+        buy,
+        /@include\('livewire\.servers\.partials\.buy-mobile-cta'\)/,
+    );
     assert.doesNotMatch(buy, /data-buy-mobile-action/);
-    assert.doesNotMatch(buy, /fixed\s+inset-x-0\s+bottom-0/);
-    assert.doesNotMatch(buy, /label="پرداخت"/);
+    assert.doesNotMatch(buy, /data-buy-mobile-notice/);
 
-    const purchaseActions = buy.match(/wire:click="purchase"/g) ?? [];
-    assert.equal(purchaseActions.length, 1);
+    assert.match(mobileCta, /data-buy-mobile-action/);
+    assert.match(mobileCta, /dock dock-xl/);
+    assert.match(mobileCta, /md:!hidden/);
+    assert.match(mobileCta, /label="پرداخت و ساخت"/);
+    assert.match(mobileCta, /wire:click="purchase"/);
+    assert.doesNotMatch(mobileCta, /fixed\s+inset-x-0\s+bottom-0/);
 });
 
-test('the only purchase action belongs to the desktop summary', () => {
+test('desktop and mobile purchase actions remain intentionally separate', () => {
+    const desktopPurchaseActions = buy.match(/wire:click="purchase"/g) ?? [];
+    const mobilePurchaseActions = mobileCta.match(/wire:click="purchase"/g) ?? [];
+
+    assert.equal(desktopPurchaseActions.length, 1);
+    assert.equal(mobilePurchaseActions.length, 1);
+
     assert.match(
         buy,
         /data-buy-desktop-summary[\s\S]*?class="[\s\S]*?hidden md:block[\s\S]*?"[\s\S]*?wire:click="purchase"/,
     );
+    assert.match(buy, /pb-28/);
+    assert.match(buy, /md:pb-0/);
+});
 
-    assert.match(buy, /data-buy-mobile-notice/);
-    assert.match(
-        buy,
-        /در این مرحله، ثبت و پرداخت سفارش از نمایش دسکتاپ انجام می‌شود/,
-    );
+test('mobile CTA follows the same quote safety conditions as desktop checkout', () => {
+    assert.match(mobileCta, /\$quote === \[\]/);
+    assert.match(mobileCta, /\$catalogError !== null/);
+    assert.match(mobileCta, /\$quoteError !== null/);
+    assert.match(mobileCta, /wire:loading\.attr="disabled"/);
+    assert.match(mobileCta, /wire:target="purchase"/);
 });
 
 test('Buy responsive layout is expressed in Tailwind markup only', () => {
