@@ -4,6 +4,7 @@ import EasyMDE from 'easymde';
 import '../css/admin-markdown.css';
 import '../css/buy.css';
 import '../css/buy-critical.css';
+import '../css/coreflare-theme-contract.css';
 import '../css/landing.css';
 import './passkeys.js';
 
