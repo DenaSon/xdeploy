@@ -306,6 +306,11 @@
             </div>
         </div>
 
+        @include(
+            'livewire.servers.partials.buy-mobile-cta',
+            ['renderStableMobileCta' => true]
+        )
+
         @include('livewire.servers.buy')
     </div>
 </div>

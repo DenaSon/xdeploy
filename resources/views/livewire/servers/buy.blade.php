@@ -288,36 +288,11 @@
         </section>
     @else
         <div
-            class="
-                mb-3 flex items-start gap-2
-                rounded-xl
-                border border-base-300
-                bg-base-100
-                px-3 py-2.5
-                text-xs leading-5
-                text-base-content/55
-                md:hidden
-            "
-            data-buy-mobile-notice
-        >
-            <x-icon
-                name="lucide.monitor"
-                class="
-                    mt-0.5 !size-3.5
-                    shrink-0 text-base-content/40
-                "
-            />
-
-            <span>
-                در این مرحله، ثبت و پرداخت سفارش از نمایش دسکتاپ انجام می‌شود.
-            </span>
-        </div>
-
-        <div
             data-buy-main-layout
             class="
-                grid gap-4
+                grid gap-4 pb-28
                 md:grid-cols-[minmax(0,1fr)_320px]
+                md:pb-0
             "
         >
             <main class="min-w-0">
@@ -1161,7 +1136,7 @@
                 @endif
             </main>
 
-            {{-- Desktop order summary and the only purchase action --}}
+            {{-- Desktop order summary --}}
             <aside
                 data-buy-desktop-summary
                 class="hidden md:block"
@@ -1464,5 +1439,7 @@
                 </div>
             </aside>
         </div>
+
+        @include('livewire.servers.partials.buy-mobile-cta')
     @endif
 </div>
