@@ -20,7 +20,7 @@ final class BuyDiskControlVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_liara_purchase_ui_uses_fixed_disk_layout(): void
+    public function test_liara_purchase_ui_renders_fixed_disk_without_resize_controls(): void
     {
         $this->bindProvider(CloudProviderType::Liara);
 
@@ -33,10 +33,12 @@ final class BuyDiskControlVisibilityTest extends TestCase
                     CloudProviderType::Liara,
                 ),
             )
-            ->assertSeeHtml('cloud-purchase-page--fixed-disk');
+            ->set('catalogLoaded', true)
+            ->assertDontSeeHtml('wire:click="decreaseDisk"')
+            ->assertDontSeeHtml('wire:click="increaseDisk"');
     }
 
-    public function test_arvan_purchase_ui_keeps_custom_disk_layout(): void
+    public function test_arvan_purchase_ui_renders_custom_disk_resize_controls(): void
     {
         $this->bindProvider(CloudProviderType::Arvan);
 
@@ -49,7 +51,9 @@ final class BuyDiskControlVisibilityTest extends TestCase
                     CloudProviderType::Arvan,
                 ),
             )
-            ->assertDontSeeHtml('cloud-purchase-page--fixed-disk');
+            ->set('catalogLoaded', true)
+            ->assertSeeHtml('wire:click="decreaseDisk"')
+            ->assertSeeHtml('wire:click="increaseDisk"');
     }
 
     private function bindProvider(CloudProviderType $providerType): void
