@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Tests\Unit\Infrastructure\Cloud\Catalog;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudPurchaseCatalogSourceInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudBillingPeriod;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Infrastructure\Cloud\Catalog\CachedCloudCatalogReader;
+use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
 use Mockery;
 use Tests\TestCase;
@@ -101,6 +104,36 @@ final class CachedCloudCatalogReaderTest extends TestCase
         $this->assertSame(
             $first,
             $second,
+        );
+    }
+
+    public function test_it_uses_the_bounded_purchase_catalog_source_on_a_cache_miss(): void
+    {
+        $cloud = Mockery::mock(
+            CloudProviderInterface::class,
+        );
+        $cloud->shouldImplement(
+            CloudPurchaseCatalogSourceInterface::class,
+        );
+
+        $cloud->shouldNotReceive('listRegions');
+        $cloud
+            ->shouldReceive('listPurchaseRegions')
+            ->once()
+            ->andReturn([
+                $this->region(
+                    'ir-thr-bounded',
+                ),
+            ]);
+
+        $reader = new CachedCloudCatalogReader(
+            cloud: $cloud,
+            provider: CloudProviderType::Arvan,
+        );
+
+        $this->assertSame(
+            'ir-thr-bounded',
+            $reader->listRegions()[0]->id,
         );
     }
 
@@ -217,6 +250,106 @@ final class CachedCloudCatalogReaderTest extends TestCase
         $this->assertSame(
             'ir-thr-si1',
             $reader->refreshRegions()[0]->id,
+        );
+    }
+
+    public function test_it_rejects_a_stale_payload_with_the_wrong_dto_shape_and_reads_the_provider(): void
+    {
+        $cacheKey =
+            'xdeploy:cloud:catalog:v2:arvan:regions';
+
+        Cache::put(
+            $cacheKey,
+            [
+                ['id' => 'stale-array-payload'],
+            ],
+            1_200,
+        );
+        Cache::put(
+            CacheRepository::FLEXIBLE_CREATED_KEY_PREFIX.$cacheKey,
+            time(),
+            1_200,
+        );
+
+        $cloud = Mockery::mock(
+            CloudProviderInterface::class,
+        );
+
+        $cloud
+            ->shouldReceive('listRegions')
+            ->once()
+            ->andReturn([
+                $this->region(
+                    'ir-thr-current',
+                ),
+            ]);
+
+        $reader = new CachedCloudCatalogReader(
+            cloud: $cloud,
+            provider: CloudProviderType::Arvan,
+        );
+
+        $this->assertSame(
+            'ir-thr-current',
+            $reader->listRegions()[0]->id,
+        );
+        $this->assertFalse(
+            Cache::has($cacheKey),
+        );
+        $this->assertFalse(
+            Cache::has(
+                CacheRepository::FLEXIBLE_CREATED_KEY_PREFIX.$cacheKey,
+            ),
+        );
+    }
+
+    public function test_refresh_sizes_returns_fresh_provider_data_and_replaces_the_cache(): void
+    {
+        $cloud = Mockery::mock(
+            CloudProviderInterface::class,
+        );
+
+        $cloud
+            ->shouldReceive('listSizes')
+            ->twice()
+            ->with('ir-thr-ba1')
+            ->andReturn(
+                [
+                    $this->cloudSize(
+                        region: 'ir-thr-ba1',
+                        id: 'eco-stale',
+                    ),
+                ],
+                [
+                    $this->cloudSize(
+                        region: 'ir-thr-ba1',
+                        id: 'eco-fresh',
+                    ),
+                ],
+            );
+
+        $reader = new CachedCloudCatalogReader(
+            cloud: $cloud,
+            provider: CloudProviderType::Arvan,
+        );
+
+        $this->assertSame(
+            'eco-stale',
+            $reader->listSizes(
+                'ir-thr-ba1',
+            )[0]->id,
+        );
+        $this->assertSame(
+            'eco-fresh',
+            $reader->refreshSizes(
+                'ir-thr-ba1',
+            )[0]->id,
+        );
+        $this->assertSame(
+            'eco-fresh',
+            $reader->listSizes(
+                'ir-thr-ba1',
+            )[0]->id,
         );
     }
 

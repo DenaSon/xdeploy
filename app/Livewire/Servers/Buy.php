@@ -15,6 +15,7 @@ use App\Domain\Billing\Exceptions\PaymentInitiationInProgressException;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\RefreshableCloudCatalogReaderInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
@@ -185,7 +186,9 @@ final class Buy extends Component
         $this->quoteError = null;
         $this->pendingOrderId = null;
 
-        $this->fetchCatalog();
+        $this->fetchCatalog(
+            refresh: true,
+        );
     }
 
     public function selectProvider(string $provider): void
@@ -601,7 +604,9 @@ final class Buy extends Component
         );
     }
 
-    private function fetchCatalog(): void
+    private function fetchCatalog(
+        bool $refresh = false,
+    ): void
     {
         $this->catalogError = null;
         $this->quoteError = null;
@@ -617,9 +622,14 @@ final class Buy extends Component
         try {
             $catalog = $this->catalog();
 
+            $providerRegions = $refresh
+                && $catalog instanceof RefreshableCloudCatalogReaderInterface
+                    ? $catalog->refreshRegions()
+                    : $catalog->listRegions();
+
             $regions = array_values(
                 array_filter(
-                    $catalog->listRegions(),
+                    $providerRegions,
                     static fn (
                         CloudRegionData $region,
                     ): bool => $region->canCreateServers
@@ -664,6 +674,7 @@ final class Buy extends Component
 
             $this->loadRegionCatalog(
                 $preferredRegion['id'],
+                refresh: $refresh,
             );
 
             $this->catalogLoaded = true;
@@ -779,6 +790,7 @@ final class Buy extends Component
 
     private function loadRegionCatalog(
         string $regionId,
+        bool $refresh = false,
     ): void {
         $this->catalogError = null;
         $this->quoteError = null;
@@ -794,11 +806,18 @@ final class Buy extends Component
         try {
             $catalog = $this->catalog();
 
+            $providerSizes = $refresh
+                && $catalog instanceof RefreshableCloudCatalogReaderInterface
+                    ? $catalog->refreshSizes(
+                        $regionId,
+                    )
+                    : $catalog->listSizes(
+                        $regionId,
+                    );
+
             $purchasableSizes = array_values(
                 array_filter(
-                    $catalog->listSizes(
-                        $regionId,
-                    ),
+                    $providerSizes,
                     static fn (
                         CloudSizeData $size,
                     ): bool => $size->hourlyPrice !== null
@@ -839,12 +858,19 @@ final class Buy extends Component
                 $purchasableSizes,
             );
 
+            $providerImages = $refresh
+                && $catalog instanceof RefreshableCloudCatalogReaderInterface
+                    ? $catalog->refreshImages(
+                        $regionId,
+                    )
+                    : $catalog->listImages(
+                        $regionId,
+                    );
+
             $supportedImages = app(
                 FilterSupportedCloudImagesAction::class,
             )->execute(
-                $catalog->listImages(
-                    $regionId,
-                ),
+                $providerImages,
             );
 
             $this->images = array_map(
@@ -884,7 +910,9 @@ final class Buy extends Component
             $this->selectedDiskGiB =
                 $this->minimumDiskGiB();
 
-            $this->recalculateQuote();
+            $this->recalculateQuote(
+                $providerSizes,
+            );
         } catch (Throwable $exception) {
             report(
                 $exception,
@@ -907,7 +935,12 @@ final class Buy extends Component
         );
     }
 
-    private function recalculateQuote(): void
+    /**
+     * @param  list<CloudSizeData>|null  $providerSizes
+     */
+    private function recalculateQuote(
+        ?array $providerSizes = null,
+    ): void
     {
         $this->quote = [];
         $this->quoteError = null;
@@ -919,7 +952,11 @@ final class Buy extends Component
         try {
             $price = app(
                 CalculateCloudPurchasePriceAction::class,
-            )->execute(
+            )->executeForPurchasePage(
+                sizes: $providerSizes
+                    ?? $this->catalog()->listSizes(
+                        $this->regionId,
+                    ),
                 region: $this->regionId,
                 sizeId: $this->sizeId,
                 selectedDiskGiB: $this->selectedDiskGiB,

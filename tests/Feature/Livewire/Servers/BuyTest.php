@@ -8,7 +8,10 @@ use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudPurchasePricingSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
+use App\Domain\Cloud\Contracts\RefreshableCloudCatalogReaderInterface;
+use App\Domain\Cloud\DTOs\CloudDiskPriceData;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudPriceData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
@@ -94,6 +97,9 @@ final class BuyTest extends TestCase
     public function test_authenticated_user_can_load_purchase_catalog(): void
     {
         $user = User::factory()->create();
+        $size = $this->cloudSize(
+            diskGiB: 25,
+        );
 
         $catalog = $this->catalogMock(
             region: $this->region(
@@ -103,7 +109,7 @@ final class BuyTest extends TestCase
                 city: 'Tehran',
                 dataCenter: 'Bamdad',
             ),
-            size: $this->cloudSize(),
+            size: $size,
             image: $this->image(
                 id: 'ubuntu-24',
                 region: 'ir-thr-ba1',
@@ -134,14 +140,40 @@ final class BuyTest extends TestCase
         $cloud = Mockery::mock(
             CloudProviderInterface::class,
         );
-
+        $cloud->shouldImplement(
+            CloudPurchasePricingSourceInterface::class,
+        );
+        $cloud->shouldNotReceive('listSizes');
         $cloud
-            ->shouldReceive('listSizes')
+            ->shouldReceive('calculatePurchaseDiskPrice')
             ->once()
-            ->with('ir-thr-ba1')
-            ->andReturn([
-                $this->cloudSize(),
-            ]);
+            ->with(
+                'ir-thr-ba1',
+                $size->id,
+                25,
+            )
+            ->andReturn(
+                $this->diskPrice(
+                    diskGiB: 25,
+                    hourly: '100',
+                    monthly: '72000',
+                ),
+            );
+        $cloud
+            ->shouldReceive('calculatePurchaseDiskPrice')
+            ->once()
+            ->with(
+                'ir-thr-ba1',
+                $size->id,
+                30,
+            )
+            ->andReturn(
+                $this->diskPrice(
+                    diskGiB: 30,
+                    hourly: '120',
+                    monthly: '86400',
+                ),
+            );
 
         $resizeCatalog = Mockery::mock(
             CloudServerResizeCatalogInterface::class,
@@ -214,6 +246,7 @@ final class BuyTest extends TestCase
             ->assertSee(
                 'تومان',
             );
+
     }
 
     public function test_user_can_switch_provider_and_receive_a_fresh_provider_scoped_catalog_and_quote(): void
@@ -295,21 +328,8 @@ final class BuyTest extends TestCase
             CloudServerResizeCatalogInterface::class,
         );
 
-        $arvan
-            ->shouldReceive('listSizes')
-            ->once()
-            ->with('ir-thr-ba1')
-            ->andReturn([
-                $arvanSize,
-            ]);
-
-        $liara
-            ->shouldReceive('listSizes')
-            ->once()
-            ->with('iran')
-            ->andReturn([
-                $liaraSize,
-            ]);
+        $arvan->shouldNotReceive('listSizes');
+        $liara->shouldNotReceive('listSizes');
 
         $arvanPricing->shouldNotReceive('calculateDiskPrice');
         $liaraPricing->shouldNotReceive('calculateDiskPrice');
@@ -373,6 +393,103 @@ final class BuyTest extends TestCase
             ->assertSet('quote.selected_disk_gib', 20)
             ->assertSee('Core-2')
             ->assertDontSee('لیارا');
+    }
+
+    public function test_retry_forces_a_fresh_provider_scoped_catalog_read(): void
+    {
+        $user = User::factory()->create();
+        $region = $this->region(
+            id: 'ir-thr-ba1',
+            name: 'Iran / Tehran / Bamdad',
+            country: 'Iran',
+            city: 'Tehran',
+            dataCenter: 'Bamdad',
+        );
+        $size = $this->cloudSize();
+        $image = $this->image(
+            id: 'ubuntu-24',
+            region: $region->id,
+            minDiskGiB: 30,
+        );
+
+        $catalog = Mockery::mock(
+            RefreshableCloudCatalogReaderInterface::class,
+        );
+
+        $catalog
+            ->shouldReceive('listRegions')
+            ->once()
+            ->andReturn([$region]);
+        $catalog
+            ->shouldReceive('listSizes')
+            ->once()
+            ->with($region->id)
+            ->andReturn([$size]);
+        $catalog
+            ->shouldReceive('listImages')
+            ->once()
+            ->with($region->id)
+            ->andReturn([$image]);
+        $catalog
+            ->shouldReceive('refreshRegions')
+            ->once()
+            ->andReturn([$region]);
+        $catalog
+            ->shouldReceive('refreshSizes')
+            ->once()
+            ->with($region->id)
+            ->andReturn([$size]);
+        $catalog
+            ->shouldReceive('refreshImages')
+            ->once()
+            ->with($region->id)
+            ->andReturn([$image]);
+
+        $resolver = Mockery::mock(
+            CloudCatalogReaderResolverInterface::class,
+        );
+        $resolver
+            ->shouldReceive('resolve')
+            ->times(4)
+            ->with(CloudProviderType::Arvan)
+            ->andReturn($catalog);
+
+        $this->app->instance(
+            CloudCatalogReaderResolverInterface::class,
+            $resolver,
+        );
+
+        $cloud = Mockery::mock(
+            CloudProviderInterface::class,
+        );
+        $cloud->shouldNotReceive('listSizes');
+
+        $pricing = Mockery::mock(
+            CloudServerResizeCatalogInterface::class,
+        );
+        $pricing->shouldNotReceive('calculateDiskPrice');
+
+        $this->app->instance(
+            CloudProviderRegistryInterface::class,
+            new CloudProviderRegistryStub(
+                provider: $cloud,
+                capabilities: [
+                    CloudServerResizeCatalogInterface::class => $pricing,
+                ],
+            ),
+        );
+
+        $this->actingAs($user);
+
+        Livewire::test(Buy::class)
+            ->call('loadCatalog')
+            ->assertSet('catalogLoaded', true)
+            ->call('reloadCatalog')
+            ->assertSet('catalogLoaded', true)
+            ->assertSet('catalogError', null)
+            ->assertSet('regionId', $region->id)
+            ->assertSet('sizeId', $size->id)
+            ->assertSet('imageId', $image->id);
     }
 
     /**
@@ -466,6 +583,26 @@ final class BuyTest extends TestCase
             memoryMiB: 2048,
             diskGiB: $diskGiB,
             category: 'cloud',
+            hourlyPrice: new CloudPriceData(
+                amount: $hourly,
+                currencyCode: 'IRR',
+                billingPeriod: CloudBillingPeriod::Hourly,
+            ),
+            monthlyPrice: new CloudPriceData(
+                amount: $monthly,
+                currencyCode: 'IRR',
+                billingPeriod: CloudBillingPeriod::Monthly,
+            ),
+        );
+    }
+
+    private function diskPrice(
+        int $diskGiB,
+        string $hourly,
+        string $monthly,
+    ): CloudDiskPriceData {
+        return new CloudDiskPriceData(
+            diskGiB: $diskGiB,
             hourlyPrice: new CloudPriceData(
                 amount: $hourly,
                 currencyCode: 'IRR',

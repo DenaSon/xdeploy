@@ -111,6 +111,39 @@ final class ArvanCloudProviderTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_it_reads_the_purchase_catalog_through_the_interactive_transport(): void
+    {
+        Http::fake([
+            '*/regions' => Http::response(
+                $this->fixture('regions.json'),
+            ),
+            '*/sizes' => Http::response(
+                $this->fixture('sizes.json'),
+            ),
+            '*/images*' => Http::response(
+                $this->fixture('images.json'),
+            ),
+        ]);
+
+        $provider = $this->provider();
+
+        $this->assertNotEmpty(
+            $provider->listPurchaseRegions(),
+        );
+        $this->assertNotEmpty(
+            $provider->listPurchaseSizes(
+                'eu-west1-a',
+            ),
+        );
+        $this->assertNotEmpty(
+            $provider->listPurchaseImages(
+                'eu-west1-a',
+            ),
+        );
+
+        Http::assertSentCount(3);
+    }
+
     public function test_it_lists_networks(): void
     {
         Http::fake([

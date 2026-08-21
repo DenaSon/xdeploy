@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Infrastructure\Cloud\ArvanCloud;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudPurchaseCatalogSourceInterface;
+use App\Domain\Cloud\Contracts\CloudPurchasePricingSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerConsoleInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
@@ -38,7 +40,7 @@ use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 
-final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudServerConsoleInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
+final readonly class ArvanCloudProvider implements CloudProviderInterface, CloudPurchaseCatalogSourceInterface, CloudPurchasePricingSourceInterface, CloudServerConsoleInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerNetworkingInterface, CloudServerProvisionerInterface, CloudServerReportsInterface, CloudServerResizeCatalogInterface, CloudServerResizerInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
 
@@ -131,6 +133,58 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         );
 
         $payload = $this->client->get(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_IMAGES,
+            ),
+            [
+                'type' => 'distributions',
+            ],
+        );
+
+        return $this->mapper->mapImages(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function listPurchaseRegions(): array
+    {
+        return $this->mapper->mapRegions(
+            $this->client->getCatalog(
+                self::RESOURCE_REGIONS,
+            ),
+        );
+    }
+
+    public function listPurchaseSizes(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->getCatalog(
+            $this->regionEndpoint(
+                regionId: $regionId,
+                resource: self::RESOURCE_SIZES,
+            ),
+        );
+
+        return $this->mapper->mapSizes(
+            payload: $payload,
+            regionId: $regionId,
+        );
+    }
+
+    public function listPurchaseImages(
+        string $region,
+    ): array {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $payload = $this->client->getCatalog(
             $this->regionEndpoint(
                 regionId: $regionId,
                 resource: self::RESOURCE_IMAGES,
@@ -367,6 +421,39 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
         );
 
         $payload = $this->client->post(
+            $this->sizeDiskEndpoint(
+                regionId: $regionId,
+                sizeId: $providerSizeId,
+            ),
+            [
+                'volume_size' => $normalizedDiskGiB,
+            ],
+        );
+
+        return $this->mapper->mapDiskPrice(
+            $payload,
+        );
+    }
+
+    public function calculatePurchaseDiskPrice(
+        string $region,
+        string $sizeId,
+        int $diskGiB,
+    ): CloudDiskPriceData {
+        $regionId = $this->normalizeRegion(
+            $region,
+        );
+
+        $providerSizeId = $this->normalizeResourceId(
+            id: $sizeId,
+            resource: 'size',
+        );
+
+        $normalizedDiskGiB = $this->normalizeDiskSize(
+            $diskGiB,
+        );
+
+        $payload = $this->client->postCatalog(
             $this->sizeDiskEndpoint(
                 regionId: $regionId,
                 sizeId: $providerSizeId,

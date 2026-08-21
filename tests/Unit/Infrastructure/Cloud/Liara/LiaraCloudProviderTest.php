@@ -87,6 +87,34 @@ final class LiaraCloudProviderTest extends TestCase
         Http::assertSentCount(3);
     }
 
+    public function test_it_reads_purchase_catalog_from_liara_endpoints(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/plans' => Http::response(
+                $this->plansResponse(),
+            ),
+            self::BASE_URL.'/oss' => Http::response([
+                'ubuntu' => [
+                    '24.04',
+                ],
+            ]),
+        ]);
+
+        $provider = $this->provider();
+
+        $this->assertNotEmpty(
+            $provider->listPurchaseRegions(),
+        );
+        $this->assertNotEmpty(
+            $provider->listPurchaseSizes('iran'),
+        );
+        $this->assertNotEmpty(
+            $provider->listPurchaseImages('iran'),
+        );
+
+        Http::assertSentCount(3);
+    }
+
     public function test_it_creates_server_using_verified_liara_payload(): void
     {
         Http::fake([

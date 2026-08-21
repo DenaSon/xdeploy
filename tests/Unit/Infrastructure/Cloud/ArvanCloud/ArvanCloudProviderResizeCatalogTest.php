@@ -274,6 +274,40 @@ final class ArvanCloudProviderResizeCatalogTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_it_calculates_purchase_disk_price_through_the_interactive_transport(): void
+    {
+        Http::fake([
+            $this->sizeDiskUrl() => Http::response([
+                'data' => [
+                    'disk' => 80,
+                    'price_per_hour' => 2550.25,
+                    'price_per_month' => '1836180.50',
+                ],
+            ]),
+        ]);
+
+        $price = $this->provider()->calculatePurchaseDiskPrice(
+            region: self::REGION_ID,
+            sizeId: self::SIZE_ID,
+            diskGiB: 80,
+        );
+
+        $this->assertSame(
+            80,
+            $price->diskGiB,
+        );
+        $this->assertSame(
+            '2550.25',
+            $price->hourlyPrice->amount,
+        );
+        $this->assertSame(
+            '1836180.50',
+            $price->monthlyPrice->amount,
+        );
+
+        Http::assertSentCount(1);
+    }
+
     public function test_it_normalizes_region_and_resource_identifiers(): void
     {
         Http::fake([

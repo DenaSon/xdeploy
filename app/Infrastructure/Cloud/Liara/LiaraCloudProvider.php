@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Infrastructure\Cloud\Liara;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
+use App\Domain\Cloud\Contracts\CloudPurchaseCatalogSourceInterface;
+use App\Domain\Cloud\Contracts\CloudPurchasePricingSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialRotationInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
@@ -27,7 +29,7 @@ use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
 
-final readonly class LiaraCloudProvider implements CloudProviderInterface, CloudServerBootstrapCredentialRotationInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface
+final readonly class LiaraCloudProvider implements CloudProviderInterface, CloudPurchaseCatalogSourceInterface, CloudPurchasePricingSourceInterface, CloudServerBootstrapCredentialRotationInterface, CloudServerCredentialManagerInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface
 {
     private const string RESOURCE_PLANS = 'plans';
 
@@ -76,6 +78,36 @@ final readonly class LiaraCloudProvider implements CloudProviderInterface, Cloud
     {
         $regionId = $this->normalizeRegion($region);
         $response = $this->client->get(self::RESOURCE_OPERATING_SYSTEMS);
+
+        return $this->mapper->mapImages(
+            response: $this->normalizeOperatingSystemCatalog($response),
+            region: $regionId,
+        );
+    }
+
+    public function listPurchaseRegions(): array
+    {
+        return $this->mapper->mapRegions(
+            $this->client->getCatalog(self::RESOURCE_PLANS),
+        );
+    }
+
+    public function listPurchaseSizes(string $region): array
+    {
+        $regionId = $this->normalizeRegion($region);
+
+        return $this->mapper->mapSizes(
+            response: $this->client->getCatalog(self::RESOURCE_PLANS),
+            region: $regionId,
+        );
+    }
+
+    public function listPurchaseImages(string $region): array
+    {
+        $regionId = $this->normalizeRegion($region);
+        $response = $this->client->getCatalog(
+            self::RESOURCE_OPERATING_SYSTEMS,
+        );
 
         return $this->mapper->mapImages(
             response: $this->normalizeOperatingSystemCatalog($response),
@@ -336,6 +368,52 @@ final readonly class LiaraCloudProvider implements CloudProviderInterface, Cloud
             region: $region,
             sizeId: $sizeId,
         );
+
+        if ($diskGiB !== $size->diskGiB) {
+            throw new CloudValidationException(
+                'Liara custom disk pricing is not exposed by the current adapter.',
+            );
+        }
+
+        return new CloudDiskPriceData(
+            diskGiB: $diskGiB,
+            hourlyPrice: new CloudPriceData(
+                amount: '0',
+                currencyCode: 'IRR',
+                billingPeriod: CloudBillingPeriod::Hourly,
+            ),
+            monthlyPrice: new CloudPriceData(
+                amount: '0',
+                currencyCode: 'IRR',
+                billingPeriod: CloudBillingPeriod::Monthly,
+            ),
+        );
+    }
+
+    public function calculatePurchaseDiskPrice(
+        string $region,
+        string $sizeId,
+        int $diskGiB,
+    ): CloudDiskPriceData {
+        $sizeId = $this->normalizeCatalogId(
+            $sizeId,
+            'plan',
+        );
+        $size = null;
+
+        foreach ($this->listPurchaseSizes($region) as $candidate) {
+            if ($candidate->id === $sizeId) {
+                $size = $candidate;
+
+                break;
+            }
+        }
+
+        if (! $size instanceof CloudSizeData) {
+            throw new CloudResourceNotFoundException(
+                sprintf('Liara plan [%s] was not found.', $sizeId),
+            );
+        }
 
         if ($diskGiB !== $size->diskGiB) {
             throw new CloudValidationException(

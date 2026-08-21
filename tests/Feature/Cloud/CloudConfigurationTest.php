@@ -59,6 +59,25 @@ final class CloudConfigurationTest extends TestCase
         );
     }
 
+    public function test_purchase_catalog_has_a_bounded_transport_budget(): void
+    {
+        $connectTimeout = config(
+            'cloud.catalog_cache.timeouts.connect',
+        );
+        $requestTimeout = config(
+            'cloud.catalog_cache.timeouts.request',
+        );
+
+        $this->assertIsInt($connectTimeout);
+        $this->assertIsInt($requestTimeout);
+        $this->assertGreaterThan(0, $connectTimeout);
+        $this->assertGreaterThanOrEqual(
+            $connectTimeout,
+            $requestTimeout,
+        );
+        $this->assertLessThanOrEqual(10, $requestTimeout);
+    }
+
     public function test_arvan_ubuntu_package_mirror_is_https(): void
     {
         $mirror = config(

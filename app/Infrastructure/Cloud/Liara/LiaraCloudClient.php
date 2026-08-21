@@ -44,12 +44,18 @@ final class LiaraCloudClient
 
     private readonly int $requestTimeout;
 
+    private readonly int $catalogConnectTimeout;
+
+    private readonly int $catalogRequestTimeout;
+
     public function __construct(
         string $baseUrl,
         #[SensitiveParameter]
         string $apiToken,
         int $connectTimeout = 10,
         int $requestTimeout = 90,
+        int $catalogConnectTimeout = 3,
+        int $catalogRequestTimeout = 6,
     ) {
         $this->baseUrl = $this->normalizeBaseUrl($baseUrl);
         $this->apiToken = $this->normalizeApiToken($apiToken);
@@ -60,6 +66,14 @@ final class LiaraCloudClient
         $this->requestTimeout = $this->validateTimeout(
             timeout: $requestTimeout,
             name: 'request timeout',
+        );
+        $this->catalogConnectTimeout = $this->validateTimeout(
+            timeout: $catalogConnectTimeout,
+            name: 'catalog connect timeout',
+        );
+        $this->catalogRequestTimeout = $this->validateTimeout(
+            timeout: $catalogRequestTimeout,
+            name: 'catalog request timeout',
         );
     }
 
@@ -75,6 +89,23 @@ final class LiaraCloudClient
             method: self::METHOD_GET,
             path: $path,
             data: $query,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $query
+     * @return array<array-key, mixed>
+     */
+    public function getCatalog(
+        string $path,
+        array $query = [],
+    ): array {
+        return $this->request(
+            method: self::METHOD_GET,
+            path: $path,
+            data: $query,
+            connectTimeout: $this->catalogConnectTimeout,
+            requestTimeout: $this->catalogRequestTimeout,
         );
     }
 
@@ -129,6 +160,8 @@ final class LiaraCloudClient
         string $method,
         string $path,
         ?array $data,
+        ?int $connectTimeout = null,
+        ?int $requestTimeout = null,
     ): array {
         $endpoint = $this->normalizePath($path);
         $url = sprintf('%s/%s', $this->baseUrl, $endpoint);
@@ -136,7 +169,10 @@ final class LiaraCloudClient
 
         try {
             $response = $this->sendRequest(
-                request: $this->pendingRequest(),
+                request: $this->pendingRequest(
+                    connectTimeout: $connectTimeout,
+                    requestTimeout: $requestTimeout,
+                ),
                 method: $method,
                 url: $url,
                 data: $data,
@@ -206,12 +242,20 @@ final class LiaraCloudClient
         };
     }
 
-    private function pendingRequest(): PendingRequest
-    {
+    private function pendingRequest(
+        ?int $connectTimeout = null,
+        ?int $requestTimeout = null,
+    ): PendingRequest {
         return Http::acceptJson()
             ->withToken($this->apiToken)
-            ->connectTimeout($this->connectTimeout)
-            ->timeout($this->requestTimeout)
+            ->connectTimeout(
+                $connectTimeout
+                    ?? $this->connectTimeout,
+            )
+            ->timeout(
+                $requestTimeout
+                    ?? $this->requestTimeout,
+            )
             ->withoutRedirecting();
     }
 
