@@ -82,9 +82,10 @@
 
     @if(count($providers) > 1)
         <div
+            data-buy-provider-layout
             class="
                 grid grid-cols-1 gap-4
-                xl:grid-cols-[minmax(0,1fr)_320px]
+                md:grid-cols-[minmax(0,1fr)_320px]
             "
         >
             <section
@@ -264,7 +265,8 @@
             </section>
 
             <div
-                class="hidden xl:block"
+                data-buy-desktop-placeholder
+                class="hidden md:block"
                 aria-hidden="true"
             ></div>
         </div>
