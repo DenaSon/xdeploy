@@ -30,7 +30,7 @@ test('Buy no longer renders a mobile purchase CTA', () => {
 test('the only purchase action belongs to the desktop summary', () => {
     assert.match(
         buy,
-        /data-buy-desktop-summary[\s\S]*?class="hidden md:block"[\s\S]*?wire:click="purchase"/,
+        /data-buy-desktop-summary[\s\S]*?class="[\s\S]*?hidden md:block[\s\S]*?"[\s\S]*?wire:click="purchase"/,
     );
 
     assert.match(buy, /data-buy-mobile-notice/);
