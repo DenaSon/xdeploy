@@ -17,6 +17,7 @@ use App\Models\Server;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -40,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
         App::setLocale('fa');
 
+        $this->registerLogViewerAuthorization();
         $this->registerPublicDocumentationNavigationCacheInvalidation();
         $this->registerPublicFooterNavigationCacheInvalidation();
 
@@ -66,6 +68,36 @@ class AppServiceProvider extends ServiceProvider
                     ->whereKey($value)
                     ->firstOrFail();
             },
+        );
+    }
+
+    private function registerLogViewerAuthorization(): void
+    {
+        Gate::define(
+            'viewLogViewer',
+            static fn (User $user): bool => $user->isAdmin(),
+        );
+
+        Gate::define(
+            'downloadLogFile',
+            static fn (User $user): bool => $user->isAdmin(),
+        );
+
+        Gate::define(
+            'downloadLogFolder',
+            static fn (User $user): bool => $user->isAdmin(),
+        );
+
+        // Production log deletion stays disabled from the web UI. Rotation and
+        // retention should remain an explicit infrastructure responsibility.
+        Gate::define(
+            'deleteLogFile',
+            static fn (): bool => false,
+        );
+
+        Gate::define(
+            'deleteLogFolder',
+            static fn (): bool => false,
         );
     }
 
