@@ -6,6 +6,7 @@ namespace App\Application\Cloud\Actions;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudPurchaseCatalogSourceInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
@@ -147,7 +148,11 @@ final readonly class ResolveCloudImageForOrderAction
         string $region,
         string $sizeId,
     ): CloudSizeData {
-        foreach ($cloud->listSizes($region) as $size) {
+        $sizes = $cloud instanceof CloudPurchaseCatalogSourceInterface
+            ? $cloud->listPurchaseSizes($region)
+            : $cloud->listSizes($region);
+
+        foreach ($sizes as $size) {
             if ($size->id === $sizeId) {
                 return $size;
             }
@@ -175,8 +180,12 @@ final readonly class ResolveCloudImageForOrderAction
                 );
             }
 
+            $providerImages = $cloud instanceof CloudPurchaseCatalogSourceInterface
+                ? $cloud->listPurchaseImages($region)
+                : $cloud->listImages($region);
+
             $images = $this->filter->execute(
-                $cloud->listImages($region),
+                $providerImages,
             );
         } else {
             if (
