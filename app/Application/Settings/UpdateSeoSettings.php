@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Validator;
 final class UpdateSeoSettings
 {
     public function __construct(
-        private readonly EnsureCanManageSystemSettings $authorization,
         private readonly PersistSystemSettingsChanges $persist,
         private readonly SeoSettings $settings,
     ) {}
@@ -21,8 +20,6 @@ final class UpdateSeoSettings
      */
     public function handle(User $actor, array $input): void
     {
-        $this->authorization->handle($actor);
-
         $validated = Validator::make($input, [
             'default_title' => ['required', 'string', 'max:70'],
             'default_description' => ['required', 'string', 'max:160'],
