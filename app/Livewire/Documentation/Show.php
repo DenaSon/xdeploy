@@ -6,6 +6,7 @@ namespace App\Livewire\Documentation;
 
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
+use App\Support\Seo\PublicSeo;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -104,6 +105,8 @@ final class Show extends Component
                     ],
                 ),
             ],
-        );
+        )->layout('layouts.public', [
+            'seo' => app(PublicSeo::class)->documentationArticle($article),
+        ]);
     }
 }
