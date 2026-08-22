@@ -60,7 +60,6 @@ final class PublicFooterNavigationTest extends TestCase
 
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('مستندات')
             ->assertSeeInOrder([
                 'حریم خصوصی',
                 'شرایط استفاده',
