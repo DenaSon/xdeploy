@@ -10,6 +10,7 @@ final readonly class SeoData
      * @param  array<string, mixed>  $schema
      */
     public function __construct(
+        public string $siteName,
         public string $title,
         public string $description,
         public string $canonical,
