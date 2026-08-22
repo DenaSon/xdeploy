@@ -11,6 +11,7 @@
                 ['title' => 'پشتیبانی', 'icon' => 'lucide.headset', 'route' => 'admin.support.index', 'active' => 'admin.support.*'],
                 ['title' => 'مستندات', 'icon' => 'lucide.book-open-text', 'route' => 'admin.documentation.articles.index', 'active' => 'admin.documentation.*'],
                 ['title' => 'صفحات', 'icon' => 'lucide.files', 'route' => 'admin.pages.index', 'active' => 'admin.pages.*'],
+                ['title' => 'تنظیمات سامانه', 'icon' => 'lucide.settings-2', 'route' => 'admin.settings.index', 'active' => 'admin.settings.*'],
             ];
         @endphp
 
