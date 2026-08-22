@@ -432,6 +432,14 @@
                             >
                                 <x-icon name="lucide.workflow" class="!size-3 stroke-[1.8]" />
                             </span>
+                            <span
+                                class="
+                                    flex size-7 items-center justify-center rounded-lg
+                                    border-2 border-base-100 bg-success/10 text-success
+                                "
+                            >
+                                <x-icon name="lucide.globe" class="!size-3 stroke-[1.8]" />
+                            </span>
                         </div>
                     </div>
 
