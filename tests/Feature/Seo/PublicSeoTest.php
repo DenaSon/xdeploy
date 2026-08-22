@@ -105,7 +105,7 @@ final class PublicSeoTest extends TestCase
             ->assertDontSee(route('pages.show', $draftPage->slug), false);
     }
 
-    public function test_robots_policy_follows_global_index_setting(): void
+    public function test_robots_policy_keeps_public_pages_crawlable_for_noindex_processing(): void
     {
         $this->get(route('robots'))
             ->assertOk()
@@ -119,7 +119,8 @@ final class PublicSeoTest extends TestCase
 
         $this->get(route('robots'))
             ->assertOk()
-            ->assertSee('Disallow: /');
+            ->assertSee('# Public HTML pages currently emit noindex,nofollow.')
+            ->assertDontSee("Disallow: /\n", false);
 
         $this->get(route('home'))
             ->assertOk()
