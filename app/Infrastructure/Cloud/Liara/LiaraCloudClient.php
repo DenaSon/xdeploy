@@ -17,15 +17,12 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use JsonException;
 use LogicException;
 use SensitiveParameter;
 
 final class LiaraCloudClient
 {
-    private const string PROVIDER = 'liara';
-
     private const string METHOD_GET = 'GET';
 
     private const string METHOD_POST = 'POST';
@@ -165,7 +162,6 @@ final class LiaraCloudClient
     ): array {
         $endpoint = $this->normalizePath($path);
         $url = sprintf('%s/%s', $this->baseUrl, $endpoint);
-        $startedAt = microtime(true);
 
         try {
             $response = $this->sendRequest(
@@ -178,24 +174,11 @@ final class LiaraCloudClient
                 data: $data,
             );
         } catch (ConnectionException $exception) {
-            $this->logConnectionFailure(
-                method: $method,
-                endpoint: $endpoint,
-                startedAt: $startedAt,
-            );
-
             throw new CloudConnectionException(
                 message: 'Could not connect to the cloud provider.',
                 previous: $exception,
             );
         }
-
-        $this->logResponse(
-            method: $method,
-            endpoint: $endpoint,
-            response: $response,
-            startedAt: $startedAt,
-        );
 
         if (! $response->successful()) {
             $this->throwForStatus($response);
@@ -535,68 +518,5 @@ final class LiaraCloudClient
         }
 
         return max(0, $retryAt - time());
-    }
-
-    private function logConnectionFailure(
-        string $method,
-        string $endpoint,
-        float $startedAt,
-    ): void {
-        Log::warning(
-            'Cloud provider connection failed.',
-            [
-                'provider' => self::PROVIDER,
-                'method' => $method,
-                'endpoint' => $endpoint,
-                'duration_ms' => $this->durationMilliseconds($startedAt),
-            ],
-        );
-    }
-
-    private function logResponse(
-        string $method,
-        string $endpoint,
-        Response $response,
-        float $startedAt,
-    ): void {
-        $context = [
-            'provider' => self::PROVIDER,
-            'method' => $method,
-            'endpoint' => $endpoint,
-            'status' => $response->status(),
-            'duration_ms' => $this->durationMilliseconds($startedAt),
-        ];
-
-        if (! $response->successful()) {
-            $providerMessage = $this->providerErrorMessage($response);
-
-            if ($providerMessage !== null) {
-                $context['provider_error'] = $providerMessage;
-            }
-        }
-
-        $requestId = trim((string) $response->header('X-Request-ID'));
-
-        if ($requestId !== '') {
-            $context['request_id'] = $requestId;
-        }
-
-        $rateLimitRemaining = trim(
-            (string) $response->header('X-RateLimit-Remaining'),
-        );
-
-        if ($rateLimitRemaining !== '') {
-            $context['rate_limit_remaining'] = $rateLimitRemaining;
-        }
-
-        Log::debug(
-            'Cloud provider request completed.',
-            $context,
-        );
-    }
-
-    private function durationMilliseconds(float $startedAt): float
-    {
-        return round((microtime(true) - $startedAt) * 1000, 2);
     }
 }

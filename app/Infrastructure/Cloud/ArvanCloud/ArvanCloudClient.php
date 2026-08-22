@@ -17,14 +17,11 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use JsonException;
 use LogicException;
 
 final class ArvanCloudClient
 {
-    private const string PROVIDER = 'arvan';
-
     private const string METHOD_GET = 'GET';
 
     private const string METHOD_POST = 'POST';
@@ -202,8 +199,6 @@ final class ArvanCloudClient
             $endpoint,
         );
 
-        $startedAt = microtime(true);
-
         try {
             $response = $this->sendRequest(
                 request: $this->pendingRequest(
@@ -215,24 +210,11 @@ final class ArvanCloudClient
                 data: $data,
             );
         } catch (ConnectionException $exception) {
-            $this->logConnectionFailure(
-                method: $method,
-                endpoint: $endpoint,
-                startedAt: $startedAt,
-            );
-
             throw new CloudConnectionException(
                 message: 'Could not connect to the cloud provider.',
                 previous: $exception,
             );
         }
-
-        $this->logResponse(
-            method: $method,
-            endpoint: $endpoint,
-            response: $response,
-            startedAt: $startedAt,
-        );
 
         if (! $response->successful()) {
             $this->throwForStatus(
@@ -629,80 +611,6 @@ final class ArvanCloudClient
         return max(
             0,
             $retryAt - time(),
-        );
-    }
-
-    private function logConnectionFailure(
-        string $method,
-        string $endpoint,
-        float $startedAt,
-    ): void {
-        Log::warning(
-            'Cloud provider connection failed.',
-            [
-                'provider' => self::PROVIDER,
-                'method' => $method,
-                'endpoint' => $endpoint,
-                'duration_ms' => $this->durationMilliseconds(
-                    $startedAt,
-                ),
-            ],
-        );
-    }
-
-    private function logResponse(
-        string $method,
-        string $endpoint,
-        Response $response,
-        float $startedAt,
-    ): void {
-        /*
-         * Payload and response body are deliberately excluded.
-         * Create responses can contain generated passwords.
-         */
-        $context = [
-            'provider' => self::PROVIDER,
-            'method' => $method,
-            'endpoint' => $endpoint,
-            'status' => $response->status(),
-            'duration_ms' => $this->durationMilliseconds(
-                $startedAt,
-            ),
-        ];
-
-        $requestId = trim(
-            (string) $response->header(
-                'X-Request-ID',
-            ),
-        );
-
-        if ($requestId !== '') {
-            $context['request_id'] = $requestId;
-        }
-
-        $rateLimitRemaining = trim(
-            (string) $response->header(
-                'X-RateLimit-Remaining',
-            ),
-        );
-
-        if ($rateLimitRemaining !== '') {
-            $context['rate_limit_remaining'] =
-                $rateLimitRemaining;
-        }
-
-        Log::debug(
-            'Cloud provider request completed.',
-            $context,
-        );
-    }
-
-    private function durationMilliseconds(
-        float $startedAt,
-    ): float {
-        return round(
-            (microtime(true) - $startedAt) * 1_000,
-            2,
         );
     }
 }
