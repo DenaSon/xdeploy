@@ -23,6 +23,7 @@
         "opcodesio/log-viewer": "^3.24",
         "phpseclib/phpseclib": "^3.0",
         "robsontenorio/mary": "^2.8",
+        "spatie/laravel-settings": "^3.9",
         "zarinpal/zarinpal-php-sdk": "*"
     },
     "require-dev": {
