@@ -33,7 +33,9 @@ final class PurchaseQuoteIntegrityTest extends TestCase
     use RefreshDatabase;
 
     private const string REGION = 'ir-thr-ba1';
+
     private const string SIZE = 'eco-2-2';
+
     private const string IMAGE = 'ubuntu-24';
 
     protected function setUp(): void

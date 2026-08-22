@@ -341,8 +341,7 @@ final class ArvanCloudClient
         return $request->retry(
             times: $this->retryMaxAttempts,
             sleepMilliseconds: $this->retryDelayMilliseconds,
-            when: static fn (?Throwable $exception): bool =>
-                CloudProviderRetryPolicy::shouldRetry($exception),
+            when: static fn (?Throwable $exception): bool => CloudProviderRetryPolicy::shouldRetry($exception),
             throw: false,
         );
     }

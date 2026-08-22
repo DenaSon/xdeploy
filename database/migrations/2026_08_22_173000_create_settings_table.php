@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create(config('settings.repositories.database.table') ?? 'settings', function (Blueprint $table): void {
             $table->id();
-            $table->string('group');
-            $table->string('name');
+            $table->string('group', 64);
+            $table->string('name', 126);
             $table->boolean('locked')->default(false);
             $table->json('payload');
             $table->timestamps();

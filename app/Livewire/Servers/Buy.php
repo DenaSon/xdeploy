@@ -726,8 +726,7 @@ final class Buy extends Component
 
     private function fetchCatalog(
         bool $refresh = false,
-    ): void
-    {
+    ): void {
         $this->catalogError = null;
         $this->quoteError = null;
 
@@ -1128,8 +1127,7 @@ final class Buy extends Component
      */
     private function recalculateQuote(
         ?array $providerSizes = null,
-    ): void
-    {
+    ): void {
         $this->quote = [];
         $this->quoteError = null;
 
@@ -1424,16 +1422,11 @@ final class Buy extends Component
         CloudProviderPurchaseReadinessStatus $status,
     ): string {
         return match ($status) {
-            CloudProviderPurchaseReadinessStatus::BlockedCredentials =>
-                'اتصال این زیرساخت موقتاً نیاز به بررسی دارد. ارائه‌دهنده دیگری را انتخاب کنید.',
-            CloudProviderPurchaseReadinessStatus::BlockedConfiguration =>
-                'پیکربندی این زیرساخت موقتاً آماده خرید جدید نیست.',
-            CloudProviderPurchaseReadinessStatus::BlockedBalance =>
-                'خرید جدید از این زیرساخت موقتاً در دسترس نیست.',
-            CloudProviderPurchaseReadinessStatus::TemporarilyUnavailable =>
-                'این زیرساخت موقتاً پاسخ‌گو نیست. کمی بعد دوباره تلاش کنید.',
-            CloudProviderPurchaseReadinessStatus::Ready =>
-                'این زیرساخت برای خرید آماده است.',
+            CloudProviderPurchaseReadinessStatus::BlockedCredentials => 'اتصال این زیرساخت موقتاً نیاز به بررسی دارد. ارائه‌دهنده دیگری را انتخاب کنید.',
+            CloudProviderPurchaseReadinessStatus::BlockedConfiguration => 'پیکربندی این زیرساخت موقتاً آماده خرید جدید نیست.',
+            CloudProviderPurchaseReadinessStatus::BlockedBalance => 'خرید جدید از این زیرساخت موقتاً در دسترس نیست.',
+            CloudProviderPurchaseReadinessStatus::TemporarilyUnavailable => 'این زیرساخت موقتاً پاسخ‌گو نیست. کمی بعد دوباره تلاش کنید.',
+            CloudProviderPurchaseReadinessStatus::Ready => 'این زیرساخت برای خرید آماده است.',
         };
     }
 

@@ -89,12 +89,9 @@ final readonly class CloudProviderPurchaseReadinessService
     ): CloudProviderPurchaseReadinessStatus {
         return match ($category) {
             CloudProviderHealthFailureCategory::Authentication,
-            CloudProviderHealthFailureCategory::Authorization =>
-                CloudProviderPurchaseReadinessStatus::BlockedCredentials,
-            CloudProviderHealthFailureCategory::Configuration =>
-                CloudProviderPurchaseReadinessStatus::BlockedConfiguration,
-            CloudProviderHealthFailureCategory::InsufficientBalance =>
-                CloudProviderPurchaseReadinessStatus::BlockedBalance,
+            CloudProviderHealthFailureCategory::Authorization => CloudProviderPurchaseReadinessStatus::BlockedCredentials,
+            CloudProviderHealthFailureCategory::Configuration => CloudProviderPurchaseReadinessStatus::BlockedConfiguration,
+            CloudProviderHealthFailureCategory::InsufficientBalance => CloudProviderPurchaseReadinessStatus::BlockedBalance,
             default => CloudProviderPurchaseReadinessStatus::Ready,
         };
     }

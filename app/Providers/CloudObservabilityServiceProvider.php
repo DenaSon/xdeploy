@@ -19,10 +19,9 @@ final class CloudObservabilityServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             CloudProviderHttpObserver::class,
-            static fn (Application $app): CloudProviderHttpObserver =>
-                new CloudProviderHttpObserver(
-                    $app->make(CloudProviderHealthEngine::class),
-                ),
+            static fn (Application $app): CloudProviderHttpObserver => new CloudProviderHttpObserver(
+                $app->make(CloudProviderHealthEngine::class),
+            ),
         );
     }
 

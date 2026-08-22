@@ -77,8 +77,7 @@ final class CloudProviderHttpObserverTest extends TestCase
             ->with(
                 'Cloud provider HTTP request failed.',
                 Mockery::on(
-                    static fn (array $context): bool =>
-                        $context['provider'] === 'arvan'
+                    static fn (array $context): bool => $context['provider'] === 'arvan'
                         && $context['operation'] === 'http.get'
                         && $context['method'] === 'GET'
                         && $context['endpoint'] === 'regions'
@@ -171,8 +170,7 @@ final class CloudProviderHttpObserverTest extends TestCase
             ->with(
                 'Cloud provider HTTP request failed.',
                 Mockery::on(
-                    static fn (array $context): bool =>
-                        $context['provider'] === 'liara'
+                    static fn (array $context): bool => $context['provider'] === 'liara'
                         && in_array($context['status'], [412, 428], true)
                         && $context['error_category'] === 'validation',
                 ),
@@ -206,8 +204,7 @@ final class CloudProviderHttpObserverTest extends TestCase
             ->with(
                 'Cloud provider HTTP connection failed.',
                 Mockery::on(
-                    static fn (array $context): bool =>
-                        $context['provider'] === 'arvan'
+                    static fn (array $context): bool => $context['provider'] === 'arvan'
                         && $context['operation'] === 'http.post'
                         && $context['error_category'] === 'timeout'
                         && $context['status'] === null

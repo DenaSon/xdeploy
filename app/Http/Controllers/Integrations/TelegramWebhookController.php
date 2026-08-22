@@ -51,7 +51,7 @@ final class TelegramWebhookController
                         route('panel.integrations.telegram.overview'),
                     ],
                     TelegramLinkStatus::Conflict => [
-                        "⚠️ این حساب Telegram قبلاً به یک حساب Coreflare دیگر متصل شده است.",
+                        '⚠️ این حساب Telegram قبلاً به یک حساب Coreflare دیگر متصل شده است.',
                         null,
                         null,
                     ],

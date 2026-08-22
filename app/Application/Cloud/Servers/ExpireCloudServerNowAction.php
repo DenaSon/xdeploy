@@ -17,7 +17,7 @@ final readonly class ExpireCloudServerNowAction
         int $serverId,
     ): bool {
         if (! $admin->isAdmin()) {
-            throw new AuthorizationException();
+            throw new AuthorizationException;
         }
 
         $audit = DB::transaction(

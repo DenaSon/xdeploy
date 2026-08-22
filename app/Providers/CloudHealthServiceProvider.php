@@ -16,21 +16,20 @@ final class CloudHealthServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             CloudProviderHealthStoreInterface::class,
-            static fn (): CacheCloudProviderHealthStore =>
-                new CacheCloudProviderHealthStore(
-                    ttlSeconds: (int) config(
-                        'cloud_health.state_ttl_seconds',
-                        1_800,
-                    ),
-                    lockSeconds: (int) config(
-                        'cloud_health.lock_seconds',
-                        5,
-                    ),
-                    lockWaitSeconds: (int) config(
-                        'cloud_health.lock_wait_seconds',
-                        1,
-                    ),
+            static fn (): CacheCloudProviderHealthStore => new CacheCloudProviderHealthStore(
+                ttlSeconds: (int) config(
+                    'cloud_health.state_ttl_seconds',
+                    1_800,
                 ),
+                lockSeconds: (int) config(
+                    'cloud_health.lock_seconds',
+                    5,
+                ),
+                lockWaitSeconds: (int) config(
+                    'cloud_health.lock_wait_seconds',
+                    1,
+                ),
+            ),
         );
 
         $this->app->singleton(
