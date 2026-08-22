@@ -24,11 +24,11 @@
     <meta property="og:image" content="{{ $seo->image }}">
 @endif
 
-@if($seo->publishedTime)
+@if($seo->type === 'article' && $seo->publishedTime)
     <meta property="article:published_time" content="{{ $seo->publishedTime }}">
 @endif
 
-@if($seo->modifiedTime)
+@if($seo->type === 'article' && $seo->modifiedTime)
     <meta property="article:modified_time" content="{{ $seo->modifiedTime }}">
 @endif
 
