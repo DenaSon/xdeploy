@@ -3,26 +3,26 @@
         [
             'number' => '01',
             'icon' => 'lucide.server',
-            'title' => 'اتصال یا تهیه VPS',
-            'description' => 'VPS فعلی خود را متصل کنید یا از داخل Coreflare یک سرور جدید متناسب با نیازتان تهیه کنید.',
+            'title' => 'سرور را متصل یا تهیه کنید',
+            'description' => 'VPS فعلی خود را متصل کنید یا از داخل Coreflare سرور جدیدی با منابع موردنیازتان تهیه کنید.',
         ],
         [
             'number' => '02',
             'icon' => 'lucide.shield-check',
-            'title' => 'بررسی و آماده‌سازی',
-            'description' => 'اتصال SSH، سیستم‌عامل، سطح دسترسی و پیش‌نیازهای ضروری بررسی می‌شوند تا سرور آماده ادامه کار باشد.',
+            'title' => 'آمادگی سرور بررسی می‌شود',
+            'description' => 'Coreflare اتصال، سیستم‌عامل، سطح دسترسی و پیش‌نیازهای لازم را بررسی می‌کند تا سرور برای ادامه کار آماده باشد.',
         ],
         [
             'number' => '03',
             'icon' => 'lucide.package-plus',
-            'title' => 'راه‌اندازی سرویس',
-            'description' => 'سرویس موردنظر را انتخاب کنید تا نصب، پیش‌نیازها و تنظیمات اولیه به‌صورت کنترل‌شده انجام شوند.',
+            'title' => 'سرویس را راه‌اندازی کنید',
+            'description' => 'سرویس موردنظر را انتخاب کنید؛ پیش‌نیازها، نصب و بررسی نهایی در یک مسیر کنترل‌شده انجام می‌شوند.',
         ],
         [
             'number' => '04',
             'icon' => 'lucide.layout-dashboard',
-            'title' => 'مدیریت از یک پنل',
-            'description' => 'منابع، سرویس‌ها، دامنه‌ها و وضعیت اجرا را از همان پنل مشاهده و مدیریت کنید.',
+            'title' => 'همه‌چیز را مدیریت کنید',
+            'description' => 'وضعیت سرور، سرویس‌ها، دامنه‌ها و عملیات مهم را از یک محیط واحد در اختیار داشته باشید.',
             'highlight' => true,
         ],
     ];
@@ -70,7 +70,7 @@
                 "
             >
                 <x-icon name="lucide.workflow" class="!size-3.5 stroke-[1.8]" />
-                مسیر راه‌اندازی
+                نحوه کار
             </span>
 
             <h2
@@ -79,8 +79,8 @@
                     tracking-tight text-base-content sm:text-4xl
                 "
             >
-                از اتصال سرور تا سرویس آماده،
-                <span class="text-primary">مسیر مشخص است</span>
+                از سرور تا سرویس،
+                <span class="text-primary">مسیر روشن است</span>
             </h2>
 
             <p
@@ -89,8 +89,8 @@
                     text-base-content/55 sm:text-base sm:leading-8
                 "
             >
-                سرور را متصل یا تهیه کنید؛ Coreflare آماده‌سازی، نصب
-                و مدیریت سرویس را در یک جریان مشخص کنار هم قرار می‌دهد.
+                Coreflare مراحل اصلی را کنار هم می‌آورد؛ از اتصال یا تهیه سرور
+                تا آماده‌سازی، راه‌اندازی و مدیریت سرویس.
             </p>
         </div>
 
@@ -186,7 +186,7 @@
                 px-4 py-2.5 text-xs text-base-content/40 backdrop-blur-sm
             "
         >
-            <span dir="ltr">VPS</span>
+            <span>سرور</span>
             <x-icon name="lucide.chevron-left" class="!size-3.5 stroke-[1.5]" />
             <span>آماده‌سازی</span>
             <x-icon name="lucide.chevron-left" class="!size-3.5 stroke-[1.5]" />
