@@ -22,6 +22,17 @@ Schedule::job(
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
+Schedule::command('cloud:providers:health-check')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->when(
+        static fn (): bool => (bool) config(
+            'cloud_health.probe.enabled',
+            true,
+        ),
+    );
+
 Schedule::command('cloud:catalog:warm')
     ->everyThirtyMinutes()
     ->withoutOverlapping()

@@ -3,6 +3,7 @@
 use App\Providers\AmneziaWgServiceProvider;
 use App\Providers\ApplicationServiceProvider;
 use App\Providers\AppServiceProvider;
+use App\Providers\CloudHealthServiceProvider;
 use App\Providers\CloudObservabilityServiceProvider;
 use App\Providers\CloudServiceProvider;
 use App\Providers\CloudSnapshotServiceProvider;
@@ -22,6 +23,7 @@ return [
     AmneziaWgServiceProvider::class,
     PlatformServiceProvider::class,
     CloudServiceProvider::class,
+    CloudHealthServiceProvider::class,
     CloudObservabilityServiceProvider::class,
     SmsServiceProvider::class,
     UserServiceProvider::class,

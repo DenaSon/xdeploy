@@ -49,7 +49,7 @@ final class CloudProviderHttpObserverTest extends TestCase
     {
         Log::spy();
 
-        $observer = new CloudProviderHttpObserver;
+        $observer = $this->observer();
         $request = $this->clientRequest(
             method: 'GET',
             url: 'https://napi.arvancloud.ir/ecc/v1/regions',
@@ -96,7 +96,7 @@ final class CloudProviderHttpObserverTest extends TestCase
     {
         Log::spy();
 
-        $observer = new CloudProviderHttpObserver;
+        $observer = $this->observer();
         $request = $this->clientRequest(
             method: 'GET',
             url: 'https://iaas-api.liara.ir/v1/regions?token=must-not-be-logged',
@@ -147,7 +147,7 @@ final class CloudProviderHttpObserverTest extends TestCase
         Log::spy();
 
         foreach ([412, 428] as $status) {
-            $observer = new CloudProviderHttpObserver;
+            $observer = $this->observer();
             $request = $this->clientRequest(
                 method: 'POST',
                 url: 'https://iaas-api.liara.ir/v1/servers',
@@ -183,7 +183,7 @@ final class CloudProviderHttpObserverTest extends TestCase
     {
         Log::spy();
 
-        $observer = new CloudProviderHttpObserver;
+        $observer = $this->observer();
         $request = $this->clientRequest(
             method: 'POST',
             url: 'https://napi.arvancloud.ir/ecc/v1/regions/ir-thr-ba1/sizes/eco-1/disk',
@@ -221,7 +221,7 @@ final class CloudProviderHttpObserverTest extends TestCase
     {
         Log::spy();
 
-        $observer = new CloudProviderHttpObserver;
+        $observer = $this->observer();
         $request = $this->clientRequest(
             method: 'GET',
             url: 'https://example.com/api/status',
@@ -241,6 +241,13 @@ final class CloudProviderHttpObserverTest extends TestCase
 
         Log::shouldNotHaveReceived('warning');
         Log::shouldNotHaveReceived('debug');
+    }
+
+    private function observer(): CloudProviderHttpObserver
+    {
+        return $this->app->make(
+            CloudProviderHttpObserver::class,
+        );
     }
 
     /**

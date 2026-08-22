@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Cloud\Observability;
 
+use App\Application\Cloud\Services\CloudProviderHealthEngine;
+use App\Domain\Cloud\Enums\CloudProviderHealthFailureCategory;
+use App\Domain\Cloud\Enums\CloudProviderType;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
@@ -11,6 +14,7 @@ use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\Request as WebRequest;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 final class CloudProviderHttpObserver
 {
@@ -21,6 +25,10 @@ final class CloudProviderHttpObserver
     private array $startedAt = [];
 
     private ?string $processCorrelationId = null;
+
+    public function __construct(
+        private readonly CloudProviderHealthEngine $health,
+    ) {}
 
     public function requestSending(RequestSending $event): void
     {
@@ -42,14 +50,17 @@ final class CloudProviderHttpObserver
             return;
         }
 
+        $operation = $this->operation($event->request);
+        $durationMs = $this->durationMilliseconds(
+            $event->request,
+        );
+
         $context = [
             ...$providerContext,
-            'operation' => $this->operation($event->request),
+            'operation' => $operation,
             'method' => strtoupper($event->request->method()),
             'status' => $event->response->status(),
-            'duration_ms' => $this->durationMilliseconds(
-                $event->request,
-            ),
+            'duration_ms' => $durationMs,
             'correlation_id' => $this->correlationId(),
         ];
 
@@ -80,17 +91,33 @@ final class CloudProviderHttpObserver
                 $context,
             );
 
+            $this->recordHealthSuccess(
+                providerContext: $providerContext,
+                latencyMs: $durationMs,
+                operation: $operation,
+            );
+
             return;
         }
 
-        $context['outcome'] = 'failure';
-        $context['error_category'] = $this->httpErrorCategory(
+        $category = $this->httpErrorCategory(
             $event->response->status(),
         );
+
+        $context['outcome'] = 'failure';
+        $context['error_category'] = $category->value;
 
         Log::warning(
             'Cloud provider HTTP request failed.',
             $context,
+        );
+
+        $this->recordHealthFailure(
+            providerContext: $providerContext,
+            category: $category,
+            httpStatus: $event->response->status(),
+            latencyMs: $durationMs,
+            operation: $operation,
         );
     }
 
@@ -104,23 +131,35 @@ final class CloudProviderHttpObserver
             return;
         }
 
+        $operation = $this->operation($event->request);
+        $durationMs = $this->durationMilliseconds(
+            $event->request,
+        );
+        $category = $this->connectionErrorCategory(
+            $event->exception->getMessage(),
+        );
+
         Log::warning(
             'Cloud provider HTTP connection failed.',
             [
                 ...$providerContext,
-                'operation' => $this->operation($event->request),
+                'operation' => $operation,
                 'method' => strtoupper($event->request->method()),
                 'status' => null,
-                'duration_ms' => $this->durationMilliseconds(
-                    $event->request,
-                ),
+                'duration_ms' => $durationMs,
                 'correlation_id' => $this->correlationId(),
                 'outcome' => 'failure',
-                'error_category' => $this->connectionErrorCategory(
-                    $event->exception->getMessage(),
-                ),
+                'error_category' => $category->value,
                 'exception_class' => $event->exception::class,
             ],
+        );
+
+        $this->recordHealthFailure(
+            providerContext: $providerContext,
+            category: $category,
+            httpStatus: null,
+            latencyMs: $durationMs,
+            operation: $operation,
         );
     }
 
@@ -293,28 +332,29 @@ final class CloudProviderHttpObserver
         return null;
     }
 
-    private function httpErrorCategory(int $status): string
-    {
+    private function httpErrorCategory(
+        int $status,
+    ): CloudProviderHealthFailureCategory {
         return match (true) {
             in_array(
                 $status,
                 [400, 409, 412, 419, 422, 428],
                 true,
-            ) => 'validation',
-            $status === 401 => 'authentication',
-            $status === 402 => 'insufficient_balance',
-            $status === 403 => 'authorization',
-            $status === 404 => 'not_found',
-            $status === 408 => 'timeout',
-            $status === 429 => 'rate_limit',
-            $status >= 500 => 'provider_server_error',
-            default => 'unexpected_status',
+            ) => CloudProviderHealthFailureCategory::Validation,
+            $status === 401 => CloudProviderHealthFailureCategory::Authentication,
+            $status === 402 => CloudProviderHealthFailureCategory::InsufficientBalance,
+            $status === 403 => CloudProviderHealthFailureCategory::Authorization,
+            $status === 404 => CloudProviderHealthFailureCategory::NotFound,
+            $status === 408 => CloudProviderHealthFailureCategory::Timeout,
+            $status === 429 => CloudProviderHealthFailureCategory::RateLimit,
+            $status >= 500 => CloudProviderHealthFailureCategory::ProviderServerError,
+            default => CloudProviderHealthFailureCategory::UnexpectedStatus,
         };
     }
 
     private function connectionErrorCategory(
         string $message,
-    ): string {
+    ): CloudProviderHealthFailureCategory {
         $message = strtolower($message);
 
         if (
@@ -322,10 +362,87 @@ final class CloudProviderHttpObserver
             || str_contains($message, 'timed out')
             || str_contains($message, 'timeout')
         ) {
-            return 'timeout';
+            return CloudProviderHealthFailureCategory::Timeout;
         }
 
-        return 'connection';
+        return CloudProviderHealthFailureCategory::Connection;
+    }
+
+    /**
+     * @param  array{provider: string, endpoint: string}  $providerContext
+     */
+    private function recordHealthSuccess(
+        array $providerContext,
+        ?float $latencyMs,
+        string $operation,
+    ): void {
+        $provider = CloudProviderType::tryFrom(
+            $providerContext['provider'],
+        );
+
+        if (! $provider instanceof CloudProviderType) {
+            return;
+        }
+
+        try {
+            $this->health->recordSuccess(
+                provider: $provider,
+                latencyMs: $latencyMs,
+                operation: $operation,
+            );
+        } catch (Throwable $exception) {
+            $this->logHealthRecordingFailure(
+                provider: $provider,
+                exception: $exception,
+            );
+        }
+    }
+
+    /**
+     * @param  array{provider: string, endpoint: string}  $providerContext
+     */
+    private function recordHealthFailure(
+        array $providerContext,
+        CloudProviderHealthFailureCategory $category,
+        ?int $httpStatus,
+        ?float $latencyMs,
+        string $operation,
+    ): void {
+        $provider = CloudProviderType::tryFrom(
+            $providerContext['provider'],
+        );
+
+        if (! $provider instanceof CloudProviderType) {
+            return;
+        }
+
+        try {
+            $this->health->recordFailure(
+                provider: $provider,
+                category: $category,
+                httpStatus: $httpStatus,
+                latencyMs: $latencyMs,
+                operation: $operation,
+            );
+        } catch (Throwable $exception) {
+            $this->logHealthRecordingFailure(
+                provider: $provider,
+                exception: $exception,
+            );
+        }
+    }
+
+    private function logHealthRecordingFailure(
+        CloudProviderType $provider,
+        Throwable $exception,
+    ): void {
+        Log::warning(
+            'Cloud provider health state update failed.',
+            [
+                'provider' => $provider->value,
+                'exception_class' => $exception::class,
+            ],
+        );
     }
 
     private function correlationId(): string
