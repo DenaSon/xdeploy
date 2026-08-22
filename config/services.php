@@ -9,6 +9,10 @@ return [
     */
     'sms' => [
         'driver' => env('SMS_DRIVER', 'fake'),
+        'otp_browser_console_debug' => filter_var(
+            env('OTP_BROWSER_CONSOLE_DEBUG', false),
+            FILTER_VALIDATE_BOOL,
+        ),
     ],
 
     'smsir' => [
