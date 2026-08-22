@@ -14,13 +14,15 @@ Schedule::job(
     new DispatchExpiredCloudServerTerminationsJob,
 )
     ->everyFiveMinutes()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::job(
     new DispatchExpiringCloudServerNotificationsJob,
 )
     ->everyFifteenMinutes()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::command('cloud:providers:health-check')
     ->everyFiveMinutes()
