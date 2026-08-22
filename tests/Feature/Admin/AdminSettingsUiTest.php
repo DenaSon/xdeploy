@@ -48,12 +48,16 @@ final class AdminSettingsUiTest extends TestCase
             ->set('seoDefaultDescription', '  مدیریت سرور و سرویس‌ها از یک محیط واحد.  ')
             ->set('seoDefaultOgImage', '  /images/og/coreflare.png  ')
             ->set('seoIndexSite', false)
+            ->set('seoGoogleSiteVerification', '  google-token  ')
+            ->set('seoBingSiteVerification', '  bing-token  ')
             ->call('saveSeo')
             ->assertHasNoErrors()
             ->assertSet('seoDefaultTitle', 'Coreflare | مدیریت زیرساخت')
             ->assertSet('seoDefaultDescription', 'مدیریت سرور و سرویس‌ها از یک محیط واحد.')
             ->assertSet('seoDefaultOgImage', '/images/og/coreflare.png')
             ->assertSet('seoIndexSite', false)
+            ->assertSet('seoGoogleSiteVerification', 'google-token')
+            ->assertSet('seoBingSiteVerification', 'bing-token')
             ->assertSet('savedSection', 'seo');
 
         $snapshot = app(GetSystemSettings::class)->handle();
@@ -64,6 +68,8 @@ final class AdminSettingsUiTest extends TestCase
         self::assertSame('مدیریت سرور و سرویس‌ها از یک محیط واحد.', $snapshot->seoDefaultDescription);
         self::assertSame('/images/og/coreflare.png', $snapshot->seoDefaultOgImage);
         self::assertFalse($snapshot->seoIndexSite);
+        self::assertSame('google-token', $snapshot->seoGoogleSiteVerification);
+        self::assertSame('bing-token', $snapshot->seoBingSiteVerification);
     }
 
     public function test_invalid_seo_title_is_rejected_before_persistence(): void
