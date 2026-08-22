@@ -13,18 +13,17 @@ final class RobotsController
     {
         $lines = [
             'User-agent: *',
+            'Allow: /',
+            'Disallow: /admin/',
+            'Disallow: /panel/',
+            'Disallow: /login',
+            'Disallow: /verify',
+            'Disallow: /passkeys/',
+            'Disallow: /payments/',
         ];
 
         if (! $seo->index_site) {
-            $lines[] = 'Disallow: /';
-        } else {
-            $lines[] = 'Allow: /';
-            $lines[] = 'Disallow: /admin/';
-            $lines[] = 'Disallow: /panel/';
-            $lines[] = 'Disallow: /login';
-            $lines[] = 'Disallow: /verify';
-            $lines[] = 'Disallow: /passkeys/';
-            $lines[] = 'Disallow: /payments/';
+            $lines[] = '# Public HTML pages currently emit noindex,nofollow.';
         }
 
         $lines[] = '';
