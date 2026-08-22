@@ -71,8 +71,8 @@
                         tracking-tight text-base-content sm:text-4xl
                     "
                 >
-                    زیرساخت خود را
-                    <span class="text-primary">از یک پنل مدیریت کنید</span>
+                    زیرساخت را
+                    <span class="text-primary">ساده‌تر مدیریت کنید</span>
                 </h2>
 
                 <p
@@ -81,9 +81,8 @@
                         text-base-content/55 sm:text-base sm:leading-8
                     "
                 >
-                    VPS خود را متصل کنید یا سرور جدید تهیه کنید؛ از راه‌اندازی
-                    سرویس تا دامنه، HTTPS و پایش، ابزارهای اصلی در Coreflare
-                    کنار هم در دسترس هستند.
+                    سرور خود را متصل کنید یا یک VPS تهیه کنید؛ سپس سرویس‌ها،
+                    دامنه و وضعیت زیرساخت را از یک محیط واحد مدیریت کنید.
                 </p>
 
                 <div
@@ -123,7 +122,7 @@
                         "
                     >
                         <x-icon name="lucide.workflow" class="!size-4 stroke-[1.7]" />
-                        مشاهده مسیر راه‌اندازی
+                        نحوه کار
                     </a>
                 </div>
 
@@ -135,17 +134,17 @@
                 >
                     <span class="inline-flex items-center gap-1.5">
                         <x-icon name="lucide.server" class="!size-3.5 stroke-[1.6]" />
-                        اتصال VPS موجود
+                        اتصال سرور
                     </span>
 
                     <span class="inline-flex items-center gap-1.5">
                         <x-icon name="lucide.cloud" class="!size-3.5 stroke-[1.6]" />
-                        تهیه VPS جدید
+                        تهیه VPS
                     </span>
 
                     <span class="inline-flex items-center gap-1.5">
                         <x-icon name="lucide.package" class="!size-3.5 stroke-[1.6]" />
-                        نصب و مدیریت سرویس‌ها
+                        راه‌اندازی سرویس
                     </span>
 
                     <span class="inline-flex items-center gap-1.5">
