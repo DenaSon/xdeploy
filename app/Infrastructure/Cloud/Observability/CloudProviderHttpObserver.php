@@ -86,7 +86,7 @@ final class CloudProviderHttpObserver
         if ($event->response->successful()) {
             $context['outcome'] = 'success';
 
-            Log::debug(
+            $this->debugSafely(
                 'Cloud provider HTTP request completed.',
                 $context,
             );
@@ -107,7 +107,7 @@ final class CloudProviderHttpObserver
         $context['outcome'] = 'failure';
         $context['error_category'] = $category->value;
 
-        Log::warning(
+        $this->warningSafely(
             'Cloud provider HTTP request failed.',
             $context,
         );
@@ -139,7 +139,7 @@ final class CloudProviderHttpObserver
             $event->exception->getMessage(),
         );
 
-        Log::warning(
+        $this->warningSafely(
             'Cloud provider HTTP connection failed.',
             [
                 ...$providerContext,
@@ -436,13 +436,50 @@ final class CloudProviderHttpObserver
         CloudProviderType $provider,
         Throwable $exception,
     ): void {
-        Log::warning(
+        $this->warningSafely(
             'Cloud provider health state update failed.',
             [
                 'provider' => $provider->value,
                 'exception_class' => $exception::class,
             ],
         );
+    }
+
+    /**
+     * Logging is observability only. A broken file/stream handler must never
+     * turn a successful provider operation into a failed business request.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function debugSafely(
+        string $message,
+        array $context,
+    ): void {
+        try {
+            Log::debug(
+                $message,
+                $context,
+            );
+        } catch (Throwable) {
+            // Deliberately fail open: the provider operation remains authoritative.
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function warningSafely(
+        string $message,
+        array $context,
+    ): void {
+        try {
+            Log::warning(
+                $message,
+                $context,
+            );
+        } catch (Throwable) {
+            // Deliberately fail open: logging must not become an outage source.
+        }
     }
 
     private function correlationId(): string
