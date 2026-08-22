@@ -169,8 +169,8 @@
                     lg:mx-0
                 "
             >
-                سرور خود را متصل یا تهیه کنید، سرویس‌ها را راه‌اندازی کنید
-                و وضعیت زیرساخت را بدون پراکندگی ابزارها از یک پنل مدیریت کنید.
+                سرور خود را متصل کنید یا یک VPS تهیه کنید. سرویس موردنیازتان را
+                راه‌اندازی کنید و وضعیت زیرساخت را از یک محیط واحد مدیریت کنید.
             </p>
 
             <div
@@ -213,7 +213,7 @@
                         hover:bg-base-200/70 hover:text-base-content
                     "
                 >
-                    <span>مشاهده مسیر راه‌اندازی</span>
+                    <span>نحوه کار</span>
                     <x-icon
                         name="lucide.chevron-down"
                         class="!size-4 stroke-[1.7]"
@@ -230,17 +230,17 @@
             >
                 <span class="inline-flex items-center gap-1.5">
                     <x-icon name="lucide.server" class="!size-3.5 stroke-[1.6]" />
-                    اتصال یا تهیه VPS
+                    اتصال یا تهیه سرور
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
                     <x-icon name="lucide.blocks" class="!size-3.5 stroke-[1.6]" />
-                    راه‌اندازی سرویس‌ها
+                    راه‌اندازی سرویس
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
                     <x-icon name="lucide.activity" class="!size-3.5 stroke-[1.6]" />
-                    پایش زیرساخت
+                    وضعیت و منابع
                 </span>
 
                 <span class="inline-flex items-center gap-1.5">
@@ -309,7 +309,7 @@
                                 نمای کلی زیرساخت
                             </div>
                             <div class="mt-1 text-[11px] text-base-content/40">
-                                وضعیت سرور و سرویس‌های فعال
+                                وضعیت سرور و سرویس‌های شما
                             </div>
                         </div>
 
@@ -321,7 +321,7 @@
                             "
                         >
                             <span class="size-1.5 rounded-full bg-success"></span>
-                            پایدار
+                            آماده
                         </div>
                     </div>
 
@@ -410,7 +410,7 @@
                             <div>
                                 <div class="text-xs font-medium text-base-content/75">سرویس‌ها</div>
                                 <div class="mt-1 text-[10px] text-base-content/40">
-                                    Marzban و n8n در حال اجرا هستند
+                                    Marzban، n8n و WordPress در حال اجرا هستند
                                 </div>
                             </div>
                         </div>
@@ -456,7 +456,7 @@
                                 زیرساخت آماده است
                             </div>
                             <div class="mt-1 text-[10px] text-base-content/40">
-                                سرور و سرویس‌های اصلی بدون مشکل در حال اجرا هستند
+                                سرور و سرویس‌های اصلی در وضعیت مطلوب هستند
                             </div>
                         </div>
                     </div>
