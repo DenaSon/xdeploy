@@ -15,7 +15,7 @@ final class Landing extends Component
     {
         return view('livewire.public.landing')
             ->layout('layouts.public', [
-                'title' => 'مدیریت ساده VPS و برنامه‌ها',
+                'title' => 'از سرور تا سرویس، در یک پنل',
             ]);
     }
 }
