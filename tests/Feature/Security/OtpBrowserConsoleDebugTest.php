@@ -122,6 +122,41 @@ final class OtpBrowserConsoleDebugTest extends TestCase
         );
     }
 
+    public function test_verify_page_displays_debug_otp_from_ephemeral_browser_storage_safely(): void
+    {
+        $template = file_get_contents(
+            resource_path(
+                'views/livewire/auth/verify-otp-page.blade.php',
+            ),
+        );
+
+        self::assertIsString($template);
+        self::assertStringContainsString(
+            'data-otp-browser-debug-panel',
+            $template,
+        );
+        self::assertStringContainsString(
+            'data-otp-browser-debug-code',
+            $template,
+        );
+        self::assertStringContainsString(
+            "window.sessionStorage.removeItem(storageKey);",
+            $template,
+        );
+        self::assertStringContainsString(
+            'code.textContent = otp;',
+            $template,
+        );
+        self::assertStringContainsString(
+            "panel.classList.remove('hidden');",
+            $template,
+        );
+        self::assertStringNotContainsString(
+            'innerHTML',
+            $template,
+        );
+    }
+
     private function action(
         bool $smsFails,
     ): RequestOtpAction {
