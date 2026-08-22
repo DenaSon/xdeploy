@@ -13,12 +13,14 @@ use App\Domain\Cloud\Exceptions\CloudRateLimitException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
+use App\Infrastructure\Cloud\Transport\CloudProviderRetryPolicy;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use JsonException;
 use LogicException;
+use Throwable;
 
 final class ArvanCloudClient
 {
@@ -42,13 +44,25 @@ final class ArvanCloudClient
 
     private readonly int $catalogRequestTimeout;
 
+    private readonly int $pricingConnectTimeout;
+
+    private readonly int $pricingRequestTimeout;
+
+    private readonly int $retryMaxAttempts;
+
+    private readonly int $retryDelayMilliseconds;
+
     public function __construct(
         string $baseUrl,
         string $apiKey,
         int $connectTimeout = 10,
         int $requestTimeout = 90,
         int $catalogConnectTimeout = 3,
-        int $catalogRequestTimeout = 6,
+        int $catalogRequestTimeout = 8,
+        int $pricingConnectTimeout = 3,
+        int $pricingRequestTimeout = 10,
+        int $retryMaxAttempts = 1,
+        int $retryDelayMilliseconds = 250,
     ) {
         $this->baseUrl = $this->normalizeBaseUrl(
             $baseUrl,
@@ -77,6 +91,24 @@ final class ArvanCloudClient
             timeout: $catalogRequestTimeout,
             name: 'catalog request timeout',
         );
+
+        $this->pricingConnectTimeout = $this->validateTimeout(
+            timeout: $pricingConnectTimeout,
+            name: 'pricing connect timeout',
+        );
+
+        $this->pricingRequestTimeout = $this->validateTimeout(
+            timeout: $pricingRequestTimeout,
+            name: 'pricing request timeout',
+        );
+
+        $this->retryMaxAttempts = $this->validateRetryMaxAttempts(
+            $retryMaxAttempts,
+        );
+
+        $this->retryDelayMilliseconds = $this->validateRetryDelay(
+            $retryDelayMilliseconds,
+        );
     }
 
     /**
@@ -91,6 +123,7 @@ final class ArvanCloudClient
             method: self::METHOD_GET,
             path: $path,
             data: $query,
+            retrySafe: true,
         );
     }
 
@@ -111,14 +144,18 @@ final class ArvanCloudClient
             data: $query,
             connectTimeout: $this->catalogConnectTimeout,
             requestTimeout: $this->catalogRequestTimeout,
+            retrySafe: true,
         );
     }
 
     /**
+     * Pricing is read-only even though Arvan exposes it as POST. Keeping a
+     * dedicated method prevents retry policy from leaking into mutations.
+     *
      * @param  array<string, mixed>|null  $payload
      * @return array<array-key, mixed>
      */
-    public function postCatalog(
+    public function postPricing(
         string $path,
         ?array $payload = null,
     ): array {
@@ -126,8 +163,9 @@ final class ArvanCloudClient
             method: self::METHOD_POST,
             path: $path,
             data: $payload,
-            connectTimeout: $this->catalogConnectTimeout,
-            requestTimeout: $this->catalogRequestTimeout,
+            connectTimeout: $this->pricingConnectTimeout,
+            requestTimeout: $this->pricingRequestTimeout,
+            retrySafe: true,
         );
     }
 
@@ -188,6 +226,7 @@ final class ArvanCloudClient
         ?array $data,
         ?int $connectTimeout = null,
         ?int $requestTimeout = null,
+        bool $retrySafe = false,
     ): array {
         $endpoint = $this->normalizePath(
             $path,
@@ -204,6 +243,7 @@ final class ArvanCloudClient
                 request: $this->pendingRequest(
                     connectTimeout: $connectTimeout,
                     requestTimeout: $requestTimeout,
+                    retrySafe: $retrySafe,
                 ),
                 method: $method,
                 url: $url,
@@ -274,8 +314,9 @@ final class ArvanCloudClient
     private function pendingRequest(
         ?int $connectTimeout = null,
         ?int $requestTimeout = null,
+        bool $retrySafe = false,
     ): PendingRequest {
-        return Http::acceptJson()
+        $request = Http::acceptJson()
             ->asJson()
             ->withHeaders([
                 'Authorization' => sprintf(
@@ -292,6 +333,18 @@ final class ArvanCloudClient
                     ?? $this->requestTimeout,
             )
             ->withoutRedirecting();
+
+        if (! $retrySafe || $this->retryMaxAttempts === 1) {
+            return $request;
+        }
+
+        return $request->retry(
+            times: $this->retryMaxAttempts,
+            sleepMilliseconds: $this->retryDelayMilliseconds,
+            when: static fn (?Throwable $exception): bool =>
+                CloudProviderRetryPolicy::shouldRetry($exception),
+            throw: false,
+        );
     }
 
     private function normalizeBaseUrl(
@@ -393,6 +446,28 @@ final class ArvanCloudClient
         }
 
         return $timeout;
+    }
+
+    private function validateRetryMaxAttempts(int $attempts): int
+    {
+        if ($attempts < 1) {
+            throw new CloudConfigurationException(
+                'ArvanCloud retry max attempts must be at least one.',
+            );
+        }
+
+        return $attempts;
+    }
+
+    private function validateRetryDelay(int $milliseconds): int
+    {
+        if ($milliseconds < 0) {
+            throw new CloudConfigurationException(
+                'ArvanCloud retry delay must not be negative.',
+            );
+        }
+
+        return $milliseconds;
     }
 
     private function normalizePath(

@@ -13,6 +13,7 @@ use App\Domain\Cloud\Exceptions\CloudRateLimitException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Cloud\Exceptions\CloudUnexpectedResponseException;
 use App\Domain\Cloud\Exceptions\CloudValidationException;
+use App\Infrastructure\Cloud\Transport\CloudProviderRetryPolicy;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Http;
 use JsonException;
 use LogicException;
 use SensitiveParameter;
+use Throwable;
 
 final class LiaraCloudClient
 {
@@ -45,6 +47,10 @@ final class LiaraCloudClient
 
     private readonly int $catalogRequestTimeout;
 
+    private readonly int $retryMaxAttempts;
+
+    private readonly int $retryDelayMilliseconds;
+
     public function __construct(
         string $baseUrl,
         #[SensitiveParameter]
@@ -52,7 +58,9 @@ final class LiaraCloudClient
         int $connectTimeout = 10,
         int $requestTimeout = 90,
         int $catalogConnectTimeout = 3,
-        int $catalogRequestTimeout = 6,
+        int $catalogRequestTimeout = 8,
+        int $retryMaxAttempts = 1,
+        int $retryDelayMilliseconds = 250,
     ) {
         $this->baseUrl = $this->normalizeBaseUrl($baseUrl);
         $this->apiToken = $this->normalizeApiToken($apiToken);
@@ -72,6 +80,12 @@ final class LiaraCloudClient
             timeout: $catalogRequestTimeout,
             name: 'catalog request timeout',
         );
+        $this->retryMaxAttempts = $this->validateRetryMaxAttempts(
+            $retryMaxAttempts,
+        );
+        $this->retryDelayMilliseconds = $this->validateRetryDelay(
+            $retryDelayMilliseconds,
+        );
     }
 
     /**
@@ -86,6 +100,7 @@ final class LiaraCloudClient
             method: self::METHOD_GET,
             path: $path,
             data: $query,
+            retrySafe: true,
         );
     }
 
@@ -103,6 +118,7 @@ final class LiaraCloudClient
             data: $query,
             connectTimeout: $this->catalogConnectTimeout,
             requestTimeout: $this->catalogRequestTimeout,
+            retrySafe: true,
         );
     }
 
@@ -159,6 +175,7 @@ final class LiaraCloudClient
         ?array $data,
         ?int $connectTimeout = null,
         ?int $requestTimeout = null,
+        bool $retrySafe = false,
     ): array {
         $endpoint = $this->normalizePath($path);
         $url = sprintf('%s/%s', $this->baseUrl, $endpoint);
@@ -168,6 +185,7 @@ final class LiaraCloudClient
                 request: $this->pendingRequest(
                     connectTimeout: $connectTimeout,
                     requestTimeout: $requestTimeout,
+                    retrySafe: $retrySafe,
                 ),
                 method: $method,
                 url: $url,
@@ -228,8 +246,9 @@ final class LiaraCloudClient
     private function pendingRequest(
         ?int $connectTimeout = null,
         ?int $requestTimeout = null,
+        bool $retrySafe = false,
     ): PendingRequest {
-        return Http::acceptJson()
+        $request = Http::acceptJson()
             ->withToken($this->apiToken)
             ->connectTimeout(
                 $connectTimeout
@@ -240,6 +259,18 @@ final class LiaraCloudClient
                     ?? $this->requestTimeout,
             )
             ->withoutRedirecting();
+
+        if (! $retrySafe || $this->retryMaxAttempts === 1) {
+            return $request;
+        }
+
+        return $request->retry(
+            times: $this->retryMaxAttempts,
+            sleepMilliseconds: $this->retryDelayMilliseconds,
+            when: static fn (?Throwable $exception): bool =>
+                CloudProviderRetryPolicy::shouldRetry($exception),
+            throw: false,
+        );
     }
 
     private function normalizeBaseUrl(string $baseUrl): string
@@ -318,6 +349,28 @@ final class LiaraCloudClient
         }
 
         return $timeout;
+    }
+
+    private function validateRetryMaxAttempts(int $attempts): int
+    {
+        if ($attempts < 1) {
+            throw new CloudConfigurationException(
+                'Liara retry max attempts must be at least one.',
+            );
+        }
+
+        return $attempts;
+    }
+
+    private function validateRetryDelay(int $milliseconds): int
+    {
+        if ($milliseconds < 0) {
+            throw new CloudConfigurationException(
+                'Liara retry delay must not be negative.',
+            );
+        }
+
+        return $milliseconds;
     }
 
     private function normalizePath(string $path): string
