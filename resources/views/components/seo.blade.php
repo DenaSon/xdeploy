@@ -17,7 +17,7 @@
 <meta property="og:title" content="{{ $seo->title }}">
 <meta property="og:description" content="{{ $seo->description }}">
 <meta property="og:url" content="{{ $seo->canonical }}">
-<meta property="og:site_name" content="Coreflare">
+<meta property="og:site_name" content="{{ $seo->siteName }}">
 <meta property="og:locale" content="{{ $seo->locale }}">
 
 @if($seo->image)
