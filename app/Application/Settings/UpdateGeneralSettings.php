@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Validator;
 final class UpdateGeneralSettings
 {
     public function __construct(
-        private readonly EnsureCanManageSystemSettings $authorization,
         private readonly PersistSystemSettingsChanges $persist,
         private readonly GeneralSettings $settings,
     ) {}
@@ -21,8 +20,6 @@ final class UpdateGeneralSettings
      */
     public function handle(User $actor, array $input): void
     {
-        $this->authorization->handle($actor);
-
         $validated = Validator::make($input, [
             'site_name' => ['required', 'string', 'max:80'],
         ])->validate();
