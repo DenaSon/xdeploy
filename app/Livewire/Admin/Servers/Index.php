@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin\Servers;
 
+use App\Application\Cloud\Servers\ExpireCloudServerNowAction;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
@@ -13,6 +15,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use LogicException;
 
 #[Layout('layouts.admin')]
 #[Title('سرورها')]
@@ -29,6 +32,10 @@ final class Index extends Component
     #[Url(history: true)]
     public string $source = 'all';
 
+    public ?string $expirationMessage = null;
+
+    public ?string $expirationError = null;
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -42,6 +49,37 @@ final class Index extends Component
     public function updatedSource(): void
     {
         $this->resetPage();
+    }
+
+    public function expireNow(
+        int $serverId,
+        ExpireCloudServerNowAction $expireCloudServer,
+    ): void {
+        $this->expirationMessage = null;
+        $this->expirationError = null;
+
+        $admin = auth()->user();
+
+        abort_unless(
+            $admin instanceof User
+            && $admin->isAdmin(),
+            403,
+        );
+
+        try {
+            $changed = $expireCloudServer->execute(
+                admin: $admin,
+                serverId: $serverId,
+            );
+        } catch (LogicException) {
+            $this->expirationError = 'این سرور برای انقضای دستی قابل استفاده نیست.';
+
+            return;
+        }
+
+        $this->expirationMessage = $changed
+            ? 'سرور منقضی شد. Scheduler در اجرای بعدی فرایند حذف را انجام می‌دهد.'
+            : 'این سرور قبلاً منقضی شده است.';
     }
 
     public function render(): View

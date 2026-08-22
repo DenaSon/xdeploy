@@ -5,6 +5,20 @@
         icon="lucide.server"
     />
 
+    @if($expirationMessage !== null)
+        <div class="flex items-start gap-2 rounded-2xl border border-success/20 bg-success/5 px-4 py-3 text-sm text-success">
+            <x-icon name="lucide.circle-check" class="mt-0.5 !size-4 shrink-0" />
+            <span>{{ $expirationMessage }}</span>
+        </div>
+    @endif
+
+    @if($expirationError !== null)
+        <div class="flex items-start gap-2 rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm text-error">
+            <x-icon name="lucide.circle-alert" class="mt-0.5 !size-4 shrink-0" />
+            <span>{{ $expirationError }}</span>
+        </div>
+    @endif
+
     <section class="overflow-hidden rounded-2xl border border-base-300 bg-base-100">
         <div class="grid gap-3 border-b border-base-300 p-4 sm:grid-cols-3 sm:p-5">
             <x-input
@@ -45,7 +59,36 @@
                             <td><span class="badge badge-ghost badge-sm">{{ $server->isCloudProvisioned() ? ($server->cloud_provider ?: 'Cloud') : 'Manual' }}</span></td>
                             <td><x-admin.status-badge :status="$server->status" /></td>
                             <td class="text-sm text-base-content/60">{{ $server->expires_at?->format('Y-m-d H:i') ?? '—' }}</td>
-                            <td class="text-left"><x-button label="جزئیات" icon="lucide.arrow-left" :link="route('admin.servers.show', $server)" wire:navigate class="btn-ghost btn-sm" /></td>
+                            <td class="text-left">
+                                <div class="flex items-center justify-end gap-1">
+                                    @if($server->isCloudProvisioned())
+                                        @if($server->isTerminated() || $server->termination_started_at !== null)
+                                            <span class="badge badge-ghost badge-sm">در حال حذف</span>
+                                        @elseif($server->hasExpired())
+                                            <span class="badge badge-warning badge-sm">منقضی</span>
+                                        @else
+                                            <button
+                                                type="button"
+                                                class="btn btn-ghost btn-sm text-error"
+                                                wire:loading.attr="disabled"
+                                                wire:target="expireNow"
+                                                x-on:click="if (confirm('تاریخ انقضای این سرور روی همین لحظه قرار می‌گیرد. حذف در اجرای بعدی Scheduler انجام می‌شود. ادامه می‌دهید؟')) $wire.expireNow({{ $server->id }})"
+                                            >
+                                                <x-icon name="lucide.calendar-x" class="!size-4" />
+                                                منقضی کردن
+                                            </button>
+                                        @endif
+                                    @endif
+
+                                    <x-button
+                                        label="جزئیات"
+                                        icon="lucide.arrow-left"
+                                        :link="route('admin.servers.show', $server)"
+                                        wire:navigate
+                                        class="btn-ghost btn-sm"
+                                    />
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="6" class="py-10 text-center text-sm text-base-content/45">سروری پیدا نشد.</td></tr>
