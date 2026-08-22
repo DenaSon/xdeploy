@@ -33,6 +33,10 @@ final class Index extends Component
 
     public bool $seoIndexSite = true;
 
+    public string $seoGoogleSiteVerification = '';
+
+    public string $seoBingSiteVerification = '';
+
     public ?string $savedSection = null;
 
     public function mount(GetSystemSettings $settings): void
@@ -49,6 +53,8 @@ final class Index extends Component
             'seoDefaultDescription',
             'seoDefaultOgImage',
             'seoIndexSite',
+            'seoGoogleSiteVerification',
+            'seoBingSiteVerification',
         ], true)) {
             $this->savedSection = null;
         }
@@ -91,17 +97,23 @@ final class Index extends Component
             'seoDefaultDescription' => ['required', 'string', 'max:160'],
             'seoDefaultOgImage' => ['nullable', 'string', 'max:2048'],
             'seoIndexSite' => ['required', 'boolean'],
+            'seoGoogleSiteVerification' => ['nullable', 'string', 'max:255'],
+            'seoBingSiteVerification' => ['nullable', 'string', 'max:255'],
         ]);
 
         $this->seoDefaultTitle = trim($validated['seoDefaultTitle']);
         $this->seoDefaultDescription = trim($validated['seoDefaultDescription']);
         $this->seoDefaultOgImage = trim($validated['seoDefaultOgImage'] ?? '');
+        $this->seoGoogleSiteVerification = trim($validated['seoGoogleSiteVerification'] ?? '');
+        $this->seoBingSiteVerification = trim($validated['seoBingSiteVerification'] ?? '');
 
         $update->handle($this->actor(), [
             'default_title' => $this->seoDefaultTitle,
             'default_description' => $this->seoDefaultDescription,
             'default_og_image' => $this->seoDefaultOgImage,
             'index_site' => $this->seoIndexSite,
+            'google_site_verification' => $this->seoGoogleSiteVerification,
+            'bing_site_verification' => $this->seoBingSiteVerification,
         ]);
 
         $this->savedSection = 'seo';
@@ -120,6 +132,8 @@ final class Index extends Component
         $this->seoDefaultDescription = $snapshot->seoDefaultDescription;
         $this->seoDefaultOgImage = $snapshot->seoDefaultOgImage ?? '';
         $this->seoIndexSite = $snapshot->seoIndexSite;
+        $this->seoGoogleSiteVerification = $snapshot->seoGoogleSiteVerification ?? '';
+        $this->seoBingSiteVerification = $snapshot->seoBingSiteVerification ?? '';
     }
 
     /**

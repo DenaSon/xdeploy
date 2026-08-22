@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Public;
 
+use App\Support\Seo\PublicSeo;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -15,7 +16,7 @@ final class Landing extends Component
     {
         return view('livewire.public.landing')
             ->layout('layouts.public', [
-                'title' => 'از سرور تا سرویس، در یک پنل',
+                'seo' => app(PublicSeo::class)->landing(),
             ]);
     }
 }

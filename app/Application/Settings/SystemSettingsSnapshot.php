@@ -13,5 +13,7 @@ final readonly class SystemSettingsSnapshot
         public string $seoDefaultDescription,
         public ?string $seoDefaultOgImage,
         public bool $seoIndexSite,
+        public ?string $seoGoogleSiteVerification,
+        public ?string $seoBingSiteVerification,
     ) {}
 }

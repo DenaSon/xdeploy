@@ -7,7 +7,7 @@
 <head>
 
     <meta charset="utf-8">
-    <meta name="enamad" content="33187641" />
+    <meta name="enamad" content="33187641">
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"
@@ -18,13 +18,12 @@
         content="light dark"
     >
 
-    <title>
-{{--        {{ isset($title) && $title--}}
-{{--            ? $title . ' | ' . config('app.name')--}}
-{{--            : config('app.name')--}}
-{{--        }}--}}
-        33187641
-    </title>
+    @php
+        $resolvedSeo = $seo
+            ?? app(\App\Support\Seo\PublicSeo::class)->generic(url()->current());
+    @endphp
+
+    <x-seo :seo="$resolvedSeo" />
 
     @vite([
         'resources/css/app.css',

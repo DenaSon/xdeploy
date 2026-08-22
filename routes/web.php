@@ -1,9 +1,16 @@
 <?php
 
+use App\Http\Controllers\Public\RobotsController;
+use App\Http\Controllers\Public\SitemapController;
 use App\Livewire\Documentation\Index as DocumentationIndex;
 use App\Livewire\Documentation\Show as DocumentationShow;
 use App\Livewire\Pages\Show as PublicPageShow;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/robots.txt', RobotsController::class)
+    ->name('robots');
+Route::get('/sitemap.xml', SitemapController::class)
+    ->name('sitemap');
 
 Route::livewire('/', 'public.landing')
     ->name('home');

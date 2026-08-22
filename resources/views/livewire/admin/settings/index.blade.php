@@ -127,9 +127,9 @@
             <div x-show="tab === 'seo'">
                 <form wire:submit="saveSeo" class="space-y-6">
                     <div>
-                        <h2 class="font-semibold">SEO پیش‌فرض</h2>
+                        <h2 class="font-semibold">SEO عمومی</h2>
                         <p class="mt-1 text-sm leading-6 text-base-content/50">
-                            مقادیر پایه برای صفحات عمومی. اتصال این تنظیمات به Meta و Schema در فاز SEO انجام می‌شود.
+                            متادیتای پیش‌فرض، تصویر اشتراک‌گذاری، ایندکس و کدهای تأیید موتورهای جستجو.
                         </p>
                     </div>
 
@@ -176,12 +176,28 @@
                         @enderror
                     </div>
 
+                    <div class="grid gap-5 lg:grid-cols-2">
+                        <x-input
+                            label="Google Site Verification"
+                            hint="فقط مقدار content تگ verification"
+                            wire:model.blur="seoGoogleSiteVerification"
+                            dir="ltr"
+                        />
+
+                        <x-input
+                            label="Bing Site Verification"
+                            hint="فقط مقدار content تگ msvalidate.01"
+                            wire:model.blur="seoBingSiteVerification"
+                            dir="ltr"
+                        />
+                    </div>
+
                     <div class="rounded-xl border border-base-300 bg-base-200/35 p-4">
                         <label class="flex cursor-pointer items-start justify-between gap-5">
                             <div>
                                 <div class="font-medium">اجازه ایندکس عمومی</div>
                                 <p class="mt-1 text-sm leading-6 text-base-content/50">
-                                    این مقدار در فاز SEO برای کنترل رفتار robots صفحات عمومی استفاده خواهد شد.
+                                    با غیرفعال‌کردن این گزینه، صفحات عمومی noindex می‌شوند؛ Crawl عمومی باز می‌ماند تا موتور جستجو این دستور را دریافت کند.
                                 </p>
                             </div>
 

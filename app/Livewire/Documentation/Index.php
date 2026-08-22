@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Documentation;
 
 use App\Models\DocumentationCategory;
+use App\Support\Seo\PublicSeo;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -33,6 +34,8 @@ final class Index extends Component
         return view(
             'livewire.documentation.index',
             ['categories' => $categories],
-        );
+        )->layout('layouts.public', [
+            'seo' => app(PublicSeo::class)->documentationIndex(),
+        ]);
     }
 }

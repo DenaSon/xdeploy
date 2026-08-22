@@ -26,6 +26,8 @@ final class SettingsFoundationTest extends TestCase
         self::assertNotSame('', $seo->default_description);
         self::assertNull($seo->default_og_image);
         self::assertTrue($seo->index_site);
+        self::assertNull($seo->google_site_verification);
+        self::assertNull($seo->bing_site_verification);
     }
 
     public function test_typed_settings_can_be_saved_and_refreshed(): void
