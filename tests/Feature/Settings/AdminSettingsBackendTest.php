@@ -39,6 +39,8 @@ final class AdminSettingsBackendTest extends TestCase
             'default_description' => '  مدیریت VPS، سرویس‌ها، دامنه و وضعیت زیرساخت در Coreflare.  ',
             'default_og_image' => '  /images/og/coreflare.png  ',
             'index_site' => false,
+            'google_site_verification' => '  google-token  ',
+            'bing_site_verification' => '  bing-token  ',
         ]);
 
         $snapshot = app(GetSystemSettings::class)->handle();
@@ -52,6 +54,8 @@ final class AdminSettingsBackendTest extends TestCase
         );
         self::assertSame('/images/og/coreflare.png', $snapshot->seoDefaultOgImage);
         self::assertFalse($snapshot->seoIndexSite);
+        self::assertSame('google-token', $snapshot->seoGoogleSiteVerification);
+        self::assertSame('bing-token', $snapshot->seoBingSiteVerification);
 
         Event::assertDispatched(
             SystemSettingsUpdated::class,
@@ -76,6 +80,8 @@ final class AdminSettingsBackendTest extends TestCase
                     'default_description',
                     'default_og_image',
                     'index_site',
+                    'google_site_verification',
+                    'bing_site_verification',
                 ],
         );
     }
