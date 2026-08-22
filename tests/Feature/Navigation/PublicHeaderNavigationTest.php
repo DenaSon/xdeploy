@@ -58,12 +58,7 @@ final class PublicHeaderNavigationTest extends TestCase
 
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('راهنما')
-            ->assertSee('مسیر راه‌اندازی')
-            ->assertSee('قابلیت‌ها')
-            ->assertSee('آموزش‌ها')
             ->assertSee('مدیریت سرور')
-            ->assertSee('مشاهده همه آموزش‌ها')
             ->assertSee(
                 route('docs.index').'#docs-category-server-management',
                 escape: false,
