@@ -138,8 +138,6 @@
                     @foreach($providers as $providerOption)
                         @php($isSelected = $providerOption['id'] === $provider)
                         @php($isAvailable = (bool) ($providerOption['available'] ?? false))
-                        @php($providerWarning = $providerOption['warning'] ?? null)
-                        @php($disabledReason = $providerOption['disabled_reason'] ?? null)
 
                         <button
                             type="button"
@@ -162,9 +160,9 @@
                                 ' => $isAvailable,
                                 '
                                     cursor-not-allowed
-                                    border-base-300/80
-                                    bg-base-200/35
-                                    opacity-65
+                                    border-base-300/70
+                                    bg-base-200/30
+                                    opacity-60
                                 ' => ! $isAvailable,
                                 '
                                     border-primary/45
@@ -198,15 +196,10 @@
                                             text-primary
                                         ' => $isSelected && $isAvailable,
                                         '
-                                            border-warning/20
-                                            bg-warning/10
-                                            text-warning
-                                        ' => ! $isAvailable,
-                                        '
                                             border-base-300
                                             bg-base-200/55
-                                            text-base-content/45
-                                        ' => ! $isSelected && $isAvailable,
+                                            text-base-content/40
+                                        ' => ! $isAvailable || (! $isSelected && $isAvailable),
                                     ])
                                 >
                                     <span
@@ -229,7 +222,7 @@
                                     >
                                         <x-icon
                                             :name="! $isAvailable
-                                                ? 'lucide.circle-alert'
+                                                ? 'lucide.circle-off'
                                                 : ($isSelected ? 'lucide.check' : 'lucide.cloud')"
                                             class="!size-3.5"
                                         />
@@ -252,40 +245,25 @@
                                             <span
                                                 class="
                                                     shrink-0 rounded-md
-                                                    bg-warning/10 px-1.5 py-0.5
+                                                    bg-base-200 px-1.5 py-0.5
                                                     text-[9px] font-medium
-                                                    text-warning
+                                                    text-base-content/45
                                                 "
                                             >
-                                                موقتاً غیرفعال
-                                            </span>
-                                        @elseif($providerWarning)
-                                            <span
-                                                class="
-                                                    shrink-0 rounded-md
-                                                    bg-warning/10 px-1.5 py-0.5
-                                                    text-[9px] font-medium
-                                                    text-warning
-                                                "
-                                            >
-                                                اختلال نسبی
+                                                فعلاً در دسترس نیست
                                             </span>
                                         @endif
                                     </div>
 
                                     <div
                                         @class([
-                                            '
-                                                mt-0.5 text-[10px]
-                                            ',
-                                            'text-warning/80' => ! $isAvailable || $providerWarning,
-                                            'text-base-content/40' => $isAvailable && ! $providerWarning,
+                                            'mt-0.5 text-[10px]',
+                                            'text-base-content/35' => ! $isAvailable,
+                                            'text-base-content/40' => $isAvailable,
                                         ])
                                     >
                                         @if(! $isAvailable)
-                                            {{ $disabledReason ?? 'خرید جدید موقتاً در دسترس نیست.' }}
-                                        @elseif($providerWarning)
-                                            {{ $providerWarning }}
+                                            خرید جدید از این زیرساخت فعلاً در دسترس نیست.
                                         @else
                                             {{ $isSelected ? 'انتخاب‌شده' : 'انتخاب زیرساخت' }}
                                         @endif

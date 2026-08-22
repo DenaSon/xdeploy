@@ -64,10 +64,11 @@ final class BuyProviderReadinessTest extends TestCase
                         && ($indexed[$liaraCode]['available'] ?? false) === true;
                 },
             )
-            ->assertSee('موقتاً غیرفعال');
+            ->assertSee('فعلاً در دسترس نیست')
+            ->assertDontSee('اختلال نسبی');
     }
 
-    public function test_degraded_provider_remains_selectable_with_warning(): void
+    public function test_degraded_provider_remains_selectable_without_customer_facing_warning(): void
     {
         config()->set('cloud.default', CloudProviderType::Arvan->value);
 
@@ -95,15 +96,14 @@ final class BuyProviderReadinessTest extends TestCase
                             continue;
                         }
 
-                        return ($provider['available'] ?? false) === true
-                            && is_string($provider['warning'] ?? null)
-                            && $provider['warning'] !== '';
+                        return ($provider['available'] ?? false) === true;
                     }
 
                     return false;
                 },
             )
-            ->assertSee('اختلال نسبی');
+            ->assertDontSee('اختلال نسبی')
+            ->assertDontSee('اختلال موقت گزارش شده');
     }
 
     public function test_readiness_refresh_preserves_user_selection_when_provider_becomes_blocked(): void
