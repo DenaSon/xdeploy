@@ -5,6 +5,7 @@
     dir="rtl"
 >
 <head>
+    <meta name="enamad" content="33187641" />
     <meta charset="utf-8">
 
     <meta
