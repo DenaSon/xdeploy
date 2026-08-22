@@ -41,8 +41,8 @@ final class TelegramWebhookController
             } elseif ($outcome->chatId !== null) {
                 [$text, $buttonText, $buttonUrl] = match ($outcome->status) {
                     TelegramLinkStatus::Connected, TelegramLinkStatus::Relinked => [
-                        "✅ Coreflare متصل شد\n\nحساب Telegram شما با موفقیت به Coreflare متصل شد.\n\nاز این پس اعلان‌های فعال‌شده را همین‌جا دریافت می‌کنید و می‌توانید نوع اعلان‌ها را از بخش Telegram مدیریت کنید.",
-                        'مدیریت اعلان‌ها در Coreflare',
+                        'به Coreflare bot خوش آمدید | فعالسازی با موفقیت انجام شد.',
+                        'مشاهده Coreflare',
                         route('panel.integrations.telegram.overview'),
                     ],
                     TelegramLinkStatus::InvalidOrExpired => [
