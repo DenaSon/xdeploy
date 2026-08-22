@@ -25,6 +25,8 @@ final class GetSystemSettings
             seoDefaultDescription: $this->seo->default_description,
             seoDefaultOgImage: $this->seo->default_og_image,
             seoIndexSite: $this->seo->index_site,
+            seoGoogleSiteVerification: $this->seo->google_site_verification,
+            seoBingSiteVerification: $this->seo->bing_site_verification,
         );
     }
 }
