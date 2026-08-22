@@ -19,10 +19,11 @@
     >
 
     <title>
-        {{ isset($title) && $title
-            ? $title . ' | ' . config('app.name')
-            : config('app.name')
-        }}
+{{--        {{ isset($title) && $title--}}
+{{--            ? $title . ' | ' . config('app.name')--}}
+{{--            : config('app.name')--}}
+{{--        }}--}}
+        33187641
     </title>
 
     @vite([
