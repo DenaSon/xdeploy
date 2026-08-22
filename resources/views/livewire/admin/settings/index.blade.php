@@ -197,7 +197,7 @@
                             <div>
                                 <div class="font-medium">اجازه ایندکس عمومی</div>
                                 <p class="mt-1 text-sm leading-6 text-base-content/50">
-                                    با غیرفعال‌کردن این گزینه، صفحات عمومی noindex می‌شوند و robots.txt نیز Crawl عمومی را مسدود می‌کند.
+                                    با غیرفعال‌کردن این گزینه، صفحات عمومی noindex می‌شوند؛ Crawl عمومی باز می‌ماند تا موتور جستجو این دستور را دریافت کند.
                                 </p>
                             </div>
 
