@@ -8,8 +8,10 @@ use App\Application\Authentication\Actions\RequestOtpAction;
 use App\Application\Authentication\Services\OtpClientRateLimiter;
 use App\Domain\Authentication\DTOs\RequestOtpData;
 use App\Domain\Authentication\Exceptions\TooManyOtpRequestsException;
+use App\Domain\Authentication\ValueObjects\OtpCode;
 use App\Domain\User\ValueObjects\PhoneNumber;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Js;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
@@ -24,6 +26,9 @@ final class LoginPage extends Component
 
     private const string PENDING_PHONE_SESSION_KEY =
         'auth.pending_otp_phone';
+
+    private const string OTP_DEBUG_STORAGE_KEY =
+        'coreflare:otp-browser-debug';
 
     #[Validate('required')]
     public string $phone = '';
@@ -43,7 +48,7 @@ final class LoginPage extends Component
                 $this->clientIdentifier(),
             );
 
-            $requestOtp->handle(
+            $debugOtp = $requestOtp->handle(
                 new RequestOtpData(
                     phone: $phone,
                 ),
@@ -53,6 +58,14 @@ final class LoginPage extends Component
                 self::PENDING_PHONE_SESSION_KEY,
                 (string) $phone,
             );
+
+            if ($debugOtp instanceof OtpCode) {
+                $this->continueWithBrowserDebugOtp(
+                    $debugOtp,
+                );
+
+                return;
+            }
 
             $this->redirectRoute(
                 name: 'verify',
@@ -84,6 +97,25 @@ final class LoginPage extends Component
     {
         return view(
             'livewire.auth.login-page',
+        );
+    }
+
+    private function continueWithBrowserDebugOtp(
+        OtpCode $code,
+    ): void {
+        $storageKey = Js::from(
+            self::OTP_DEBUG_STORAGE_KEY,
+        );
+        $otp = Js::from(
+            (string) $code,
+        );
+        $verifyUrl = Js::from(
+            route('verify'),
+        );
+
+        $this->js(
+            "sessionStorage.setItem({$storageKey}, {$otp});"
+            ."window.location.assign({$verifyUrl});",
         );
     }
 

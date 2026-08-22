@@ -238,4 +238,20 @@
         </div>
     </div>
 
+    @script
+    <script>
+        (() => {
+            const storageKey = 'coreflare:otp-browser-debug';
+            const otp = sessionStorage.getItem(storageKey);
+
+            if (otp === null) {
+                return;
+            }
+
+            sessionStorage.removeItem(storageKey);
+            console.info('[Coreflare OTP debug]', otp);
+        })();
+    </script>
+    @endscript
+
 </div>
