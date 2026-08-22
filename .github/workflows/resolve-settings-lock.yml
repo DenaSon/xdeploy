@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/settings-foundation
+  pull_request:
 
 permissions:
   contents: read
