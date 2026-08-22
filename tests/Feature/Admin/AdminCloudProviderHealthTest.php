@@ -24,7 +24,7 @@ final class AdminCloudProviderHealthTest extends TestCase
         Cache::flush();
     }
 
-    public function test_admin_can_view_provider_health_snapshots(): void
+    public function test_admin_can_view_separated_health_and_purchase_readiness(): void
     {
         $health = $this->app->make(CloudProviderHealthEngine::class);
 
@@ -46,10 +46,13 @@ final class AdminCloudProviderHealthTest extends TestCase
             ->get(route('admin.cloud-providers.index'))
             ->assertOk()
             ->assertSee('وضعیت ارائه‌دهندگان ابری')
+            ->assertSee('سلامت سرویس')
+            ->assertSee('آمادگی خرید')
             ->assertSee('ArvanCloud')
             ->assertSee('Liara')
             ->assertSee('سالم')
-            ->assertSee('اختلال نسبی')
+            ->assertSee('ناپایدار')
+            ->assertSee('آماده خرید')
             ->assertSee('125.45 ms')
             ->assertSee('محدودیت نرخ درخواست')
             ->assertSee('HTTP 429')
@@ -66,12 +69,33 @@ final class AdminCloudProviderHealthTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('admin.cloud-providers.index'))
             ->assertOk()
-            ->assertSee('نامشخص')
-            ->assertSee('عملیاتی')
-            ->assertSee('خرید فعال')
+            ->assertSee('بدون داده')
+            ->assertSee('عملیاتی:')
+            ->assertSee('خرید در تنظیمات:')
+            ->assertSee('فعال')
             ->assertSee('غیرفعال')
-            ->assertSee('خرید غیرفعال')
-            ->assertSee('هنوز Health signal معتبری برای این Provider ثبت نشده است.');
+            ->assertSee('هنوز سیگنال Health معتبری برای این Provider ثبت نشده است.');
+    }
+
+    public function test_admin_can_distinguish_healthy_provider_from_blocked_purchase_readiness(): void
+    {
+        $health = $this->app->make(CloudProviderHealthEngine::class);
+
+        $health->recordSuccess(CloudProviderType::Arvan);
+        $health->recordFailure(
+            provider: CloudProviderType::Arvan,
+            category: CloudProviderHealthFailureCategory::Authentication,
+            httpStatus: 401,
+        );
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.cloud-providers.index'))
+            ->assertOk()
+            ->assertSee('Health: سالم')
+            ->assertSee('خرید مسدود')
+            ->assertSee('دسترسی Provider نیاز به بررسی دارد')
+            ->assertSee('احراز هویت')
+            ->assertSee('HTTP 401');
     }
 
     public function test_non_admin_cannot_open_provider_health_page(): void
