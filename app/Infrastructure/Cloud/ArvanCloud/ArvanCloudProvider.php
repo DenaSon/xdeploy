@@ -453,7 +453,7 @@ final readonly class ArvanCloudProvider implements CloudProviderInterface, Cloud
             $diskGiB,
         );
 
-        $payload = $this->client->postCatalog(
+        $payload = $this->client->postPricing(
             $this->sizeDiskEndpoint(
                 regionId: $regionId,
                 sizeId: $providerSizeId,

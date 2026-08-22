@@ -59,23 +59,56 @@ final class CloudConfigurationTest extends TestCase
         );
     }
 
-    public function test_purchase_catalog_has_a_bounded_transport_budget(): void
+    public function test_purchase_transport_has_bounded_interactive_budgets_and_retry_policy(): void
     {
-        $connectTimeout = config(
-            'cloud.catalog_cache.timeouts.connect',
+        $catalogConnectTimeout = config(
+            'cloud.transport.catalog.connect',
         );
-        $requestTimeout = config(
-            'cloud.catalog_cache.timeouts.request',
+        $catalogRequestTimeout = config(
+            'cloud.transport.catalog.request',
+        );
+        $pricingConnectTimeout = config(
+            'cloud.transport.pricing.connect',
+        );
+        $pricingRequestTimeout = config(
+            'cloud.transport.pricing.request',
+        );
+        $retryMaxAttempts = config(
+            'cloud.transport.safe_read_retry.max_attempts',
+        );
+        $retryDelayMilliseconds = config(
+            'cloud.transport.safe_read_retry.delay_milliseconds',
         );
 
-        $this->assertIsInt($connectTimeout);
-        $this->assertIsInt($requestTimeout);
-        $this->assertGreaterThan(0, $connectTimeout);
+        foreach (
+            [
+                $catalogConnectTimeout,
+                $catalogRequestTimeout,
+                $pricingConnectTimeout,
+                $pricingRequestTimeout,
+                $retryMaxAttempts,
+                $retryDelayMilliseconds,
+            ] as $value
+        ) {
+            $this->assertIsInt($value);
+        }
+
+        $this->assertGreaterThan(0, $catalogConnectTimeout);
         $this->assertGreaterThanOrEqual(
-            $connectTimeout,
-            $requestTimeout,
+            $catalogConnectTimeout,
+            $catalogRequestTimeout,
         );
-        $this->assertLessThanOrEqual(10, $requestTimeout);
+        $this->assertLessThanOrEqual(10, $catalogRequestTimeout);
+
+        $this->assertGreaterThan(0, $pricingConnectTimeout);
+        $this->assertGreaterThanOrEqual(
+            $pricingConnectTimeout,
+            $pricingRequestTimeout,
+        );
+        $this->assertLessThanOrEqual(15, $pricingRequestTimeout);
+
+        $this->assertGreaterThanOrEqual(1, $retryMaxAttempts);
+        $this->assertGreaterThanOrEqual(0, $retryDelayMilliseconds);
     }
 
     public function test_arvan_ubuntu_package_mirror_is_https(): void

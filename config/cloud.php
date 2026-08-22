@@ -20,6 +20,56 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cloud Transport
+    |--------------------------------------------------------------------------
+    |
+    | Catalog و Pricing بخشی از flow تعاملی خرید هستند و باید محدودتر از
+    | timeout عملیاتی Provider باشند. Retry فقط برای درخواست‌های امن و
+    | خطاهای transient سریع استفاده می‌شود.
+    |
+    */
+
+    'transport' => [
+        'catalog' => [
+            'connect' => (int) env(
+                'CLOUD_CATALOG_CONNECT_TIMEOUT',
+                3,
+            ),
+
+            'request' => (int) env(
+                'CLOUD_CATALOG_TIMEOUT',
+                8,
+            ),
+        ],
+
+        'pricing' => [
+            'connect' => (int) env(
+                'CLOUD_PRICING_CONNECT_TIMEOUT',
+                3,
+            ),
+
+            'request' => (int) env(
+                'CLOUD_PRICING_TIMEOUT',
+                10,
+            ),
+        ],
+
+        'safe_read_retry' => [
+            /* Total attempts. 2 means one retry after the initial request. */
+            'max_attempts' => (int) env(
+                'CLOUD_SAFE_READ_RETRY_MAX_ATTEMPTS',
+                2,
+            ),
+
+            'delay_milliseconds' => (int) env(
+                'CLOUD_SAFE_READ_RETRY_DELAY_MS',
+                250,
+            ),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Purchase Catalog Cache
     |--------------------------------------------------------------------------
     |
@@ -41,23 +91,6 @@ return [
             'CLOUD_CATALOG_CACHE_LOCK_SECONDS',
             30,
         ),
-
-        /*
-         * A cache miss runs inside the Buy Livewire request. Keep catalog
-         * transport below the web request execution budget while preserving
-         * the longer provider timeout for provisioning and lifecycle calls.
-         */
-        'timeouts' => [
-            'connect' => (int) env(
-                'CLOUD_CATALOG_CONNECT_TIMEOUT',
-                3,
-            ),
-
-            'request' => (int) env(
-                'CLOUD_CATALOG_TIMEOUT',
-                6,
-            ),
-        ],
 
         'regions' => [
             'fresh_seconds' => (int) env(
