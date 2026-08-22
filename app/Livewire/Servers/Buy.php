@@ -9,9 +9,11 @@ use App\Application\Billing\Actions\CreateOrderAction;
 use App\Application\Billing\Actions\CreatePaymentAction;
 use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Domain\Billing\DTOs\PurchasePriceData;
+use App\Domain\Billing\DTOs\PurchaseQuoteExpectationData;
 use App\Domain\Billing\Exceptions\OrderNotPayableException;
 use App\Domain\Billing\Exceptions\OrderQuoteExpiredException;
 use App\Domain\Billing\Exceptions\PaymentInitiationInProgressException;
+use App\Domain\Billing\Exceptions\PurchaseQuoteChangedException;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
@@ -452,6 +454,12 @@ final class Buy extends Component
 
         $user = $this->authenticatedUser();
         $provider = $this->providerType();
+        $expectedQuote = new PurchaseQuoteExpectationData(
+            finalAmount: (int) $this->quote['final_amount'],
+            currency: (string) $this->quote['currency'],
+            durationHours: (int) $this->quote['duration_hours'],
+            selectedDiskGiB: (int) $this->quote['selected_disk_gib'],
+        );
 
         /*
          * Keep order creation separate from payment initiation so the UI
@@ -467,10 +475,24 @@ final class Buy extends Component
                     selectedDiskGiB: $this->selectedDiskGiB,
                     period: $this->period,
                     provider: $provider,
+                    expectedQuote: $expectedQuote,
                 );
 
                 $this->pendingOrderId =
                     $order->getKey();
+            } catch (PurchaseQuoteChangedException $exception) {
+                $this->pendingOrderId = null;
+                $this->quoteError = null;
+                $this->quote = $this->quoteArray(
+                    $exception->currentQuote,
+                );
+
+                $this->warning(
+                    'قیمت به‌روزرسانی شد',
+                    'قیمت این پیکربندی تغییر کرده است. مبلغ جدید را بررسی کنید و برای ادامه دوباره پرداخت را آغاز کنید.',
+                );
+
+                return null;
             } catch (Throwable $exception) {
                 report(
                     $exception,

@@ -8,6 +8,7 @@ use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Services\CloudPricingCalculator;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudPurchaseCatalogSourceInterface;
 use App\Domain\Cloud\Contracts\CloudPurchasePricingSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\DTOs\CloudDiskPriceData;
@@ -40,15 +41,21 @@ final readonly class CalculateCloudPurchasePriceAction
             $provider,
         );
 
-        return $this->calculate(
-            size: $this->findSize(
-                sizes: $cloud->listSizes(
-                    $region,
-                ),
-                region: $region,
-                sizeId: $sizeId,
-            ),
-            diskPrice: static fn (
+        $sizes = $cloud instanceof CloudPurchaseCatalogSourceInterface
+            ? $cloud->listPurchaseSizes($region)
+            : $cloud->listSizes($region);
+
+        $diskPrice = $cloud instanceof CloudPurchasePricingSourceInterface
+            ? static fn (
+                string $priceRegion,
+                string $priceSizeId,
+                int $diskGiB,
+            ): CloudDiskPriceData => $cloud->calculatePurchaseDiskPrice(
+                region: $priceRegion,
+                sizeId: $priceSizeId,
+                diskGiB: $diskGiB,
+            )
+            : static fn (
                 string $priceRegion,
                 string $priceSizeId,
                 int $diskGiB,
@@ -56,7 +63,15 @@ final readonly class CalculateCloudPurchasePriceAction
                 region: $priceRegion,
                 sizeId: $priceSizeId,
                 diskGiB: $diskGiB,
+            );
+
+        return $this->calculate(
+            size: $this->findSize(
+                sizes: $sizes,
+                region: $region,
+                sizeId: $sizeId,
             ),
+            diskPrice: $diskPrice,
             region: $region,
             sizeId: $sizeId,
             selectedDiskGiB: $selectedDiskGiB,

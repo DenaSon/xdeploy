@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Application\Billing\Actions;
 
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
+use App\Domain\Billing\DTOs\PurchasePriceData;
+use App\Domain\Billing\DTOs\PurchaseQuoteExpectationData;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Enums\OrderType;
+use App\Domain\Billing\Exceptions\PurchaseQuoteChangedException;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudProviderPurchaseUnavailableException;
@@ -30,6 +33,7 @@ final readonly class CreateOrderAction
         int $selectedDiskGiB,
         string $period,
         CloudProviderType $provider = CloudProviderType::Arvan,
+        ?PurchaseQuoteExpectationData $expectedQuote = null,
     ): Order {
         if (! in_array(
             $provider,
@@ -70,6 +74,17 @@ final readonly class CreateOrderAction
             selectedDiskGiB: $selectedDiskGiB,
             period: $period,
             provider: $provider,
+        );
+
+        /*
+         * The customer may have seen a catalog/price snapshot moments before
+         * this authoritative read. Never create a payable Order for a changed
+         * amount without making the customer explicitly confirm the fresh
+         * quote first.
+         */
+        $this->assertExpectedQuote(
+            price: $price,
+            expectedQuote: $expectedQuote,
         );
 
         $quoteTtlMinutes = max(
@@ -113,6 +128,29 @@ final readonly class CreateOrderAction
 
                 'paid_at' => null,
             ]),
+        );
+    }
+
+    private function assertExpectedQuote(
+        PurchasePriceData $price,
+        ?PurchaseQuoteExpectationData $expectedQuote,
+    ): void {
+        if ($expectedQuote === null) {
+            return;
+        }
+
+        $sameQuote = $expectedQuote->finalAmount === (int) $price->finalAmount
+            && strtoupper(trim($expectedQuote->currency))
+                === strtoupper(trim($price->currency))
+            && $expectedQuote->durationHours === $price->durationHours
+            && $expectedQuote->selectedDiskGiB === $price->selectedDiskGiB;
+
+        if ($sameQuote) {
+            return;
+        }
+
+        throw new PurchaseQuoteChangedException(
+            currentQuote: $price,
         );
     }
 }
