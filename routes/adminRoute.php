@@ -25,6 +25,7 @@ use App\Livewire\Admin\Payments\Show as AdminPaymentsShow;
 use App\Livewire\Admin\Security\ConfirmPasskey as AdminConfirmPasskey;
 use App\Livewire\Admin\Servers\Index as AdminServersIndex;
 use App\Livewire\Admin\Servers\Show as AdminServersShow;
+use App\Livewire\Admin\Settings\Index as AdminSettingsIndex;
 use App\Livewire\Admin\Support\Index as AdminSupportIndex;
 use App\Livewire\Admin\Support\Show as AdminSupportShow;
 use App\Livewire\Admin\Users\Index as AdminUsersIndex;
@@ -144,5 +145,8 @@ Route::middleware([
                     ->name('pages.create');
                 Route::livewire('/pages/{page}/edit', AdminPagesEdit::class)
                     ->name('pages.edit');
+
+                Route::livewire('/settings', AdminSettingsIndex::class)
+                    ->name('settings.index');
             });
     });
