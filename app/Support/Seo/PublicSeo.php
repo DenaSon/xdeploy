@@ -130,6 +130,7 @@ final class PublicSeo
         array $schema = [],
     ): SeoData {
         return new SeoData(
+            siteName: $this->general->site_name,
             title: Str::limit(trim($title), 70, ''),
             description: Str::limit(trim($description), 160, ''),
             canonical: $canonical,
