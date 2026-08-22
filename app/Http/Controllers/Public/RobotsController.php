@@ -22,7 +22,9 @@ final class RobotsController
             $lines[] = 'Disallow: /admin/';
             $lines[] = 'Disallow: /panel/';
             $lines[] = 'Disallow: /login';
-            $lines[] = 'Disallow: /register';
+            $lines[] = 'Disallow: /verify';
+            $lines[] = 'Disallow: /passkeys/';
+            $lines[] = 'Disallow: /payments/';
         }
 
         $lines[] = '';
