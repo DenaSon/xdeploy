@@ -169,6 +169,43 @@
                 </div>
 
 
+                {{-- Browser OTP debug --}}
+                <div
+                    data-otp-browser-debug-panel
+                    role="status"
+                    aria-live="polite"
+                    class="
+                        hidden
+                        rounded-xl
+                        border border-warning/25
+                        bg-warning/10
+                        px-4 py-3
+                        text-center
+                    "
+                >
+                    <div
+                        class="
+                            flex items-center
+                            justify-center gap-2
+                            text-sm text-base-content/70
+                        "
+                    >
+                        <x-icon
+                            name="lucide.flask-conical"
+                            class="!size-4 shrink-0 stroke-[1.7] text-warning"
+                        />
+
+                        <span>کد تست موقت:</span>
+
+                        <code
+                            data-otp-browser-debug-code
+                            dir="ltr"
+                            class="technical-value font-semibold text-base-content"
+                        ></code>
+                    </div>
+                </div>
+
+
                 {{-- Validation --}}
                 @error('code')
                 <div
@@ -242,14 +279,24 @@
     <script>
         (() => {
             const storageKey = 'coreflare:otp-browser-debug';
-            const otp = sessionStorage.getItem(storageKey);
+            const otp = window.sessionStorage.getItem(storageKey);
 
             if (otp === null) {
                 return;
             }
 
-            sessionStorage.removeItem(storageKey);
+            window.sessionStorage.removeItem(storageKey);
             console.info('[Coreflare OTP debug]', otp);
+
+            const panel = document.querySelector('[data-otp-browser-debug-panel]');
+            const code = panel?.querySelector('[data-otp-browser-debug-code]');
+
+            if (panel === null || code === null) {
+                return;
+            }
+
+            code.textContent = otp;
+            panel.classList.remove('hidden');
         })();
     </script>
     @endscript
