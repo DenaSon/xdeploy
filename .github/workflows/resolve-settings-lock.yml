@@ -1,0 +1,43 @@
+name: Resolve settings lock
+
+on:
+  push:
+    branches:
+      - feat/settings-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  lock:
+    name: Resolve Composer lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          extensions: mbstring, dom, fileinfo, gd, pdo_sqlite, sqlite3, simplexml, sodium
+          tools: composer:v2
+
+      - name: Resolve Spatie settings dependency
+        run: composer update spatie/laravel-settings --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+      - name: Validate Composer metadata
+        run: composer validate
+
+      - name: Upload composer.lock
+        uses: actions/upload-artifact@v7
+        with:
+          name: settings-composer-lock
+          path: composer.lock
+          if-no-files-found: error
+          retention-days: 1
