@@ -117,7 +117,10 @@ final class SchemaBuilder
                 $this->breadcrumbs([
                     ['name' => $siteName, 'url' => $homeUrl],
                     ['name' => 'مستندات', 'url' => $docsUrl],
-                    ['name' => $category->title, 'url' => $docsUrl.'#'.$category->slug],
+                    [
+                        'name' => $category->title,
+                        'url' => $docsUrl.'#docs-category-'.$category->slug,
+                    ],
                     ['name' => $article->title, 'url' => $canonical],
                 ]),
             ],
