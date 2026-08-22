@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - feat/settings-foundation
-  pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   lock:
@@ -18,8 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          persist-credentials: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -35,10 +32,15 @@ jobs:
       - name: Validate Composer metadata
         run: composer validate
 
-      - name: Upload composer.lock
-        uses: actions/upload-artifact@v7
-        with:
-          name: settings-composer-lock
-          path: composer.lock
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit composer.lock when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- composer.lock; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.lock
+          git commit -m "Lock Spatie Laravel Settings dependencies"
+          git push origin HEAD:feat/settings-foundation
