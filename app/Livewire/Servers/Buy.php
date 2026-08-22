@@ -8,6 +8,7 @@ use App\Application\Billing\Actions\CalculateCloudPurchasePriceAction;
 use App\Application\Billing\Actions\CreateOrderAction;
 use App\Application\Billing\Actions\CreatePaymentAction;
 use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
+use App\Application\Cloud\Services\CloudProviderPurchaseReadinessService;
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\DTOs\PurchaseQuoteExpectationData;
 use App\Domain\Billing\Exceptions\OrderNotPayableException;
@@ -21,8 +22,10 @@ use App\Domain\Cloud\Contracts\RefreshableCloudCatalogReaderInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
+use App\Domain\Cloud\Enums\CloudProviderPurchaseReadinessStatus;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
+use App\Domain\Cloud\Exceptions\CloudProviderPurchaseUnavailableException;
 use App\Models\User;
 use App\Support\Cloud\CloudProviderPublicIdentity;
 use App\Support\Cloud\CloudRegionLabel;
@@ -49,7 +52,11 @@ final class Buy extends Component
      * @var list<array{
      *     id: string,
      *     label: string,
-     *     description: string
+     *     description: string,
+     *     available: bool,
+     *     readiness: string,
+     *     warning: string|null,
+     *     disabled_reason: string|null
      * }>
      */
     public array $providers = [];
@@ -193,14 +200,81 @@ final class Buy extends Component
         );
     }
 
+    public function refreshProviderReadiness(): void
+    {
+        $this->loadProviders(
+            preserveSelection: true,
+        );
+
+        if ($this->provider === '') {
+            $this->pendingOrderId = null;
+            $this->catalogLoaded = true;
+            $this->resetCatalogSelection();
+            $this->catalogLoaded = true;
+            $this->catalogError =
+                'ارائه‌دهنده انتخاب‌شده دیگر برای خرید جدید در دسترس نیست.';
+
+            return;
+        }
+
+        $providerOption = $this->findById(
+            $this->providers,
+            $this->provider,
+        );
+
+        if (
+            $providerOption !== null
+            && ($providerOption['available'] ?? false) === true
+        ) {
+            return;
+        }
+
+        $this->pendingOrderId = null;
+        $this->catalogLoaded = true;
+        $this->resetCatalogSelection();
+        $this->catalogLoaded = true;
+        $this->catalogError = is_string(
+            $providerOption['disabled_reason'] ?? null,
+        )
+            ? $providerOption['disabled_reason']
+            : 'این زیرساخت موقتاً برای خرید جدید در دسترس نیست.';
+    }
+
     public function selectProvider(string $provider): void
     {
-        if (
-            $this->findById(
-                $this->providers,
-                $provider,
-            ) === null
-        ) {
+        $providerOption = $this->findById(
+            $this->providers,
+            $provider,
+        );
+
+        if ($providerOption === null) {
+            return;
+        }
+
+        $providerType = CloudProviderPublicIdentity::provider(
+            $provider,
+        );
+
+        if (! $providerType instanceof CloudProviderType) {
+            return;
+        }
+
+        $readiness = app(
+            CloudProviderPurchaseReadinessService::class,
+        )->evaluate($providerType);
+
+        if (! $readiness->allowsPurchase()) {
+            $this->loadProviders(
+                preserveSelection: true,
+            );
+
+            $this->warning(
+                'زیرساخت موقتاً قابل خرید نیست',
+                $this->purchaseReadinessMessage(
+                    $readiness->status,
+                ),
+            );
+
             return;
         }
 
@@ -493,6 +567,30 @@ final class Buy extends Component
                 );
 
                 return null;
+            } catch (CloudProviderPurchaseUnavailableException) {
+                $this->pendingOrderId = null;
+                $this->loadProviders(
+                    preserveSelection: true,
+                );
+                $providerOption = $this->findById(
+                    $this->providers,
+                    $this->provider,
+                );
+                $this->catalogLoaded = true;
+                $this->resetCatalogSelection();
+                $this->catalogLoaded = true;
+                $this->catalogError = is_string(
+                    $providerOption['disabled_reason'] ?? null,
+                )
+                    ? $providerOption['disabled_reason']
+                    : 'این زیرساخت موقتاً برای خرید جدید در دسترس نیست.';
+
+                $this->warning(
+                    'زیرساخت موقتاً قابل خرید نیست',
+                    'وضعیت ارائه‌دهنده تغییر کرده است. ارائه‌دهنده دیگری را انتخاب کنید یا کمی بعد دوباره تلاش کنید.',
+                );
+
+                return null;
             } catch (Throwable $exception) {
                 report(
                     $exception,
@@ -641,6 +739,25 @@ final class Buy extends Component
             return;
         }
 
+        $providerOption = $this->findById(
+            $this->providers,
+            $this->provider,
+        );
+
+        if (
+            $providerOption !== null
+            && ($providerOption['available'] ?? false) !== true
+        ) {
+            $this->catalogLoaded = true;
+            $this->catalogError = is_string(
+                $providerOption['disabled_reason'] ?? null,
+            )
+                ? $providerOption['disabled_reason']
+                : 'این زیرساخت موقتاً برای خرید جدید در دسترس نیست.';
+
+            return;
+        }
+
         try {
             $catalog = $this->catalog();
 
@@ -713,26 +830,65 @@ final class Buy extends Component
         }
     }
 
-    private function loadProviders(): void
-    {
+    private function loadProviders(
+        bool $preserveSelection = false,
+    ): void {
         $purchasable = app(
             CloudProviderRegistryInterface::class,
         )->purchasableProviders();
 
+        $readiness = app(
+            CloudProviderPurchaseReadinessService::class,
+        );
+
         $this->providers = array_map(
-            static fn (CloudProviderType $provider): array => [
-                'id' => CloudProviderPublicIdentity::code(
+            function (CloudProviderType $provider) use ($readiness): array {
+                $providerReadiness = $readiness->evaluate(
                     $provider,
-                ),
-                'label' => CloudProviderPublicIdentity::label(
-                    $provider,
-                ),
-                'description' => CloudProviderPublicIdentity::description(
-                    $provider,
-                ),
-            ],
+                );
+
+                return [
+                    'id' => CloudProviderPublicIdentity::code(
+                        $provider,
+                    ),
+                    'label' => CloudProviderPublicIdentity::label(
+                        $provider,
+                    ),
+                    'description' => CloudProviderPublicIdentity::description(
+                        $provider,
+                    ),
+                    'available' => $providerReadiness->allowsPurchase(),
+                    'readiness' => $providerReadiness->status->value,
+                    'warning' => $providerReadiness->isDegraded()
+                        ? 'اختلال موقت گزارش شده؛ خرید همچنان فعال است.'
+                        : null,
+                    'disabled_reason' => $providerReadiness->allowsPurchase()
+                        ? null
+                        : $this->purchaseReadinessMessage(
+                            $providerReadiness->status,
+                        ),
+                ];
+            },
             $purchasable,
         );
+
+        if (
+            $preserveSelection
+            && $this->provider !== ''
+        ) {
+            if (
+                $this->findById(
+                    $this->providers,
+                    $this->provider,
+                ) !== null
+            ) {
+                return;
+            }
+
+            $this->provider = '';
+
+            return;
+        }
 
         $configuredDefault = CloudProviderType::tryFrom(
             strtolower(
@@ -749,12 +905,14 @@ final class Buy extends Component
             $publicDefault = CloudProviderPublicIdentity::code(
                 $configuredDefault,
             );
+            $defaultOption = $this->findById(
+                $this->providers,
+                $publicDefault,
+            );
 
             if (
-                $this->findById(
-                    $this->providers,
-                    $publicDefault,
-                ) !== null
+                $defaultOption !== null
+                && ($defaultOption['available'] ?? false) === true
             ) {
                 $this->provider = $publicDefault;
 
@@ -762,7 +920,15 @@ final class Buy extends Component
             }
         }
 
-        $this->provider = $this->providers[0]['id'] ?? '';
+        foreach ($this->providers as $providerOption) {
+            if (($providerOption['available'] ?? false) === true) {
+                $this->provider = (string) $providerOption['id'];
+
+                return;
+            }
+        }
+
+        $this->provider = '';
     }
 
     private function loadPeriods(): void
@@ -1042,11 +1208,25 @@ final class Buy extends Component
 
     private function selectionIsValid(): bool
     {
-        return
-            $this->findById(
-                $this->providers,
-                $this->provider,
-            ) !== null
+        $providerOption = $this->findById(
+            $this->providers,
+            $this->provider,
+        );
+
+        if (
+            $providerOption === null
+            || ($providerOption['available'] ?? false) !== true
+        ) {
+            return false;
+        }
+
+        $readiness = app(
+            CloudProviderPurchaseReadinessService::class,
+        )->evaluate(
+            $this->providerType(),
+        );
+
+        return $readiness->allowsPurchase()
             && $this->findById(
                 $this->regions,
                 $this->regionId,
@@ -1238,6 +1418,23 @@ final class Buy extends Component
         return CloudProviderPublicIdentity::description(
             $provider,
         );
+    }
+
+    private function purchaseReadinessMessage(
+        CloudProviderPurchaseReadinessStatus $status,
+    ): string {
+        return match ($status) {
+            CloudProviderPurchaseReadinessStatus::BlockedCredentials =>
+                'اتصال این زیرساخت موقتاً نیاز به بررسی دارد. ارائه‌دهنده دیگری را انتخاب کنید.',
+            CloudProviderPurchaseReadinessStatus::BlockedConfiguration =>
+                'پیکربندی این زیرساخت موقتاً آماده خرید جدید نیست.',
+            CloudProviderPurchaseReadinessStatus::BlockedBalance =>
+                'خرید جدید از این زیرساخت موقتاً در دسترس نیست.',
+            CloudProviderPurchaseReadinessStatus::TemporarilyUnavailable =>
+                'این زیرساخت موقتاً پاسخ‌گو نیست. کمی بعد دوباره تلاش کنید.',
+            CloudProviderPurchaseReadinessStatus::Ready =>
+                'این زیرساخت برای خرید آماده است.',
+        };
     }
 
     private function customDiskEnabled(): bool

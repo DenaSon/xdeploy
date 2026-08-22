@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Billing\Actions;
 
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
+use App\Application\Cloud\Services\CloudProviderPurchaseReadinessService;
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\DTOs\PurchaseQuoteExpectationData;
 use App\Domain\Billing\Enums\OrderStatus;
@@ -23,6 +24,7 @@ final readonly class CreateOrderAction
         private CalculateCloudPurchasePriceAction $calculatePrice,
         private ResolveCloudImageForOrderAction $resolveImage,
         private CloudProviderRegistryInterface $providers,
+        private ?CloudProviderPurchaseReadinessService $purchaseReadiness = null,
     ) {}
 
     public function execute(
@@ -44,6 +46,20 @@ final readonly class CreateOrderAction
                 sprintf(
                     'The cloud provider [%s] is not available for new purchases.',
                     $provider->value,
+                ),
+            );
+        }
+
+        $readiness = ($this->purchaseReadiness
+            ?? app(CloudProviderPurchaseReadinessService::class))
+            ->evaluate($provider);
+
+        if (! $readiness->allowsPurchase()) {
+            throw new CloudProviderPurchaseUnavailableException(
+                sprintf(
+                    'The cloud provider [%s] is not ready for new purchases [%s].',
+                    $provider->value,
+                    $readiness->status->value,
                 ),
             );
         }

@@ -2,6 +2,7 @@
     dir="rtl"
     data-current-provider="{{ $provider }}"
     data-buy-workspace
+    wire:poll.30s="refreshProviderReadiness"
     x-data="{
         switchingProvider: false,
         pendingProvider: null,
@@ -20,7 +21,7 @@
 
             try {
                 await this.$wire.selectProvider(provider);
-                this.currentProvider = provider;
+                this.currentProvider = $el.dataset.currentProvider;
             } finally {
                 this.switchingProvider = false;
                 this.pendingProvider = null;
@@ -136,35 +137,46 @@
                 >
                     @foreach($providers as $providerOption)
                         @php($isSelected = $providerOption['id'] === $provider)
+                        @php($isAvailable = (bool) ($providerOption['available'] ?? false))
+                        @php($providerWarning = $providerOption['warning'] ?? null)
+                        @php($disabledReason = $providerOption['disabled_reason'] ?? null)
 
                         <button
                             type="button"
                             data-provider-option="{{ $providerOption['id'] }}"
                             x-on:click="selectProvider($el.dataset.providerOption)"
-                            x-bind:disabled="switchingProvider"
+                            x-bind:disabled="switchingProvider || {{ $isAvailable ? 'false' : 'true' }}"
                             wire:loading.attr="disabled"
                             wire:target="selectProvider"
                             @class([
                                 '
                                     group min-w-0
-                                    cursor-pointer
                                     rounded-xl border
                                     px-3 py-3
                                     text-right
                                     transition-all duration-150
-                                    disabled:cursor-wait
                                 ',
+                                '
+                                    cursor-pointer
+                                    disabled:cursor-wait
+                                ' => $isAvailable,
+                                '
+                                    cursor-not-allowed
+                                    border-base-300/80
+                                    bg-base-200/35
+                                    opacity-65
+                                ' => ! $isAvailable,
                                 '
                                     border-primary/45
                                     bg-primary/[0.055]
                                     ring-1 ring-primary/10
-                                ' => $isSelected,
+                                ' => $isSelected && $isAvailable,
                                 '
                                     border-base-300
                                     bg-base-100
                                     hover:border-primary/30
                                     hover:bg-primary/[0.025]
-                                ' => ! $isSelected,
+                                ' => ! $isSelected && $isAvailable,
                             ])
                             x-bind:class="{
                                 'opacity-55':
@@ -184,12 +196,17 @@
                                             border-primary/20
                                             bg-primary/10
                                             text-primary
-                                        ' => $isSelected,
+                                        ' => $isSelected && $isAvailable,
+                                        '
+                                            border-warning/20
+                                            bg-warning/10
+                                            text-warning
+                                        ' => ! $isAvailable,
                                         '
                                             border-base-300
                                             bg-base-200/55
                                             text-base-content/45
-                                        ' => ! $isSelected,
+                                        ' => ! $isSelected && $isAvailable,
                                     ])
                                 >
                                     <span
@@ -211,7 +228,9 @@
                                         "
                                     >
                                         <x-icon
-                                            :name="$isSelected ? 'lucide.check' : 'lucide.cloud'"
+                                            :name="! $isAvailable
+                                                ? 'lucide.circle-alert'
+                                                : ($isSelected ? 'lucide.check' : 'lucide.cloud')"
                                             class="!size-3.5"
                                         />
                                     </span>
@@ -220,20 +239,56 @@
                                 <div class="min-w-0 flex-1">
                                     <div
                                         class="
-                                            truncate text-sm font-semibold
+                                            flex min-w-0 items-center gap-2
+                                            text-sm font-semibold
                                             text-base-content
                                         "
                                     >
-                                        {{ $providerOption['label'] }}
+                                        <span class="truncate">
+                                            {{ $providerOption['label'] }}
+                                        </span>
+
+                                        @if(! $isAvailable)
+                                            <span
+                                                class="
+                                                    shrink-0 rounded-md
+                                                    bg-warning/10 px-1.5 py-0.5
+                                                    text-[9px] font-medium
+                                                    text-warning
+                                                "
+                                            >
+                                                موقتاً غیرفعال
+                                            </span>
+                                        @elseif($providerWarning)
+                                            <span
+                                                class="
+                                                    shrink-0 rounded-md
+                                                    bg-warning/10 px-1.5 py-0.5
+                                                    text-[9px] font-medium
+                                                    text-warning
+                                                "
+                                            >
+                                                اختلال نسبی
+                                            </span>
+                                        @endif
                                     </div>
 
                                     <div
-                                        class="
-                                            mt-0.5 text-[10px]
-                                            text-base-content/40
-                                        "
+                                        @class([
+                                            '
+                                                mt-0.5 text-[10px]
+                                            ',
+                                            'text-warning/80' => ! $isAvailable || $providerWarning,
+                                            'text-base-content/40' => $isAvailable && ! $providerWarning,
+                                        ])
                                     >
-                                        {{ $isSelected ? 'انتخاب‌شده' : 'انتخاب زیرساخت' }}
+                                        @if(! $isAvailable)
+                                            {{ $disabledReason ?? 'خرید جدید موقتاً در دسترس نیست.' }}
+                                        @elseif($providerWarning)
+                                            {{ $providerWarning }}
+                                        @else
+                                            {{ $isSelected ? 'انتخاب‌شده' : 'انتخاب زیرساخت' }}
+                                        @endif
                                     </div>
                                 </div>
                             </div>
