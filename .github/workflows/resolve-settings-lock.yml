@@ -30,7 +30,7 @@ jobs:
           tools: composer:v2
 
       - name: Resolve Spatie settings dependency
-        run: composer update spatie/laravel-settings --with-all-dependencies --no-interaction --prefer-dist --no-progress
+        run: composer update spatie/laravel-settings --with-dependencies --no-scripts --no-interaction --prefer-dist --no-progress
 
       - name: Validate Composer metadata
         run: composer validate
