@@ -12,6 +12,10 @@ use Spatie\LaravelSettings\Settings;
 
 final class PersistSystemSettingsChanges
 {
+    public function __construct(
+        private readonly EnsureCanManageSystemSettings $authorization,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $values
      */
@@ -20,6 +24,8 @@ final class PersistSystemSettingsChanges
         Settings $settings,
         array $values,
     ): void {
+        $this->authorization->handle($actor);
+
         $before = $settings->toArray();
 
         $changedKeys = [];
