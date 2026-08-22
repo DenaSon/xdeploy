@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 final class UpdateBrandingSettings
 {
     public function __construct(
+        private readonly EnsureCanManageSystemSettings $authorization,
         private readonly PersistSystemSettingsChanges $persist,
         private readonly BrandingSettings $settings,
     ) {}
@@ -20,6 +21,8 @@ final class UpdateBrandingSettings
      */
     public function handle(User $actor, array $input): void
     {
+        $this->authorization->handle($actor);
+
         $validated = Validator::make($input, [
             'tagline' => ['required', 'string', 'max:120'],
         ])->validate();
