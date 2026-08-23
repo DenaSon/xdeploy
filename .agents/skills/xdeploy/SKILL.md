@@ -162,7 +162,7 @@ Do not introduce a new Domain merely to organize files. A new Domain requires a 
 
 # Application vs Platform
 
-Applications are user-facing software, for example Marzban, n8n, and AmneziaWG.
+Applications are user-facing software, for example Marzban, n8n, and WordPress.
 
 Platforms are internal reusable infrastructure, for example Docker, Docker Compose, and Caddy.
 
@@ -197,8 +197,6 @@ Do not report endpoint success before the actual post-condition is verified.
 
 Persisted PublicEndpoint lifecycle may represent product/workflow state such as Pending, Active, and Disabled. It does **not** replace remote runtime truth. Inspect Caddy/Application reality where operational truth matters.
 
-AmneziaWG is not a PublicEndpoint consumer in the current architecture.
-
 ---
 
 # Remote Runtime State
@@ -213,7 +211,6 @@ Examples:
 - Linux services
 - Containers
 - CPU / RAM / Disk
-- AmneziaWG runtime peer telemetry
 - SSH availability
 
 Do not turn remote runtime state into authoritative database state unless the product explicitly requires persisted workflow or product metadata.

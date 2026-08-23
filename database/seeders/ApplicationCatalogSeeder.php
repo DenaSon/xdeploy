@@ -41,20 +41,6 @@ final class ApplicationCatalogSeeder extends Seeder
 
         ApplicationCatalogItem::query()->updateOrCreate(
             [
-                'slug' => 'amneziawg',
-            ],
-            [
-                'name' => 'AmneziaWG',
-                'short_description' => 'پروتکل VPN سریع و مقاوم در برابر شناسایی مبتنی بر WireGuard',
-                'description' => 'AmneziaWG یک پروتکل VPN متن‌باز مبتنی بر WireGuard است که با افزودن روش‌های استتار ترافیک، شناسایی اتصال توسط سامانه‌های تحلیل عمیق بسته‌ها را دشوارتر می‌کند و در عین حال سرعت و سادگی WireGuard را حفظ می‌کند.',
-                'icon' => 'lucide.shield',
-                'is_published' => true,
-                'sort_order' => 30,
-            ],
-        );
-
-        ApplicationCatalogItem::query()->updateOrCreate(
-            [
                 'slug' => 'wordpress',
             ],
             [
@@ -63,7 +49,7 @@ final class ApplicationCatalogSeeder extends Seeder
                 'description' => 'WordPress یک سامانه مدیریت محتوای متن‌باز برای راه‌اندازی وب‌سایت، وبلاگ و فروشگاه اینترنتی است. xDeploy آن را همراه با پایگاه داده اختصاصی و فضای ذخیره‌سازی پایدار روی سرور اجرا می‌کند.',
                 'icon' => 'lucide.newspaper',
                 'is_published' => true,
-                'sort_order' => 40,
+                'sort_order' => 30,
             ],
         );
     }

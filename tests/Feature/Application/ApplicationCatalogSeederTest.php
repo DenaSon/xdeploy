@@ -47,20 +47,10 @@ final class ApplicationCatalogSeederTest extends TestCase
         $this->assertDatabaseHas(
             'applications',
             [
-                'slug' => 'amneziawg',
-                'name' => 'AmneziaWG',
-                'is_published' => true,
-                'sort_order' => 30,
-            ],
-        );
-
-        $this->assertDatabaseHas(
-            'applications',
-            [
                 'slug' => 'wordpress',
                 'name' => 'WordPress',
                 'is_published' => true,
-                'sort_order' => 40,
+                'sort_order' => 30,
             ],
         );
     }

@@ -8,7 +8,6 @@ use App\Application\PublicEndpoint\Drivers\MarzbanPublicEndpointDriver;
 use App\Application\PublicEndpoint\Drivers\N8nPublicEndpointDriver;
 use App\Application\PublicEndpoint\Drivers\WordPressPublicEndpointDriver;
 use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
-use App\Domain\Application\AmneziaWg\AmneziaWgApplication;
 use App\Domain\Application\Contracts\ApplicationRegistryInterface;
 use App\Domain\Application\Marzban\MarzbanApplication;
 use App\Domain\Application\N8n\N8nApplication;
@@ -27,7 +26,6 @@ final class ApplicationServiceProviderTest extends TestCase
         $expectedApplications = [
             ApplicationType::Marzban->value => MarzbanApplication::class,
             ApplicationType::N8n->value => N8nApplication::class,
-            ApplicationType::AmneziaWg->value => AmneziaWgApplication::class,
             ApplicationType::WordPress->value => WordPressApplication::class,
         ];
 
