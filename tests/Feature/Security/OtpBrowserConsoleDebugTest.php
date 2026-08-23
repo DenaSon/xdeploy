@@ -140,7 +140,7 @@ final class OtpBrowserConsoleDebugTest extends TestCase
             $template,
         );
         self::assertStringContainsString(
-            "window.sessionStorage.removeItem(storageKey);",
+            'window.sessionStorage.removeItem(storageKey);',
             $template,
         );
         self::assertStringContainsString(
