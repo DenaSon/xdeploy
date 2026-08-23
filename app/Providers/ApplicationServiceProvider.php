@@ -1,125 +1,60 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Providers;
 
-use App\Application\PublicEndpoint\Drivers\MarzbanPublicEndpointDriver;
-use App\Application\PublicEndpoint\Drivers\N8nPublicEndpointDriver;
-use App\Application\PublicEndpoint\Drivers\WordPressPublicEndpointDriver;
-use App\Application\PublicEndpoint\PublicEndpointDriverRegistry;
-use App\Domain\Application\AmneziaWg\AmneziaWgApplication;
-use App\Domain\Application\Contracts\ApplicationInterface;
-use App\Domain\Application\Contracts\ApplicationRegistryInterface;
-use App\Domain\Application\Marzban\Admin\MarzbanAdminGateway;
-use App\Domain\Application\Marzban\Admin\MarzbanAdminReader;
-use App\Domain\Application\Marzban\Https\MarzbanHttpsDisabler;
-use App\Domain\Application\Marzban\Https\MarzbanHttpsGateway;
-use App\Domain\Application\Marzban\Https\MarzbanHttpsInterruptedOperationRecovery;
-use App\Domain\Application\Marzban\MarzbanApplication;
-use App\Domain\Application\N8n\N8nApplication;
-use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointGateway;
-use App\Domain\Application\N8n\PublicEndpoint\N8nPublicEndpointInterruptedOperationRecovery;
-use App\Domain\Application\Registry\ApplicationRegistry;
-use App\Domain\Application\WordPress\PublicEndpoint\WordPressPublicEndpointGateway;
-use App\Domain\Application\WordPress\PublicEndpoint\WordPressPublicEndpointInterruptedOperationRecovery;
-use App\Domain\Application\WordPress\WordPressApplication;
-use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsDisabler;
-use App\Infrastructure\Application\Marzban\Https\SshMarzbanHttpsInterruptedOperationRecovery;
-use App\Infrastructure\Application\Marzban\SshMarzbanAdminGateway;
-use App\Infrastructure\Application\Marzban\SshMarzbanHttpsGateway;
-use App\Infrastructure\Application\N8n\PublicEndpoint\SshN8nPublicEndpointGateway;
-use App\Infrastructure\Application\N8n\PublicEndpoint\SshN8nPublicEndpointInterruptedOperationRecovery;
-use App\Infrastructure\Application\WordPress\PublicEndpoint\SshWordPressPublicEndpointGateway;
-use App\Infrastructure\Application\WordPress\PublicEndpoint\SshWordPressPublicEndpointInterruptedOperationRecovery;
-use Illuminate\Contracts\Container\BindingResolutionException;
+use App\Domain\Application\Shared\Contracts\ApplicationRegistryInterface;
+use App\Domain\Application\Shared\Contracts\ApplicationRuntimeGatewayInterface;
+use App\Domain\Application\Shared\Enums\ApplicationType;
+use App\Domain\Application\Shared\Registry\ApplicationDefinition;
+use App\Domain\Application\Shared\Registry\ApplicationRegistry;
+use App\Domain\Application\Shared\Services\ApplicationPathResolver;
+use App\Domain\Application\Shared\Services\ApplicationReadinessChecker;
+use App\Domain\Application\Shared\Services\ApplicationRequiresService;
+use App\Domain\Application\Shared\Services\ApplicationRuntime;
+use App\Domain\Application\Shared\Services\SystemDependencyService;
+use App\Domain\Application\Shared\Services\SystemDependencyStateInspector;
+use App\Domain\Application\Shared\Services\SystemdApplicationRuntime;
+use App\Domain\Application\Shared\Support\Files\ApplicationAssetReader;
+use App\Domain\Application\Shared\Support\Files\ApplicationAssetReaderInterface;
+use App\Infrastructure\Application\Shared\SshApplicationRuntimeGateway;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
-final class ApplicationServiceProvider extends ServiceProvider
+class ApplicationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(
-            MarzbanAdminGateway::class,
-            SshMarzbanAdminGateway::class,
-        );
+        $this->app->bind(ApplicationRuntimeGatewayInterface::class, SshApplicationRuntimeGateway::class);
 
-        $this->app->bind(
-            MarzbanAdminReader::class,
-            SshMarzbanAdminGateway::class,
-        );
+        $this->app->singleton(ApplicationAssetReaderInterface::class, fn (): ApplicationAssetReaderInterface => new ApplicationAssetReader);
+        $this->app->singleton(ApplicationPathResolver::class);
+        $this->app->singleton(ApplicationReadinessChecker::class);
+        $this->app->singleton(ApplicationRequiresService::class);
+        $this->app->singleton(SystemDependencyService::class);
+        $this->app->singleton(SystemDependencyStateInspector::class);
+        $this->app->singleton(SystemdApplicationRuntime::class);
 
-        $this->app->bind(
-            MarzbanHttpsGateway::class,
-            SshMarzbanHttpsGateway::class,
-        );
+        $this->app->singleton(ApplicationRuntime::class, fn (Application $app): ApplicationRuntime => new ApplicationRuntime(
+            $app->make(ApplicationPathResolver::class),
+            $app->make(SystemDependencyStateInspector::class),
+            $app->make(SystemdApplicationRuntime::class),
+        ));
 
-        $this->app->bind(
-            MarzbanHttpsDisabler::class,
-            SshMarzbanHttpsDisabler::class,
-        );
-
-        $this->app->bind(
-            MarzbanHttpsInterruptedOperationRecovery::class,
-            SshMarzbanHttpsInterruptedOperationRecovery::class,
-        );
-
-        $this->app->bind(
-            N8nPublicEndpointGateway::class,
-            SshN8nPublicEndpointGateway::class,
-        );
-
-        $this->app->bind(
-            N8nPublicEndpointInterruptedOperationRecovery::class,
-            SshN8nPublicEndpointInterruptedOperationRecovery::class,
-        );
-
-        $this->app->bind(
-            WordPressPublicEndpointGateway::class,
-            SshWordPressPublicEndpointGateway::class,
-        );
-
-        $this->app->bind(
-            WordPressPublicEndpointInterruptedOperationRecovery::class,
-            SshWordPressPublicEndpointInterruptedOperationRecovery::class,
-        );
-
-        /*
-         * Applications contain lifecycle-scoped SSH dependencies.
-         *
-         * The registry therefore must not survive beyond
-         * the request/job lifecycle that created them.
-         */
-        $this->app->scoped(
-            ApplicationRegistryInterface::class,
-            fn (Application $app): ApplicationRegistry => new ApplicationRegistry(
-                $this->applications($app),
-            ),
-        );
-
-        $this->app->scoped(
-            PublicEndpointDriverRegistry::class,
-            fn (Application $app): PublicEndpointDriverRegistry => new PublicEndpointDriverRegistry([
-                $app->make(MarzbanPublicEndpointDriver::class),
-                $app->make(N8nPublicEndpointDriver::class),
-                $app->make(WordPressPublicEndpointDriver::class),
-            ]),
-        );
-    }
-
-    /**
-     * @return list<ApplicationInterface>
-     *
-     * @throws BindingResolutionException
-     */
-    private function applications(Application $app): array
-    {
-        return [
-            $app->make(MarzbanApplication::class),
-            $app->make(N8nApplication::class),
-            $app->make(AmneziaWgApplication::class),
-            $app->make(WordPressApplication::class),
-        ];
+        $this->app->singleton(ApplicationRegistryInterface::class, function (Application $app): ApplicationRegistryInterface {
+            return new ApplicationRegistry([
+                ApplicationType::Marzban => new ApplicationDefinition(
+                    $app->make(\App\Domain\Application\Marzban\Services\MarzbanApplication::class),
+                    $app->make(\App\Application\Applications\Marzban\Services\MarzbanManager::class),
+                ),
+                ApplicationType::N8n => new ApplicationDefinition(
+                    $app->make(\App\Domain\Application\N8n\Services\N8nApplication::class),
+                    $app->make(\App\Application\Applications\N8n\Services\N8nManager::class),
+                ),
+                ApplicationType::WordPress => new ApplicationDefinition(
+                    $app->make(\App\Domain\Application\WordPress\Services\WordPressApplication::class),
+                    $app->make(\App\Application\Applications\WordPress\Services\WordPressManager::class),
+                ),
+            ]);
+        });
     }
 }

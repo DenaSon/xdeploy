@@ -202,5 +202,3 @@ Route::middleware(['web', 'auth'])
             OrderShow::class,
         )->name('orders.show');
     });
-
-require __DIR__.'/amneziawg.php';

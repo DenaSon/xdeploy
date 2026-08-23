@@ -1,33 +1,10 @@
 <?php
 
-use App\Providers\AmneziaWgServiceProvider;
-use App\Providers\ApplicationServiceProvider;
-use App\Providers\AppServiceProvider;
-use App\Providers\CloudHealthServiceProvider;
-use App\Providers\CloudObservabilityServiceProvider;
-use App\Providers\CloudServiceProvider;
-use App\Providers\CloudSnapshotServiceProvider;
-use App\Providers\CredentialSecurityServiceProvider;
-use App\Providers\PasskeySecurityServiceProvider;
-use App\Providers\PaymentServiceProvider;
-use App\Providers\PlatformServiceProvider;
-use App\Providers\ServerServiceProvider;
-use App\Providers\SmsServiceProvider;
-use App\Providers\UserServiceProvider;
-
 return [
-    AppServiceProvider::class,
-    PasskeySecurityServiceProvider::class,
-    ServerServiceProvider::class,
-    ApplicationServiceProvider::class,
-    AmneziaWgServiceProvider::class,
-    PlatformServiceProvider::class,
-    CloudServiceProvider::class,
-    CloudHealthServiceProvider::class,
-    CloudObservabilityServiceProvider::class,
-    SmsServiceProvider::class,
-    UserServiceProvider::class,
-    CredentialSecurityServiceProvider::class,
-    CloudSnapshotServiceProvider::class,
-    PaymentServiceProvider::class,
+    App\Providers\AppServiceProvider::class,
+    App\Providers\PasskeysServiceProvider::class,
+    App\Providers\ApplicationServiceProvider::class,
+    App\Providers\CloudProviderServiceProvider::class,
+    App\Providers\CloudflareServiceProvider::class,
+    App\Providers\TelescopeServiceProvider::class,
 ];

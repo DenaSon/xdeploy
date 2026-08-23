@@ -13,7 +13,6 @@ final class ApplicationManagementPanelResolver
         return match ($type) {
             ApplicationType::Marzban => 'applications.marzban.management-panel',
             ApplicationType::N8n => 'applications.n8n.management-panel',
-            ApplicationType::AmneziaWg => 'applications.amnezia-wg.management-panel',
             ApplicationType::WordPress => 'applications.wordpress.management-panel',
         };
     }
