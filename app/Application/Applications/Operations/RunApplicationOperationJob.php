@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Applications\Operations;
 
+use App\Application\Analytics\Contracts\ProductAnalytics;
+use App\Application\Analytics\ProductAnalyticsEvent;
 use App\Application\Applications\Manager\ApplicationManager;
 use App\Application\Applications\Operations\Exceptions\ApplicationUninstallBlockedByPublicEndpointException;
 use App\Domain\Application\Shared\Enums\ApplicationOperationType;
@@ -43,6 +45,7 @@ final class RunApplicationOperationJob implements ShouldQueue
     public function handle(
         ApplicationManager $applicationManager,
         SSHConnectionInterface $ssh,
+        ProductAnalytics $analytics,
     ): void {
         $operation = ApplicationOperation::query()->find(
             $this->operationId,
@@ -60,6 +63,18 @@ final class RunApplicationOperationJob implements ShouldQueue
         Log::info('application.operation.started', [
             'status' => 'running',
         ]);
+
+        if ($operation->operation === ApplicationOperationType::Install) {
+            $analytics->capture(
+                ProductAnalyticsEvent::ApplicationInstallStarted,
+                $operation->user_id,
+                [
+                    'operation_id' => $operation->getKey(),
+                    'server_id' => $operation->server_id,
+                    'application_type' => $operation->application_type,
+                ],
+            );
+        }
 
         try {
             $user = User::query()->findOrFail(
