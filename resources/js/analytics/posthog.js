@@ -104,6 +104,44 @@ function captureNavigation() {
     }
 }
 
+function captureProviderSelection(event) {
+    if (
+        !enabled()
+        || metaContent('coreflare-analytics-route')
+            !== 'panel.servers.buy'
+    ) {
+        return;
+    }
+
+    const target = event.target instanceof Element
+        ? event.target.closest('[wire\\:click^="selectProvider("]')
+        : null;
+
+    if (!(target instanceof Element)) {
+        return;
+    }
+
+    const action = target.getAttribute('wire:click') ?? '';
+    const match = action.match(
+        /^selectProvider\(['"]([^'"]+)['"]\)$/,
+    );
+
+    if (!match) {
+        return;
+    }
+
+    window.posthog.capture(
+        'provider_selected',
+        {
+            provider_public_code: match[1],
+            route_name: 'panel.servers.buy',
+            $current_url: currentUrlWithoutQuery(),
+            event_source: 'frontend',
+            analytics_schema_version: 1,
+        },
+    );
+}
+
 export function registerPostHogNavigationTracking() {
     document.addEventListener(
         'livewire:navigated',
@@ -116,5 +154,10 @@ export function registerPostHogNavigationTracking() {
         {
             once: true,
         },
+    );
+
+    document.addEventListener(
+        'click',
+        captureProviderSelection,
     );
 }
