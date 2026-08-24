@@ -7,10 +7,15 @@ import '../css/landing.css';
 import './passkeys.js';
 
 import {
+    registerPostHogNavigationTracking,
+} from './analytics/posthog.js';
+import {
     registerLivewireRequestErrorHandler,
 } from './livewire/request-error-handler.js';
 
 window.EasyMDE = EasyMDE;
+
+registerPostHogNavigationTracking();
 
 document.addEventListener(
     'livewire:init',
