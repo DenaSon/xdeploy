@@ -16,9 +16,13 @@ use App\Listeners\CaptureAuthenticationCompleted;
 use App\Livewire\Applications\WordPress\ManagementPanel as WordPressManagementPanel;
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
+use App\Models\Order;
 use App\Models\Page;
+use App\Models\Payment;
 use App\Models\Server;
 use App\Models\User;
+use App\Observers\OrderAnalyticsObserver;
+use App\Observers\PaymentAnalyticsObserver;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
@@ -61,6 +65,9 @@ class AppServiceProvider extends ServiceProvider
             Login::class,
             CaptureAuthenticationCompleted::class,
         );
+
+        Order::observe(OrderAnalyticsObserver::class);
+        Payment::observe(PaymentAnalyticsObserver::class);
 
         $this->registerLogViewerAuthorization();
         $this->registerPublicDocumentationNavigationCacheInvalidation();
