@@ -14,6 +14,7 @@ use App\Infrastructure\Analytics\PostHogProductAnalytics;
 use App\Infrastructure\Support\LaravelSupportImageProcessor;
 use App\Listeners\CaptureAuthenticationCompleted;
 use App\Livewire\Applications\WordPress\ManagementPanel as WordPressManagementPanel;
+use App\Models\ApplicationOperation;
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
 use App\Models\Order;
@@ -21,6 +22,7 @@ use App\Models\Page;
 use App\Models\Payment;
 use App\Models\Server;
 use App\Models\User;
+use App\Observers\ApplicationOperationAnalyticsObserver;
 use App\Observers\OrderAnalyticsObserver;
 use App\Observers\PaymentAnalyticsObserver;
 use Illuminate\Auth\AuthenticationException;
@@ -68,6 +70,9 @@ class AppServiceProvider extends ServiceProvider
 
         Order::observe(OrderAnalyticsObserver::class);
         Payment::observe(PaymentAnalyticsObserver::class);
+        ApplicationOperation::observe(
+            ApplicationOperationAnalyticsObserver::class,
+        );
 
         $this->registerLogViewerAuthorization();
         $this->registerPublicDocumentationNavigationCacheInvalidation();
