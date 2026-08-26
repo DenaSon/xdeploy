@@ -231,7 +231,13 @@ final class ZarinPalCallbackControllerTest extends TestCase
             $order->fresh()->status,
         );
 
-        Queue::assertNothingPushed();
+        /*
+         * Billing notifications are allowed on the notifications queue, but a
+         * cancelled gateway callback must never enqueue VPS provisioning.
+         */
+        Queue::assertNotPushed(
+            ProvisionPaidOrderJob::class,
+        );
     }
 
     private function createOrder(

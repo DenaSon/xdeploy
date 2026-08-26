@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App;
 use App\Application\Analytics\Contracts\ProductAnalytics;
+use App\Application\Billing\Events\PaymentStatusChanged;
 use App\Application\Navigation\PublicDocumentationNavigation;
 use App\Application\Navigation\PublicFooterNavigation;
 use App\Application\Support\Contracts\SupportImageProcessorInterface;
@@ -13,6 +14,7 @@ use App\Infrastructure\Analytics\NullProductAnalytics;
 use App\Infrastructure\Analytics\PostHogProductAnalytics;
 use App\Infrastructure\Support\LaravelSupportImageProcessor;
 use App\Listeners\CaptureAuthenticationCompleted;
+use App\Listeners\SendPaymentStatusNotification;
 use App\Livewire\Applications\WordPress\ManagementPanel as WordPressManagementPanel;
 use App\Models\ApplicationOperation;
 use App\Models\DocumentationArticle;
@@ -25,6 +27,7 @@ use App\Models\User;
 use App\Observers\ApplicationOperationAnalyticsObserver;
 use App\Observers\OrderAnalyticsObserver;
 use App\Observers\PaymentAnalyticsObserver;
+use App\Observers\PaymentNotificationObserver;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
@@ -68,8 +71,14 @@ class AppServiceProvider extends ServiceProvider
             CaptureAuthenticationCompleted::class,
         );
 
+        Event::listen(
+            PaymentStatusChanged::class,
+            SendPaymentStatusNotification::class,
+        );
+
         Order::observe(OrderAnalyticsObserver::class);
         Payment::observe(PaymentAnalyticsObserver::class);
+        Payment::observe(PaymentNotificationObserver::class);
         ApplicationOperation::observe(
             ApplicationOperationAnalyticsObserver::class,
         );
