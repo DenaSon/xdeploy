@@ -22,9 +22,13 @@ final class SettingsFoundationTest extends TestCase
 
         self::assertSame('Coreflare', $general->site_name);
         self::assertSame('از سرور تا سرویس، در یک پنل', $branding->tagline);
-        self::assertSame('Coreflare | از سرور تا سرویس، در یک پنل', $seo->default_title);
+        self::assertSame('Coreflare | مدیریت VPS و راه‌اندازی سرویس‌ها', $seo->default_title);
         self::assertNotSame('', $seo->default_description);
         self::assertNull($seo->default_og_image);
+        self::assertSame('کورفلر', $seo->site_alternate_name);
+        self::assertNull($seo->organization_logo);
+        self::assertNull($seo->favicon);
+        self::assertNull($seo->apple_touch_icon);
         self::assertTrue($seo->index_site);
         self::assertNull($seo->google_site_verification);
         self::assertNull($seo->bing_site_verification);
