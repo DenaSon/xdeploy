@@ -14,6 +14,14 @@ final class SeoSettings extends Settings
 
     public ?string $default_og_image;
 
+    public string $site_alternate_name;
+
+    public ?string $organization_logo;
+
+    public ?string $favicon;
+
+    public ?string $apple_touch_icon;
+
     public bool $index_site;
 
     public ?string $google_site_verification;
