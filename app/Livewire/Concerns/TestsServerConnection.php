@@ -139,7 +139,7 @@ trait TestsServerConnection
 
             ServerConnectionTestStatus::CommandUnavailable => $this->error(
                 'امکان اجرای دستورات وجود ندارد',
-                'اتصال SSH برقرار شد، اما xDeploy نمی‌تواند دستورات موردنیاز را روی این سرور اجرا کند.',
+                'اتصال SSH برقرار شد، اما Coreflare نمی‌تواند دستورات موردنیاز را روی این سرور اجرا کند.',
             ),
 
             ServerConnectionTestStatus::UnsupportedOperatingSystem => $this->showUnsupportedOperatingSystem(
@@ -154,7 +154,7 @@ trait TestsServerConnection
         $operatingSystem = $result->operatingSystem;
 
         $description = $operatingSystem === null
-            ? 'سرور برای استفاده در xDeploy آماده است.'
+            ? 'سرور برای استفاده در Coreflare آماده است.'
             : sprintf(
                 'اتصال برقرار شد و سیستم‌عامل %s پشتیبانی می‌شود.',
                 $operatingSystem->displayName(),
@@ -177,7 +177,7 @@ trait TestsServerConnection
         $this->error(
             'سیستم‌عامل پشتیبانی نمی‌شود',
             sprintf(
-                'سیستم‌عامل شناسایی‌شده %s است. نسخه فعلی xDeploy فقط از Ubuntu و Debian پشتیبانی می‌کند.',
+                'سیستم‌عامل شناسایی‌شده %s است. نسخه فعلی Coreflare فقط از نسخه‌های تأییدشده Ubuntu پشتیبانی می‌کند.',
                 $detected,
             ),
         );
