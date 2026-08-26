@@ -125,11 +125,22 @@
             </div>
 
             <div x-show="tab === 'seo'">
-                <form wire:submit="saveSeo" class="space-y-6">
+                @php
+                    $ogPreview = $seoDefaultOgImageUpload?->temporaryUrl()
+                        ?? ($seoDefaultOgImage !== '' ? $seoDefaultOgImage : null);
+                    $logoPreview = $seoOrganizationLogoUpload?->temporaryUrl()
+                        ?? ($seoOrganizationLogo !== '' ? $seoOrganizationLogo : null);
+                    $faviconPreview = $seoFaviconUpload?->temporaryUrl()
+                        ?? ($seoFavicon !== '' ? $seoFavicon : '/favicon.svg');
+                    $applePreview = $seoAppleTouchIconUpload?->temporaryUrl()
+                        ?? ($seoAppleTouchIcon !== '' ? $seoAppleTouchIcon : null);
+                @endphp
+
+                <form wire:submit="saveSeo" class="space-y-7">
                     <div>
-                        <h2 class="font-semibold">SEO عمومی</h2>
+                        <h2 class="font-semibold">SEO و Search Appearance</h2>
                         <p class="mt-1 text-sm leading-6 text-base-content/50">
-                            متادیتای پیش‌فرض، تصویر اشتراک‌گذاری، ایندکس و کدهای تأیید موتورهای جستجو.
+                            عنوان و توضیحات نتایج جستجو، هویت سایت، تصاویر اشتراک‌گذاری و فایل‌های برند را مدیریت کنید.
                         </p>
                     </div>
 
@@ -139,58 +150,220 @@
                         </div>
                     @endif
 
-                    <div class="grid gap-5 lg:grid-cols-2">
-                        <x-input
-                            label="عنوان پیش‌فرض"
-                            hint="حداکثر ۷۰ کاراکتر"
-                            wire:model.blur="seoDefaultTitle"
-                            required
-                        />
-
-                        <x-input
-                            label="تصویر Open Graph"
-                            placeholder="/images/og/coreflare.png"
-                            hint="مسیر داخلی یا URL تصویر"
-                            wire:model.blur="seoDefaultOgImage"
-                            dir="ltr"
-                        />
-                    </div>
-
-                    <div>
-                        <label for="seo-default-description" class="mb-2 block text-sm font-medium">
-                            Meta Description پیش‌فرض
-                        </label>
-                        <textarea
-                            id="seo-default-description"
-                            wire:model.blur="seoDefaultDescription"
-                            rows="4"
-                            maxlength="160"
-                            class="textarea textarea-bordered w-full leading-7"
-                            required
-                        ></textarea>
-                        <div class="mt-1.5 text-xs text-base-content/45">
-                            حداکثر ۱۶۰ کاراکتر
+                    <section class="space-y-5 rounded-2xl border border-base-300 bg-base-200/20 p-4 sm:p-5">
+                        <div>
+                            <h3 class="text-sm font-semibold">نمایش در نتایج جستجو</h3>
+                            <p class="mt-1 text-xs leading-6 text-base-content/45">
+                                متادیتای اصلی که برای عنوان و توضیح صفحات عمومی استفاده می‌شود.
+                            </p>
                         </div>
-                        @error('seoDefaultDescription')
-                            <p class="mt-1.5 text-sm text-error">{{ $message }}</p>
-                        @enderror
-                    </div>
 
-                    <div class="grid gap-5 lg:grid-cols-2">
-                        <x-input
-                            label="Google Site Verification"
-                            hint="فقط مقدار content تگ verification"
-                            wire:model.blur="seoGoogleSiteVerification"
-                            dir="ltr"
-                        />
+                        <div class="grid gap-5 lg:grid-cols-2">
+                            <x-input
+                                label="عنوان پیش‌فرض"
+                                hint="حداکثر ۷۰ کاراکتر"
+                                wire:model.blur="seoDefaultTitle"
+                                required
+                            />
 
-                        <x-input
-                            label="Bing Site Verification"
-                            hint="فقط مقدار content تگ msvalidate.01"
-                            wire:model.blur="seoBingSiteVerification"
-                            dir="ltr"
-                        />
-                    </div>
+                            <x-input
+                                label="نام جایگزین سایت"
+                                hint="برای Site Name؛ مثال: کورفلر"
+                                wire:model.blur="seoSiteAlternateName"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label for="seo-default-description" class="mb-2 block text-sm font-medium">
+                                Meta Description پیش‌فرض
+                            </label>
+                            <textarea
+                                id="seo-default-description"
+                                wire:model.blur="seoDefaultDescription"
+                                rows="4"
+                                maxlength="160"
+                                class="textarea textarea-bordered w-full leading-7"
+                                required
+                            ></textarea>
+                            <div class="mt-1.5 text-xs text-base-content/45">
+                                حداکثر ۱۶۰ کاراکتر
+                            </div>
+                            @error('seoDefaultDescription')
+                                <p class="mt-1.5 text-sm text-error">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </section>
+
+                    <section class="space-y-5">
+                        <div>
+                            <h3 class="text-sm font-semibold">هویت بصری موتورهای جستجو</h3>
+                            <p class="mt-1 text-xs leading-6 text-base-content/45">
+                                تصاویر آپلودشده در فضای عمومی SEO نگهداری می‌شوند. فایل جدید، فایل مدیریت‌شده قبلی همان بخش را جایگزین می‌کند.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <div class="rounded-2xl border border-base-300 p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-base-300 bg-base-200/40">
+                                        @if($logoPreview)
+                                            <img src="{{ $logoPreview }}" alt="Organization logo preview" class="size-full object-contain p-1.5">
+                                        @else
+                                            <x-icon name="lucide.image" class="!size-5 text-base-content/30" />
+                                        @endif
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium">Organization Logo</div>
+                                        <div class="mt-1 text-xs text-base-content/45">PNG/JPG/WebP · حداقل 112px</div>
+                                    </div>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    wire:model="seoOrganizationLogoUpload"
+                                    accept="image/png,image/jpeg,image/webp"
+                                    class="file-input file-input-bordered file-input-sm mt-4 w-full"
+                                >
+                                @error('seoOrganizationLogoUpload')
+                                    <p class="mt-2 text-xs text-error">{{ $message }}</p>
+                                @enderror
+
+                                <x-input
+                                    class="mt-3"
+                                    label="مسیر یا URL"
+                                    wire:model.blur="seoOrganizationLogo"
+                                    dir="ltr"
+                                />
+                            </div>
+
+                            <div class="rounded-2xl border border-base-300 p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-base-300 bg-base-200/40">
+                                        <img src="{{ $faviconPreview }}" alt="Favicon preview" class="size-full object-contain p-2">
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium">Favicon</div>
+                                        <div class="mt-1 text-xs text-base-content/45">PNG مربع · حداقل 48×48</div>
+                                    </div>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    wire:model="seoFaviconUpload"
+                                    accept="image/png"
+                                    class="file-input file-input-bordered file-input-sm mt-4 w-full"
+                                >
+                                @error('seoFaviconUpload')
+                                    <p class="mt-2 text-xs text-error">{{ $message }}</p>
+                                @enderror
+
+                                <x-input
+                                    class="mt-3"
+                                    label="مسیر یا URL"
+                                    placeholder="/favicon.svg"
+                                    wire:model.blur="seoFavicon"
+                                    dir="ltr"
+                                />
+                            </div>
+
+                            <div class="rounded-2xl border border-base-300 p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-base-300 bg-base-200/40">
+                                        @if($applePreview)
+                                            <img src="{{ $applePreview }}" alt="Apple touch icon preview" class="size-full object-contain p-1.5">
+                                        @else
+                                            <x-icon name="lucide.smartphone" class="!size-5 text-base-content/30" />
+                                        @endif
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium">Apple Touch Icon</div>
+                                        <div class="mt-1 text-xs text-base-content/45">PNG مربع · حداقل 180×180</div>
+                                    </div>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    wire:model="seoAppleTouchIconUpload"
+                                    accept="image/png"
+                                    class="file-input file-input-bordered file-input-sm mt-4 w-full"
+                                >
+                                @error('seoAppleTouchIconUpload')
+                                    <p class="mt-2 text-xs text-error">{{ $message }}</p>
+                                @enderror
+
+                                <x-input
+                                    class="mt-3"
+                                    label="مسیر یا URL"
+                                    wire:model.blur="seoAppleTouchIcon"
+                                    dir="ltr"
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4 rounded-2xl border border-base-300 bg-base-200/20 p-4 sm:p-5">
+                        <div>
+                            <h3 class="text-sm font-semibold">Open Graph</h3>
+                            <p class="mt-1 text-xs leading-6 text-base-content/45">
+                                تصویر پیش‌فرض لینک Coreflare در شبکه‌های اجتماعی و پیام‌رسان‌ها.
+                            </p>
+                        </div>
+
+                        <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                            <div class="space-y-3">
+                                <input
+                                    type="file"
+                                    wire:model="seoDefaultOgImageUpload"
+                                    accept="image/png,image/jpeg,image/webp"
+                                    class="file-input file-input-bordered w-full"
+                                >
+                                @error('seoDefaultOgImageUpload')
+                                    <p class="text-xs text-error">{{ $message }}</p>
+                                @enderror
+
+                                <x-input
+                                    label="مسیر یا URL تصویر"
+                                    placeholder="/storage/seo/open-graph.png"
+                                    hint="حداقل 600×315؛ برای کیفیت بهتر 1200×630 پیشنهاد می‌شود."
+                                    wire:model.blur="seoDefaultOgImage"
+                                    dir="ltr"
+                                />
+                            </div>
+
+                            <div class="aspect-[1.91/1] overflow-hidden rounded-xl border border-base-300 bg-base-200/40">
+                                @if($ogPreview)
+                                    <img src="{{ $ogPreview }}" alt="Open Graph preview" class="size-full object-cover">
+                                @else
+                                    <div class="flex size-full items-center justify-center text-xs text-base-content/35">
+                                        بدون تصویر Open Graph
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="space-y-5">
+                        <div>
+                            <h3 class="text-sm font-semibold">تأیید موتورهای جستجو</h3>
+                        </div>
+
+                        <div class="grid gap-5 lg:grid-cols-2">
+                            <x-input
+                                label="Google Site Verification"
+                                hint="فقط مقدار content تگ verification"
+                                wire:model.blur="seoGoogleSiteVerification"
+                                dir="ltr"
+                            />
+
+                            <x-input
+                                label="Bing Site Verification"
+                                hint="فقط مقدار content تگ msvalidate.01"
+                                wire:model.blur="seoBingSiteVerification"
+                                dir="ltr"
+                            />
+                        </div>
+                    </section>
 
                     <div class="rounded-xl border border-base-300 bg-base-200/35 p-4">
                         <label class="flex cursor-pointer items-start justify-between gap-5">
