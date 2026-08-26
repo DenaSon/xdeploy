@@ -42,6 +42,16 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * Orders created by this user.
+     *
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
      * Determine whether the account currently owns a usable purchased VPS.
      *
      * User-provided servers intentionally do not satisfy this predicate: the

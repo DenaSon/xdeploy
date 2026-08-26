@@ -10,6 +10,7 @@ use App\Livewire\Applications\Index as ApplicationsIndex;
 use App\Livewire\Applications\Show as ApplicationShow;
 use App\Livewire\Domains\Index as DomainsIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
+use App\Livewire\Orders\Index as OrderIndex;
 use App\Livewire\Orders\Show as OrderShow;
 use App\Livewire\Profile\Edit as ProfileEdit;
 use App\Livewire\Security\Index as SecurityIndex;
@@ -196,6 +197,11 @@ Route::middleware(['web', 'auth'])
             '/servers/{server}/applications/{application}',
             ApplicationShow::class,
         )->name('servers.applications.show');
+
+        Route::livewire(
+            '/orders',
+            OrderIndex::class,
+        )->name('orders.index');
 
         Route::livewire(
             '/orders/{order}',

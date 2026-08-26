@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class Order extends Model
 {
@@ -126,6 +127,18 @@ final class Order extends Model
         return $this->hasMany(
             Payment::class,
         );
+    }
+
+    /**
+     * Most recently created payment attempt for customer-facing order state.
+     *
+     * @return HasOne<Payment, $this>
+     */
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(
+            Payment::class,
+        )->latestOfMany();
     }
 
     public function isProvisioning(): bool

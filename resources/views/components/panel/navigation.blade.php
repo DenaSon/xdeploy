@@ -49,6 +49,37 @@
             "
         />
 
+        <x-menu-item
+            title="سفارش‌ها"
+            icon="lucide.receipt-text"
+            :link="route('panel.orders.index')"
+            :active="request()->routeIs('panel.orders.*')"
+            wire:navigate
+
+            class="
+                rounded-xl
+
+                text-sm
+                text-base-content/65
+
+                transition-colors duration-200
+
+                hover:bg-base-200
+                hover:text-base-content
+            "
+
+            active-bg-color="
+                !bg-primary/10
+                !text-primary
+                !font-medium
+            "
+
+            icon-classes="
+                !size-[18px]
+                stroke-[1.7]
+            "
+        />
+
         @if ($contextServer !== null)
             <x-menu-item
                 title="دامنه‌ها"
