@@ -165,9 +165,11 @@
                                     opacity-60
                                 ' => ! $isAvailable,
                                 '
-                                    border-primary/45
-                                    bg-primary/[0.055]
-                                    ring-1 ring-primary/10
+                                    border-primary
+                                    bg-primary
+                                    text-primary-content
+                                    ring-2 ring-primary/15
+                                    shadow-sm
                                 ' => $isSelected && $isAvailable,
                                 '
                                     border-base-300
@@ -191,9 +193,9 @@
                                             rounded-lg border
                                         ',
                                         '
-                                            border-primary/20
-                                            bg-primary/10
-                                            text-primary
+                                            border-primary-content/20
+                                            bg-primary-content/15
+                                            text-primary-content
                                         ' => $isSelected && $isAvailable,
                                         '
                                             border-base-300
@@ -231,11 +233,14 @@
 
                                 <div class="min-w-0 flex-1">
                                     <div
-                                        class="
-                                            flex min-w-0 items-center gap-2
-                                            text-sm font-semibold
-                                            text-base-content
-                                        "
+                                        @class([
+                                            '
+                                                flex min-w-0 items-center gap-2
+                                                text-sm font-semibold
+                                            ',
+                                            'text-primary-content' => $isSelected && $isAvailable,
+                                            'text-base-content' => ! $isSelected || ! $isAvailable,
+                                        ])
                                     >
                                         <span class="truncate">
                                             {{ $providerOption['label'] }}
@@ -259,7 +264,8 @@
                                         @class([
                                             'mt-0.5 text-[10px]',
                                             'text-base-content/35' => ! $isAvailable,
-                                            'text-base-content/40' => $isAvailable,
+                                            'text-primary-content/70' => $isSelected && $isAvailable,
+                                            'text-base-content/40' => ! $isSelected && $isAvailable,
                                         ])
                                     >
                                         @if(! $isAvailable)
