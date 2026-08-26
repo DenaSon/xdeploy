@@ -20,6 +20,7 @@ final readonly class GetCustomerOrderAction
                 $user->getKey(),
             )
             ->with([
+                'server',
                 'historicalServer',
                 'latestPayment',
                 'payments' => static fn ($query) => $query->latest('id'),
