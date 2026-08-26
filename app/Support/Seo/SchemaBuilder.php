@@ -14,9 +14,11 @@ final class SchemaBuilder
      */
     public function landing(
         string $siteName,
+        string $alternateName,
         string $tagline,
         string $description,
         string $canonical,
+        string $logo,
     ): array {
         $organizationId = $canonical.'#organization';
         $websiteId = $canonical.'#website';
@@ -29,13 +31,16 @@ final class SchemaBuilder
                     '@type' => 'Organization',
                     '@id' => $organizationId,
                     'name' => $siteName,
+                    'alternateName' => $alternateName,
                     'url' => $canonical,
+                    'logo' => $logo,
                 ],
                 [
                     '@type' => 'WebSite',
                     '@id' => $websiteId,
                     'url' => $canonical,
                     'name' => $siteName,
+                    'alternateName' => $alternateName,
                     'inLanguage' => 'fa-IR',
                     'publisher' => ['@id' => $organizationId],
                 ],
