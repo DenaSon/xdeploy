@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Observers\ApplicationOperationAnalyticsObserver;
 use App\Observers\OrderAnalyticsObserver;
 use App\Observers\PaymentAnalyticsObserver;
+use App\Observers\PaymentNotificationObserver;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
@@ -77,6 +78,7 @@ class AppServiceProvider extends ServiceProvider
 
         Order::observe(OrderAnalyticsObserver::class);
         Payment::observe(PaymentAnalyticsObserver::class);
+        Payment::observe(PaymentNotificationObserver::class);
         ApplicationOperation::observe(
             ApplicationOperationAnalyticsObserver::class,
         );
