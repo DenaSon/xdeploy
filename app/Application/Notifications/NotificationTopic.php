@@ -9,4 +9,5 @@ enum NotificationTopic: string
     case Servers = 'servers';
     case Support = 'support';
     case Account = 'account';
+    case Billing = 'billing';
 }
