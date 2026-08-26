@@ -1,22 +1,18 @@
 @props([
     'date' => null,
-    'withTime' => true,
     'fallback' => '—',
 ])
-
-@php
-    $formatted = \App\Support\Localization\PersianDate::format(
-        $date,
-        withTime: (bool) $withTime,
-    );
-@endphp
 
 @if ($date instanceof \DateTimeInterface)
     <time
         datetime="{{ $date->format(DATE_ATOM) }}"
         {{ $attributes->merge(['class' => 'whitespace-nowrap']) }}
     >
-        {{ $formatted ?? $fallback }}
+        {{ \App\Support\Date\JalaliDateFormatter::dateTime(
+            $date,
+            separator: ' — ',
+            persianDigits: true,
+        ) }}
     </time>
 @else
     <span {{ $attributes }}>{{ $fallback }}</span>
