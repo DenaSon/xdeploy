@@ -182,6 +182,7 @@
                     'servers' => ['سرورها و سرویس‌ها', 'پایان سرویس، حذف VPS و رویدادهای مهم زیرساخت', 'lucide.server'],
                     'support' => ['پشتیبانی', 'پاسخ‌های جدید تیم پشتیبانی به درخواست‌های شما', 'lucide.messages-square'],
                     'account' => ['حساب کاربری', 'یادآوری‌های ضروری مربوط به پروفایل و حساب', 'lucide.user-round'],
+                    'billing' => ['پرداخت‌ها و سفارش‌ها', 'تأیید پرداخت، لغو پرداخت و رویدادهای مالی مهم', 'lucide.credit-card'],
                 ] as $topic => [$label, $description, $icon])
                     <div class="flex items-center gap-4 px-4 py-4 sm:px-5">
                         <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-base-200/60 text-base-content/55">
