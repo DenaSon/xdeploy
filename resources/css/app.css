@@ -240,7 +240,7 @@
     |--------------------------------------------------------------------------
     */
 
-    --size-selector: 0.25rem;
+    --size-selector: 0.75rem;
     --size-field: 0.25rem;
 
 
@@ -522,6 +522,27 @@ input[inputmode="decimal"] {
             var(--color-primary) 70%,
             transparent
         );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Buy Page Selected States
+|--------------------------------------------------------------------------
+|
+| Keep radio-style selections as explicit as the selected billing period.
+| This is intentionally scoped to the VPS purchase form.
+|
+*/
+
+[data-buy-form] input[name="server_image"]:checked + span {
+    color: var(--color-primary-content);
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+
+    box-shadow:
+        0 1px 2px
+        color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 
