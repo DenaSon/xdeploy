@@ -38,7 +38,7 @@ final class AdminSettingsBackendTest extends TestCase
             'default_title' => '  Coreflare | مدیریت زیرساخت  ',
             'default_description' => '  مدیریت VPS، سرویس‌ها، دامنه و وضعیت زیرساخت در Coreflare.  ',
             'default_og_image' => '  /images/og/coreflare.png  ',
-            'site_alternate_name' => '  کورفلر  ',
+            'site_alternate_name' => '  کورفلر کلاد  ',
             'organization_logo' => '  /storage/seo/logo.png  ',
             'favicon' => '  /storage/seo/favicon.png  ',
             'apple_touch_icon' => '  /storage/seo/apple-touch.png  ',
@@ -57,7 +57,7 @@ final class AdminSettingsBackendTest extends TestCase
             $snapshot->seoDefaultDescription,
         );
         self::assertSame('/images/og/coreflare.png', $snapshot->seoDefaultOgImage);
-        self::assertSame('کورفلر', $snapshot->seoSiteAlternateName);
+        self::assertSame('کورفلر کلاد', $snapshot->seoSiteAlternateName);
         self::assertSame('/storage/seo/logo.png', $snapshot->seoOrganizationLogo);
         self::assertSame('/storage/seo/favicon.png', $snapshot->seoFavicon);
         self::assertSame('/storage/seo/apple-touch.png', $snapshot->seoAppleTouchIcon);
