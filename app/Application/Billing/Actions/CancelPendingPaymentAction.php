@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
-use App\Application\Billing\Events\PaymentStatusChanged;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
-use Throwable;
 
 final readonly class CancelPendingPaymentAction
 {
@@ -17,11 +14,10 @@ final readonly class CancelPendingPaymentAction
         string $gateway,
         string $reference,
     ): Payment {
-        /** @var array{payment: Payment, changed: bool} $result */
-        $result = DB::transaction(function () use (
+        return DB::transaction(function () use (
             $gateway,
             $reference,
-        ): array {
+        ): Payment {
             /** @var Payment $payment */
             $payment = Payment::query()
                 ->where('gateway', $gateway)
@@ -33,43 +29,17 @@ final readonly class CancelPendingPaymentAction
                 $payment->status === PaymentStatus::Cancelled
                 || $payment->status === PaymentStatus::Paid
             ) {
-                return [
-                    'payment' => $payment,
-                    'changed' => false,
-                ];
+                return $payment;
             }
-
-            $changed = false;
 
             if ($payment->status === PaymentStatus::Pending) {
                 $payment->forceFill([
                     'status' => PaymentStatus::Cancelled,
                     'failure_code' => 'customer_cancelled',
                 ])->save();
-
-                $changed = true;
             }
 
-            return [
-                'payment' => $payment->fresh(),
-                'changed' => $changed,
-            ];
+            return $payment->fresh();
         });
-
-        $payment = $result['payment'];
-
-        if ($result['changed']) {
-            try {
-                Event::dispatch(new PaymentStatusChanged(
-                    paymentId: (int) $payment->getKey(),
-                    orderId: $payment->order_id,
-                    status: PaymentStatus::Cancelled,
-                ));
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
-
-        return $payment;
     }
 }
