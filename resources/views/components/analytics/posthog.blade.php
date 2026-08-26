@@ -105,6 +105,13 @@
                         const normalizedKey = key.toLowerCase();
 
                         if (
+                            normalizedKey === 'token'
+                            && event.properties[key] === apiKey
+                        ) {
+                            continue;
+                        }
+
+                        if (
                             normalizedKey === 'code'
                             || sensitiveFragments.some(
                                 (fragment) => normalizedKey.includes(fragment),
