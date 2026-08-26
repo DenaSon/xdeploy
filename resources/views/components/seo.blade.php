@@ -6,7 +6,7 @@
 <link rel="canonical" href="{{ $seo->canonical }}">
 
 @if($seo->favicon)
-    <link rel="icon" href="{{ $seo->favicon }}" sizes="any">
+    <link rel="icon" href="{{ $seo->favicon }}">
 @endif
 
 @if($seo->appleTouchIcon)
