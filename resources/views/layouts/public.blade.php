@@ -30,6 +30,8 @@
         'resources/js/app.js',
     ])
 
+    <x-analytics.posthog />
+
     @livewireStyles
 </head>
 

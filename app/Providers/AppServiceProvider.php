@@ -3,20 +3,32 @@
 namespace App\Providers;
 
 use App;
+use App\Application\Analytics\Contracts\ProductAnalytics;
 use App\Application\Navigation\PublicDocumentationNavigation;
 use App\Application\Navigation\PublicFooterNavigation;
 use App\Application\Support\Contracts\SupportImageProcessorInterface;
 use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Infrastructure\Analytics\NullProductAnalytics;
+use App\Infrastructure\Analytics\PostHogProductAnalytics;
 use App\Infrastructure\Support\LaravelSupportImageProcessor;
+use App\Listeners\CaptureAuthenticationCompleted;
 use App\Livewire\Applications\WordPress\ManagementPanel as WordPressManagementPanel;
+use App\Models\ApplicationOperation;
 use App\Models\DocumentationArticle;
 use App\Models\DocumentationCategory;
+use App\Models\Order;
 use App\Models\Page;
+use App\Models\Payment;
 use App\Models\Server;
 use App\Models\User;
+use App\Observers\ApplicationOperationAnalyticsObserver;
+use App\Observers\OrderAnalyticsObserver;
+use App\Observers\PaymentAnalyticsObserver;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -34,12 +46,33 @@ class AppServiceProvider extends ServiceProvider
             SupportImageProcessorInterface::class,
             LaravelSupportImageProcessor::class,
         );
+
+        $this->app->singleton(
+            ProductAnalytics::class,
+            static fn ($app): ProductAnalytics => (bool) config(
+                'services.posthog.enabled',
+                false,
+            )
+                ? $app->make(PostHogProductAnalytics::class)
+                : $app->make(NullProductAnalytics::class),
+        );
     }
 
     public function boot(): void
     {
         Schema::defaultStringLength(191);
         App::setLocale('fa');
+
+        Event::listen(
+            Login::class,
+            CaptureAuthenticationCompleted::class,
+        );
+
+        Order::observe(OrderAnalyticsObserver::class);
+        Payment::observe(PaymentAnalyticsObserver::class);
+        ApplicationOperation::observe(
+            ApplicationOperationAnalyticsObserver::class,
+        );
 
         $this->registerLogViewerAuthorization();
         $this->registerPublicDocumentationNavigationCacheInvalidation();

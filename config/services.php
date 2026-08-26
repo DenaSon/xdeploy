@@ -22,6 +22,27 @@ return [
         'expiring_soon_parameter_name' => env('SMSIR_EXPIRING_SOON_PARAMETER_NAME', 'Hours'),
     ],
 
+    'posthog' => [
+        'enabled' => filter_var(
+            env('POSTHOG_ENABLED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'api_key' => env('POSTHOG_API_KEY'),
+        'host' => env(
+            'POSTHOG_HOST',
+            'https://us.i.posthog.com',
+        ),
+        'queue' => env('POSTHOG_QUEUE', 'default'),
+        'connect_timeout' => (int) env(
+            'POSTHOG_CONNECT_TIMEOUT',
+            1,
+        ),
+        'timeout' => (int) env(
+            'POSTHOG_TIMEOUT',
+            3,
+        ),
+    ],
+
     'google_oidc' => [
         'client_id' => env('GOOGLE_OAUTH_CLIENT_ID'),
         'client_secret' => env('GOOGLE_OAUTH_CLIENT_SECRET'),
