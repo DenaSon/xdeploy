@@ -20,7 +20,7 @@
             </h2>
 
             <p class="mt-1 text-xs leading-6 text-base-content/45">
-                اطلاعات SSH موردنیاز برای اتصال xDeploy به سرور را وارد کنید.
+                اطلاعات SSH موردنیاز برای اتصال Coreflare به سرور را وارد کنید.
             </p>
         </div>
 
