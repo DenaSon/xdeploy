@@ -38,6 +38,10 @@ final class AdminSettingsBackendTest extends TestCase
             'default_title' => '  Coreflare | مدیریت زیرساخت  ',
             'default_description' => '  مدیریت VPS، سرویس‌ها، دامنه و وضعیت زیرساخت در Coreflare.  ',
             'default_og_image' => '  /images/og/coreflare.png  ',
+            'site_alternate_name' => '  کورفلر کلاد  ',
+            'organization_logo' => '  /storage/seo/logo.png  ',
+            'favicon' => '  /storage/seo/favicon.png  ',
+            'apple_touch_icon' => '  /storage/seo/apple-touch.png  ',
             'index_site' => false,
             'google_site_verification' => '  google-token  ',
             'bing_site_verification' => '  bing-token  ',
@@ -53,6 +57,10 @@ final class AdminSettingsBackendTest extends TestCase
             $snapshot->seoDefaultDescription,
         );
         self::assertSame('/images/og/coreflare.png', $snapshot->seoDefaultOgImage);
+        self::assertSame('کورفلر کلاد', $snapshot->seoSiteAlternateName);
+        self::assertSame('/storage/seo/logo.png', $snapshot->seoOrganizationLogo);
+        self::assertSame('/storage/seo/favicon.png', $snapshot->seoFavicon);
+        self::assertSame('/storage/seo/apple-touch.png', $snapshot->seoAppleTouchIcon);
         self::assertFalse($snapshot->seoIndexSite);
         self::assertSame('google-token', $snapshot->seoGoogleSiteVerification);
         self::assertSame('bing-token', $snapshot->seoBingSiteVerification);
@@ -79,6 +87,10 @@ final class AdminSettingsBackendTest extends TestCase
                     'default_title',
                     'default_description',
                     'default_og_image',
+                    'site_alternate_name',
+                    'organization_logo',
+                    'favicon',
+                    'apple_touch_icon',
                     'index_site',
                     'google_site_verification',
                     'bing_site_verification',
@@ -107,6 +119,10 @@ final class AdminSettingsBackendTest extends TestCase
                 'default_title' => str_repeat('x', 71),
                 'default_description' => 'Valid description',
                 'default_og_image' => null,
+                'site_alternate_name' => 'کورفلر',
+                'organization_logo' => null,
+                'favicon' => null,
+                'apple_touch_icon' => null,
                 'index_site' => true,
             ]);
 

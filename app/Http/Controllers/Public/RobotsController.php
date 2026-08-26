@@ -16,9 +16,6 @@ final class RobotsController
             'Allow: /',
             'Disallow: /admin/',
             'Disallow: /panel/',
-            'Disallow: /login',
-            'Disallow: /verify',
-            'Disallow: /passkeys/',
             'Disallow: /payments/',
         ];
 

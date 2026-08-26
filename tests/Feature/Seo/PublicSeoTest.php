@@ -19,6 +19,10 @@ final class PublicSeoTest extends TestCase
     {
         $settings = app(SeoSettings::class);
         $settings->default_og_image = '/images/og/coreflare.png';
+        $settings->site_alternate_name = 'کورفلر';
+        $settings->organization_logo = '/images/coreflare-logo.png';
+        $settings->favicon = '/images/favicon.png';
+        $settings->apple_touch_icon = '/images/apple-touch-icon.png';
         $settings->google_site_verification = 'google-token';
         $settings->bing_site_verification = 'bing-token';
         $settings->save();
@@ -29,13 +33,29 @@ final class PublicSeoTest extends TestCase
                 '<link rel="canonical" href="'.route('home').'">',
                 false,
             )
+            ->assertSee('rel="icon" href="'.url('/images/favicon.png').'"', false)
+            ->assertSee('rel="apple-touch-icon" href="'.url('/images/apple-touch-icon.png').'"', false)
             ->assertSee('property="og:type" content="website"', false)
+            ->assertSee('property="og:image:alt"', false)
             ->assertSee('name="twitter:card" content="summary_large_image"', false)
             ->assertSee('name="google-site-verification" content="google-token"', false)
             ->assertSee('name="msvalidate.01" content="bing-token"', false)
             ->assertSee('"@type":"WebSite"', false)
+            ->assertSee('"alternateName":"کورفلر"', false)
+            ->assertSee('"logo":"'.url('/images/coreflare-logo.png').'"', false)
             ->assertSee('"@type":"SoftwareApplication"', false)
             ->assertDontSee('<title>33187641</title>', false);
+    }
+
+    public function test_landing_uses_coreflare_favicon_fallback(): void
+    {
+        $settings = app(SeoSettings::class);
+        $settings->favicon = null;
+        $settings->save();
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('rel="icon" href="'.url('/favicon.svg').'"', false);
     }
 
     public function test_documentation_article_outputs_article_schema_and_canonical_url(): void
@@ -105,12 +125,16 @@ final class PublicSeoTest extends TestCase
             ->assertDontSee(route('pages.show', $draftPage->slug), false);
     }
 
-    public function test_robots_policy_keeps_public_pages_crawlable_for_noindex_processing(): void
+    public function test_robots_policy_keeps_noindex_auth_pages_crawlable(): void
     {
         $this->get(route('robots'))
             ->assertOk()
             ->assertSee('Allow: /')
             ->assertSee('Disallow: /admin/')
+            ->assertSee('Disallow: /panel/')
+            ->assertDontSee('Disallow: /login')
+            ->assertDontSee('Disallow: /verify')
+            ->assertDontSee('Disallow: /passkeys/')
             ->assertSee('Sitemap: '.route('sitemap'));
 
         $settings = app(SeoSettings::class);

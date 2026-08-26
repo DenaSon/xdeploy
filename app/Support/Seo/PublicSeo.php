@@ -32,6 +32,8 @@ final class PublicSeo
     public function landing(): SeoData
     {
         $canonical = route('home');
+        $organizationLogo = $this->absoluteImage($this->seo->organization_logo)
+            ?? url('/favicon.svg');
 
         return $this->make(
             title: $this->seo->default_title,
@@ -39,9 +41,11 @@ final class PublicSeo
             canonical: $canonical,
             schema: $this->schema->landing(
                 siteName: $this->general->site_name,
+                alternateName: $this->seo->site_alternate_name,
                 tagline: $this->branding->tagline,
                 description: $this->seo->default_description,
                 canonical: $canonical,
+                logo: $organizationLogo,
             ),
         );
     }
@@ -49,10 +53,10 @@ final class PublicSeo
     public function documentationIndex(): SeoData
     {
         $canonical = route('docs.index');
-        $description = 'راهنماها و مستندات رسمی '.$this->general->site_name.' برای اتصال سرور، راه‌اندازی سرویس‌ها و مدیریت زیرساخت.';
+        $description = 'راهنمای رسمی '.$this->general->site_name.' برای اتصال و مدیریت سرور، تهیه VPS، راه‌اندازی سرویس‌ها، دامنه و HTTPS.';
 
         return $this->make(
-            title: 'مستندات | '.$this->general->site_name,
+            title: 'مستندات '.$this->general->site_name.' | راهنمای سرور و سرویس‌ها',
             description: $description,
             canonical: $canonical,
             schema: $this->schema->documentationIndex(
@@ -139,6 +143,9 @@ final class PublicSeo
                 : 'noindex,nofollow',
             type: $type,
             image: $this->absoluteImage($this->seo->default_og_image),
+            favicon: $this->absoluteImage($this->seo->favicon)
+                ?? url('/favicon.svg'),
+            appleTouchIcon: $this->absoluteImage($this->seo->apple_touch_icon),
             publishedTime: $publishedTime,
             modifiedTime: $modifiedTime,
             schema: $schema,

@@ -17,6 +17,8 @@ final readonly class SeoData
         public string $robots,
         public string $type = 'website',
         public ?string $image = null,
+        public ?string $favicon = null,
+        public ?string $appleTouchIcon = null,
         public string $locale = 'fa_IR',
         public ?string $publishedTime = null,
         public ?string $modifiedTime = null,

@@ -8,6 +8,9 @@ use App\Application\Settings\GetSystemSettings;
 use App\Livewire\Admin\Settings\Index;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -47,6 +50,10 @@ final class AdminSettingsUiTest extends TestCase
             ->set('seoDefaultTitle', '  Coreflare | مدیریت زیرساخت  ')
             ->set('seoDefaultDescription', '  مدیریت سرور و سرویس‌ها از یک محیط واحد.  ')
             ->set('seoDefaultOgImage', '  /images/og/coreflare.png  ')
+            ->set('seoSiteAlternateName', '  کورفلر  ')
+            ->set('seoOrganizationLogo', '  /images/coreflare-logo.png  ')
+            ->set('seoFavicon', '  /images/favicon.png  ')
+            ->set('seoAppleTouchIcon', '  /images/apple-touch-icon.png  ')
             ->set('seoIndexSite', false)
             ->set('seoGoogleSiteVerification', '  google-token  ')
             ->set('seoBingSiteVerification', '  bing-token  ')
@@ -55,6 +62,10 @@ final class AdminSettingsUiTest extends TestCase
             ->assertSet('seoDefaultTitle', 'Coreflare | مدیریت زیرساخت')
             ->assertSet('seoDefaultDescription', 'مدیریت سرور و سرویس‌ها از یک محیط واحد.')
             ->assertSet('seoDefaultOgImage', '/images/og/coreflare.png')
+            ->assertSet('seoSiteAlternateName', 'کورفلر')
+            ->assertSet('seoOrganizationLogo', '/images/coreflare-logo.png')
+            ->assertSet('seoFavicon', '/images/favicon.png')
+            ->assertSet('seoAppleTouchIcon', '/images/apple-touch-icon.png')
             ->assertSet('seoIndexSite', false)
             ->assertSet('seoGoogleSiteVerification', 'google-token')
             ->assertSet('seoBingSiteVerification', 'bing-token')
@@ -67,9 +78,37 @@ final class AdminSettingsUiTest extends TestCase
         self::assertSame('Coreflare | مدیریت زیرساخت', $snapshot->seoDefaultTitle);
         self::assertSame('مدیریت سرور و سرویس‌ها از یک محیط واحد.', $snapshot->seoDefaultDescription);
         self::assertSame('/images/og/coreflare.png', $snapshot->seoDefaultOgImage);
+        self::assertSame('کورفلر', $snapshot->seoSiteAlternateName);
+        self::assertSame('/images/coreflare-logo.png', $snapshot->seoOrganizationLogo);
+        self::assertSame('/images/favicon.png', $snapshot->seoFavicon);
+        self::assertSame('/images/apple-touch-icon.png', $snapshot->seoAppleTouchIcon);
         self::assertFalse($snapshot->seoIndexSite);
         self::assertSame('google-token', $snapshot->seoGoogleSiteVerification);
         self::assertSame('bing-token', $snapshot->seoBingSiteVerification);
+    }
+
+    public function test_admin_can_upload_a_managed_favicon(): void
+    {
+        Storage::fake('public');
+        $this->actingAs($this->admin());
+
+        Livewire::test(Index::class)
+            ->set('seoFaviconUpload', UploadedFile::fake()->image('favicon.png', 96, 96))
+            ->call('saveSeo')
+            ->assertHasNoErrors()
+            ->assertSet('savedSection', 'seo');
+
+        $favicon = app(GetSystemSettings::class)->handle()->seoFavicon;
+
+        self::assertNotNull($favicon);
+        self::assertStringContainsString('/storage/seo/favicon-', $favicon);
+
+        $path = parse_url($favicon, PHP_URL_PATH);
+        self::assertIsString($path);
+
+        Storage::disk('public')->assertExists(
+            ltrim(Str::after($path, '/storage/'), '/'),
+        );
     }
 
     public function test_invalid_seo_title_is_rejected_before_persistence(): void
