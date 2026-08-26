@@ -8,6 +8,7 @@ use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\Date\JalaliDateFormatter;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -51,6 +52,20 @@ final class AdminServerDetailsPresentationTest extends TestCase
             ),
         ])->save();
 
+        $server->refresh();
+
+        $createdAt = JalaliDateFormatter::dateTime(
+            $server->created_at,
+            separator: ' — ',
+            persianDigits: true,
+        );
+
+        $expiresAt = JalaliDateFormatter::dateTime(
+            $server->expires_at,
+            separator: ' — ',
+            persianDigits: true,
+        );
+
         $this->actingAs($admin)
             ->get(route('admin.servers.show', $server))
             ->assertOk()
@@ -58,8 +73,8 @@ final class AdminServerDetailsPresentationTest extends TestCase
             ->assertSee('زیرساخت و چرخه عمر')
             ->assertSee('ارائه‌دهنده')
             ->assertSee('تاریخ انقضا')
-            ->assertSee('۱۴۰۵/۰۶/۰۵ — ۰۱:۴۲')
-            ->assertSee('۱۴۰۵/۰۶/۱۲ — ۰۱:۵۰')
+            ->assertSee($createdAt)
+            ->assertSee($expiresAt)
             ->assertDontSee('Cloud lifecycle');
     }
 }
