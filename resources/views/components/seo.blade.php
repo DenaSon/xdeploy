@@ -5,6 +5,14 @@
 <meta name="robots" content="{{ $seo->robots }}">
 <link rel="canonical" href="{{ $seo->canonical }}">
 
+@if($seo->favicon)
+    <link rel="icon" href="{{ $seo->favicon }}" sizes="any">
+@endif
+
+@if($seo->appleTouchIcon)
+    <link rel="apple-touch-icon" href="{{ $seo->appleTouchIcon }}">
+@endif
+
 @if($seo->googleSiteVerification)
     <meta name="google-site-verification" content="{{ $seo->googleSiteVerification }}">
 @endif
@@ -22,6 +30,7 @@
 
 @if($seo->image)
     <meta property="og:image" content="{{ $seo->image }}">
+    <meta property="og:image:alt" content="{{ $seo->title }}">
 @endif
 
 @if($seo->type === 'article' && $seo->publishedTime)
@@ -38,6 +47,7 @@
 
 @if($seo->image)
     <meta name="twitter:image" content="{{ $seo->image }}">
+    <meta name="twitter:image:alt" content="{{ $seo->title }}">
 @endif
 
 @if($seo->schema !== [])
