@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
+use App\Application\Billing\Events\PaymentStatusChanged;
 use App\Domain\Billing\Contracts\PaymentGatewayInterface;
 use App\Domain\Billing\DTOs\PaymentVerificationRequestData;
 use App\Domain\Billing\Enums\OrderStatus;
@@ -12,6 +13,8 @@ use App\Domain\Billing\Exceptions\PaymentNotVerifiableException;
 use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Throwable;
 
 final readonly class VerifyPaymentAction
 {
@@ -30,7 +33,7 @@ final readonly class VerifyPaymentAction
         /*
          * Gateway callbacks may be delivered more than once.
          * A previously verified payment is therefore a successful,
-         * idempotent result.
+         * idempotent result and must not emit another notification.
          */
         if ($payment->status === PaymentStatus::Paid) {
             return $payment;
@@ -63,10 +66,13 @@ final readonly class VerifyPaymentAction
             );
         }
 
-        return DB::transaction(function () use (
+        /**
+         * @var array{payment: Payment, changed: bool} $result
+         */
+        $result = DB::transaction(function () use (
             $payment,
             $verification,
-        ): Payment {
+        ): array {
             /** @var Payment $lockedPayment */
             $lockedPayment = Payment::query()
                 ->whereKey($payment->getKey())
@@ -74,7 +80,10 @@ final readonly class VerifyPaymentAction
                 ->firstOrFail();
 
             if ($lockedPayment->status === PaymentStatus::Paid) {
-                return $lockedPayment;
+                return [
+                    'payment' => $lockedPayment,
+                    'changed' => false,
+                ];
             }
 
             if ($lockedPayment->status !== PaymentStatus::Pending) {
@@ -116,7 +125,36 @@ final readonly class VerifyPaymentAction
                 ])->save();
             }
 
-            return $lockedPayment->fresh();
+            return [
+                'payment' => $lockedPayment->fresh(),
+                'changed' => true,
+            ];
         });
+
+        $verifiedPayment = $result['payment'];
+
+        if ($result['changed']) {
+            $this->dispatchStatusChanged(
+                $verifiedPayment,
+                PaymentStatus::Paid,
+            );
+        }
+
+        return $verifiedPayment;
+    }
+
+    private function dispatchStatusChanged(
+        Payment $payment,
+        PaymentStatus $status,
+    ): void {
+        try {
+            Event::dispatch(new PaymentStatusChanged(
+                paymentId: (int) $payment->getKey(),
+                orderId: $payment->order_id,
+                status: $status,
+            ));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }
