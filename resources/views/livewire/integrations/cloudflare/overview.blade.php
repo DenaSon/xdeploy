@@ -4,6 +4,9 @@
 >
     @php
         $selectedZone = collect($zones)->firstWhere('id', $selectedZoneId);
+        $editingDnsRecord = $editingDnsRecordId
+            ? collect($dnsRecords)->firstWhere('id', $editingDnsRecordId)
+            : null;
     @endphp
 
     <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -392,7 +395,7 @@
                         </div>
                     @else
                         <div class="mt-4 overflow-hidden rounded-2xl border border-base-300/60">
-                            <div class="hidden grid-cols-[4.5rem_minmax(9rem,1fr)_minmax(11rem,1.25fr)_5rem_6.5rem] gap-3 border-b border-base-300/60 bg-base-200/35 px-3.5 py-2.5 text-[10px] font-medium text-base-content/40 md:grid">
+                            <div class="hidden grid-cols-[4.5rem_minmax(9rem,1fr)_minmax(11rem,1.25fr)_5rem_8.5rem] gap-3 border-b border-base-300/60 bg-base-200/35 px-3.5 py-2.5 text-[10px] font-medium text-base-content/40 md:grid">
                                 <span>نوع</span>
                                 <span>نام</span>
                                 <span>مقدار</span>
@@ -404,17 +407,29 @@
                                 @foreach ($dnsRecords as $record)
                                     @php
                                         $manageableType = in_array($record['type'], $manageableDnsTypes, true);
+                                        $isEditing = $editingDnsRecordId === $record['id'];
                                     @endphp
 
-                                    <div class="grid gap-2 px-3.5 py-3 md:grid-cols-[4.5rem_minmax(9rem,1fr)_minmax(11rem,1.25fr)_5rem_6.5rem] md:items-start md:gap-3" wire:key="cloudflare-dns-{{ $record['id'] }}">
+                                    <div
+                                        class="grid gap-2 px-3.5 py-3 transition md:grid-cols-[4.5rem_minmax(9rem,1fr)_minmax(11rem,1.25fr)_5rem_8.5rem] md:items-start md:gap-3 {{ $isEditing ? 'bg-primary/[0.045] ring-1 ring-inset ring-primary/20' : '' }}"
+                                        wire:key="cloudflare-dns-{{ $record['id'] }}"
+                                    >
                                         <div>
-                                            <span class="inline-flex min-w-10 justify-center rounded-lg bg-base-200 px-2 py-1 font-mono text-[10px] font-semibold text-base-content/65">
+                                            <span class="inline-flex min-w-10 justify-center rounded-lg px-2 py-1 font-mono text-[10px] font-semibold {{ $isEditing ? 'bg-primary/10 text-primary' : 'bg-base-200 text-base-content/65' }}">
                                                 {{ $record['type'] }}
                                             </span>
                                         </div>
 
-                                        <div class="min-w-0 break-all font-mono text-xs leading-6 text-base-content/65" dir="ltr">
-                                            {{ $record['name'] }}
+                                        <div class="min-w-0">
+                                            <div class="break-all font-mono text-xs leading-6 text-base-content/65" dir="ltr">
+                                                {{ $record['name'] }}
+                                            </div>
+                                            @if ($isEditing)
+                                                <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                                    <span class="size-1.5 rounded-full bg-primary"></span>
+                                                    در حال ویرایش
+                                                </span>
+                                            @endif
                                         </div>
 
                                         <div class="min-w-0 break-all font-mono text-xs leading-6 text-base-content/55" dir="ltr">
@@ -445,10 +460,15 @@
                                                 <button
                                                     type="button"
                                                     wire:click="editDnsRecord('{{ $record['id'] }}')"
-                                                    class="btn btn-ghost btn-xs rounded-lg data-loading:pointer-events-none data-loading:opacity-60"
+                                                    class="btn btn-ghost btn-xs gap-1.5 rounded-lg data-loading:pointer-events-none data-loading:opacity-60 {{ $isEditing ? 'bg-primary/10 text-primary' : '' }}"
                                                     title="ویرایش رکورد"
+                                                    aria-label="ویرایش رکورد {{ $record['name'] }}"
+                                                    aria-pressed="{{ $isEditing ? 'true' : 'false' }}"
                                                 >
-                                                    <x-icon name="lucide.pencil" class="in-data-loading:hidden !size-3.5" />
+                                                    <span class="in-data-loading:hidden inline-flex items-center gap-1.5">
+                                                        <x-icon name="lucide.pencil" class="!size-3.5" />
+                                                        <span>ویرایش</span>
+                                                    </span>
                                                     <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
                                                 </button>
                                             @endif
@@ -460,6 +480,7 @@
                                                     wire:confirm="این رکورد DNS برای همیشه از Cloudflare حذف شود؟"
                                                     class="btn btn-ghost btn-xs rounded-lg text-error data-loading:pointer-events-none data-loading:opacity-60"
                                                     title="حذف رکورد"
+                                                    aria-label="حذف رکورد {{ $record['name'] }}"
                                                 >
                                                     <x-icon name="lucide.trash-2" class="in-data-loading:hidden !size-3.5" />
                                                     <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
@@ -474,15 +495,40 @@
                 </section>
 
                 @if ($dnsFormOpen && is_array($selectedZone) && $canManageDns)
-                    <section class="rounded-3xl border border-primary/15 bg-base-100 p-5 sm:p-6">
+                    <section
+                        x-data
+                        x-init="$nextTick(() => { $el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => $refs.dnsNameInput?.focus({ preventScroll: true }), 300) })"
+                        class="rounded-3xl border p-5 transition sm:p-6 {{ $editingDnsRecordId ? 'border-primary/25 bg-primary/[0.025] shadow-sm shadow-primary/5' : 'border-primary/15 bg-base-100' }}"
+                        aria-label="{{ $editingDnsRecordId ? 'فرم ویرایش رکورد DNS' : 'فرم افزودن رکورد DNS' }}"
+                    >
                         <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-sm font-semibold">
-                                    {{ $editingDnsRecordId ? 'ویرایش رکورد DNS' : 'افزودن رکورد DNS' }}
-                                </h3>
-                                <p class="mt-1 text-xs leading-6 text-base-content/45">
-                                    برای ریشه دامنه از <code dir="ltr">@</code> و برای زیردامنه از نام کوتاه مانند <code dir="ltr">www</code> استفاده کنید.
-                                </p>
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-sm font-semibold">
+                                        {{ $editingDnsRecordId ? 'ویرایش رکورد '.$dnsType : 'افزودن رکورد DNS' }}
+                                    </h3>
+
+                                    @if ($editingDnsRecordId)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">
+                                            <x-icon name="lucide.pencil" class="!size-3" />
+                                            در حال ویرایش
+                                        </span>
+                                    @endif
+                                </div>
+
+                                @if ($editingDnsRecordId)
+                                    <p class="mt-1 text-xs leading-6 text-base-content/50">
+                                        رکورد
+                                        <code class="mx-1 rounded bg-base-200/70 px-1.5 py-0.5" dir="ltr">{{ is_array($editingDnsRecord) ? ($editingDnsRecord['name'] ?? $dnsName) : $dnsName }}</code>
+                                        از دامنه
+                                        <code class="mx-1 rounded bg-base-200/70 px-1.5 py-0.5" dir="ltr">{{ $selectedZone['name'] }}</code>
+                                        را ویرایش می‌کنید.
+                                    </p>
+                                @else
+                                    <p class="mt-1 text-xs leading-6 text-base-content/45">
+                                        برای ریشه دامنه از <code dir="ltr">@</code> و برای زیردامنه از نام کوتاه مانند <code dir="ltr">www</code> استفاده کنید.
+                                    </p>
+                                @endif
                             </div>
 
                             <button
@@ -490,6 +536,7 @@
                                 wire:click="cancelDnsRecordForm"
                                 class="btn btn-ghost btn-xs rounded-lg data-loading:pointer-events-none data-loading:opacity-60"
                                 title="بستن فرم"
+                                aria-label="بستن فرم DNS"
                             >
                                 <x-icon name="lucide.x" class="in-data-loading:hidden !size-4" />
                                 <span class="not-in-data-loading:hidden loading loading-spinner loading-xs"></span>
@@ -513,9 +560,10 @@
                                 <label class="form-control gap-1.5">
                                     <span class="text-xs font-medium text-base-content/60">نام</span>
                                     <input
+                                        x-ref="dnsNameInput"
                                         type="text"
                                         wire:model="dnsName"
-                                        class="input input-bordered input-sm w-full rounded-xl font-mono"
+                                        class="input input-bordered input-sm w-full rounded-xl font-mono focus:border-primary/50"
                                         dir="ltr"
                                         placeholder="@ یا www"
                                     />
