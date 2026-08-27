@@ -6,10 +6,10 @@ namespace App\Application\Cloud\Servers;
 
 use App\Application\Cloud\Events\CloudServerExpired;
 use App\Application\Cloud\Events\CloudServerTerminated;
+use App\Application\Cloud\Servers\Termination\CloudServerTerminationDecision;
+use App\Application\Cloud\Servers\Termination\CloudServerTerminationPolicyResolver;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
-use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
-use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use App\Models\User;
@@ -19,13 +19,10 @@ use Throwable;
 
 final readonly class TerminateExpiredCloudServerAction
 {
-    private const int LIARA_MINIMUM_EXPIRED_MINUTES = 5;
-
-    private const int LIARA_MINIMUM_RESOURCE_AGE_HOURS = 24;
-
     public function __construct(
         private DeleteCloudServerAction $deleteCloudServer,
         private ?CloudProviderRegistryInterface $providers = null,
+        private ?CloudServerTerminationPolicyResolver $terminationPolicies = null,
     ) {}
 
     /**
@@ -85,7 +82,17 @@ final readonly class TerminateExpiredCloudServerAction
         }
 
         try {
-            if (! $this->isReadyForProviderDeletion($server)) {
+            $decision = $this->terminationPolicyResolver()
+                ->advance(
+                    $server,
+                );
+
+            $this->logTerminationState(
+                server: $server,
+                decision: $decision,
+            );
+
+            if (! $decision->readyForDelete()) {
                 return true;
             }
 
@@ -135,144 +142,6 @@ final readonly class TerminateExpiredCloudServerAction
                 terminatedAt: $terminatedAt,
             ),
         );
-
-        return true;
-    }
-
-    /**
-     * Liara requires a stopped VM before deletion and rejects deletion of
-     * resources younger than 24 hours. Expected waiting states are not
-     * failures; the five-minute scheduler will evaluate them again.
-     */
-    private function isReadyForProviderDeletion(
-        Server $server,
-    ): bool {
-        if ($server->cloud_provider !== CloudProviderType::Liara) {
-            return true;
-        }
-
-        if (! $this->providers instanceof CloudProviderRegistryInterface) {
-            throw new LogicException(
-                'Cloud provider registry is required for Liara termination readiness checks.',
-            );
-        }
-
-        $region = trim((string) $server->cloud_region);
-        $providerServerId = trim((string) $server->cloud_server_id);
-
-        if ($region === '' || $providerServerId === '') {
-            throw new LogicException(
-                sprintf(
-                    'Liara Server [%d] has incomplete cloud metadata.',
-                    $server->getKey(),
-                ),
-            );
-        }
-
-        try {
-            $providerServer = $this->providers
-                ->resolve(CloudProviderType::Liara)
-                ->findServer(
-                    region: $region,
-                    serverId: $providerServerId,
-                );
-        } catch (CloudResourceNotFoundException) {
-            /*
-             * The desired external state is already reached. Continue to
-             * DeleteCloudServerAction so its existing not-found handling can
-             * finalize the local record consistently.
-             */
-            return true;
-        }
-
-        if ($providerServer->isRunning()) {
-            /** @var CloudServerLifecycleInterface $lifecycle */
-            $lifecycle = $this->providers->resolveCapability(
-                provider: CloudProviderType::Liara,
-                capability: CloudServerLifecycleInterface::class,
-            );
-
-            $lifecycle->powerOff(
-                region: $region,
-                serverId: $providerServerId,
-            );
-
-            logger()->info(
-                'cloud_server.termination_poweroff_requested',
-                [
-                    'server_id' => (int) $server->getKey(),
-                    'provider' => CloudProviderType::Liara->value,
-                    'provider_server_id' => $providerServerId,
-                ],
-            );
-
-            return false;
-        }
-
-        if (! $providerServer->isStopped()) {
-            logger()->info(
-                'cloud_server.termination_waiting_for_power_state',
-                [
-                    'server_id' => (int) $server->getKey(),
-                    'provider' => CloudProviderType::Liara->value,
-                    'power_state' => $providerServer->powerState->value,
-                ],
-            );
-
-            return false;
-        }
-
-        $expiresAt = $server->expires_at;
-
-        if (
-            $expiresAt === null
-            || $expiresAt->greaterThan(
-                now()->subMinutes(self::LIARA_MINIMUM_EXPIRED_MINUTES),
-            )
-        ) {
-            logger()->info(
-                'cloud_server.termination_waiting_for_expiration_grace',
-                [
-                    'server_id' => (int) $server->getKey(),
-                    'provider' => CloudProviderType::Liara->value,
-                    'expires_at' => $expiresAt?->toIso8601String(),
-                    'minimum_minutes' => self::LIARA_MINIMUM_EXPIRED_MINUTES,
-                ],
-            );
-
-            return false;
-        }
-
-        if ($providerServer->createdAt === null) {
-            logger()->warning(
-                'cloud_server.termination_waiting_for_provider_created_at',
-                [
-                    'server_id' => (int) $server->getKey(),
-                    'provider' => CloudProviderType::Liara->value,
-                    'provider_server_id' => $providerServerId,
-                ],
-            );
-
-            return false;
-        }
-
-        $minimumCreatedAt = now()
-            ->subHours(self::LIARA_MINIMUM_RESOURCE_AGE_HOURS)
-            ->toDateTimeImmutable();
-
-        if ($providerServer->createdAt > $minimumCreatedAt) {
-            logger()->info(
-                'cloud_server.termination_waiting_for_provider_minimum_age',
-                [
-                    'server_id' => (int) $server->getKey(),
-                    'provider' => CloudProviderType::Liara->value,
-                    'provider_created_at' => $providerServer->createdAt->format(DATE_ATOM),
-                    'minimum_hours' => self::LIARA_MINIMUM_RESOURCE_AGE_HOURS,
-                ],
-            );
-
-            return false;
-        }
 
         return true;
     }
@@ -390,6 +259,36 @@ final readonly class TerminateExpiredCloudServerAction
                     ),
                 ])->saveOrFail();
             },
+        );
+    }
+
+    private function terminationPolicyResolver(): CloudServerTerminationPolicyResolver
+    {
+        if ($this->terminationPolicies instanceof CloudServerTerminationPolicyResolver) {
+            return $this->terminationPolicies;
+        }
+
+        return new CloudServerTerminationPolicyResolver(
+            providers: $this->providers,
+        );
+    }
+
+    private function logTerminationState(
+        Server $server,
+        CloudServerTerminationDecision $decision,
+    ): void {
+        $provider = $server->cloud_provider;
+
+        logger()->info(
+            'cloud_server.termination_state',
+            [
+                ...$decision->context,
+                'server_id' => (int) $server->getKey(),
+                'provider' => $provider instanceof CloudProviderType
+                    ? $provider->value
+                    : null,
+                'state' => $decision->state->value,
+            ],
         );
     }
 
