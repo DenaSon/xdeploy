@@ -83,6 +83,17 @@ final readonly class DeleteCloudServerAction
 
         if ($volumeManager instanceof CloudVolumeManagerInterface) {
             foreach ($volumeIds as $volumeId) {
+                if (
+                    $isArvanRetry
+                    && ! $this->shouldDeleteArvanVolumeOnRetry(
+                        manager: $volumeManager,
+                        region: $cloudRegion,
+                        volumeId: $volumeId,
+                    )
+                ) {
+                    continue;
+                }
+
                 try {
                     $volumeManager->deleteVolume(
                         region: $cloudRegion,
@@ -198,6 +209,47 @@ final readonly class DeleteCloudServerAction
         }
 
         return false;
+    }
+
+    private function shouldDeleteArvanVolumeOnRetry(
+        CloudVolumeManagerInterface $manager,
+        string $region,
+        string $volumeId,
+    ): bool {
+        try {
+            $volume = $manager->findVolume(
+                region: $region,
+                volumeId: $volumeId,
+            );
+        } catch (CloudResourceNotFoundException) {
+            return false;
+        }
+
+        $status = strtolower(trim($volume->status));
+
+        if ($status === 'deleted') {
+            return false;
+        }
+
+        if ($status === 'deleting') {
+            throw new CloudValidationException(
+                sprintf(
+                    'ArvanCloud volume [%s] deletion is still in progress.',
+                    $volumeId,
+                ),
+            );
+        }
+
+        if ($volume->isAttached()) {
+            throw new CloudValidationException(
+                sprintf(
+                    'ArvanCloud volume [%s] is still attached.',
+                    $volumeId,
+                ),
+            );
+        }
+
+        return true;
     }
 
     /**
