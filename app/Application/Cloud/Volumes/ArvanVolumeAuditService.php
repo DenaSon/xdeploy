@@ -10,6 +10,7 @@ use App\Domain\Cloud\DTOs\CloudVolumeAuditItemData;
 use App\Domain\Cloud\DTOs\CloudVolumeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Enums\CloudVolumeAuditStatus;
+use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Collection;
@@ -85,6 +86,29 @@ final readonly class ArvanVolumeAuditService
         }
 
         return null;
+    }
+
+    public function findExact(
+        string $region,
+        string $volumeId,
+    ): ?CloudVolumeAuditItemData {
+        try {
+            $volume = $this->volumeManager()->findVolume(
+                region: $region,
+                volumeId: $volumeId,
+            );
+        } catch (CloudResourceNotFoundException) {
+            return null;
+        }
+
+        $servers = $this->arvanServers();
+        $indexes = $this->serverIndexes($servers);
+
+        return $this->classify(
+            volume: $volume,
+            serversByProviderKey: $indexes['by_provider'],
+            serversByVolumeKey: $indexes['by_volume'],
+        );
     }
 
     private function volumeManager(): CloudVolumeManagerInterface
