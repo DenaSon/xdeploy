@@ -209,6 +209,42 @@ final class ArvanVolumeAuditServiceTest extends TestCase
         $action->handle('region-a', 'vol-linked');
     }
 
+    public function test_manual_delete_does_not_treat_missing_list_item_as_verified_absence(): void
+    {
+        config()->set('cloud.providers.arvan.region', 'region-a');
+
+        $manager = new AuditVolumeManagerFake([
+            'region-a' => [],
+        ]);
+        $manager->pointLookupOnlyVolumesByRegion = [
+            'region-a' => [
+                'vol-hidden' => new CloudVolumeData(
+                    id: 'vol-hidden',
+                    name: 'Point lookup only volume',
+                    regionId: 'region-a',
+                    status: 'available',
+                ),
+            ],
+        ];
+        $registry = new AuditRegistryFake($manager);
+        $action = new DeleteArvanAuditedVolumeAction(
+            audit: new ArvanVolumeAuditService($registry),
+            providers: $registry,
+        );
+
+        try {
+            $action->handle('region-a', 'vol-hidden');
+            $this->fail('Expected an unclassified provider volume to fail closed.');
+        } catch (CloudValidationException $exception) {
+            $this->assertStringContainsString(
+                'could not be safely classified',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame([], $manager->deletedVolumeIds);
+    }
+
     private function server(
         User $user,
         string $name,
@@ -280,6 +316,9 @@ final class AuditVolumeManagerFake implements CloudVolumeManagerInterface
     /** @var array<string, list<CloudVolumeData>> */
     public array $volumesByRegion;
 
+    /** @var array<string, array<string, CloudVolumeData>> */
+    public array $pointLookupOnlyVolumesByRegion = [];
+
     /** @var list<string> */
     public array $deletedVolumeIds = [];
 
@@ -312,6 +351,10 @@ final class AuditVolumeManagerFake implements CloudVolumeManagerInterface
             if ($volume->id === $volumeId) {
                 return $volume;
             }
+        }
+
+        if (isset($this->pointLookupOnlyVolumesByRegion[$region][$volumeId])) {
+            return $this->pointLookupOnlyVolumesByRegion[$region][$volumeId];
         }
 
         throw new CloudResourceNotFoundException('Volume not found.');
