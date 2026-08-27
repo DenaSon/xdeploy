@@ -28,64 +28,24 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
 
     public function test_expired_cloud_server_is_deleted_from_provider_then_soft_deleted_locally(): void
     {
-        $server = $this->cloudServer(
-            expiresAt: now()->subMinute(),
-        );
-
+        $server = $this->cloudServer(expiresAt: now()->subMinute());
         $lifecycle = $this->mockLifecycle();
 
-        $lifecycle
-            ->expects($this->once())
+        $lifecycle->expects($this->once())
             ->method('deleteServer')
-            ->with(
-                'eu-west1-a',
-                'cloud-server-123',
-            );
+            ->with('eu-west1-a', 'cloud-server-123');
 
-        $terminated = $this->action(
-            $lifecycle,
-        )->execute(
-            (int) $server->getKey(),
-        );
+        $terminated = $this->action($lifecycle)->execute((int) $server->getKey());
+        $this->assertTrue($terminated);
 
-        $this->assertTrue(
-            $terminated,
-        );
-
-        $terminatedServer = Server::withTrashed()
-            ->findOrFail(
-                $server->getKey(),
-            );
-
-        $this->assertNotNull(
-            $terminatedServer->deleted_at,
-        );
-
-        $this->assertNotNull(
-            $terminatedServer->terminated_at,
-        );
-
-        $this->assertNotNull(
-            $terminatedServer->termination_started_at,
-        );
-
-        $this->assertNotNull(
-            $terminatedServer->termination_last_attempt_at,
-        );
-
-        $this->assertSame(
-            1,
-            $terminatedServer->termination_attempts,
-        );
-
-        $this->assertNull(
-            $terminatedServer->termination_last_error,
-        );
-
-        $this->assertSame(
-            ServerStatus::Inactive,
-            $terminatedServer->status,
-        );
+        $terminatedServer = Server::withTrashed()->findOrFail($server->getKey());
+        $this->assertNotNull($terminatedServer->deleted_at);
+        $this->assertNotNull($terminatedServer->terminated_at);
+        $this->assertNotNull($terminatedServer->termination_started_at);
+        $this->assertNotNull($terminatedServer->termination_last_attempt_at);
+        $this->assertSame(1, $terminatedServer->termination_attempts);
+        $this->assertNull($terminatedServer->termination_last_error);
+        $this->assertSame(ServerStatus::Inactive, $terminatedServer->status);
     }
 
     public function test_running_liara_server_is_powered_off_without_delete_attempt(): void
@@ -94,15 +54,11 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
             expiresAt: now()->subMinute(),
             provider: CloudProviderType::Liara,
         );
-
         $lifecycle = $this->mockLifecycle();
-        $lifecycle
-            ->expects($this->once())
+        $lifecycle->expects($this->once())
             ->method('powerOff')
             ->with('iran', 'liara-server-123');
-        $lifecycle
-            ->expects($this->never())
-            ->method('deleteServer');
+        $lifecycle->expects($this->never())->method('deleteServer');
 
         $registry = $this->liaraRegistry(
             providerServer: $this->providerServer(
@@ -113,9 +69,7 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         );
 
         $this->assertTrue(
-            $this->action($lifecycle, $registry)->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle, $registry)->execute((int) $server->getKey()),
         );
 
         $fresh = $server->fresh();
@@ -133,7 +87,6 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
             expiresAt: now()->subMinutes(2),
             provider: CloudProviderType::Liara,
         );
-
         $lifecycle = $this->mockLifecycle();
         $lifecycle->expects($this->never())->method('powerOff');
         $lifecycle->expects($this->never())->method('deleteServer');
@@ -147,9 +100,7 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         );
 
         $this->assertTrue(
-            $this->action($lifecycle, $registry)->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle, $registry)->execute((int) $server->getKey()),
         );
 
         $fresh = $server->fresh();
@@ -164,7 +115,6 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
             expiresAt: now()->subMinutes(10),
             provider: CloudProviderType::Liara,
         );
-
         $lifecycle = $this->mockLifecycle();
         $lifecycle->expects($this->never())->method('powerOff');
         $lifecycle->expects($this->never())->method('deleteServer');
@@ -178,9 +128,7 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         );
 
         $this->assertTrue(
-            $this->action($lifecycle, $registry)->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle, $registry)->execute((int) $server->getKey()),
         );
 
         $fresh = $server->fresh();
@@ -195,7 +143,6 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
             expiresAt: now()->subMinutes(10),
             provider: CloudProviderType::Liara,
         );
-
         $lifecycle = $this->mockLifecycle();
         $lifecycle->expects($this->never())->method('powerOff');
         $lifecycle->expects($this->never())->method('deleteServer');
@@ -209,9 +156,7 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         );
 
         $this->assertTrue(
-            $this->action($lifecycle, $registry)->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle, $registry)->execute((int) $server->getKey()),
         );
 
         $fresh = $server->fresh();
@@ -225,11 +170,9 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
             expiresAt: now()->subMinutes(10),
             provider: CloudProviderType::Liara,
         );
-
         $lifecycle = $this->mockLifecycle();
         $lifecycle->expects($this->never())->method('powerOff');
-        $lifecycle
-            ->expects($this->once())
+        $lifecycle->expects($this->once())
             ->method('deleteServer')
             ->with('iran', 'liara-server-123');
 
@@ -242,9 +185,7 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         );
 
         $this->assertTrue(
-            $this->action($lifecycle, $registry)->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle, $registry)->execute((int) $server->getKey()),
         );
 
         $terminated = Server::withTrashed()->findOrFail($server->getKey());
@@ -257,64 +198,33 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
 
     public function test_provider_not_found_is_treated_as_successful_termination(): void
     {
-        $server = $this->cloudServer(
-            expiresAt: now()->subMinute(),
-        );
-
+        $server = $this->cloudServer(expiresAt: now()->subMinute());
         $lifecycle = $this->mockLifecycle();
-
-        $lifecycle
-            ->expects($this->once())
+        $lifecycle->expects($this->once())
             ->method('deleteServer')
             ->willThrowException(
-                new CloudResourceNotFoundException(
-                    'Cloud resource does not exist.',
-                ),
+                new CloudResourceNotFoundException('Cloud resource does not exist.'),
             );
 
         $this->assertTrue(
-            $this->action(
-                $lifecycle,
-            )->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle)->execute((int) $server->getKey()),
         );
-
-        $this->assertSoftDeleted(
-            'servers',
-            [
-                'id' => $server->getKey(),
-            ],
-        );
+        $this->assertSoftDeleted('servers', ['id' => $server->getKey()]);
     }
 
     public function test_provider_failure_keeps_local_server_for_retry_and_records_audit_data(): void
     {
-        $server = $this->cloudServer(
-            expiresAt: now()->subMinute(),
-        );
-
+        $server = $this->cloudServer(expiresAt: now()->subMinute());
         $lifecycle = $this->mockLifecycle();
-
-        $lifecycle
-            ->expects($this->once())
+        $lifecycle->expects($this->once())
             ->method('deleteServer')
             ->willThrowException(
-                new CloudConnectionException(
-                    'Provider temporarily unavailable.',
-                ),
+                new CloudConnectionException('Provider temporarily unavailable.'),
             );
 
         try {
-            $this->action(
-                $lifecycle,
-            )->execute(
-                (int) $server->getKey(),
-            );
-
-            $this->fail(
-                'Expected provider deletion failure.',
-            );
+            $this->action($lifecycle)->execute((int) $server->getKey());
+            $this->fail('Expected provider deletion failure.');
         } catch (CloudConnectionException $exception) {
             $this->assertSame(
                 'Provider temporarily unavailable.',
@@ -323,29 +233,11 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         }
 
         $fresh = $server->fresh();
-
-        $this->assertNotNull(
-            $fresh,
-        );
-
-        $this->assertNull(
-            $fresh->deleted_at,
-        );
-
-        $this->assertNull(
-            $fresh->terminated_at,
-        );
-
-        $this->assertSame(
-            ServerStatus::Inactive,
-            $fresh->status,
-        );
-
-        $this->assertSame(
-            1,
-            $fresh->termination_attempts,
-        );
-
+        $this->assertNotNull($fresh);
+        $this->assertNull($fresh->deleted_at);
+        $this->assertNull($fresh->terminated_at);
+        $this->assertSame(ServerStatus::Inactive, $fresh->status);
+        $this->assertSame(1, $fresh->termination_attempts);
         $this->assertSame(
             'Provider temporarily unavailable.',
             $fresh->termination_last_error,
@@ -354,61 +246,34 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
 
     public function test_server_before_expiration_is_a_noop(): void
     {
-        $server = $this->cloudServer(
-            expiresAt: now()->addHour(),
-        );
-
+        $server = $this->cloudServer(expiresAt: now()->addHour());
         $lifecycle = $this->mockLifecycle();
-
-        $lifecycle
-            ->expects($this->never())
-            ->method('deleteServer');
+        $lifecycle->expects($this->never())->method('deleteServer');
 
         $this->assertFalse(
-            $this->action(
-                $lifecycle,
-            )->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle)->execute((int) $server->getKey()),
         );
-
-        $this->assertModelExists(
-            $server,
-        );
+        $this->assertModelExists($server);
     }
 
     public function test_user_provided_server_is_never_terminated_by_cloud_expiration(): void
     {
         $user = User::factory()->create();
-
-        $server = $user
-            ->servers()
-            ->create([
-                'name' => 'Manual VPS',
-                'host' => '192.0.2.20',
-                'port' => 22,
-                'username' => 'root',
-                'status' => ServerStatus::Active,
-                'expires_at' => now()->subMinute(),
-            ]);
-
+        $server = $user->servers()->create([
+            'name' => 'Manual VPS',
+            'host' => '192.0.2.20',
+            'port' => 22,
+            'username' => 'root',
+            'status' => ServerStatus::Active,
+            'expires_at' => now()->subMinute(),
+        ]);
         $lifecycle = $this->mockLifecycle();
-
-        $lifecycle
-            ->expects($this->never())
-            ->method('deleteServer');
+        $lifecycle->expects($this->never())->method('deleteServer');
 
         $this->assertFalse(
-            $this->action(
-                $lifecycle,
-            )->execute(
-                (int) $server->getKey(),
-            ),
+            $this->action($lifecycle)->execute((int) $server->getKey()),
         );
-
-        $this->assertModelExists(
-            $server,
-        );
+        $this->assertModelExists($server);
     }
 
     private function action(
@@ -426,32 +291,20 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
 
     private function mockLifecycle(): CloudServerLifecycleInterface&MockObject
     {
-        return $this->createMock(
-            CloudServerLifecycleInterface::class,
-        );
+        return $this->createMock(CloudServerLifecycleInterface::class);
     }
 
     private function liaraRegistry(
         CloudServerData $providerServer,
         CloudServerLifecycleInterface $lifecycle,
     ): CloudProviderRegistryInterface&MockObject {
-        $provider = $this->createMock(
-            CloudProviderInterface::class,
-        );
-        $provider
-            ->method('findServer')
-            ->with('iran', 'liara-server-123')
-            ->willReturn($providerServer);
+        $provider = new LiaraTerminationTestProvider($providerServer);
 
-        $registry = $this->createMock(
-            CloudProviderRegistryInterface::class,
-        );
-        $registry
-            ->method('resolve')
+        $registry = $this->createMock(CloudProviderRegistryInterface::class);
+        $registry->method('resolve')
             ->with(CloudProviderType::Liara)
             ->willReturn($provider);
-        $registry
-            ->method('resolveCapability')
+        $registry->method('resolveCapability')
             ->with(
                 CloudProviderType::Liara,
                 CloudServerLifecycleInterface::class,
@@ -473,9 +326,7 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
             username: 'root',
             sizeId: 'standard-base-g2',
             imageId: 'ubuntu-24.04',
-            createdAt: now()
-                ->subHours($createdHoursAgo)
-                ->toDateTimeImmutable(),
+            createdAt: now()->subHours($createdHoursAgo)->toDateTimeImmutable(),
             powerState: $powerState,
         );
     }
@@ -487,21 +338,48 @@ final class TerminateExpiredCloudServerActionTest extends TestCase
         $user = User::factory()->create();
         $isLiara = $provider === CloudProviderType::Liara;
 
-        return $user
-            ->servers()
-            ->create([
-                'name' => 'Expiring Cloud Server',
-                'host' => '203.0.113.20',
-                'port' => 22,
-                'username' => $isLiara ? 'root' : 'ubuntu',
-                'status' => ServerStatus::Active,
-                'cloud_provider' => $provider,
-                'cloud_server_id' => $isLiara
-                    ? 'liara-server-123'
-                    : 'cloud-server-123',
-                'cloud_region' => $isLiara ? 'iran' : 'eu-west1-a',
-                'provisioned_at' => now()->subDay(),
-                'expires_at' => $expiresAt,
-            ]);
+        return $user->servers()->create([
+            'name' => 'Expiring Cloud Server',
+            'host' => '203.0.113.20',
+            'port' => 22,
+            'username' => $isLiara ? 'root' : 'ubuntu',
+            'status' => ServerStatus::Active,
+            'cloud_provider' => $provider,
+            'cloud_server_id' => $isLiara
+                ? 'liara-server-123'
+                : 'cloud-server-123',
+            'cloud_region' => $isLiara ? 'iran' : 'eu-west1-a',
+            'provisioned_at' => now()->subDay(),
+            'expires_at' => $expiresAt,
+        ]);
+    }
+}
+
+final readonly class LiaraTerminationTestProvider implements CloudProviderInterface
+{
+    public function __construct(
+        private CloudServerData $server,
+    ) {}
+
+    public function listRegions(): array
+    {
+        return [];
+    }
+
+    public function listSizes(string $region): array
+    {
+        return [];
+    }
+
+    public function listImages(string $region): array
+    {
+        return [];
+    }
+
+    public function findServer(
+        string $region,
+        string $serverId,
+    ): CloudServerData {
+        return $this->server;
     }
 }
