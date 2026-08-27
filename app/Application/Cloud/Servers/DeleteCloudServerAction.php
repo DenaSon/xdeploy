@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Servers;
 
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudVolumeManagerInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
@@ -49,6 +50,9 @@ final readonly class DeleteCloudServerAction
             $provider,
         );
 
+        $isArvanRetry = $provider === CloudProviderType::Arvan
+            && is_array($server->termination_volume_ids);
+
         [$volumeManager, $volumeIds] = $this->prepareArvanVolumeCleanup(
             server: $server,
             provider: $provider,
@@ -56,17 +60,25 @@ final readonly class DeleteCloudServerAction
             providerServerId: $cloudServerId,
         );
 
-        /*
-         * Provider deletion is the authoritative external side effect.
-         * Not-found is also a successful terminal state.
-         */
-        try {
-            $lifecycle->deleteServer(
+        if (
+            ! $isArvanRetry
+            || $this->arvanServerExists(
                 region: $cloudRegion,
-                serverId: $cloudServerId,
-            );
-        } catch (CloudResourceNotFoundException) {
-            // Desired state already reached at the owning provider.
+                providerServerId: $cloudServerId,
+            )
+        ) {
+            /*
+             * Provider deletion is the authoritative external side effect.
+             * Not-found is also a successful terminal state.
+             */
+            try {
+                $lifecycle->deleteServer(
+                    region: $cloudRegion,
+                    serverId: $cloudServerId,
+                );
+            } catch (CloudResourceNotFoundException) {
+                // Desired state already reached at the owning provider.
+            }
         }
 
         if ($volumeManager instanceof CloudVolumeManagerInterface) {
@@ -156,6 +168,36 @@ final readonly class DeleteCloudServerAction
         ])->saveOrFail();
 
         return [$volumeManager, $volumeIds];
+    }
+
+    private function arvanServerExists(
+        string $region,
+        string $providerServerId,
+    ): bool {
+        if (! $this->providers instanceof CloudProviderRegistryInterface) {
+            return true;
+        }
+
+        if (! $this->providers->supportsCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudServerInventoryInterface::class,
+        )) {
+            return true;
+        }
+
+        /** @var CloudServerInventoryInterface $inventory */
+        $inventory = $this->providers->resolveCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudServerInventoryInterface::class,
+        );
+
+        foreach ($inventory->listServers($region) as $providerServer) {
+            if (trim($providerServer->id) === $providerServerId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
