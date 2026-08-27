@@ -60,4 +60,16 @@ final class JalaliDateFormatterTest extends TestCase
             ),
         );
     }
+
+    public function test_it_can_render_persian_digits_for_persian_ui(): void
+    {
+        $this->assertSame(
+            '۱۴۰۵/۰۶/۰۵ — ۲۰:۲۵',
+            JalaliDateFormatter::dateTime(
+                new DateTimeImmutable('2026-08-27 20:25:00'),
+                separator: ' — ',
+                persianDigits: true,
+            ),
+        );
+    }
 }

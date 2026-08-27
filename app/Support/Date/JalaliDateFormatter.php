@@ -8,9 +8,23 @@ use DateTimeInterface;
 
 final class JalaliDateFormatter
 {
+    private const array PERSIAN_DIGITS = [
+        '0' => '۰',
+        '1' => '۱',
+        '2' => '۲',
+        '3' => '۳',
+        '4' => '۴',
+        '5' => '۵',
+        '6' => '۶',
+        '7' => '۷',
+        '8' => '۸',
+        '9' => '۹',
+    ];
+
     public static function dateTime(
         DateTimeInterface $dateTime,
         string $separator = ' ',
+        bool $persianDigits = false,
     ): string {
         [$year, $month, $day] = self::gregorianToJalali(
             year: (int) $dateTime->format('Y'),
@@ -18,7 +32,7 @@ final class JalaliDateFormatter
             day: (int) $dateTime->format('j'),
         );
 
-        return sprintf(
+        $formatted = sprintf(
             '%04d/%02d/%02d%s%s',
             $year,
             $month,
@@ -26,6 +40,10 @@ final class JalaliDateFormatter
             $separator,
             $dateTime->format('H:i'),
         );
+
+        return $persianDigits
+            ? strtr($formatted, self::PERSIAN_DIGITS)
+            : $formatted;
     }
 
     /**
