@@ -22,12 +22,14 @@ use App\Domain\Cloud\Contracts\CloudServerReportsInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizeCatalogInterface;
 use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\Contracts\CloudSshKeyCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudVolumeManagerInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudCatalogCapabilities;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudClient;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvider;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
+use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudVolumeManager;
 use App\Infrastructure\Cloud\ArvanCloud\Mappers\ArvanCloudResponseMapper;
 use App\Infrastructure\Cloud\Catalog\CloudCatalogReaderResolver;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
@@ -46,6 +48,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerArvanCloudProvider();
         $this->registerArvanCloudCatalogCapabilities();
         $this->registerArvanCloudProvisioner();
+        $this->registerArvanCloudVolumeManager();
 
         $this->registerLiaraCloudClient();
         $this->registerLiaraCloudMapper();
@@ -176,6 +179,16 @@ final class CloudServiceProvider extends ServiceProvider
         );
     }
 
+    private function registerArvanCloudVolumeManager(): void
+    {
+        $this->app->singleton(
+            ArvanCloudVolumeManager::class,
+            static fn (Application $app): ArvanCloudVolumeManager => new ArvanCloudVolumeManager(
+                client: $app->make(ArvanCloudClient::class),
+            ),
+        );
+    }
+
     private function registerLiaraCloudClient(): void
     {
         $this->app->singleton(
@@ -277,6 +290,9 @@ final class CloudServiceProvider extends ServiceProvider
                         CloudProvisioningInfrastructureCatalogInterface::class => $arvanCapabilities,
                         CloudQuotaReaderInterface::class => $arvanCapabilities,
                         CloudSshKeyCatalogInterface::class => $arvanCapabilities,
+                        CloudVolumeManagerInterface::class => $app->make(
+                            ArvanCloudVolumeManager::class,
+                        ),
                     ];
 
                     if ($this->providerPurchaseEnabled(CloudProviderType::Arvan)) {
@@ -367,6 +383,7 @@ final class CloudServiceProvider extends ServiceProvider
             CloudProvisioningInfrastructureCatalogInterface::class,
             CloudQuotaReaderInterface::class,
             CloudSshKeyCatalogInterface::class,
+            CloudVolumeManagerInterface::class,
             CloudServerConsoleInterface::class,
             CloudServerCredentialManagerInterface::class,
             CloudServerInventoryInterface::class,
