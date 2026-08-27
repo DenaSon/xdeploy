@@ -75,6 +75,7 @@ final class CloudServerTerminationPolicyTest extends TestCase
         $unknownServer = $this->cloudServer(
             provider: CloudProviderType::Liara,
             expiresAt: now()->subMinutes(10),
+            providerServerId: 'liara-server-unknown',
         );
         $unknown = $this->resolver(
             providerServer: $this->providerServer(
@@ -92,6 +93,7 @@ final class CloudServerTerminationPolicyTest extends TestCase
         $graceServer = $this->cloudServer(
             provider: CloudProviderType::Liara,
             expiresAt: now()->subMinutes(2),
+            providerServerId: 'liara-server-grace',
         );
         $grace = $this->resolver(
             providerServer: $this->providerServer(
@@ -109,6 +111,7 @@ final class CloudServerTerminationPolicyTest extends TestCase
         $youngServer = $this->cloudServer(
             provider: CloudProviderType::Liara,
             expiresAt: now()->subMinutes(10),
+            providerServerId: 'liara-server-young',
         );
         $young = $this->resolver(
             providerServer: $this->providerServer(
@@ -201,6 +204,7 @@ final class CloudServerTerminationPolicyTest extends TestCase
     private function cloudServer(
         CloudProviderType $provider,
         mixed $expiresAt,
+        string $providerServerId = 'liara-server-123',
     ): Server {
         $user = User::factory()->create();
         $isLiara = $provider === CloudProviderType::Liara;
@@ -213,7 +217,7 @@ final class CloudServerTerminationPolicyTest extends TestCase
             'status' => ServerStatus::Active,
             'cloud_provider' => $provider,
             'cloud_server_id' => $isLiara
-                ? 'liara-server-123'
+                ? $providerServerId
                 : 'cloud-server-123',
             'cloud_region' => $isLiara ? 'iran' : 'eu-west1-a',
             'provisioned_at' => now()->subDay(),
