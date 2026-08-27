@@ -19,7 +19,7 @@ use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use LogicException;
+use PHPUnit\Framework\MockObject\MockObject;
 use Tests\TestCase;
 
 final class ArvanCloudServerVolumeCleanupTest extends TestCase
@@ -78,7 +78,6 @@ final class ArvanCloudServerVolumeCleanupTest extends TestCase
         $this->assertSame(1, $volumes->listAttachedCalls);
 
         $lifecycle->missingAfterFirstDelete = true;
-        $volumes->discoveredVolumes = [];
 
         $action->handle(
             user: $user,
@@ -176,7 +175,7 @@ final readonly class ArvanCleanupRegistryFake implements CloudProviderRegistryIn
 
     public function resolve(CloudProviderType $provider): CloudProviderInterface
     {
-        throw new LogicException('Provider resolution is not used by this test.');
+        throw new \LogicException('Provider resolution is not used by this test.');
     }
 
     public function resolveCapability(
@@ -186,7 +185,7 @@ final readonly class ArvanCleanupRegistryFake implements CloudProviderRegistryIn
         return match ($capability) {
             CloudServerLifecycleInterface::class => $this->lifecycle,
             CloudVolumeManagerInterface::class => $this->volumes,
-            default => throw new LogicException('Unexpected capability: '.$capability),
+            default => throw new \LogicException('Unexpected capability: '.$capability),
         };
     }
 
