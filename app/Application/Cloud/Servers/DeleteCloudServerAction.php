@@ -127,7 +127,7 @@ final readonly class DeleteCloudServerAction
         if (is_array($persistedIds)) {
             return [
                 $volumeManager,
-                $this->normalizeVolumeIds($persistedIds),
+                $this->requiredVolumeIds($persistedIds),
             ];
         }
 
@@ -142,7 +142,7 @@ final readonly class DeleteCloudServerAction
             $volumeIds[] = $volume->id;
         }
 
-        $volumeIds = $this->normalizeVolumeIds(
+        $volumeIds = $this->requiredVolumeIds(
             $volumeIds,
         );
 
@@ -162,7 +162,7 @@ final readonly class DeleteCloudServerAction
      * @param  array<array-key, mixed>  $values
      * @return list<string>
      */
-    private function normalizeVolumeIds(
+    private function requiredVolumeIds(
         array $values,
     ): array {
         $ids = [];
@@ -177,6 +177,12 @@ final readonly class DeleteCloudServerAction
             if ($value !== '') {
                 $ids[$value] = $value;
             }
+        }
+
+        if ($ids === []) {
+            throw new CloudValidationException(
+                'ArvanCloud volume cleanup targets could not be determined.',
+            );
         }
 
         return array_values($ids);
