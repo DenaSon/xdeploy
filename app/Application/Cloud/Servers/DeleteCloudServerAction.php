@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Servers;
 
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Contracts\CloudVolumeManagerInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
@@ -48,17 +50,62 @@ final readonly class DeleteCloudServerAction
             $provider,
         );
 
-        /*
-         * Provider deletion is the authoritative external side effect.
-         * Not-found is also a successful terminal state.
-         */
-        try {
-            $lifecycle->deleteServer(
+        $isArvanRetry = $provider === CloudProviderType::Arvan
+            && is_array($server->termination_volume_ids);
+
+        [$volumeManager, $volumeIds] = $this->prepareArvanVolumeCleanup(
+            server: $server,
+            provider: $provider,
+            region: $cloudRegion,
+            providerServerId: $cloudServerId,
+        );
+
+        if (
+            ! $isArvanRetry
+            || $this->shouldDeleteArvanServerOnRetry(
+                server: $server,
                 region: $cloudRegion,
-                serverId: $cloudServerId,
+                providerServerId: $cloudServerId,
+            )
+        ) {
+            try {
+                $lifecycle->deleteServer(
+                    region: $cloudRegion,
+                    serverId: $cloudServerId,
+                );
+            } catch (CloudResourceNotFoundException) {
+                // Desired state already reached at the owning provider.
+            }
+        }
+
+        if ($volumeManager instanceof CloudVolumeManagerInterface) {
+            foreach ($volumeIds as $volumeId) {
+                if (
+                    $isArvanRetry
+                    && ! $this->shouldDeleteArvanVolumeOnRetry(
+                        manager: $volumeManager,
+                        region: $cloudRegion,
+                        volumeId: $volumeId,
+                    )
+                ) {
+                    continue;
+                }
+
+                try {
+                    $volumeManager->deleteVolume(
+                        region: $cloudRegion,
+                        volumeId: $volumeId,
+                    );
+                } catch (CloudResourceNotFoundException) {
+                    // Desired state already reached at the owning provider.
+                }
+            }
+
+            $this->verifyArvanVolumesAreGone(
+                manager: $volumeManager,
+                region: $cloudRegion,
+                volumeIds: $volumeIds,
             );
-        } catch (CloudResourceNotFoundException) {
-            // Desired state already reached at the owning provider.
         }
 
         $server->forceFill([
@@ -69,6 +116,223 @@ final readonly class DeleteCloudServerAction
         ])->saveOrFail();
 
         $server->delete();
+    }
+
+    /**
+     * @return array{CloudVolumeManagerInterface|null, list<string>}
+     */
+    private function prepareArvanVolumeCleanup(
+        Server $server,
+        CloudProviderType $provider,
+        string $region,
+        string $providerServerId,
+    ): array {
+        if (
+            $provider !== CloudProviderType::Arvan
+            || ! $this->providers instanceof CloudProviderRegistryInterface
+        ) {
+            return [null, []];
+        }
+
+        /** @var CloudVolumeManagerInterface $volumeManager */
+        $volumeManager = $this->providers->resolveCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudVolumeManagerInterface::class,
+        );
+
+        $persistedIds = $server->termination_volume_ids;
+
+        if (is_array($persistedIds)) {
+            return [
+                $volumeManager,
+                $this->requiredVolumeIds($persistedIds),
+            ];
+        }
+
+        $volumeIds = [];
+
+        foreach (
+            $volumeManager->listAttachedToServer(
+                region: $region,
+                serverId: $providerServerId,
+            ) as $volume
+        ) {
+            $volumeIds[] = $volume->id;
+        }
+
+        $volumeIds = $this->requiredVolumeIds(
+            $volumeIds,
+        );
+
+        $server->forceFill([
+            'termination_volume_ids' => $volumeIds,
+        ])->saveOrFail();
+
+        return [$volumeManager, $volumeIds];
+    }
+
+    private function shouldDeleteArvanServerOnRetry(
+        Server $server,
+        string $region,
+        string $providerServerId,
+    ): bool {
+        if (! $this->arvanServerExists(
+            region: $region,
+            providerServerId: $providerServerId,
+        )) {
+            return false;
+        }
+
+        /*
+         * Automated expiration attempts already have a persisted attempt
+         * counter and backoff. The first retry is reconciliation-only so an
+         * ambiguous asynchronous DELETE is not replayed immediately. A fresh
+         * provider lookup on a later attempt may explicitly retry deletion.
+         */
+        if (
+            $server->termination_started_at !== null
+            && $server->termination_attempts <= 2
+        ) {
+            throw new CloudValidationException(
+                'ArvanCloud server deletion is still being reconciled.',
+            );
+        }
+
+        return true;
+    }
+
+    private function arvanServerExists(
+        string $region,
+        string $providerServerId,
+    ): bool {
+        if (! $this->providers instanceof CloudProviderRegistryInterface) {
+            return true;
+        }
+
+        if (! $this->providers->supportsCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudServerInventoryInterface::class,
+        )) {
+            return true;
+        }
+
+        /** @var CloudServerInventoryInterface $inventory */
+        $inventory = $this->providers->resolveCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudServerInventoryInterface::class,
+        );
+
+        foreach ($inventory->listServers($region) as $providerServer) {
+            if (trim($providerServer->id) === $providerServerId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function shouldDeleteArvanVolumeOnRetry(
+        CloudVolumeManagerInterface $manager,
+        string $region,
+        string $volumeId,
+    ): bool {
+        try {
+            $volume = $manager->findVolume(
+                region: $region,
+                volumeId: $volumeId,
+            );
+        } catch (CloudResourceNotFoundException) {
+            return false;
+        }
+
+        $status = strtolower(trim($volume->status));
+
+        if ($status === 'deleted') {
+            return false;
+        }
+
+        if ($status === 'deleting') {
+            throw new CloudValidationException(
+                sprintf(
+                    'ArvanCloud volume [%s] deletion is still in progress.',
+                    $volumeId,
+                ),
+            );
+        }
+
+        if ($volume->isAttached()) {
+            throw new CloudValidationException(
+                sprintf(
+                    'ArvanCloud volume [%s] is still attached.',
+                    $volumeId,
+                ),
+            );
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  list<string>  $volumeIds
+     */
+    private function verifyArvanVolumesAreGone(
+        CloudVolumeManagerInterface $manager,
+        string $region,
+        array $volumeIds,
+    ): void {
+        foreach ($volumeIds as $volumeId) {
+            try {
+                $volume = $manager->findVolume(
+                    region: $region,
+                    volumeId: $volumeId,
+                );
+            } catch (CloudResourceNotFoundException) {
+                continue;
+            }
+
+            $status = strtolower(trim($volume->status));
+
+            if ($status === 'deleted') {
+                continue;
+            }
+
+            throw new CloudValidationException(
+                sprintf(
+                    'ArvanCloud volume [%s] cleanup is not complete.',
+                    $volumeId,
+                ),
+            );
+        }
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $values
+     * @return list<string>
+     */
+    private function requiredVolumeIds(
+        array $values,
+    ): array {
+        $ids = [];
+
+        foreach ($values as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $value = trim($value);
+
+            if ($value !== '') {
+                $ids[$value] = $value;
+            }
+        }
+
+        if ($ids === []) {
+            throw new CloudValidationException(
+                'ArvanCloud volume cleanup targets could not be determined.',
+            );
+        }
+
+        return array_values($ids);
     }
 
     private function lifecycleFor(
