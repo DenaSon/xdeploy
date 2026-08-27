@@ -6,6 +6,7 @@ namespace App\Application\Cloud\Servers;
 
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
+use App\Domain\Cloud\Contracts\CloudVolumeManagerInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
@@ -48,6 +49,13 @@ final readonly class DeleteCloudServerAction
             $provider,
         );
 
+        [$volumeManager, $volumeIds] = $this->prepareArvanVolumeCleanup(
+            server: $server,
+            provider: $provider,
+            region: $cloudRegion,
+            providerServerId: $cloudServerId,
+        );
+
         /*
          * Provider deletion is the authoritative external side effect.
          * Not-found is also a successful terminal state.
@@ -61,6 +69,24 @@ final readonly class DeleteCloudServerAction
             // Desired state already reached at the owning provider.
         }
 
+        if ($volumeManager instanceof CloudVolumeManagerInterface) {
+            foreach ($volumeIds as $volumeId) {
+                try {
+                    $volumeManager->deleteVolume(
+                        region: $cloudRegion,
+                        volumeId: $volumeId,
+                    );
+                } catch (CloudResourceNotFoundException) {
+                    // Desired state already reached at the owning provider.
+                }
+            }
+        }
+
+        /*
+         * Local finalization happens only after all provider resources have
+         * reached the desired deleted state. Any provider failure therefore
+         * keeps the Server row available for the existing queue retry flow.
+         */
         $server->forceFill([
             'status' => ServerStatus::Inactive,
             'terminated_at' => $server->terminated_at
@@ -69,6 +95,91 @@ final readonly class DeleteCloudServerAction
         ])->saveOrFail();
 
         $server->delete();
+    }
+
+    /**
+     * Snapshot Arvan volume IDs before deleting the VPS so retries never lose
+     * the cleanup targets after the provider detaches or removes the server.
+     *
+     * @return array{CloudVolumeManagerInterface|null, list<string>}
+     */
+    private function prepareArvanVolumeCleanup(
+        Server $server,
+        CloudProviderType $provider,
+        string $region,
+        string $providerServerId,
+    ): array {
+        if (
+            $provider !== CloudProviderType::Arvan
+            || ! $this->providers instanceof CloudProviderRegistryInterface
+        ) {
+            return [null, []];
+        }
+
+        /** @var CloudVolumeManagerInterface $volumeManager */
+        $volumeManager = $this->providers->resolveCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudVolumeManagerInterface::class,
+        );
+
+        $persistedIds = $server->termination_volume_ids;
+
+        if (is_array($persistedIds)) {
+            return [
+                $volumeManager,
+                $this->normalizeVolumeIds($persistedIds),
+            ];
+        }
+
+        $volumeIds = [];
+
+        foreach (
+            $volumeManager->listAttachedToServer(
+                region: $region,
+                serverId: $providerServerId,
+            ) as $volume
+        ) {
+            $volumeIds[] = $volume->id;
+        }
+
+        $volumeIds = $this->normalizeVolumeIds(
+            $volumeIds,
+        );
+
+        /*
+         * Persist before the destructive server DELETE. If deleting a Volume
+         * fails later, TerminateExpiredCloudServerJob retries using this exact
+         * snapshot instead of trying to rediscover detached resources.
+         */
+        $server->forceFill([
+            'termination_volume_ids' => $volumeIds,
+        ])->saveOrFail();
+
+        return [$volumeManager, $volumeIds];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $values
+     * @return list<string>
+     */
+    private function normalizeVolumeIds(
+        array $values,
+    ): array {
+        $ids = [];
+
+        foreach ($values as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $value = trim($value);
+
+            if ($value !== '') {
+                $ids[$value] = $value;
+            }
+        }
+
+        return array_values($ids);
     }
 
     private function lifecycleFor(
