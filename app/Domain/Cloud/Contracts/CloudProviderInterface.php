@@ -6,6 +6,7 @@ namespace App\Domain\Cloud\Contracts;
 
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
+use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 
 interface CloudProviderInterface
@@ -28,4 +29,9 @@ interface CloudProviderInterface
     public function listImages(
         string $region,
     ): array;
+
+    public function findServer(
+        string $region,
+        string $serverId,
+    ): CloudServerData;
 }
