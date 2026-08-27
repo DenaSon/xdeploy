@@ -16,6 +16,7 @@ use App\Domain\Cloud\DTOs\CloudVolumeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Enums\CloudServerStatus;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
+use App\Domain\Cloud\Exceptions\CloudValidationException;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use App\Models\User;
@@ -51,6 +52,7 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
 
         $this->assertSame(0, $lifecycle->deleteCalls);
         $this->assertSame(1, $inventory->listCalls);
+        $this->assertSame(1, $volumes->findCalls);
         $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
         $this->assertNotNull($terminated->terminated_at);
         $this->assertNotNull($terminated->deleted_at);
@@ -89,7 +91,49 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
 
         $this->assertSame(1, $lifecycle->deleteCalls);
         $this->assertSame(1, $inventory->listCalls);
+        $this->assertSame(1, $volumes->findCalls);
         $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
+    }
+
+    public function test_retry_waits_when_volume_deletion_is_still_in_progress(): void
+    {
+        [$user, $server] = $this->server();
+        $server->forceFill([
+            'termination_volume_ids' => ['volume-1'],
+        ])->saveOrFail();
+
+        $lifecycle = new ArvanRetryLifecycleFake();
+        $inventory = new ArvanRetryInventoryFake([]);
+        $volumes = new ArvanRetryVolumeManagerFake();
+        $volumes->status = 'deleting';
+
+        try {
+            $this->action(
+                lifecycle: $lifecycle,
+                inventory: $inventory,
+                volumes: $volumes,
+            )->handle(
+                user: $user,
+                serverId: (int) $server->getKey(),
+            );
+
+            $this->fail('Expected in-progress volume cleanup to wait for retry.');
+        } catch (CloudValidationException $exception) {
+            $this->assertStringContainsString(
+                'deletion is still in progress',
+                $exception->getMessage(),
+            );
+        }
+
+        $fresh = $server->fresh();
+
+        $this->assertNotNull($fresh);
+        $this->assertSame(0, $lifecycle->deleteCalls);
+        $this->assertSame(1, $inventory->listCalls);
+        $this->assertSame(1, $volumes->findCalls);
+        $this->assertSame([], $volumes->deletedVolumeIds);
+        $this->assertNull($fresh->terminated_at);
+        $this->assertNull($fresh->deleted_at);
     }
 
     private function action(
@@ -219,6 +263,10 @@ final class ArvanRetryInventoryFake implements CloudServerInventoryInterface
 
 final class ArvanRetryVolumeManagerFake implements CloudVolumeManagerInterface
 {
+    public int $findCalls = 0;
+
+    public string $status = 'available';
+
     /** @var list<string> */
     public array $deletedVolumeIds = [];
 
@@ -234,7 +282,14 @@ final class ArvanRetryVolumeManagerFake implements CloudVolumeManagerInterface
 
     public function findVolume(string $region, string $volumeId): CloudVolumeData
     {
-        throw new CloudResourceNotFoundException('Volume not found.');
+        ++$this->findCalls;
+
+        return new CloudVolumeData(
+            id: $volumeId,
+            name: $volumeId,
+            regionId: $region,
+            status: $this->status,
+        );
     }
 
     public function deleteVolume(string $region, string $volumeId): void
