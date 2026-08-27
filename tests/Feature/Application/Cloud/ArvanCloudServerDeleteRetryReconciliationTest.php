@@ -31,19 +31,13 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
     public function test_retry_skips_server_delete_when_provider_vps_is_already_gone(): void
     {
         [$user, $server] = $this->server();
-        $server->forceFill([
-            'termination_volume_ids' => ['volume-1'],
-        ])->saveOrFail();
+        $server->forceFill(['termination_volume_ids' => ['volume-1']])->saveOrFail();
 
         $lifecycle = new ArvanRetryLifecycleFake();
         $inventory = new ArvanRetryInventoryFake([]);
         $volumes = new ArvanRetryVolumeManagerFake();
 
-        $this->action(
-            lifecycle: $lifecycle,
-            inventory: $inventory,
-            volumes: $volumes,
-        )->handle(
+        $this->action($lifecycle, $inventory, $volumes)->handle(
             user: $user,
             serverId: (int) $server->getKey(),
         );
@@ -52,7 +46,7 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
 
         $this->assertSame(0, $lifecycle->deleteCalls);
         $this->assertSame(1, $inventory->listCalls);
-        $this->assertSame(1, $volumes->findCalls);
+        $this->assertGreaterThanOrEqual(2, $volumes->findCalls);
         $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
         $this->assertNotNull($terminated->terminated_at);
         $this->assertNotNull($terminated->deleted_at);
@@ -61,9 +55,7 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
     public function test_retry_deletes_server_when_provider_vps_still_exists(): void
     {
         [$user, $server] = $this->server();
-        $server->forceFill([
-            'termination_volume_ids' => ['volume-1'],
-        ])->saveOrFail();
+        $server->forceFill(['termination_volume_ids' => ['volume-1']])->saveOrFail();
 
         $lifecycle = new ArvanRetryLifecycleFake();
         $inventory = new ArvanRetryInventoryFake([
@@ -80,27 +72,21 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
         ]);
         $volumes = new ArvanRetryVolumeManagerFake();
 
-        $this->action(
-            lifecycle: $lifecycle,
-            inventory: $inventory,
-            volumes: $volumes,
-        )->handle(
+        $this->action($lifecycle, $inventory, $volumes)->handle(
             user: $user,
             serverId: (int) $server->getKey(),
         );
 
         $this->assertSame(1, $lifecycle->deleteCalls);
         $this->assertSame(1, $inventory->listCalls);
-        $this->assertSame(1, $volumes->findCalls);
+        $this->assertGreaterThanOrEqual(2, $volumes->findCalls);
         $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
     }
 
     public function test_retry_waits_when_volume_deletion_is_still_in_progress(): void
     {
         [$user, $server] = $this->server();
-        $server->forceFill([
-            'termination_volume_ids' => ['volume-1'],
-        ])->saveOrFail();
+        $server->forceFill(['termination_volume_ids' => ['volume-1']])->saveOrFail();
 
         $lifecycle = new ArvanRetryLifecycleFake();
         $inventory = new ArvanRetryInventoryFake([]);
@@ -108,21 +94,13 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
         $volumes->status = 'deleting';
 
         try {
-            $this->action(
-                lifecycle: $lifecycle,
-                inventory: $inventory,
-                volumes: $volumes,
-            )->handle(
+            $this->action($lifecycle, $inventory, $volumes)->handle(
                 user: $user,
                 serverId: (int) $server->getKey(),
             );
-
             $this->fail('Expected in-progress volume cleanup to wait for retry.');
         } catch (CloudValidationException $exception) {
-            $this->assertStringContainsString(
-                'deletion is still in progress',
-                $exception->getMessage(),
-            );
+            $this->assertStringContainsString('deletion is still in progress', $exception->getMessage());
         }
 
         $fresh = $server->fresh();
@@ -136,6 +114,34 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
         $this->assertNull($fresh->deleted_at);
     }
 
+    public function test_delete_does_not_finalize_while_volume_is_still_visible(): void
+    {
+        [$user, $server] = $this->server();
+        $server->forceFill(['termination_volume_ids' => ['volume-1']])->saveOrFail();
+
+        $lifecycle = new ArvanRetryLifecycleFake();
+        $inventory = new ArvanRetryInventoryFake([]);
+        $volumes = new ArvanRetryVolumeManagerFake();
+        $volumes->keepVisibleAfterDelete = true;
+
+        try {
+            $this->action($lifecycle, $inventory, $volumes)->handle(
+                user: $user,
+                serverId: (int) $server->getKey(),
+            );
+            $this->fail('Expected visible provider volume to block finalization.');
+        } catch (CloudValidationException $exception) {
+            $this->assertStringContainsString('cleanup is not complete', $exception->getMessage());
+        }
+
+        $fresh = $server->fresh();
+
+        $this->assertNotNull($fresh);
+        $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
+        $this->assertNull($fresh->terminated_at);
+        $this->assertNull($fresh->deleted_at);
+    }
+
     private function action(
         ArvanRetryLifecycleFake $lifecycle,
         ArvanRetryInventoryFake $inventory,
@@ -143,11 +149,7 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
     ): DeleteCloudServerAction {
         return new DeleteCloudServerAction(
             lifecycle: $lifecycle,
-            providers: new ArvanRetryRegistryFake(
-                lifecycle: $lifecycle,
-                inventory: $inventory,
-                volumes: $volumes,
-            ),
+            providers: new ArvanRetryRegistryFake($lifecycle, $inventory, $volumes),
         );
     }
 
@@ -179,25 +181,16 @@ final readonly class ArvanRetryRegistryFake implements CloudProviderRegistryInte
         private ArvanRetryVolumeManagerFake $volumes,
     ) {}
 
-    public function registeredProviders(): array
-    {
-        return [CloudProviderType::Arvan];
-    }
-
-    public function purchasableProviders(): array
-    {
-        return [CloudProviderType::Arvan];
-    }
+    public function registeredProviders(): array { return [CloudProviderType::Arvan]; }
+    public function purchasableProviders(): array { return [CloudProviderType::Arvan]; }
 
     public function resolve(CloudProviderType $provider): CloudProviderInterface
     {
         throw new LogicException('Provider resolution is not used by this test.');
     }
 
-    public function resolveCapability(
-        CloudProviderType $provider,
-        string $capability,
-    ): object {
+    public function resolveCapability(CloudProviderType $provider, string $capability): object
+    {
         return match ($capability) {
             CloudServerLifecycleInterface::class => $this->lifecycle,
             CloudServerInventoryInterface::class => $this->inventory,
@@ -206,19 +199,13 @@ final readonly class ArvanRetryRegistryFake implements CloudProviderRegistryInte
         };
     }
 
-    public function supportsCapability(
-        CloudProviderType $provider,
-        string $capability,
-    ): bool {
-        return in_array(
-            $capability,
-            [
-                CloudServerLifecycleInterface::class,
-                CloudServerInventoryInterface::class,
-                CloudVolumeManagerInterface::class,
-            ],
-            true,
-        );
+    public function supportsCapability(CloudProviderType $provider, string $capability): bool
+    {
+        return in_array($capability, [
+            CloudServerLifecycleInterface::class,
+            CloudServerInventoryInterface::class,
+            CloudVolumeManagerInterface::class,
+        ], true);
     }
 }
 
@@ -227,21 +214,12 @@ final class ArvanRetryLifecycleFake implements CloudServerLifecycleInterface
     public int $deleteCalls = 0;
 
     public function powerOn(string $region, string $serverId): void {}
-
     public function powerOff(string $region, string $serverId): void {}
-
     public function reboot(string $region, string $serverId): void {}
-
-    public function deleteServer(string $region, string $serverId): void
-    {
-        ++$this->deleteCalls;
-    }
+    public function deleteServer(string $region, string $serverId): void { ++$this->deleteCalls; }
 
     /** @return list<CloudServerActionData> */
-    public function getAvailableActions(string $region, string $serverId): array
-    {
-        return [];
-    }
+    public function getAvailableActions(string $region, string $serverId): array { return []; }
 }
 
 final class ArvanRetryInventoryFake implements CloudServerInventoryInterface
@@ -249,14 +227,11 @@ final class ArvanRetryInventoryFake implements CloudServerInventoryInterface
     public int $listCalls = 0;
 
     /** @param list<CloudServerData> $servers */
-    public function __construct(
-        private readonly array $servers,
-    ) {}
+    public function __construct(private readonly array $servers) {}
 
     public function listServers(string $region): array
     {
         ++$this->listCalls;
-
         return $this->servers;
     }
 }
@@ -264,36 +239,35 @@ final class ArvanRetryInventoryFake implements CloudServerInventoryInterface
 final class ArvanRetryVolumeManagerFake implements CloudVolumeManagerInterface
 {
     public int $findCalls = 0;
-
     public string $status = 'available';
+    public bool $keepVisibleAfterDelete = false;
+    public bool $deleted = false;
 
     /** @var list<string> */
     public array $deletedVolumeIds = [];
 
-    public function listVolumes(string $region): array
-    {
-        return [];
-    }
-
-    public function listAttachedToServer(string $region, string $serverId): array
-    {
-        return [];
-    }
+    public function listVolumes(string $region): array { return []; }
+    public function listAttachedToServer(string $region, string $serverId): array { return []; }
 
     public function findVolume(string $region, string $volumeId): CloudVolumeData
     {
         ++$this->findCalls;
 
+        if ($this->deleted && ! $this->keepVisibleAfterDelete) {
+            throw new CloudResourceNotFoundException('Volume not found.');
+        }
+
         return new CloudVolumeData(
             id: $volumeId,
             name: $volumeId,
             regionId: $region,
-            status: $this->status,
+            status: $this->keepVisibleAfterDelete && $this->deleted ? 'deleting' : $this->status,
         );
     }
 
     public function deleteVolume(string $region, string $volumeId): void
     {
         $this->deletedVolumeIds[] = $volumeId;
+        $this->deleted = true;
     }
 }
