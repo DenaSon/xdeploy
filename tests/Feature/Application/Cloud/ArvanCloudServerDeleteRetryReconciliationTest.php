@@ -52,24 +52,13 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
         $this->assertNotNull($terminated->deleted_at);
     }
 
-    public function test_retry_deletes_server_when_provider_vps_still_exists(): void
+    public function test_direct_retry_deletes_server_when_provider_vps_still_exists(): void
     {
         [$user, $server] = $this->server();
         $server->forceFill(['termination_volume_ids' => ['volume-1']])->saveOrFail();
 
         $lifecycle = new ArvanRetryLifecycleFake();
-        $inventory = new ArvanRetryInventoryFake([
-            new CloudServerData(
-                id: 'cloud-server-123',
-                name: 'Arvan VPS',
-                regionId: 'eu-west1-a',
-                status: CloudServerStatus::Active,
-                username: 'ubuntu',
-                sizeId: null,
-                imageId: null,
-                createdAt: null,
-            ),
-        ]);
+        $inventory = new ArvanRetryInventoryFake([$this->providerServer()]);
         $volumes = new ArvanRetryVolumeManagerFake();
 
         $this->action($lifecycle, $inventory, $volumes)->handle(
@@ -79,7 +68,62 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
 
         $this->assertSame(1, $lifecycle->deleteCalls);
         $this->assertSame(1, $inventory->listCalls);
-        $this->assertGreaterThanOrEqual(2, $volumes->findCalls);
+        $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
+    }
+
+    public function test_first_automated_retry_waits_while_provider_vps_is_still_visible(): void
+    {
+        [$user, $server] = $this->server();
+        $server->forceFill([
+            'termination_volume_ids' => ['volume-1'],
+            'termination_started_at' => now()->subMinute(),
+            'termination_attempts' => 2,
+        ])->saveOrFail();
+
+        $lifecycle = new ArvanRetryLifecycleFake();
+        $inventory = new ArvanRetryInventoryFake([$this->providerServer()]);
+        $volumes = new ArvanRetryVolumeManagerFake();
+
+        try {
+            $this->action($lifecycle, $inventory, $volumes)->handle(
+                user: $user,
+                serverId: (int) $server->getKey(),
+            );
+            $this->fail('Expected the first automated retry to reconcile only.');
+        } catch (CloudValidationException $exception) {
+            $this->assertStringContainsString('still being reconciled', $exception->getMessage());
+        }
+
+        $fresh = $server->fresh();
+
+        $this->assertNotNull($fresh);
+        $this->assertSame(0, $lifecycle->deleteCalls);
+        $this->assertSame(1, $inventory->listCalls);
+        $this->assertSame([], $volumes->deletedVolumeIds);
+        $this->assertNull($fresh->terminated_at);
+        $this->assertNull($fresh->deleted_at);
+    }
+
+    public function test_later_automated_retry_can_delete_server_after_reconciliation_pass(): void
+    {
+        [$user, $server] = $this->server();
+        $server->forceFill([
+            'termination_volume_ids' => ['volume-1'],
+            'termination_started_at' => now()->subMinutes(10),
+            'termination_attempts' => 3,
+        ])->saveOrFail();
+
+        $lifecycle = new ArvanRetryLifecycleFake();
+        $inventory = new ArvanRetryInventoryFake([$this->providerServer()]);
+        $volumes = new ArvanRetryVolumeManagerFake();
+
+        $this->action($lifecycle, $inventory, $volumes)->handle(
+            user: $user,
+            serverId: (int) $server->getKey(),
+        );
+
+        $this->assertSame(1, $lifecycle->deleteCalls);
+        $this->assertSame(1, $inventory->listCalls);
         $this->assertSame(['volume-1'], $volumes->deletedVolumeIds);
     }
 
@@ -170,6 +214,20 @@ final class ArvanCloudServerDeleteRetryReconciliationTest extends TestCase
         ]);
 
         return [$user, $server];
+    }
+
+    private function providerServer(): CloudServerData
+    {
+        return new CloudServerData(
+            id: 'cloud-server-123',
+            name: 'Arvan VPS',
+            regionId: 'eu-west1-a',
+            status: CloudServerStatus::Active,
+            username: 'ubuntu',
+            sizeId: null,
+            imageId: null,
+            createdAt: null,
+        );
     }
 }
 
