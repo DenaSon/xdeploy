@@ -6,6 +6,7 @@
                 ['title' => 'کاربران', 'icon' => 'lucide.users', 'route' => 'admin.users.index', 'active' => 'admin.users.*'],
                 ['title' => 'سرورها', 'icon' => 'lucide.server', 'route' => 'admin.servers.index', 'active' => 'admin.servers.*'],
                 ['title' => 'ارائه‌دهندگان ابری', 'icon' => 'lucide.cloud', 'route' => 'admin.cloud-providers.index', 'active' => 'admin.cloud-providers.*'],
+                ['title' => 'بررسی Volumeها', 'icon' => 'lucide.hard-drive', 'route' => 'admin.cloud-volumes.index', 'active' => 'admin.cloud-volumes.*'],
                 ['title' => 'سفارش‌ها', 'icon' => 'lucide.receipt-text', 'route' => 'admin.orders.index', 'active' => 'admin.orders.*'],
                 ['title' => 'پرداخت‌ها', 'icon' => 'lucide.credit-card', 'route' => 'admin.payments.index', 'active' => 'admin.payments.*'],
                 ['title' => 'پشتیبانی', 'icon' => 'lucide.headset', 'route' => 'admin.support.index', 'active' => 'admin.support.*'],
