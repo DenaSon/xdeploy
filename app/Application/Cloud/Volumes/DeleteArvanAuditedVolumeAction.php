@@ -25,13 +25,30 @@ final readonly class DeleteArvanAuditedVolumeAction
         string $region,
         string $volumeId,
     ): bool {
+        /** @var CloudVolumeManagerInterface $manager */
+        $manager = $this->providers->resolveCapability(
+            provider: CloudProviderType::Arvan,
+            capability: CloudVolumeManagerInterface::class,
+        );
+
         $item = $this->audit->find(
             region: $region,
             volumeId: $volumeId,
         );
 
         if ($item === null) {
-            return true;
+            try {
+                $manager->findVolume(
+                    region: $region,
+                    volumeId: $volumeId,
+                );
+            } catch (CloudResourceNotFoundException) {
+                return true;
+            }
+
+            throw new CloudValidationException(
+                'Cloud volume still exists but could not be safely classified by the audit.',
+            );
         }
 
         if (! $item->canDelete()) {
@@ -39,12 +56,6 @@ final readonly class DeleteArvanAuditedVolumeAction
                 'Cloud volume is not eligible for manual audit deletion.',
             );
         }
-
-        /** @var CloudVolumeManagerInterface $manager */
-        $manager = $this->providers->resolveCapability(
-            provider: CloudProviderType::Arvan,
-            capability: CloudVolumeManagerInterface::class,
-        );
 
         try {
             $manager->deleteVolume(
