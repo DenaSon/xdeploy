@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Servers\SupportPasskeyOptionsController;
 use App\Http\Controllers\Admin\Users\StartUserImpersonationController;
 use App\Http\Controllers\Support\ShowSupportMessageAttachmentController;
 use App\Livewire\Admin\CloudProviders\Index as AdminCloudProvidersIndex;
+use App\Livewire\Admin\CloudVolumes\Index as AdminCloudVolumesIndex;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Admin\Documentation\Articles\Create as AdminDocumentationArticlesCreate;
 use App\Livewire\Admin\Documentation\Articles\Edit as AdminDocumentationArticlesEdit;
@@ -69,6 +70,11 @@ Route::middleware([
                     '/cloud-providers',
                     AdminCloudProvidersIndex::class,
                 )->name('cloud-providers.index');
+
+                Route::livewire(
+                    '/cloud-volumes',
+                    AdminCloudVolumesIndex::class,
+                )->name('cloud-volumes.index');
 
                 Route::livewire('/users', AdminUsersIndex::class)
                     ->name('users.index');
