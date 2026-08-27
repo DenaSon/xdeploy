@@ -10,7 +10,6 @@ use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudServerLifecycleInterface;
 use App\Domain\Cloud\Contracts\CloudVolumeManagerInterface;
 use App\Domain\Cloud\DTOs\CloudServerActionData;
-use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudVolumeData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConnectionException;
@@ -19,7 +18,6 @@ use App\Domain\Server\Enums\ServerStatus;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use PHPUnit\Framework\MockObject\MockObject;
 use Tests\TestCase;
 
 final class ArvanCloudServerVolumeCleanupTest extends TestCase
@@ -272,6 +270,10 @@ final class ArvanCleanupVolumeManagerFake implements CloudVolumeManagerInterface
 
     public function findVolume(string $region, string $volumeId): CloudVolumeData
     {
+        if (in_array($volumeId, $this->missingVolumeIds, true)) {
+            throw new CloudResourceNotFoundException('Volume not found.');
+        }
+
         foreach ($this->discoveredVolumes as $volume) {
             if ($volume->id === $volumeId) {
                 return $volume;
@@ -294,5 +296,6 @@ final class ArvanCleanupVolumeManagerFake implements CloudVolumeManagerInterface
         }
 
         $this->deletedVolumeIds[] = $volumeId;
+        $this->missingVolumeIds[] = $volumeId;
     }
 }
