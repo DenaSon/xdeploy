@@ -219,7 +219,9 @@ final class ArvanVolumeAuditServiceTest extends TestCase
         return $user->servers()->create([
             'name' => $name,
             'host' => '203.0.113.10',
-            'port' => 22,
+            'port' => $providerServerId === 'srv-linked'
+                ? 22
+                : 2222,
             'username' => 'ubuntu',
             'status' => $status,
             'cloud_provider' => CloudProviderType::Arvan,
