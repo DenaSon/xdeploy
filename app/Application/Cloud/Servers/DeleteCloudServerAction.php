@@ -62,7 +62,8 @@ final readonly class DeleteCloudServerAction
 
         if (
             ! $isArvanRetry
-            || $this->arvanServerExists(
+            || $this->shouldDeleteArvanServerOnRetry(
+                server: $server,
                 region: $cloudRegion,
                 providerServerId: $cloudServerId,
             )
@@ -168,6 +169,36 @@ final readonly class DeleteCloudServerAction
         ])->saveOrFail();
 
         return [$volumeManager, $volumeIds];
+    }
+
+    private function shouldDeleteArvanServerOnRetry(
+        Server $server,
+        string $region,
+        string $providerServerId,
+    ): bool {
+        if (! $this->arvanServerExists(
+            region: $region,
+            providerServerId: $providerServerId,
+        )) {
+            return false;
+        }
+
+        /*
+         * Automated expiration attempts already have a persisted attempt
+         * counter and backoff. The first retry is reconciliation-only so an
+         * ambiguous asynchronous DELETE is not replayed immediately. A fresh
+         * provider lookup on a later attempt may explicitly retry deletion.
+         */
+        if (
+            $server->termination_started_at !== null
+            && $server->termination_attempts <= 2
+        ) {
+            throw new CloudValidationException(
+                'ArvanCloud server deletion is still being reconciled.',
+            );
+        }
+
+        return true;
     }
 
     private function arvanServerExists(
