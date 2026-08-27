@@ -67,10 +67,6 @@ final readonly class DeleteCloudServerAction
                 providerServerId: $cloudServerId,
             )
         ) {
-            /*
-             * Provider deletion is the authoritative external side effect.
-             * Not-found is also a successful terminal state.
-             */
             try {
                 $lifecycle->deleteServer(
                     region: $cloudRegion,
@@ -103,13 +99,14 @@ final readonly class DeleteCloudServerAction
                     // Desired state already reached at the owning provider.
                 }
             }
+
+            $this->verifyArvanVolumesAreGone(
+                manager: $volumeManager,
+                region: $cloudRegion,
+                volumeIds: $volumeIds,
+            );
         }
 
-        /*
-         * Local finalization happens only after all provider resources have
-         * reached the desired deleted state. Any provider failure therefore
-         * keeps the Server row available for the existing queue retry flow.
-         */
         $server->forceFill([
             'status' => ServerStatus::Inactive,
             'terminated_at' => $server->terminated_at
@@ -121,9 +118,6 @@ final readonly class DeleteCloudServerAction
     }
 
     /**
-     * Snapshot Arvan volume IDs before deleting the VPS so retries never lose
-     * the cleanup targets after the provider detaches or removes the server.
-     *
      * @return array{CloudVolumeManagerInterface|null, list<string>}
      */
     private function prepareArvanVolumeCleanup(
@@ -169,11 +163,6 @@ final readonly class DeleteCloudServerAction
             $volumeIds,
         );
 
-        /*
-         * Persist before the destructive server DELETE. If deleting a Volume
-         * fails later, TerminateExpiredCloudServerJob retries using this exact
-         * snapshot instead of trying to rediscover detached resources.
-         */
         $server->forceFill([
             'termination_volume_ids' => $volumeIds,
         ])->saveOrFail();
@@ -250,6 +239,39 @@ final readonly class DeleteCloudServerAction
         }
 
         return true;
+    }
+
+    /**
+     * @param  list<string>  $volumeIds
+     */
+    private function verifyArvanVolumesAreGone(
+        CloudVolumeManagerInterface $manager,
+        string $region,
+        array $volumeIds,
+    ): void {
+        foreach ($volumeIds as $volumeId) {
+            try {
+                $volume = $manager->findVolume(
+                    region: $region,
+                    volumeId: $volumeId,
+                );
+            } catch (CloudResourceNotFoundException) {
+                continue;
+            }
+
+            $status = strtolower(trim($volume->status));
+
+            if ($status === 'deleted') {
+                continue;
+            }
+
+            throw new CloudValidationException(
+                sprintf(
+                    'ArvanCloud volume [%s] cleanup is not complete.',
+                    $volumeId,
+                ),
+            );
+        }
     }
 
     /**
