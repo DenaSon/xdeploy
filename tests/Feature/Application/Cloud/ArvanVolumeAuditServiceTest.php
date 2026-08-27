@@ -209,7 +209,7 @@ final class ArvanVolumeAuditServiceTest extends TestCase
         $action->handle('region-a', 'vol-linked');
     }
 
-    public function test_manual_delete_does_not_treat_missing_list_item_as_verified_absence(): void
+    public function test_manual_delete_uses_exact_lookup_when_volume_is_missing_from_collection(): void
     {
         config()->set('cloud.providers.arvan.region', 'region-a');
 
@@ -227,22 +227,26 @@ final class ArvanVolumeAuditServiceTest extends TestCase
             ],
         ];
         $registry = new AuditRegistryFake($manager);
+        $audit = new ArvanVolumeAuditService($registry);
         $action = new DeleteArvanAuditedVolumeAction(
-            audit: new ArvanVolumeAuditService($registry),
+            audit: $audit,
             providers: $registry,
         );
 
-        try {
-            $action->handle('region-a', 'vol-hidden');
-            $this->fail('Expected an unclassified provider volume to fail closed.');
-        } catch (CloudValidationException $exception) {
-            $this->assertStringContainsString(
-                'could not be safely classified',
-                $exception->getMessage(),
-            );
-        }
-
-        $this->assertSame([], $manager->deletedVolumeIds);
+        $this->assertNull($audit->find('region-a', 'vol-hidden'));
+        $this->assertTrue(
+            $audit->findExact('region-a', 'vol-hidden')?->canDelete(),
+        );
+        $this->assertTrue(
+            $action->handle('region-a', 'vol-hidden'),
+        );
+        $this->assertSame(
+            ['vol-hidden'],
+            $manager->deletedVolumeIds,
+        );
+        $this->assertNull(
+            $audit->findExact('region-a', 'vol-hidden'),
+        );
     }
 
     private function server(
@@ -347,14 +351,14 @@ final class AuditVolumeManagerFake implements CloudVolumeManagerInterface
         string $region,
         string $volumeId,
     ): CloudVolumeData {
+        if (isset($this->pointLookupOnlyVolumesByRegion[$region][$volumeId])) {
+            return $this->pointLookupOnlyVolumesByRegion[$region][$volumeId];
+        }
+
         foreach ($this->listVolumes($region) as $volume) {
             if ($volume->id === $volumeId) {
                 return $volume;
             }
-        }
-
-        if (isset($this->pointLookupOnlyVolumesByRegion[$region][$volumeId])) {
-            return $this->pointLookupOnlyVolumesByRegion[$region][$volumeId];
         }
 
         throw new CloudResourceNotFoundException('Volume not found.');
@@ -364,6 +368,13 @@ final class AuditVolumeManagerFake implements CloudVolumeManagerInterface
         string $region,
         string $volumeId,
     ): void {
+        if (isset($this->pointLookupOnlyVolumesByRegion[$region][$volumeId])) {
+            unset($this->pointLookupOnlyVolumesByRegion[$region][$volumeId]);
+            $this->deletedVolumeIds[] = $volumeId;
+
+            return;
+        }
+
         $remaining = [];
         $found = false;
 
