@@ -881,7 +881,7 @@
                         </div>
                     </div>
 
-                    {{-- Operating system and disk --}}
+                    {{-- Operating system and optional disk controls --}}
                     <div
                         class="
                             grid gap-3 p-4
@@ -905,16 +905,15 @@
                                     text-base-content/40
                                 "
                             >
-                                سیستم‌عامل و دیسک
+                                {{ $customDiskEnabled ? 'سیستم‌عامل و دیسک' : 'سیستم‌عامل' }}
                             </div>
                         </div>
 
                         <div
-                            class="
-                                grid gap-2.5
-                                sm:grid-cols-[minmax(0,1fr)_180px]
-                                sm:items-start
-                            "
+                            @class([
+                                'grid gap-2.5',
+                                'sm:grid-cols-[minmax(0,1fr)_180px] sm:items-start' => $customDiskEnabled,
+                            ])
                         >
                             <div class="min-w-0">
                                 <div
@@ -1007,6 +1006,7 @@
 
                             @if($customDiskEnabled)
                                 <div
+                                    data-buy-disk-controls
                                     class="
                                         flex h-11 items-center
                                         justify-between
@@ -1085,36 +1085,6 @@
                                             hover:text-primary
                                         "
                                     />
-                                </div>
-                            @else
-                                <div
-                                    class="
-                                        flex h-11 items-center
-                                        justify-between gap-3
-                                        rounded-xl
-                                        border border-base-300
-                                        bg-base-200/40 px-3
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            text-[11px]
-                                            text-base-content/40
-                                        "
-                                    >
-                                        دیسک
-                                    </span>
-
-                                    <span
-                                        dir="ltr"
-                                        class="
-                                            technical-value
-                                            text-sm font-semibold
-                                            text-base-content
-                                        "
-                                    >
-                                        {{ $selectedDiskGiB }} GB
-                                    </span>
                                 </div>
                             @endif
                         </div>

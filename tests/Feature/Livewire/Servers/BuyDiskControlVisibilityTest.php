@@ -21,7 +21,7 @@ final class BuyDiskControlVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_purchase_ui_hides_custom_disk_controls_without_capability(): void
+    public function test_purchase_ui_hides_fixed_disk_row_without_custom_disk_capability(): void
     {
         $this->bindProvider(
             providerType: CloudProviderType::Liara,
@@ -38,8 +38,10 @@ final class BuyDiskControlVisibilityTest extends TestCase
                 ),
             )
             ->set('catalogLoaded', true)
+            ->assertDontSeeHtml('data-buy-disk-controls')
             ->assertDontSeeHtml('wire:click="decreaseDisk"')
-            ->assertDontSeeHtml('wire:click="increaseDisk"');
+            ->assertDontSeeHtml('wire:click="increaseDisk"')
+            ->assertDontSee('سیستم‌عامل و دیسک');
     }
 
     public function test_purchase_ui_uses_provider_capability_for_custom_disk_controls(): void
@@ -59,8 +61,10 @@ final class BuyDiskControlVisibilityTest extends TestCase
                 ),
             )
             ->set('catalogLoaded', true)
+            ->assertSeeHtml('data-buy-disk-controls')
             ->assertSeeHtml('wire:click="decreaseDisk"')
-            ->assertSeeHtml('wire:click="increaseDisk"');
+            ->assertSeeHtml('wire:click="increaseDisk"')
+            ->assertSee('سیستم‌عامل و دیسک');
     }
 
     private function bindProvider(
