@@ -149,7 +149,13 @@ final class Show extends Component
 
     public function render(): View
     {
-        $server = $this->server->load('user');
+        $server = $this->server->load([
+            'user',
+            'connectionHostUpdateLogs' => fn ($query) => $query
+                ->with('adminUser')
+                ->latest('id')
+                ->limit(10),
+        ]);
 
         return view(
             'livewire.admin.servers.show',
