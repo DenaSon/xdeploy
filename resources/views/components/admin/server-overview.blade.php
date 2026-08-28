@@ -175,5 +175,68 @@
                 این عملیات فقط آدرس ذخیره‌شده در Coreflare را تغییر می‌دهد و هیچ درخواست تغییر IP به Cloud Provider ارسال نمی‌کند. تغییر موفق در Audit ثبت می‌شود.
             </p>
         </div>
+
+        <div class="border-t border-base-300">
+            <div class="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+                <div>
+                    <h3 class="text-sm font-semibold">سوابق تغییر IP</h3>
+                    <p class="mt-0.5 text-xs text-base-content/45">۱۰ تغییر اخیر ثبت‌شده برای این سرور</p>
+                </div>
+                <x-icon name="lucide.history" class="!size-4 text-base-content/35" />
+            </div>
+
+            @if ($server->connectionHostUpdateLogs->isEmpty())
+                <div class="border-t border-base-300 px-5 py-6 text-center text-sm text-base-content/45">
+                    هنوز تغییری برای IP این سرور ثبت نشده است.
+                </div>
+            @else
+                <div class="overflow-x-auto border-t border-base-300">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>تغییر IP</th>
+                            <th>مدیر</th>
+                            <th>دلیل</th>
+                            <th>زمان</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach ($server->connectionHostUpdateLogs as $changeLog)
+                            @php
+                                $matches = [];
+                                $parsed = preg_match(
+                                    '/^IP:\s*(?<old>[0-9.]+)\s*→\s*(?<new>[0-9.]+)\s*\|\s*(?<reason>.*)$/u',
+                                    $changeLog->reason,
+                                    $matches,
+                                ) === 1;
+                            @endphp
+                            <tr>
+                                <td class="whitespace-nowrap">
+                                    @if ($parsed)
+                                        <div class="flex items-center gap-2 font-mono text-xs" dir="ltr">
+                                            <span>{{ $matches['old'] }}</span>
+                                            <x-icon name="lucide.arrow-right" class="!size-3.5 text-base-content/35" />
+                                            <span class="font-semibold text-warning">{{ $matches['new'] }}</span>
+                                        </div>
+                                    @else
+                                        <span class="text-sm text-base-content/50">—</span>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap text-sm">
+                                    {{ $changeLog->adminUser?->name ?: $changeLog->adminUser?->phone ?: '—' }}
+                                </td>
+                                <td class="max-w-md text-sm text-base-content/65">
+                                    {{ $parsed ? $matches['reason'] : $changeLog->reason }}
+                                </td>
+                                <td class="whitespace-nowrap text-xs text-base-content/50">
+                                    <x-persian-date :date="$changeLog->created_at" />
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
     </section>
 </div>
