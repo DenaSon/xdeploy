@@ -34,6 +34,31 @@ final readonly class UpdateServerConnectionHostAction
         $normalizedHost = trim($newHost);
         $normalizedReason = trim($reason);
 
+        if (
+            filter_var(
+                $normalizedHost,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV4,
+            ) === false
+        ) {
+            throw ValidationException::withMessages([
+                'newHost' => [
+                    'آدرس واردشده باید یک IPv4 معتبر باشد.',
+                ],
+            ]);
+        }
+
+        if (
+            mb_strlen($normalizedReason) < 5
+            || mb_strlen($normalizedReason) > 500
+        ) {
+            throw ValidationException::withMessages([
+                'hostUpdateReason' => [
+                    'دلیل تغییر IP باید بین ۵ تا ۵۰۰ کاراکتر باشد.',
+                ],
+            ]);
+        }
+
         return DB::transaction(function () use (
             $admin,
             $server,
