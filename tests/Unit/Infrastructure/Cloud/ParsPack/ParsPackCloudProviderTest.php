@@ -136,6 +136,20 @@ final class ParsPackCloudProviderTest extends TestCase
         );
     }
 
+    public function test_purchase_catalog_defaults_to_normalized_price_without_funding_overhead(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/sizes*' => Http::response($this->sizesResponse()),
+        ]);
+
+        $sizes = $this->provider()->listPurchaseSizes('frankfurt');
+
+        $this->assertCount(1, $sizes);
+        $this->assertSame('17312.5', $sizes[0]->hourlyPrice?->amount);
+        $this->assertSame('12469200', $sizes[0]->monthlyPrice?->amount);
+        $this->assertSame('IRR', $sizes[0]->hourlyPrice?->currencyCode);
+    }
+
     public function test_purchase_catalog_applies_configured_funding_overhead(): void
     {
         Http::fake([
