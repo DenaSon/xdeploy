@@ -36,7 +36,7 @@
                         text-base-content/50
                     "
                 >
-                    اطلاعات SSH مورد استفاده xDeploy برای اتصال
+                    اطلاعات SSH مورد استفاده Coreflare برای اتصال
                     به این سرور را ویرایش کنید.
                 </p>
             </div>
@@ -161,7 +161,7 @@
 
             <span>
                 آدرس سرور پس از ثبت ثابت است.
-                پورت، نام کاربری و رمز عبور SSH را می‌توانید به‌روزرسانی کنید.
+                پورت، نام کاربری، روش احراز هویت و اطلاعات ورود SSH را می‌توانید به‌روزرسانی کنید.
             </span>
         </div>
 
@@ -170,6 +170,8 @@
             submit="update"
             button="ذخیره تغییرات"
             :editing="true"
+            :connection-verified="$this->connectionIsVerified()"
+            :authentication-type="$authenticationType"
         />
 
     </section>
