@@ -6,6 +6,7 @@ namespace Tests\Unit\Providers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialSourceInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Cloud\Exceptions\CloudConfigurationException;
 use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudCatalogCapabilities;
@@ -15,6 +16,8 @@ use App\Infrastructure\Cloud\ArvanCloud\ArvanCloudProvisioner;
 use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
+use App\Infrastructure\Cloud\ParsPack\ParsPackCloudClient;
+use App\Infrastructure\Cloud\ParsPack\ParsPackCloudProvider;
 use Tests\TestCase;
 
 final class CloudServiceProviderRegistrationTest extends TestCase
@@ -39,6 +42,8 @@ final class CloudServiceProviderRegistrationTest extends TestCase
         config()->set('cloud.providers.liara.api_token', 'test-liara-token');
         config()->set('cloud.providers.liara.timeouts.connect', 5);
         config()->set('cloud.providers.liara.timeouts.request', 15);
+
+        $this->configureParsPack(enabled: false, purchaseEnabled: false);
 
         $this->resetCloudResolutionState();
     }
@@ -120,6 +125,57 @@ final class CloudServiceProviderRegistrationTest extends TestCase
         );
     }
 
+    public function test_parspack_can_be_registered_operationally_before_purchase_is_enabled(): void
+    {
+        $this->configureParsPack(enabled: true, purchaseEnabled: false);
+        $this->resetCloudResolutionState();
+
+        $registry = $this->app->make(CloudProviderRegistryInterface::class);
+
+        $this->assertSame(
+            [
+                CloudProviderType::Arvan,
+                CloudProviderType::Liara,
+                CloudProviderType::ParsPack,
+            ],
+            $registry->registeredProviders(),
+        );
+        $this->assertSame(
+            [
+                CloudProviderType::Arvan,
+                CloudProviderType::Liara,
+            ],
+            $registry->purchasableProviders(),
+        );
+        $this->assertInstanceOf(
+            ParsPackCloudProvider::class,
+            $registry->resolve(CloudProviderType::ParsPack),
+        );
+        $this->assertInstanceOf(
+            CloudServerBootstrapCredentialSourceInterface::class,
+            $registry->resolveCapability(
+                CloudProviderType::ParsPack,
+                CloudServerBootstrapCredentialSourceInterface::class,
+            ),
+        );
+    }
+
+    public function test_parspack_can_be_the_default_provider_when_enabled(): void
+    {
+        config()->set('cloud.default', 'parspack');
+        config()->set('cloud.providers.arvan.enabled', false);
+        config()->set('cloud.providers.arvan.purchase_enabled', false);
+        config()->set('cloud.providers.liara.enabled', false);
+        config()->set('cloud.providers.liara.purchase_enabled', false);
+        $this->configureParsPack(enabled: true, purchaseEnabled: false);
+        $this->resetCloudResolutionState();
+
+        $this->assertInstanceOf(
+            ParsPackCloudProvider::class,
+            $this->app->make(CloudProviderInterface::class),
+        );
+    }
+
     public function test_purchase_disabled_provider_remains_registered_for_existing_resources(): void
     {
         config()->set('cloud.providers.arvan.purchase_enabled', false);
@@ -192,6 +248,20 @@ final class CloudServiceProviderRegistrationTest extends TestCase
         $this->app->make(CloudProviderRegistryInterface::class);
     }
 
+    public function test_enabled_parspack_requires_bootstrap_key_material(): void
+    {
+        $this->configureParsPack(enabled: true, purchaseEnabled: false);
+        config()->set('parspack.bootstrap.private_key_base64', null);
+        $this->resetCloudResolutionState();
+
+        $this->expectException(CloudConfigurationException::class);
+        $this->expectExceptionMessage(
+            'ParsPack bootstrap SSH private key is not configured.',
+        );
+
+        $this->app->make(CloudProviderRegistryInterface::class);
+    }
+
     public function test_default_provider_must_be_enabled(): void
     {
         config()->set('cloud.default', 'liara');
@@ -234,6 +304,30 @@ final class CloudServiceProviderRegistrationTest extends TestCase
         $this->app->make(CloudProviderRegistryInterface::class);
     }
 
+    private function configureParsPack(
+        bool $enabled,
+        bool $purchaseEnabled,
+    ): void {
+        $privateKey = base64_encode(
+            "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-private-key\n-----END OPENSSH PRIVATE KEY-----",
+        );
+
+        config()->set('parspack.enabled', $enabled);
+        config()->set('parspack.purchase_enabled', $purchaseEnabled);
+        config()->set(
+            'parspack.base_url',
+            'https://my.parspack.example.test/cserver/api/public/v1',
+        );
+        config()->set('parspack.api_token', 'test-parspack-token');
+        config()->set('parspack.timeouts.connect', 5);
+        config()->set('parspack.timeouts.request', 15);
+        config()->set('parspack.funding_overhead_percent', 10);
+        config()->set('parspack.bootstrap.ssh_key_id', 14956);
+        config()->set('parspack.bootstrap.private_key_base64', $privateKey);
+
+        config()->set('cloud.providers.parspack', config('parspack'));
+    }
+
     private function resetCloudResolutionState(): void
     {
         foreach ([
@@ -246,6 +340,8 @@ final class CloudServiceProviderRegistrationTest extends TestCase
             ArvanCloudProvisioner::class,
             LiaraCloudClient::class,
             LiaraCloudProvider::class,
+            ParsPackCloudClient::class,
+            ParsPackCloudProvider::class,
         ] as $abstract) {
             $this->app->forgetInstance($abstract);
         }
