@@ -5,16 +5,28 @@ declare(strict_types=1);
 namespace App\Infrastructure\SSH\Authentication;
 
 use App\Models\Server;
+use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SSH2;
 
-class SSHKeyAuthenticator implements AuthenticationStrategy
+final class SSHKeyAuthenticator implements AuthenticationStrategy
 {
     public function authenticate(
         SSH2 $ssh,
         Server $server,
     ): bool {
-        throw new \LogicException(
-            'SSH Key authentication is not implemented.'
+        $privateKey = $server->credential;
+
+        if (! is_string($privateKey) || trim($privateKey) === '') {
+            return false;
+        }
+
+        $key = PublicKeyLoader::loadPrivateKey(
+            $privateKey,
+        );
+
+        return $ssh->login(
+            $server->username,
+            $key,
         );
     }
 }
