@@ -21,6 +21,7 @@ use App\Infrastructure\SSH\Contracts\SSHPortReadinessProbeInterface;
 use App\Infrastructure\SSH\Enums\SSHCommandReadinessStatus;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionException;
 use App\Infrastructure\SSH\Services\SSHCommandReadinessInspector;
+use App\Infrastructure\SSH\Services\SSHKeyBootstrapService;
 use App\Infrastructure\SSH\Services\SSHPasswordRotationService;
 use App\Models\Server;
 use Illuminate\Support\Str;
@@ -33,6 +34,7 @@ final readonly class VerifyCloudServerSshReadinessAction
         private PrivilegedExecutionPreflight $preflight,
         private SSHCommandReadinessInspector $commandReadiness,
         private SSHPasswordRotationService $passwordRotation,
+        private SSHKeyBootstrapService $sshKeyBootstrap,
         private CloudServerCredentialRecovery $credentialRecovery,
         private SSHPortReadinessProbeInterface $portReadinessProbe,
         private EnsureSupportedOperatingSystemAction $ensureSupportedOperatingSystem,
@@ -53,16 +55,8 @@ final readonly class VerifyCloudServerSshReadinessAction
                 $server,
             );
 
-            /*
-             * A previous process may have changed the remote password and
-             * crashed before promoting the locally persisted candidate. Reconcile
-             * that distributed state before attempting the normal SSH session.
-             */
-            $this->credentialRecovery->recoverPendingCredentialIfNeeded(
-                server: $server,
-                markBootstrapCredentialRotated: $this->providerUsesBootstrapCredential(
-                    $server,
-                ),
+            $this->recoverCredentialStateIfNeeded(
+                $server,
             );
 
             $this->connect(
@@ -119,6 +113,40 @@ final readonly class VerifyCloudServerSshReadinessAction
         return $mode;
     }
 
+    private function recoverCredentialStateIfNeeded(
+        Server $server,
+    ): void {
+        /*
+         * A previous SSH-key bootstrap may have changed the remote password
+         * and crashed before promoting the locally persisted candidate. Keep
+         * the private key active locally until the pending password is
+         * verified and the bootstrap key has been removed remotely.
+         */
+        if ($server->authentication_type === AuthenticationType::SSHKey) {
+            if (
+                $server->hasPendingCredential()
+                && $this->providerUsesBootstrapCredential($server)
+            ) {
+                $this->completeSshKeyBootstrapCredentialRotation(
+                    $server,
+                );
+            }
+
+            return;
+        }
+
+        /*
+         * A previous password rotation may have changed the remote password
+         * and crashed before promoting the locally persisted candidate.
+         */
+        $this->credentialRecovery->recoverPendingCredentialIfNeeded(
+            server: $server,
+            markBootstrapCredentialRotated: $this->providerUsesBootstrapCredential(
+                $server,
+            ),
+        );
+    }
+
     private function ensureCommandExecutionReady(
         Server $server,
     ): void {
@@ -160,6 +188,22 @@ final readonly class VerifyCloudServerSshReadinessAction
             return;
         }
 
+        if ($server->authentication_type === AuthenticationType::SSHKey) {
+            $this->rotateSshKeyBootstrapCredential(
+                $server,
+            );
+
+            $this->assertCommandReadyAfterPasswordRotation();
+
+            return;
+        }
+
+        if ($server->authentication_type !== AuthenticationType::Password) {
+            throw new CloudServerSshUnavailableException(
+                'Cloud server bootstrap credential rotation uses an unsupported authentication type.',
+            );
+        }
+
         $this->rotateCredential(
             server: $server,
             forcedPasswordChange: false,
@@ -178,11 +222,60 @@ final readonly class VerifyCloudServerSshReadinessAction
     private function providerUsesBootstrapCredential(
         Server $server,
     ): bool {
-        return $server->authentication_type === AuthenticationType::Password
-            && $this->capabilities->supports(
-                server: $server,
-                capability: CloudServerBootstrapCredentialRotationInterface::class,
+        return $this->capabilities->supports(
+            server: $server,
+            capability: CloudServerBootstrapCredentialRotationInterface::class,
+        );
+    }
+
+    private function rotateSshKeyBootstrapCredential(
+        Server $server,
+    ): void {
+        $newPassword = Str::password(
+            length: 32,
+            letters: true,
+            numbers: true,
+            symbols: true,
+            spaces: false,
+        );
+
+        $this->credentialRecovery->persistPendingCredential(
+            server: $server,
+            pendingPassword: $newPassword,
+        );
+
+        $this->completeSshKeyBootstrapCredentialRotation(
+            $server,
+        );
+
+        $this->connect(
+            $server,
+        );
+    }
+
+    private function completeSshKeyBootstrapCredentialRotation(
+        Server $server,
+    ): void {
+        $pendingPassword = $server->pending_credential;
+
+        if (! is_string($pendingPassword) || $pendingPassword === '') {
+            throw new CloudServerSshUnavailableException(
+                'SSH key bootstrap requires a recoverable pending password.',
             );
+        }
+
+        $this->ssh->disconnect();
+
+        $this->sshKeyBootstrap->bootstrapToPassword(
+            server: $server,
+            newPassword: $pendingPassword,
+        );
+
+        $this->credentialRecovery->promotePendingCredential(
+            server: $server,
+            markBootstrapCredentialRotated: true,
+            authenticationType: AuthenticationType::Password,
+        );
     }
 
     private function rotateCredential(
