@@ -31,7 +31,16 @@ use App\Domain\Server\Enums\AuthenticationType;
 use App\Infrastructure\Cloud\ParsPack\Mappers\ParsPackCloudResponseMapper;
 use SensitiveParameter;
 
-final readonly class ParsPackCloudProvider implements CloudProviderInterface, CloudPurchaseCatalogSourceInterface, CloudPurchasePricingSourceInterface, CloudServerBootstrapCredentialRotationInterface, CloudServerBootstrapCredentialSourceInterface, CloudServerInventoryInterface, CloudServerLifecycleInterface, CloudServerProvisionerInterface, CloudServerResizeCatalogInterface
+final readonly class ParsPackCloudProvider implements
+    CloudProviderInterface,
+    CloudPurchaseCatalogSourceInterface,
+    CloudPurchasePricingSourceInterface,
+    CloudServerBootstrapCredentialRotationInterface,
+    CloudServerBootstrapCredentialSourceInterface,
+    CloudServerInventoryInterface,
+    CloudServerLifecycleInterface,
+    CloudServerProvisionerInterface,
+    CloudServerResizeCatalogInterface
 {
     private const string RESOURCE_REGIONS = 'regions';
     private const string RESOURCE_SIZES = 'sizes';
@@ -44,6 +53,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
 
     private readonly int $bootstrapSshKeyId;
     private readonly string $bootstrapPrivateKey;
+    private readonly int $fundingOverheadPercent;
 
     public function __construct(
         private ParsPackCloudClient $client,
@@ -51,6 +61,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         int $bootstrapSshKeyId,
         #[SensitiveParameter]
         string $bootstrapPrivateKey,
+        int $fundingOverheadPercent = 0,
     ) {
         if ($bootstrapSshKeyId < 1) {
             throw new CloudConfigurationException(
@@ -64,18 +75,22 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
             );
         }
 
+        if ($fundingOverheadPercent < 0 || $fundingOverheadPercent > 100) {
+            throw new CloudConfigurationException(
+                'ParsPack funding overhead percent must be between 0 and 100.',
+            );
+        }
+
         $this->bootstrapSshKeyId = $bootstrapSshKeyId;
         $this->bootstrapPrivateKey = $bootstrapPrivateKey;
+        $this->fundingOverheadPercent = $fundingOverheadPercent;
     }
 
     /** @return list<CloudRegionData> */
     public function listRegions(): array
     {
         return $this->mapper->mapRegions(
-            $this->client->get(
-                self::RESOURCE_REGIONS,
-                $this->catalogPagination(),
-            ),
+            $this->client->get(self::RESOURCE_REGIONS, $this->catalogPagination()),
         );
     }
 
@@ -85,10 +100,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         $regionId = $this->normalizeRegion($region);
 
         return $this->mapper->mapSizes(
-            response: $this->client->get(
-                self::RESOURCE_SIZES,
-                $this->catalogPagination(),
-            ),
+            response: $this->client->get(self::RESOURCE_SIZES, $this->catalogPagination()),
             region: $regionId,
         );
     }
@@ -99,10 +111,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         $regionId = $this->normalizeRegion($region);
 
         return $this->mapper->mapImages(
-            response: $this->client->get(
-                self::RESOURCE_IMAGES,
-                $this->catalogPagination(),
-            ),
+            response: $this->client->get(self::RESOURCE_IMAGES, $this->catalogPagination()),
             region: $regionId,
         );
     }
@@ -111,10 +120,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
     public function listPurchaseRegions(): array
     {
         return $this->mapper->mapRegions(
-            $this->client->getCatalog(
-                self::RESOURCE_REGIONS,
-                $this->catalogPagination(),
-            ),
+            $this->client->getCatalog(self::RESOURCE_REGIONS, $this->catalogPagination()),
         );
     }
 
@@ -122,13 +128,14 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
     public function listPurchaseSizes(string $region): array
     {
         $regionId = $this->normalizeRegion($region);
-
-        return $this->mapper->mapSizes(
-            response: $this->client->getCatalog(
-                self::RESOURCE_SIZES,
-                $this->catalogPagination(),
-            ),
+        $sizes = $this->mapper->mapSizes(
+            response: $this->client->getCatalog(self::RESOURCE_SIZES, $this->catalogPagination()),
             region: $regionId,
+        );
+
+        return array_map(
+            fn (CloudSizeData $size): CloudSizeData => $this->applyFundingOverhead($size),
+            $sizes,
         );
     }
 
@@ -138,17 +145,13 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         $regionId = $this->normalizeRegion($region);
 
         return $this->mapper->mapImages(
-            response: $this->client->getCatalog(
-                self::RESOURCE_IMAGES,
-                $this->catalogPagination(),
-            ),
+            response: $this->client->getCatalog(self::RESOURCE_IMAGES, $this->catalogPagination()),
             region: $regionId,
         );
     }
 
-    public function createServer(
-        CreateCloudServerData $data,
-    ): CreatedCloudServerData {
+    public function createServer(CreateCloudServerData $data): CreatedCloudServerData
+    {
         $regionId = $this->normalizeRegion($data->regionId);
         $name = $this->normalizeServerName($data->name);
         $sizeId = $this->normalizeCatalogId($data->sizeId, 'size');
@@ -172,10 +175,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
             );
         }
 
-        $size = $this->findSize(
-            region: $regionId,
-            sizeId: $sizeId,
-        );
+        $size = $this->findSize(region: $regionId, sizeId: $sizeId);
 
         if ($data->diskGiB !== $size->diskGiB) {
             throw new CloudValidationException(
@@ -202,24 +202,17 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         }
 
         return $this->mapper->mapCreatedServer(
-            $this->client->post(
-                self::RESOURCE_SERVERS,
-                $payload,
-            ),
+            $this->client->post(self::RESOURCE_SERVERS, $payload),
         );
     }
 
-    public function findServer(
-        string $region,
-        string $serverId,
-    ): CloudServerData {
+    public function findServer(string $region, string $serverId): CloudServerData
+    {
         $regionId = $this->normalizeRegion($region);
         $providerServerId = $this->normalizeServerId($serverId);
 
         return $this->mapper->mapServer(
-            response: $this->client->get(
-                $this->serverEndpoint($providerServerId),
-            ),
+            response: $this->client->get($this->serverEndpoint($providerServerId)),
             region: $regionId,
         );
     }
@@ -229,74 +222,43 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
     {
         $regionId = $this->normalizeRegion($region);
         $servers = $this->mapper->mapServerInventory(
-            $this->client->get(
-                self::RESOURCE_SERVERS,
-                $this->catalogPagination(),
-            ),
+            $this->client->get(self::RESOURCE_SERVERS, $this->catalogPagination()),
         );
 
-        return array_values(
-            array_filter(
-                $servers,
-                static fn (CloudServerData $server): bool => $server->regionId === $regionId,
-            ),
-        );
+        return array_values(array_filter(
+            $servers,
+            static fn (CloudServerData $server): bool => $server->regionId === $regionId,
+        ));
     }
 
-    public function powerOn(
-        string $region,
-        string $serverId,
-    ): void {
+    public function powerOn(string $region, string $serverId): void
+    {
         $this->assertRegion($region);
-        $this->submitVmAction(
-            serverId: $serverId,
-            type: 'power_on',
-        );
+        $this->submitVmAction($serverId, 'power_on');
     }
 
-    public function powerOff(
-        string $region,
-        string $serverId,
-    ): void {
+    public function powerOff(string $region, string $serverId): void
+    {
         $this->assertRegion($region);
-        $this->submitVmAction(
-            serverId: $serverId,
-            type: 'power_off',
-        );
+        $this->submitVmAction($serverId, 'power_off');
     }
 
-    public function reboot(
-        string $region,
-        string $serverId,
-    ): void {
+    public function reboot(string $region, string $serverId): void
+    {
         $this->assertRegion($region);
-        $this->submitVmAction(
-            serverId: $serverId,
-            type: 'reboot',
-        );
+        $this->submitVmAction($serverId, 'reboot');
     }
 
-    public function deleteServer(
-        string $region,
-        string $serverId,
-    ): void {
+    public function deleteServer(string $region, string $serverId): void
+    {
         $this->assertRegion($region);
-        $providerServerId = $this->normalizeServerId($serverId);
-
-        $this->client->delete(
-            $this->serverEndpoint($providerServerId),
-        );
+        $this->client->delete($this->serverEndpoint($this->normalizeServerId($serverId)));
     }
 
     /** @return list<CloudServerActionData> */
-    public function getAvailableActions(
-        string $region,
-        string $serverId,
-    ): array {
-        $server = $this->findServer(
-            region: $region,
-            serverId: $serverId,
-        );
+    public function getAvailableActions(string $region, string $serverId): array
+    {
+        $server = $this->findServer(region: $region, serverId: $serverId);
 
         if ($server->isRunning()) {
             return [
@@ -306,9 +268,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         }
 
         if ($server->isStopped()) {
-            return [
-                new CloudServerActionData(self::ACTION_POWER_ON),
-            ];
+            return [new CloudServerActionData(self::ACTION_POWER_ON)];
         }
 
         return [];
@@ -328,19 +288,15 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
     }
 
     /** @return list<CloudSizeData> */
-    public function listServerResizePlans(
-        string $region,
-        string $serverId,
-    ): array {
+    public function listServerResizePlans(string $region, string $serverId): array
+    {
         $this->normalizeServerId($serverId);
 
         return $this->listSizes($region);
     }
 
-    public function findSize(
-        string $region,
-        string $sizeId,
-    ): CloudSizeData {
+    public function findSize(string $region, string $sizeId): CloudSizeData
+    {
         $sizeId = $this->normalizeCatalogId($sizeId, 'size');
 
         foreach ($this->listSizes($region) as $size) {
@@ -359,10 +315,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         string $sizeId,
         int $diskGiB,
     ): CloudSizeData {
-        $size = $this->findSize(
-            region: $region,
-            sizeId: $sizeId,
-        );
+        $size = $this->findSize(region: $region, sizeId: $sizeId);
 
         if ($diskGiB !== $size->diskGiB) {
             throw new CloudValidationException(
@@ -378,12 +331,10 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         string $sizeId,
         int $diskGiB,
     ): CloudDiskPriceData {
-        $size = $this->findSize(
-            region: $region,
-            sizeId: $sizeId,
+        return $this->fixedDiskPrice(
+            $this->findSize(region: $region, sizeId: $sizeId),
+            $diskGiB,
         );
-
-        return $this->fixedDiskPrice($size, $diskGiB);
     }
 
     public function calculatePurchaseDiskPrice(
@@ -408,6 +359,59 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         }
 
         return $this->fixedDiskPrice($size, $diskGiB);
+    }
+
+    private function applyFundingOverhead(CloudSizeData $size): CloudSizeData
+    {
+        if ($this->fundingOverheadPercent === 0) {
+            return $size;
+        }
+
+        return new CloudSizeData(
+            id: $size->id,
+            name: $size->name,
+            regionId: $size->regionId,
+            vCpu: $size->vCpu,
+            memoryMiB: $size->memoryMiB,
+            diskGiB: $size->diskGiB,
+            category: $size->category,
+            hourlyPrice: $this->priceWithFundingOverhead($size->hourlyPrice),
+            monthlyPrice: $this->priceWithFundingOverhead($size->monthlyPrice),
+        );
+    }
+
+    private function priceWithFundingOverhead(?CloudPriceData $price): ?CloudPriceData
+    {
+        if (! $price instanceof CloudPriceData) {
+            return null;
+        }
+
+        return new CloudPriceData(
+            amount: $this->amountWithFundingOverhead($price->amount),
+            currencyCode: $price->currencyCode,
+            billingPeriod: $price->billingPeriod,
+        );
+    }
+
+    private function amountWithFundingOverhead(string $amount): string
+    {
+        if (preg_match('/\A([0-9]+)(?:\.([0-9]+))?\z/', $amount, $matches) !== 1) {
+            throw new CloudValidationException(
+                'ParsPack purchase price contains an invalid amount.',
+            );
+        }
+
+        $fraction = $matches[2] ?? '';
+        $scale = 10 ** strlen($fraction);
+        $scaledAmount = ((int) $matches[1] * $scale)
+            + ($fraction === '' ? 0 : (int) $fraction);
+        $numerator = $scaledAmount * (100 + $this->fundingOverheadPercent);
+        $denominator = 100 * $scale;
+
+        return (string) intdiv(
+            $numerator + $denominator - 1,
+            $denominator,
+        );
     }
 
     private function fixedDiskPrice(
@@ -435,10 +439,8 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         );
     }
 
-    private function submitVmAction(
-        string $serverId,
-        string $type,
-    ): void {
+    private function submitVmAction(string $serverId, string $type): void
+    {
         $providerServerId = $this->normalizeServerId($serverId);
 
         $this->client->post(
@@ -455,10 +457,7 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
     /** @return array{page:int,per_page:int} */
     private function catalogPagination(): array
     {
-        return [
-            'page' => 1,
-            'per_page' => 100,
-        ];
+        return ['page' => 1, 'per_page' => 100];
     }
 
     private function assertRegion(string $region): void
@@ -495,10 +494,8 @@ final readonly class ParsPackCloudProvider implements CloudProviderInterface, Cl
         return $serverId;
     }
 
-    private function normalizeCatalogId(
-        string $id,
-        string $resource,
-    ): string {
+    private function normalizeCatalogId(string $id, string $resource): string
+    {
         $id = trim($id);
 
         if (
