@@ -9,10 +9,13 @@ use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Billing\Enums\OrderStatus;
 use App\Domain\Billing\Exceptions\OrderNotProvisionableException;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerCredentialManagerInterface;
 use App\Domain\Cloud\Contracts\CloudServerInventoryInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
+use App\Domain\Cloud\DTOs\CloudServerBootstrapCredentialData;
 use App\Domain\Cloud\DTOs\CloudServerData;
+use App\Domain\Cloud\DTOs\CreatedCloudServerData;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
@@ -319,28 +322,13 @@ final readonly class ProvisionPaidOrderAction
                 return null;
             }
 
-            $credential = $cloudServer->generatedPassword();
+            $credential = $this->recoverCredential(
+                order: $order,
+                provider: $provider,
+                cloudServer: $cloudServer,
+            );
 
-            if (
-                (! is_string($credential) || trim($credential) === '')
-                && $this->providers->supportsCapability(
-                    provider: $provider,
-                    capability: CloudServerCredentialManagerInterface::class,
-                )
-            ) {
-                /** @var CloudServerCredentialManagerInterface $credentials */
-                $credentials = $this->providers->resolveCapability(
-                    provider: $provider,
-                    capability: CloudServerCredentialManagerInterface::class,
-                );
-
-                $credential = $credentials->resetRootPassword(
-                    region: $order->region_id,
-                    serverId: $providerServerId,
-                )->password;
-            }
-
-            if (! is_string($credential) || trim($credential) === '') {
+            if (! $credential instanceof CloudServerBootstrapCredentialData) {
                 return null;
             }
 
@@ -367,8 +355,8 @@ final readonly class ProvisionPaidOrderAction
                         'host' => $host,
                         'port' => 22,
                         'username' => $username,
-                        'authentication_type' => AuthenticationType::Password,
-                        'credential' => $credential,
+                        'authentication_type' => $credential->authenticationType,
+                        'credential' => $credential->credential(),
                         'cloud_provider' => $provider->value,
                         'cloud_server_id' => $providerServerId,
                         'cloud_region' => $order->region_id,
@@ -392,6 +380,75 @@ final readonly class ProvisionPaidOrderAction
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function recoverCredential(
+        Order $order,
+        CloudProviderType $provider,
+        CloudServerData $cloudServer,
+    ): ?CloudServerBootstrapCredentialData {
+        $generatedPassword = $cloudServer->generatedPassword();
+
+        if (
+            is_string($generatedPassword)
+            && trim($generatedPassword) !== ''
+        ) {
+            return new CloudServerBootstrapCredentialData(
+                authenticationType: AuthenticationType::Password,
+                credential: $generatedPassword,
+            );
+        }
+
+        if ($this->providers->supportsCapability(
+            provider: $provider,
+            capability: CloudServerBootstrapCredentialSourceInterface::class,
+        )) {
+            /** @var CloudServerBootstrapCredentialSourceInterface $source */
+            $source = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerBootstrapCredentialSourceInterface::class,
+            );
+
+            return $source->bootstrapCredential(
+                request: $this->buildCloudServerData->execute($order),
+                server: new CreatedCloudServerData(
+                    id: $cloudServer->id,
+                    name: $cloudServer->name,
+                    regionId: $cloudServer->regionId,
+                    status: $cloudServer->status,
+                    username: $cloudServer->username,
+                    createdAt: $cloudServer->createdAt,
+                    generatedPassword: null,
+                ),
+            );
+        }
+
+        if (! $this->providers->supportsCapability(
+            provider: $provider,
+            capability: CloudServerCredentialManagerInterface::class,
+        )) {
+            return null;
+        }
+
+        /** @var CloudServerCredentialManagerInterface $credentials */
+        $credentials = $this->providers->resolveCapability(
+            provider: $provider,
+            capability: CloudServerCredentialManagerInterface::class,
+        );
+
+        $password = $credentials->resetRootPassword(
+            region: $order->region_id,
+            serverId: $cloudServer->id,
+        )->password;
+
+        if (trim($password) === '') {
+            return null;
+        }
+
+        return new CloudServerBootstrapCredentialData(
+            authenticationType: AuthenticationType::Password,
+            credential: $password,
+        );
     }
 
     private function hasProviderDeliveryEvidence(

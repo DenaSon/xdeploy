@@ -19,6 +19,7 @@ use App\Domain\Billing\Exceptions\PurchaseQuoteChangedException;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderInterface;
 use App\Domain\Cloud\Contracts\CloudCatalogReaderResolverInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\Contracts\RefreshableCloudCatalogReaderInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
@@ -1472,9 +1473,19 @@ final class Buy extends Component
 
     private function customDiskEnabled(): bool
     {
-        return CloudProviderPublicIdentity::provider(
+        $provider = CloudProviderPublicIdentity::provider(
             $this->provider,
-        ) === CloudProviderType::Arvan;
+        );
+
+        if (! $provider instanceof CloudProviderType) {
+            return false;
+        }
+
+        return app(CloudProviderRegistryInterface::class)
+            ->supportsCapability(
+                provider: $provider,
+                capability: CloudServerResizerInterface::class,
+            );
     }
 
     private function memoryLabel(
