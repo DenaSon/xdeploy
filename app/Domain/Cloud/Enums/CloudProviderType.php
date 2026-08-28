@@ -8,4 +8,5 @@ enum CloudProviderType: string
 {
     case Arvan = 'arvan';
     case Liara = 'liara';
+    case ParsPack = 'parspack';
 }
