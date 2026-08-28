@@ -146,11 +146,11 @@ final class ParsPackCloudProviderTest extends TestCase
             ->listPurchaseSizes('frankfurt');
 
         $this->assertCount(1, $sizes);
-        $this->assertSame('1905', $sizes[0]->hourlyPrice?->amount);
-        $this->assertSame('1371612', $sizes[0]->monthlyPrice?->amount);
+        $this->assertSame('19044', $sizes[0]->hourlyPrice?->amount);
+        $this->assertSame('13716120', $sizes[0]->monthlyPrice?->amount);
     }
 
-    public function test_operational_catalog_keeps_raw_provider_price(): void
+    public function test_operational_catalog_keeps_normalized_provider_price(): void
     {
         Http::fake([
             self::BASE_URL.'/sizes*' => Http::response($this->sizesResponse()),
@@ -159,8 +159,9 @@ final class ParsPackCloudProviderTest extends TestCase
         $sizes = $this->provider(fundingOverheadPercent: 10)
             ->listSizes('frankfurt');
 
-        $this->assertSame('1731.25', $sizes[0]->hourlyPrice?->amount);
-        $this->assertSame('1246920', $sizes[0]->monthlyPrice?->amount);
+        $this->assertSame('17312.5', $sizes[0]->hourlyPrice?->amount);
+        $this->assertSame('12469200', $sizes[0]->monthlyPrice?->amount);
+        $this->assertSame('IRR', $sizes[0]->hourlyPrice?->currencyCode);
     }
 
     public function test_fixed_disk_price_is_zero_for_included_disk(): void
