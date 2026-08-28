@@ -45,7 +45,11 @@ final class AdminServerIpUpdateTest extends TestCase
             ->assertHasNoErrors()
             ->assertSet('newHost', '198.51.100.25')
             ->assertSet('hostUpdateReason', '')
-            ->assertSee('198.51.100.25:22');
+            ->assertSee('198.51.100.25:22')
+            ->assertSee('سوابق تغییر IP')
+            ->assertSee('192.0.2.10')
+            ->assertSee('198.51.100.25')
+            ->assertSee($reason);
 
         $this->assertSame(
             '198.51.100.25',
