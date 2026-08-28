@@ -24,12 +24,24 @@ final class CloudProviderPublicIdentity
     ];
 
     /**
+     * Customer-facing provider names. Canonical provider names stay internal
+     * and stable public codes continue to be used for Livewire routing.
+     *
      * @var array<string, string>
      */
     private const array LABELS = [
         'arvan' => 'Core-1',
-        'liara' => 'Core-2',
-        'parspack' => 'Core-3',
+        'liara' => 'دماوند',
+        'parspack' => 'زاگرس',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    private const array DESCRIPTIONS = [
+        'arvan' => 'زیرساخت ابری Core-1',
+        'liara' => 'زیرساخت ایران',
+        'parspack' => 'انتخاب موقعیت‌های بیشتر',
     ];
 
     public static function code(
@@ -47,10 +59,7 @@ final class CloudProviderPublicIdentity
     public static function description(
         CloudProviderType $provider,
     ): string {
-        return sprintf(
-            'زیرساخت ابری %s',
-            self::label($provider),
-        );
+        return self::DESCRIPTIONS[$provider->value];
     }
 
     public static function provider(
