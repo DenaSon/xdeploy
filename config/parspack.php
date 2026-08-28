@@ -22,11 +22,6 @@ return [
 
     'api_token' => env('PARSPACK_CLOUD_API_TOKEN'),
 
-    'region' => env(
-        'PARSPACK_CLOUD_REGION',
-        'frankfurt',
-    ),
-
     'timeouts' => [
         'connect' => (int) env(
             'PARSPACK_CLOUD_CONNECT_TIMEOUT',
@@ -81,23 +76,12 @@ return [
         ),
     ],
 
+    /*
+     * Order selections (region, size, image and disk) come from the dynamic
+     * provider catalog and are persisted on the order. Keep only genuine
+     * provisioning behavior defaults here.
+     */
     'defaults' => [
-        'size_id' => env(
-            'PARSPACK_CLOUD_DEFAULT_SIZE_ID',
-            'deVPS2',
-        ),
-        'image_id' => env(
-            'PARSPACK_CLOUD_DEFAULT_IMAGE_ID',
-            'ubuntu24-cloudinit-qcow2',
-        ),
-        'username' => env(
-            'PARSPACK_CLOUD_DEFAULT_USERNAME',
-            'root',
-        ),
-        'disk_size' => (int) env(
-            'PARSPACK_CLOUD_DEFAULT_DISK_SIZE',
-            40,
-        ),
         'init_script' => env(
             'PARSPACK_CLOUD_DEFAULT_INIT_SCRIPT',
             '',
