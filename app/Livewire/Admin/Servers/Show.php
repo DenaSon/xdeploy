@@ -30,8 +30,6 @@ final class Show extends Component
 
     public string $hostUpdateReason = '';
 
-    public ?string $hostUpdateMessage = null;
-
     public string $supportReason = '';
 
     public bool $supportAccessConfirmed = false;
@@ -58,7 +56,6 @@ final class Show extends Component
     ): void {
         $this->newHost = trim($this->newHost);
         $this->hostUpdateReason = trim($this->hostUpdateReason);
-        $this->hostUpdateMessage = null;
 
         $validated = $this->validate(
             [
@@ -83,8 +80,6 @@ final class Show extends Component
             ],
         );
 
-        $oldHost = (string) $this->server->host;
-
         $updatedServer = $updateHost->handle(
             admin: $this->adminUser(),
             server: $this->server,
@@ -99,11 +94,6 @@ final class Show extends Component
         $this->hostUpdateReason = '';
         $this->connectionTestPassed = null;
         $this->connectionTestMessage = null;
-        $this->hostUpdateMessage = sprintf(
-            'آدرس IP سرور از %s به %s تغییر کرد.',
-            $oldHost,
-            $updatedServer->host,
-        );
     }
 
     public function prepareSupportPasskeyVerification(
