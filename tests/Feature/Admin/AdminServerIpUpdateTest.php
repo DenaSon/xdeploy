@@ -63,17 +63,13 @@ final class AdminServerIpUpdateTest extends TestCase
         $this->assertSame($customer->id, $log->user_id);
         $this->assertSame($server->id, $log->server_id);
         $this->assertTrue($log->successful);
-        $this->assertStringContainsString(
-            '192.0.2.10',
-            $log->reason,
-        );
-        $this->assertStringContainsString(
-            '198.51.100.25',
-            $log->reason,
-        );
-        $this->assertStringContainsString(
-            $reason,
-            $log->reason,
+        $this->assertSame($reason, $log->reason);
+        $this->assertSame(
+            [
+                'old_host' => '192.0.2.10',
+                'new_host' => '198.51.100.25',
+            ],
+            $log->metadata,
         );
     }
 

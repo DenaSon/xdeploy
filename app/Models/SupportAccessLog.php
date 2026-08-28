@@ -18,6 +18,7 @@ final class SupportAccessLog extends Model
         'server_id',
         'action',
         'reason',
+        'metadata',
         'successful',
         'ip_address',
         'user_agent',
@@ -27,6 +28,7 @@ final class SupportAccessLog extends Model
     {
         return [
             'action' => SupportAccessAction::class,
+            'metadata' => 'array',
             'successful' => 'boolean',
         ];
     }

@@ -13,6 +13,7 @@ use LogicException;
 
 final readonly class RecordSupportAccessAction
 {
+    /** @param array<string, mixed> $metadata */
     public function handle(
         User $admin,
         Server $server,
@@ -21,6 +22,7 @@ final readonly class RecordSupportAccessAction
         bool $successful,
         ?string $ipAddress,
         ?string $userAgent,
+        array $metadata = [],
     ): SupportAccessLog {
         if (! $admin->isAdmin()) {
             throw new LogicException(
@@ -42,6 +44,7 @@ final readonly class RecordSupportAccessAction
             'server_id' => $server->getKey(),
             'action' => $action,
             'reason' => Str::limit($normalizedReason, 500, ''),
+            'metadata' => $metadata === [] ? null : $metadata,
             'successful' => $successful,
             'ip_address' => is_string($ipAddress) && $ipAddress !== ''
                 ? Str::limit($ipAddress, 45, '')

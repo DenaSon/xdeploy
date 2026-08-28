@@ -14,7 +14,13 @@
                     </div>
                 </div>
 
-                <x-admin.status-badge :status="$server->status" />
+                <div class="flex items-center gap-2">
+                    <livewire:admin.servers.support-history
+                        :server-id="$server->id"
+                        :key="'admin-support-history-'.$server->id"
+                    />
+                    <x-admin.status-badge :status="$server->status" />
+                </div>
             </div>
 
             <dl class="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
