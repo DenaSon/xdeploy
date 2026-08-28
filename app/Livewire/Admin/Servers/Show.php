@@ -173,6 +173,11 @@ final class Show extends Component
                 'supportAccessLogs' => SupportAccessLog::query()
                     ->with('adminUser')
                     ->where('server_id', $server->getKey())
+                    ->whereIn('action', [
+                        SupportAccessAction::SshConnectionTest->value,
+                        SupportAccessAction::PasskeyConfirmed->value,
+                        SupportAccessAction::CredentialRevealed->value,
+                    ])
                     ->latest('id')
                     ->limit(10)
                     ->get(),
