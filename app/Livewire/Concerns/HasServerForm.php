@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Models\Server;
+use App\Rules\SSHPrivateKey;
 use Illuminate\Validation\Rule;
 
 trait HasServerForm
@@ -26,6 +27,20 @@ trait HasServerForm
     protected function serverRules(
         bool $requireCredential = true,
     ): array {
+        $credentialRules = [
+            $requireCredential
+                ? 'required'
+                : 'nullable',
+            'string',
+        ];
+
+        if (
+            $this->authenticationType
+            === AuthenticationType::SSHKey->value
+        ) {
+            $credentialRules[] = new SSHPrivateKey;
+        }
+
         return [
             'host' => [
                 'required',
@@ -45,12 +60,7 @@ trait HasServerForm
                 'max:255',
             ],
 
-            'credential' => [
-                $requireCredential
-                    ? 'required'
-                    : 'nullable',
-                'string',
-            ],
+            'credential' => $credentialRules,
 
             'authenticationType' => [
                 'required',
