@@ -20,7 +20,7 @@ final class BuyProviderPeriodPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_parspack_buy_workspace_exposes_weekly_and_monthly_periods_only(): void
+    public function test_parspack_buy_workspace_exposes_fourteen_day_and_monthly_periods_only(): void
     {
         config()->set(
             'cloud.default',
@@ -59,15 +59,15 @@ final class BuyProviderPeriodPolicyTest extends TestCase
             )
             ->assertSet(
                 'period',
-                '7_days',
+                '14_days',
             )
             ->assertSet(
                 'periods',
                 [
                     [
-                        'id' => '7_days',
-                        'label' => '۷ روزه',
-                        'hint' => 'مناسب استفاده هفتگی',
+                        'id' => '14_days',
+                        'label' => '۱۴ روزه',
+                        'hint' => 'مناسب استفاده کوتاه',
                         'recommended' => true,
                     ],
                     [
