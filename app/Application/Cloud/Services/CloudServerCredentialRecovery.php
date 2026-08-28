@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Cloud\Services;
 
 use App\Domain\Cloud\Exceptions\CloudServerSshUnavailableException;
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Infrastructure\SSH\Contracts\SSHCredentialVerifierInterface;
 use App\Infrastructure\SSH\Exceptions\SSHPasswordRotationException;
 use App\Models\Server;
@@ -102,6 +103,7 @@ final readonly class CloudServerCredentialRecovery
     public function promotePendingCredential(
         Server $server,
         bool $markBootstrapCredentialRotated,
+        ?AuthenticationType $authenticationType = null,
     ): void {
         $pendingPassword = $server->pending_credential;
 
@@ -119,6 +121,10 @@ final readonly class CloudServerCredentialRecovery
                 'credential' => $pendingPassword,
                 'pending_credential' => null,
             ];
+
+            if ($authenticationType instanceof AuthenticationType) {
+                $attributes['authentication_type'] = $authenticationType;
+            }
 
             if ($markBootstrapCredentialRotated) {
                 $attributes['bootstrap_credential_rotated_at'] =
