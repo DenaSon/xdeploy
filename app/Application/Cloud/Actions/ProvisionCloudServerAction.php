@@ -9,11 +9,13 @@ use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\DTOs\CloudServerBootstrapCredentialData;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
@@ -95,13 +97,18 @@ final readonly class ProvisionCloudServerAction
 
         $createdServer = $provisioner->createServer($data);
         $username = $this->serverUsername($createdServer);
+        $bootstrapCredential = $this->bootstrapCredentialFor(
+            provider: $provider,
+            request: $data,
+            createdServer: $createdServer,
+        );
 
         $server = $this->persistProvisioningServer(
             user: $user,
             data: $data,
             createdServer: $createdServer,
             username: $username,
-            password: $createdServer->generatedPassword(),
+            bootstrapCredential: $bootstrapCredential,
             provider: $provider,
         );
 
@@ -187,7 +194,7 @@ final readonly class ProvisionCloudServerAction
             if (! $server->hasCredential()) {
                 throw new CloudServerNotReadyException(
                     sprintf(
-                        'Cloud server [%s] became active but its generated credential is not available yet.',
+                        'Cloud server [%s] became active but its bootstrap credential is not available yet.',
                         $providerServerId,
                     ),
                 );
@@ -208,7 +215,7 @@ final readonly class ProvisionCloudServerAction
         CreateCloudServerData $data,
         CreatedCloudServerData $createdServer,
         string $username,
-        ?string $password,
+        CloudServerBootstrapCredentialData $bootstrapCredential,
         CloudProviderType $provider,
     ): Server {
         try {
@@ -219,8 +226,8 @@ final readonly class ProvisionCloudServerAction
                     'host' => null,
                     'port' => 22,
                     'username' => $username,
-                    'authentication_type' => AuthenticationType::Password,
-                    'credential' => $password,
+                    'authentication_type' => $bootstrapCredential->authenticationType,
+                    'credential' => $bootstrapCredential->credential(),
                     'cloud_provider' => $provider->value,
                     'cloud_server_id' => $createdServer->id,
                     'cloud_region' => trim($data->regionId),
@@ -237,6 +244,64 @@ final readonly class ProvisionCloudServerAction
                 previous: $exception,
             );
         }
+    }
+
+    private function bootstrapCredentialFor(
+        CloudProviderType $provider,
+        CreateCloudServerData $request,
+        CreatedCloudServerData $createdServer,
+    ): CloudServerBootstrapCredentialData {
+        $generatedPassword = $createdServer->generatedPassword();
+
+        if (is_string($generatedPassword) && $generatedPassword !== '') {
+            return new CloudServerBootstrapCredentialData(
+                authenticationType: AuthenticationType::Password,
+                credential: $generatedPassword,
+            );
+        }
+
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            if (! $this->providers->supportsCapability(
+                provider: $provider,
+                capability: CloudServerBootstrapCredentialSourceInterface::class,
+            )) {
+                throw new CloudServerNotReadyException(
+                    sprintf(
+                        'Cloud provider [%s] did not expose a usable bootstrap credential.',
+                        $provider->value,
+                    ),
+                );
+            }
+
+            /** @var CloudServerBootstrapCredentialSourceInterface $source */
+            $source = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerBootstrapCredentialSourceInterface::class,
+            );
+
+            return $source->bootstrapCredential(
+                request: $request,
+                server: $createdServer,
+            );
+        }
+
+        foreach ([$this->provisioner, $this->catalog] as $candidate) {
+            if (! $candidate instanceof CloudServerBootstrapCredentialSourceInterface) {
+                continue;
+            }
+
+            return $candidate->bootstrapCredential(
+                request: $request,
+                server: $createdServer,
+            );
+        }
+
+        throw new CloudServerNotReadyException(
+            sprintf(
+                'Cloud provider [%s] did not expose a usable bootstrap credential.',
+                $provider->value,
+            ),
+        );
     }
 
     private function syncProviderAccessInformation(
@@ -259,7 +324,8 @@ final readonly class ProvisionCloudServerAction
         }
 
         if (
-            ! $server->hasCredential()
+            $server->authentication_type === AuthenticationType::Password
+            && ! $server->hasCredential()
             && $cloudServer->hasGeneratedPassword()
         ) {
             $attributes['credential'] = $cloudServer->generatedPassword();
