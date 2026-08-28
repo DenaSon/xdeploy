@@ -24,6 +24,7 @@ use App\Notifications\Admin\AdminUserRegisteredNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use RuntimeException;
 use Tests\TestCase;
 
 final class AdminTelegramAlertsTest extends TestCase
@@ -54,6 +55,29 @@ final class AdminTelegramAlertsTest extends TestCase
         Event::assertDispatched(
             UserRegistered::class,
             static fn (UserRegistered $event): bool => $event->userId === (int) $created->getKey(),
+        );
+    }
+
+    public function test_registration_succeeds_when_admin_alert_dispatch_fails(): void
+    {
+        Event::shouldReceive('dispatch')
+            ->once()
+            ->andThrow(new RuntimeException(
+                'notification queue unavailable',
+            ));
+
+        $phone = PhoneNumber::from('09123456789');
+
+        $user = app(FindOrCreateUserAction::class)->handle(
+            $phone,
+        );
+
+        $this->assertDatabaseHas(
+            'users',
+            [
+                'id' => $user->getKey(),
+                'phone' => (string) $phone,
+            ],
         );
     }
 
