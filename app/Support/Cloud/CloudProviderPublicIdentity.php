@@ -20,6 +20,7 @@ final class CloudProviderPublicIdentity
     private const array CODES = [
         'arvan' => 'core-1',
         'liara' => 'core-2',
+        'parspack' => 'core-3',
     ];
 
     /**
@@ -28,6 +29,7 @@ final class CloudProviderPublicIdentity
     private const array LABELS = [
         'arvan' => 'Core-1',
         'liara' => 'Core-2',
+        'parspack' => 'Core-3',
     ];
 
     public static function code(

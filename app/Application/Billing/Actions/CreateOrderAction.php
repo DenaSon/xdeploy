@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
+use App\Application\Billing\Services\CloudProviderPurchasePeriodPolicy;
 use App\Application\Cloud\Actions\ResolveCloudImageForOrderAction;
 use App\Application\Cloud\Services\CloudProviderPurchaseReadinessService;
 use App\Domain\Billing\DTOs\PurchasePriceData;
@@ -25,6 +26,7 @@ final readonly class CreateOrderAction
         private ResolveCloudImageForOrderAction $resolveImage,
         private CloudProviderRegistryInterface $providers,
         private ?CloudProviderPurchaseReadinessService $purchaseReadiness = null,
+        private ?CloudProviderPurchasePeriodPolicy $purchasePeriods = null,
     ) {}
 
     public function execute(
@@ -63,6 +65,13 @@ final readonly class CreateOrderAction
                 ),
             );
         }
+
+        ($this->purchasePeriods
+            ?? app(CloudProviderPurchasePeriodPolicy::class))
+            ->assertAllowed(
+                provider: $provider,
+                period: $period,
+            );
 
         $region = trim($region);
         $sizeId = trim($sizeId);

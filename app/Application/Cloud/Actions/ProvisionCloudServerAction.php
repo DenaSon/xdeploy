@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Actions;
 
+use App\Application\Cloud\DTOs\CloudProvisioningPollingSettings;
 use App\Application\Cloud\DTOs\ProvisionCloudServerResult;
+use App\Application\Cloud\Services\CloudProvisioningPollingPolicy;
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
 use App\Domain\Cloud\Contracts\CloudProvisioningInfrastructureCatalogInterface;
+use App\Domain\Cloud\Contracts\CloudServerBootstrapCredentialSourceInterface;
 use App\Domain\Cloud\Contracts\CloudServerProvisionerInterface;
 use App\Domain\Cloud\DTOs\CloudImageData;
 use App\Domain\Cloud\DTOs\CloudNetworkData;
 use App\Domain\Cloud\DTOs\CloudRegionData;
 use App\Domain\Cloud\DTOs\CloudSecurityGroupData;
+use App\Domain\Cloud\DTOs\CloudServerBootstrapCredentialData;
 use App\Domain\Cloud\DTOs\CloudServerData;
 use App\Domain\Cloud\DTOs\CloudSizeData;
 use App\Domain\Cloud\DTOs\CreateCloudServerData;
@@ -41,15 +45,16 @@ final readonly class ProvisionCloudServerAction
         private CreateServerAction $createServer,
         private VerifyCloudServerSshReadinessAction $verifySshReadiness,
         private string $providerName = 'arvan',
-        private int $maxAttempts = 20,
-        private int $pollDelaySeconds = 3,
+        private ?int $maxAttempts = null,
+        private ?int $pollDelaySeconds = null,
         private ?CloudProviderRegistryInterface $providers = null,
+        private ?CloudProvisioningPollingPolicy $pollingPolicy = null,
     ) {
-        if ($this->maxAttempts < 1) {
+        if ($this->maxAttempts !== null && $this->maxAttempts < 1) {
             throw new InvalidArgumentException('Provisioning attempts must be greater than zero.');
         }
 
-        if ($this->pollDelaySeconds < 0) {
+        if ($this->pollDelaySeconds !== null && $this->pollDelaySeconds < 0) {
             throw new InvalidArgumentException('Provisioning poll delay cannot be negative.');
         }
 
@@ -86,6 +91,7 @@ final readonly class ProvisionCloudServerAction
         $provider = $this->resolveProviderType($provider);
         $catalog = $this->catalogFor($provider);
         $provisioner = $this->provisionerFor($provider);
+        $polling = $this->pollingSettings($provider);
 
         $this->validateSelection(
             data: $data,
@@ -95,13 +101,18 @@ final readonly class ProvisionCloudServerAction
 
         $createdServer = $provisioner->createServer($data);
         $username = $this->serverUsername($createdServer);
+        $bootstrapCredential = $this->bootstrapCredentialFor(
+            provider: $provider,
+            request: $data,
+            createdServer: $createdServer,
+        );
 
         $server = $this->persistProvisioningServer(
             user: $user,
             data: $data,
             createdServer: $createdServer,
             username: $username,
-            password: $createdServer->generatedPassword(),
+            bootstrapCredential: $bootstrapCredential,
             provider: $provider,
         );
 
@@ -119,6 +130,7 @@ final readonly class ProvisionCloudServerAction
             regionId: $data->regionId,
             providerServerId: $createdServer->id,
             provisioner: $provisioner,
+            polling: $polling,
         );
     }
 
@@ -127,17 +139,21 @@ final readonly class ProvisionCloudServerAction
         string $regionId,
         string $providerServerId,
         CloudServerProvisionerInterface $provisioner,
+        CloudProvisioningPollingSettings $polling,
     ): ProvisionCloudServerResult {
         $lastCloudServer = null;
 
-        for ($attempt = 1; $attempt <= $this->maxAttempts; $attempt++) {
+        for ($attempt = 1; $attempt <= $polling->maxAttempts; $attempt++) {
             try {
                 $cloudServer = $provisioner->findServer(
                     $regionId,
                     $providerServerId,
                 );
             } catch (CloudResourceNotFoundException) {
-                $this->waitBeforeNextAttempt($attempt);
+                $this->waitBeforeNextAttempt(
+                    attempt: $attempt,
+                    polling: $polling,
+                );
 
                 continue;
             }
@@ -171,7 +187,10 @@ final readonly class ProvisionCloudServerAction
                 );
             }
 
-            $this->waitBeforeNextAttempt($attempt);
+            $this->waitBeforeNextAttempt(
+                attempt: $attempt,
+                polling: $polling,
+            );
         }
 
         if ($lastCloudServer instanceof CloudServerData && $lastCloudServer->status->isReady()) {
@@ -187,7 +206,7 @@ final readonly class ProvisionCloudServerAction
             if (! $server->hasCredential()) {
                 throw new CloudServerNotReadyException(
                     sprintf(
-                        'Cloud server [%s] became active but its generated credential is not available yet.',
+                        'Cloud server [%s] became active but its bootstrap credential is not available yet.',
                         $providerServerId,
                     ),
                 );
@@ -198,7 +217,7 @@ final readonly class ProvisionCloudServerAction
             sprintf(
                 'Cloud server [%s] did not become ready after [%d] attempts.',
                 $providerServerId,
-                $this->maxAttempts,
+                $polling->maxAttempts,
             ),
         );
     }
@@ -208,7 +227,7 @@ final readonly class ProvisionCloudServerAction
         CreateCloudServerData $data,
         CreatedCloudServerData $createdServer,
         string $username,
-        ?string $password,
+        ?CloudServerBootstrapCredentialData $bootstrapCredential,
         CloudProviderType $provider,
     ): Server {
         try {
@@ -219,8 +238,9 @@ final readonly class ProvisionCloudServerAction
                     'host' => null,
                     'port' => 22,
                     'username' => $username,
-                    'authentication_type' => AuthenticationType::Password,
-                    'credential' => $password,
+                    'authentication_type' => $bootstrapCredential?->authenticationType
+                        ?? AuthenticationType::Password,
+                    'credential' => $bootstrapCredential?->credential(),
                     'cloud_provider' => $provider->value,
                     'cloud_server_id' => $createdServer->id,
                     'cloud_region' => trim($data->regionId),
@@ -237,6 +257,54 @@ final readonly class ProvisionCloudServerAction
                 previous: $exception,
             );
         }
+    }
+
+    private function bootstrapCredentialFor(
+        CloudProviderType $provider,
+        CreateCloudServerData $request,
+        CreatedCloudServerData $createdServer,
+    ): ?CloudServerBootstrapCredentialData {
+        $generatedPassword = $createdServer->generatedPassword();
+
+        if (is_string($generatedPassword) && $generatedPassword !== '') {
+            return new CloudServerBootstrapCredentialData(
+                authenticationType: AuthenticationType::Password,
+                credential: $generatedPassword,
+            );
+        }
+
+        if ($this->providers instanceof CloudProviderRegistryInterface) {
+            if (! $this->providers->supportsCapability(
+                provider: $provider,
+                capability: CloudServerBootstrapCredentialSourceInterface::class,
+            )) {
+                return null;
+            }
+
+            /** @var CloudServerBootstrapCredentialSourceInterface $source */
+            $source = $this->providers->resolveCapability(
+                provider: $provider,
+                capability: CloudServerBootstrapCredentialSourceInterface::class,
+            );
+
+            return $source->bootstrapCredential(
+                request: $request,
+                server: $createdServer,
+            );
+        }
+
+        foreach ([$this->provisioner, $this->catalog] as $candidate) {
+            if (! $candidate instanceof CloudServerBootstrapCredentialSourceInterface) {
+                continue;
+            }
+
+            return $candidate->bootstrapCredential(
+                request: $request,
+                server: $createdServer,
+            );
+        }
+
+        return null;
     }
 
     private function syncProviderAccessInformation(
@@ -259,7 +327,8 @@ final readonly class ProvisionCloudServerAction
         }
 
         if (
-            ! $server->hasCredential()
+            $server->authentication_type === AuthenticationType::Password
+            && ! $server->hasCredential()
             && $cloudServer->hasGeneratedPassword()
         ) {
             $attributes['credential'] = $cloudServer->generatedPassword();
@@ -305,13 +374,31 @@ final readonly class ProvisionCloudServerAction
         return $username;
     }
 
-    private function waitBeforeNextAttempt(int $attempt): void
-    {
-        if ($attempt >= $this->maxAttempts || $this->pollDelaySeconds === 0) {
+    private function pollingSettings(
+        CloudProviderType $provider,
+    ): CloudProvisioningPollingSettings {
+        $policy = $this->pollingPolicy
+            ?? new CloudProvisioningPollingPolicy();
+
+        return $policy->resolve(
+            provider: $provider,
+            maxAttemptsOverride: $this->maxAttempts,
+            pollDelaySecondsOverride: $this->pollDelaySeconds,
+        );
+    }
+
+    private function waitBeforeNextAttempt(
+        int $attempt,
+        CloudProvisioningPollingSettings $polling,
+    ): void {
+        if (
+            $attempt >= $polling->maxAttempts
+            || $polling->pollDelaySeconds === 0
+        ) {
             return;
         }
 
-        sleep($this->pollDelaySeconds);
+        sleep($polling->pollDelaySeconds);
     }
 
     private function validateSelection(

@@ -36,6 +36,7 @@ use App\Infrastructure\Cloud\CloudProviderRegistry;
 use App\Infrastructure\Cloud\Liara\LiaraCloudClient;
 use App\Infrastructure\Cloud\Liara\LiaraCloudProvider;
 use App\Infrastructure\Cloud\Liara\Mappers\LiaraCloudResponseMapper;
+use App\Infrastructure\Cloud\ParsPack\ParsPackCloudProvider;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -307,6 +308,16 @@ final class CloudServiceProvider extends ServiceProvider
 
                     if ($this->providerPurchaseEnabled(CloudProviderType::Liara)) {
                         $purchasableProviders[] = CloudProviderType::Liara->value;
+                    }
+                }
+
+                if ($this->providerEnabled(CloudProviderType::ParsPack)) {
+                    $providers[CloudProviderType::ParsPack->value] = $app->make(
+                        ParsPackCloudProvider::class,
+                    );
+
+                    if ($this->providerPurchaseEnabled(CloudProviderType::ParsPack)) {
+                        $purchasableProviders[] = CloudProviderType::ParsPack->value;
                     }
                 }
 

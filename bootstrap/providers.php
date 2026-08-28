@@ -7,6 +7,7 @@ use App\Providers\CloudObservabilityServiceProvider;
 use App\Providers\CloudServiceProvider;
 use App\Providers\CloudSnapshotServiceProvider;
 use App\Providers\CredentialSecurityServiceProvider;
+use App\Providers\ParsPackServiceProvider;
 use App\Providers\PasskeySecurityServiceProvider;
 use App\Providers\PaymentServiceProvider;
 use App\Providers\PlatformServiceProvider;
@@ -20,6 +21,7 @@ return [
     ServerServiceProvider::class,
     ApplicationServiceProvider::class,
     PlatformServiceProvider::class,
+    ParsPackServiceProvider::class,
     CloudServiceProvider::class,
     CloudHealthServiceProvider::class,
     CloudObservabilityServiceProvider::class,

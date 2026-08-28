@@ -7,6 +7,7 @@ namespace App\Livewire\Servers;
 use App\Application\Billing\Actions\CalculateCloudPurchasePriceAction;
 use App\Application\Billing\Actions\CreateOrderAction;
 use App\Application\Billing\Actions\CreatePaymentAction;
+use App\Application\Billing\Services\CloudProviderPurchasePeriodPolicy;
 use App\Application\Cloud\Actions\FilterSupportedCloudImagesAction;
 use App\Application\Cloud\Services\CloudProviderPurchaseReadinessService;
 use App\Domain\Billing\DTOs\PurchasePriceData;
@@ -120,7 +121,7 @@ final class Buy extends Component
     public bool $catalogLoaded = false;
 
     /**
-     * Public presentation code such as core-1/core-2.
+     * Public presentation code such as core-1/core-2/core-3.
      * Canonical provider identity never crosses this Livewire boundary.
      */
     public string $provider = '';
@@ -210,6 +211,7 @@ final class Buy extends Component
             $this->pendingOrderId = null;
             $this->catalogLoaded = true;
             $this->resetCatalogSelection();
+            $this->loadPeriods();
             $this->catalogLoaded = true;
             $this->catalogError =
                 'ارائه‌دهنده انتخاب‌شده دیگر برای خرید جدید در دسترس نیست.';
@@ -286,6 +288,7 @@ final class Buy extends Component
         $this->pendingOrderId = null;
         $this->catalogLoaded = false;
         $this->resetCatalogSelection();
+        $this->loadPeriods();
 
         $this->fetchCatalog();
     }
@@ -932,20 +935,55 @@ final class Buy extends Component
 
     private function loadPeriods(): void
     {
-        $configuredPeriods = (array) config(
+        $this->periods = [];
+        $this->period = '';
+
+        if ($this->provider === '') {
+            return;
+        }
+
+        $provider = CloudProviderPublicIdentity::provider(
+            $this->provider,
+        );
+
+        if (! $provider instanceof CloudProviderType) {
+            throw new CloudConfigurationException(
+                sprintf(
+                    'Selected public cloud provider [%s] is invalid.',
+                    $this->provider,
+                ),
+            );
+        }
+
+        $configuredPeriods = config(
             'money.periods',
             [],
         );
 
-        $this->periods = [];
+        if (! is_array($configuredPeriods)) {
+            throw new CloudConfigurationException(
+                'Cloud purchase period catalog must be an array.',
+            );
+        }
 
-        foreach (
-            $configuredPeriods as $id => $config
-        ) {
-            if (
-                ! is_string($id)
-                || ! is_array($config)
-            ) {
+        $allowedPeriodIds = app(
+            CloudProviderPurchasePeriodPolicy::class,
+        )->allowedPeriodIds(
+            $provider,
+        );
+
+        $preferredPeriodId = in_array(
+            '14_days',
+            $allowedPeriodIds,
+            true,
+        )
+            ? '14_days'
+            : ($allowedPeriodIds[0] ?? '');
+
+        foreach ($allowedPeriodIds as $id) {
+            $config = $configuredPeriods[$id] ?? null;
+
+            if (! is_array($config)) {
                 continue;
             }
 
@@ -961,13 +999,13 @@ final class Buy extends Component
                 'hint' => $this->periodHint(
                     $id,
                 ),
-                'recommended' => $id === '14_days',
+                'recommended' => $id === $preferredPeriodId,
             ];
         }
 
         $preferred = $this->findById(
             $this->periods,
-            '14_days',
+            $preferredPeriodId,
         );
 
         $this->period =
@@ -1382,6 +1420,8 @@ final class Buy extends Component
     ): string {
         return match ($period) {
             '2_days' => 'مناسب آزمایش کوتاه',
+
+            '7_days' => 'مناسب استفاده هفتگی',
 
             '14_days' => 'مناسب استفاده کوتاه',
 

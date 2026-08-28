@@ -56,5 +56,11 @@ final class CloudProviderPublicIdentityTest extends TestCase
             'core-2',
             'Core-2',
         ];
+
+        yield 'parspack' => [
+            CloudProviderType::ParsPack,
+            'core-3',
+            'Core-3',
+        ];
     }
 }
