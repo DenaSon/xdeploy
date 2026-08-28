@@ -23,6 +23,8 @@ final readonly class ParsPackCloudResponseMapper
 {
     private const string CURRENCY = 'IRR';
 
+    private const int TOMAN_TO_RIAL = 10;
+
     private const string DEFAULT_USERNAME = 'root';
 
     /** @return list<CloudRegionData> */
@@ -84,12 +86,18 @@ final readonly class ParsPackCloudResponseMapper
                 diskGiB: $this->positiveInt($size['disk'] ?? null, 'disk'),
                 category: 'parspack',
                 hourlyPrice: new CloudPriceData(
-                    amount: $this->decimalString($size['price_hourly'] ?? null, 'price_hourly'),
+                    amount: $this->tomanToRial(
+                        $size['price_hourly'] ?? null,
+                        'price_hourly',
+                    ),
                     currencyCode: self::CURRENCY,
                     billingPeriod: CloudBillingPeriod::Hourly,
                 ),
                 monthlyPrice: new CloudPriceData(
-                    amount: $this->decimalString($size['price_monthly'] ?? null, 'price_monthly'),
+                    amount: $this->tomanToRial(
+                        $size['price_monthly'] ?? null,
+                        'price_monthly',
+                    ),
                     currencyCode: self::CURRENCY,
                     billingPeriod: CloudBillingPeriod::Monthly,
                 ),
@@ -630,6 +638,42 @@ final readonly class ParsPackCloudResponseMapper
         }
 
         return $value;
+    }
+
+    private function tomanToRial(mixed $value, string $field): string
+    {
+        $amount = $this->decimalString($value, $field);
+        [$whole, $fraction] = array_pad(
+            explode('.', $amount, 2),
+            2,
+            '',
+        );
+
+        $decimalPlaces = strlen($fraction);
+        $digits = ltrim($whole.$fraction, '0');
+        $digits = ($digits === '' ? '0' : $digits)
+            .str_repeat('0', strlen((string) self::TOMAN_TO_RIAL) - 1);
+
+        if ($decimalPlaces === 0) {
+            return ltrim($digits, '0') ?: '0';
+        }
+
+        if (strlen($digits) <= $decimalPlaces) {
+            $digits = str_pad(
+                $digits,
+                $decimalPlaces + 1,
+                '0',
+                STR_PAD_LEFT,
+            );
+        }
+
+        $split = strlen($digits) - $decimalPlaces;
+        $integer = ltrim(substr($digits, 0, $split), '0') ?: '0';
+        $fraction = rtrim(substr($digits, $split), '0');
+
+        return $fraction === ''
+            ? $integer
+            : $integer.'.'.$fraction;
     }
 
     private function dateTime(mixed $value): ?DateTimeImmutable
