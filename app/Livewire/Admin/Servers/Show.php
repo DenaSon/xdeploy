@@ -6,6 +6,7 @@ namespace App\Livewire\Admin\Servers;
 
 use App\Application\Server\Actions\RecordSupportAccessAction;
 use App\Application\Server\Actions\TestSupportConnectionAction;
+use App\Application\Server\Actions\UpdateServerConnectionHostAction;
 use App\Domain\Server\Enums\SupportAccessAction;
 use App\Models\Order;
 use App\Models\Server;
@@ -25,6 +26,10 @@ final class Show extends Component
 {
     public Server $server;
 
+    public string $newHost = '';
+
+    public string $hostUpdateReason = '';
+
     public string $supportReason = '';
 
     public bool $supportAccessConfirmed = false;
@@ -36,6 +41,7 @@ final class Show extends Component
     public function mount(Server $adminServer): void
     {
         $this->server = $adminServer;
+        $this->newHost = (string) $adminServer->host;
 
         $this->supportAccessConfirmed = app(
             AdminSupportAccessSession::class,
@@ -43,6 +49,51 @@ final class Show extends Component
             admin: $this->adminUser(),
             server: $this->server,
         );
+    }
+
+    public function updateServerConnectionHost(
+        UpdateServerConnectionHostAction $updateHost,
+    ): void {
+        $this->newHost = trim($this->newHost);
+        $this->hostUpdateReason = trim($this->hostUpdateReason);
+
+        $validated = $this->validate(
+            [
+                'newHost' => [
+                    'required',
+                    'string',
+                    'ipv4',
+                    'max:45',
+                ],
+                'hostUpdateReason' => [
+                    'required',
+                    'string',
+                    'min:5',
+                    'max:500',
+                ],
+            ],
+            [
+                'newHost.required' => 'آدرس IP جدید را وارد کنید.',
+                'newHost.ipv4' => 'آدرس واردشده باید یک IPv4 معتبر باشد.',
+                'hostUpdateReason.required' => 'دلیل تغییر IP را وارد کنید.',
+                'hostUpdateReason.min' => 'دلیل تغییر IP باید حداقل ۵ کاراکتر باشد.',
+            ],
+        );
+
+        $updatedServer = $updateHost->handle(
+            admin: $this->adminUser(),
+            server: $this->server,
+            newHost: $validated['newHost'],
+            reason: $validated['hostUpdateReason'],
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
+
+        $this->server = $updatedServer;
+        $this->newHost = (string) $updatedServer->host;
+        $this->hostUpdateReason = '';
+        $this->connectionTestPassed = null;
+        $this->connectionTestMessage = null;
     }
 
     public function prepareSupportPasskeyVerification(
@@ -112,6 +163,11 @@ final class Show extends Component
                 'supportAccessLogs' => SupportAccessLog::query()
                     ->with('adminUser')
                     ->where('server_id', $server->getKey())
+                    ->whereIn('action', [
+                        SupportAccessAction::SshConnectionTest->value,
+                        SupportAccessAction::PasskeyConfirmed->value,
+                        SupportAccessAction::CredentialRevealed->value,
+                    ])
                     ->latest('id')
                     ->limit(10)
                     ->get(),

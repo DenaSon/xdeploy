@@ -9,4 +9,5 @@ enum SupportAccessAction: string
     case SshConnectionTest = 'ssh_connection_test';
     case PasskeyConfirmed = 'passkey_confirmed';
     case CredentialRevealed = 'credential_revealed';
+    case ConnectionHostUpdated = 'connection_host_updated';
 }
