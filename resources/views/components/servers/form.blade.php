@@ -84,8 +84,10 @@
                     type="button"
                     wire:click="selectAuthenticationType('password')"
                     aria-pressed="{{ $authenticationType === 'password' ? 'true' : 'false' }}"
+                    aria-label="رمز عبور — ورود SSH با رمز عبور کاربر سرور"
+                    data-tip="ورود SSH با رمز عبور کاربر سرور."
                     @class([
-                        'flex min-h-20 items-start gap-3 rounded-xl border p-3.5 text-right transition',
+                        'tooltip tooltip-bottom flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-right transition',
                         'border-primary/35 bg-primary/5 ring-1 ring-primary/10' => $authenticationType === 'password',
                         'border-base-300 bg-base-100 hover:border-base-content/20 hover:bg-base-200/30' => $authenticationType !== 'password',
                     ])
@@ -103,14 +105,8 @@
                         />
                     </span>
 
-                    <span class="min-w-0">
-                        <span class="block text-sm font-medium text-base-content/80">
-                            رمز عبور
-                        </span>
-
-                        <span class="mt-1 block text-xs leading-5 text-base-content/45">
-                            ورود SSH با رمز عبور کاربر سرور.
-                        </span>
+                    <span class="min-w-0 text-sm font-medium text-base-content/80">
+                        رمز عبور
                     </span>
                 </button>
 
@@ -118,8 +114,10 @@
                     type="button"
                     wire:click="selectAuthenticationType('ssh_key')"
                     aria-pressed="{{ $authenticationType === 'ssh_key' ? 'true' : 'false' }}"
+                    aria-label="کلید خصوصی SSH — مناسب سرورهایی که ورود با رمز عبور غیرفعال است"
+                    data-tip="مناسب سرورهایی که ورود با رمز عبور غیرفعال است."
                     @class([
-                        'flex min-h-20 items-start gap-3 rounded-xl border p-3.5 text-right transition',
+                        'tooltip tooltip-bottom flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-right transition',
                         'border-primary/35 bg-primary/5 ring-1 ring-primary/10' => $authenticationType === 'ssh_key',
                         'border-base-300 bg-base-100 hover:border-base-content/20 hover:bg-base-200/30' => $authenticationType !== 'ssh_key',
                     ])
@@ -137,14 +135,8 @@
                         />
                     </span>
 
-                    <span class="min-w-0">
-                        <span class="block text-sm font-medium text-base-content/80">
-                            کلید خصوصی SSH
-                        </span>
-
-                        <span class="mt-1 block text-xs leading-5 text-base-content/45">
-                            مناسب سرورهایی که ورود با رمز عبور غیرفعال است.
-                        </span>
+                    <span class="min-w-0 text-sm font-medium text-base-content/80">
+                        کلید خصوصی SSH
                     </span>
                 </button>
             </div>
