@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
+use App\Application\Notifications\Actions\SendTelegramNotificationOnceAction;
 use App\Application\User\Events\UserRegistered;
 use App\Models\User;
 use App\Notifications\Admin\AdminUserRegisteredNotification;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 final class SendAdminUserRegisteredNotification implements ShouldQueueAfterCommit
@@ -17,6 +17,10 @@ final class SendAdminUserRegisteredNotification implements ShouldQueueAfterCommi
     use InteractsWithQueue;
 
     public int $tries = 3;
+
+    public function __construct(
+        private readonly SendTelegramNotificationOnceAction $sendOnce,
+    ) {}
 
     /** @return list<int> */
     public function backoff(): array
@@ -49,13 +53,22 @@ final class SendAdminUserRegisteredNotification implements ShouldQueueAfterCommi
             return;
         }
 
-        Notification::send(
-            $admins,
-            new AdminUserRegisteredNotification(
-                userId: (int) $user->getKey(),
-                phone: (string) $user->phone,
-            ),
+        $notification = new AdminUserRegisteredNotification(
+            userId: (int) $user->getKey(),
+            phone: (string) $user->phone,
         );
+
+        foreach ($admins as $admin) {
+            $this->sendOnce->execute(
+                user: $admin,
+                dedupeKey: sprintf(
+                    'admin:user-registered:%d:recipient:%d',
+                    $user->getKey(),
+                    $admin->getKey(),
+                ),
+                notification: $notification,
+            );
+        }
     }
 
     public function failed(
