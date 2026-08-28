@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use App\Application\Billing\Events\PaymentStatusChanged;
+use App\Application\Notifications\Actions\SendTelegramNotificationOnceAction;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\Payment;
@@ -12,7 +13,6 @@ use App\Models\User;
 use App\Notifications\Admin\AdminPaymentSucceededNotification;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 final class SendAdminPaymentSucceededNotification implements ShouldQueueAfterCommit
@@ -20,6 +20,10 @@ final class SendAdminPaymentSucceededNotification implements ShouldQueueAfterCom
     use InteractsWithQueue;
 
     public int $tries = 3;
+
+    public function __construct(
+        private readonly SendTelegramNotificationOnceAction $sendOnce,
+    ) {}
 
     /** @return list<int> */
     public function backoff(): array
@@ -68,15 +72,24 @@ final class SendAdminPaymentSucceededNotification implements ShouldQueueAfterCom
             return;
         }
 
-        Notification::send(
-            $admins,
-            new AdminPaymentSucceededNotification(
-                paymentId: (int) $payment->getKey(),
-                orderId: (int) $order->getKey(),
-                userId: (int) $order->user_id,
-                amount: (int) $payment->amount,
-            ),
+        $notification = new AdminPaymentSucceededNotification(
+            paymentId: (int) $payment->getKey(),
+            orderId: (int) $order->getKey(),
+            userId: (int) $order->user_id,
+            amount: (int) $payment->amount,
         );
+
+        foreach ($admins as $admin) {
+            $this->sendOnce->execute(
+                user: $admin,
+                dedupeKey: sprintf(
+                    'admin:payment:%d:paid:recipient:%d',
+                    $payment->getKey(),
+                    $admin->getKey(),
+                ),
+                notification: $notification,
+            );
+        }
     }
 
     public function failed(
