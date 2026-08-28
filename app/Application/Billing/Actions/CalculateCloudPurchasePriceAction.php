@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Billing\Actions;
 
+use App\Application\Billing\Services\CloudProviderPurchasePeriodPolicy;
 use App\Domain\Billing\DTOs\PurchasePriceData;
 use App\Domain\Billing\Services\CloudPricingCalculator;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
@@ -25,6 +26,7 @@ final readonly class CalculateCloudPurchasePriceAction
         private ?CloudProviderRegistryInterface $providers = null,
         private ?CloudProviderInterface $cloud = null,
         private ?CloudServerResizeCatalogInterface $pricing = null,
+        private ?CloudProviderPurchasePeriodPolicy $purchasePeriods = null,
     ) {}
 
     public function execute(
@@ -34,6 +36,11 @@ final readonly class CalculateCloudPurchasePriceAction
         string $period,
         CloudProviderType $provider = CloudProviderType::Arvan,
     ): PurchasePriceData {
+        $this->assertPurchasePeriod(
+            provider: $provider,
+            period: $period,
+        );
+
         [
             $cloud,
             $pricing,
@@ -90,6 +97,11 @@ final readonly class CalculateCloudPurchasePriceAction
         string $period,
         CloudProviderType $provider = CloudProviderType::Arvan,
     ): PurchasePriceData {
+        $this->assertPurchasePeriod(
+            provider: $provider,
+            period: $period,
+        );
+
         [$cloud, $pricing] = $this->providerDependencies(
             $provider,
         );
@@ -222,6 +234,18 @@ final readonly class CalculateCloudPurchasePriceAction
             finalAmount: $result['final_amount'],
             currency: $result['currency'],
         );
+    }
+
+    private function assertPurchasePeriod(
+        CloudProviderType $provider,
+        string $period,
+    ): void {
+        ($this->purchasePeriods
+            ?? app(CloudProviderPurchasePeriodPolicy::class))
+            ->assertAllowed(
+                provider: $provider,
+                period: $period,
+            );
     }
 
     /**
