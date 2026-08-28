@@ -115,7 +115,7 @@
             button="افزودن سرور"
             :require-verified-connection="true"
             :connection-verified="$this->connectionIsVerified()"
-
+            :authentication-type="$authenticationType"
         />
 
     </section>
