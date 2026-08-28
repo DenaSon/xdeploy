@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Application\Server\Actions\CreateServerAction;
-use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Livewire\Concerns\HasServerForm;
 use App\Livewire\Concerns\TestsServerConnection;
@@ -30,7 +29,7 @@ final class Create extends Component
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     protected function rules(): array
     {
@@ -42,7 +41,9 @@ final class Create extends Component
     public function save(
         CreateServerAction $action,
     ): mixed {
-        $data = $this->validate();
+        $data = $this->normalizeServerFormData(
+            $this->validate(),
+        );
 
         if (! $this->connectionIsVerified()) {
             $this->error(
@@ -63,9 +64,6 @@ final class Create extends Component
         }
 
         $user = $this->authenticatedUser();
-
-        $data['authentication_type'] =
-            AuthenticationType::Password->value;
 
         $server = $action->handle(
             user: $user,
