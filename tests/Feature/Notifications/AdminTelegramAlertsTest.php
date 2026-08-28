@@ -78,14 +78,25 @@ final class AdminTelegramAlertsTest extends TestCase
             ),
         );
 
+        $assertRegistrationNotification = static fn (AdminUserRegisteredNotification $notification): bool => $notification->telegramTopic() === NotificationTopic::Account
+            && $notification->via(new \stdClass()) === [TelegramChannel::class];
+
         Notification::assertSentTo(
-            [$adminA, $adminB],
+            $adminA,
             AdminUserRegisteredNotification::class,
-            static fn (AdminUserRegisteredNotification $notification): bool => $notification->telegramTopic() === NotificationTopic::Account
-                && $notification->via(new \stdClass()) === [TelegramChannel::class],
+            $assertRegistrationNotification,
+        );
+        Notification::assertSentTo(
+            $adminB,
+            AdminUserRegisteredNotification::class,
+            $assertRegistrationNotification,
         );
         Notification::assertNotSentTo(
-            [$nonAdmin, $registered],
+            $nonAdmin,
+            AdminUserRegisteredNotification::class,
+        );
+        Notification::assertNotSentTo(
+            $registered,
             AdminUserRegisteredNotification::class,
         );
 
@@ -130,7 +141,11 @@ final class AdminTelegramAlertsTest extends TestCase
             1,
         );
         Notification::assertNotSentTo(
-            [$customer, $otherUser],
+            $customer,
+            AdminPaymentSucceededNotification::class,
+        );
+        Notification::assertNotSentTo(
+            $otherUser,
             AdminPaymentSucceededNotification::class,
         );
 
