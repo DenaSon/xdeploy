@@ -23,6 +23,12 @@ final class CloudPricingCalculatorTest extends TestCase
                 'pricing' => 'hourly',
             ],
 
+            '7_days' => [
+                'label' => '۷ روزه',
+                'hours' => 168,
+                'pricing' => 'hourly',
+            ],
+
             '14_days' => [
                 'label' => '۱۴ روزه',
                 'hours' => 336,
@@ -74,6 +80,23 @@ final class CloudPricingCalculatorTest extends TestCase
             'IRR',
             $result['currency'],
         );
+    }
+
+    public function test_it_preserves_decimal_hourly_prices_until_the_period_total(): void
+    {
+        $result = $this->calculator()->calculate(
+            baseHourlyPrice: '17312.5',
+            baseMonthlyPrice: '12469200',
+            defaultDiskHourlyPrice: '0',
+            defaultDiskMonthlyPrice: '0',
+            selectedDiskHourlyPrice: '0',
+            selectedDiskMonthlyPrice: '0',
+            period: '7_days',
+        );
+
+        $this->assertSame(168, $result['duration_hours']);
+        $this->assertSame('2908500', $result['provider_cost']);
+        $this->assertSame('4653600', $result['final_amount']);
     }
 
     public function test_it_adds_only_extra_disk_cost_to_base_plan(): void
