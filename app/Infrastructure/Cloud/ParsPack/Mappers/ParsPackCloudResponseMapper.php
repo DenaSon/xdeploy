@@ -22,6 +22,7 @@ use Throwable;
 final readonly class ParsPackCloudResponseMapper
 {
     private const string CURRENCY = 'IRR';
+
     private const string DEFAULT_USERNAME = 'root';
 
     /** @return list<CloudRegionData> */
@@ -145,7 +146,10 @@ final readonly class ParsPackCloudResponseMapper
                 version: $version,
                 architecture: $this->imageArchitecture($image, $slug),
                 minDiskGiB: $this->optionalPositiveInt(
-                    $image['min_disk'] ?? $image['min_disk_gib'] ?? null,
+                    $image['min_disk_size']
+                        ?? $image['min_disk']
+                        ?? $image['min_disk_gib']
+                        ?? null,
                 ),
                 minMemoryMiB: $this->optionalPositiveInt(
                     $image['min_memory'] ?? $image['min_memory_mib'] ?? null,
@@ -160,58 +164,61 @@ final readonly class ParsPackCloudResponseMapper
 
     public function mapCreatedServer(array $response): CreatedCloudServerData
     {
-        $id = $this->requiredString($response, 'id');
+        $vm = $this->vmPayload($response);
+        $id = $this->requiredString($vm, 'id');
         $this->assertServerId($id);
 
         return new CreatedCloudServerData(
             id: $id,
-            name: $this->requiredString($response, 'name'),
-            regionId: $this->embeddedSlug($response['region'] ?? null, 'region'),
-            status: $this->mapStatus($this->requiredString($response, 'status')),
+            name: $this->requiredString($vm, 'name'),
+            regionId: $this->embeddedSlug($vm['region'] ?? null, 'region'),
+            status: $this->mapStatus($this->requiredString($vm, 'status')),
             username: self::DEFAULT_USERNAME,
-            createdAt: $this->dateTime($response['created_at'] ?? null),
+            createdAt: $this->dateTime($vm['created_at'] ?? null),
             generatedPassword: null,
         );
     }
 
     public function mapServer(array $response, string $region): CloudServerData
     {
-        $id = $this->requiredString($response, 'id');
+        $vm = $this->vmPayload($response);
+        $id = $this->requiredString($vm, 'id');
         $this->assertServerId($id);
-        $status = strtolower($this->requiredString($response, 'status'));
-        $size = $this->embeddedObject($response['size'] ?? null);
-        $image = $this->embeddedObject($response['image'] ?? null);
-        $vpcUuid = $this->optionalScalarString($response['vpc_uuid'] ?? null);
+        $status = strtolower($this->requiredString($vm, 'status'));
+        $size = $this->embeddedObject($vm['size'] ?? null);
+        $image = $this->embeddedObject($vm['image'] ?? null);
+        $vpcUuid = $this->optionalScalarString($vm['vpc_uuid'] ?? null);
 
         return new CloudServerData(
             id: $id,
-            name: $this->requiredString($response, 'name'),
+            name: $this->requiredString($vm, 'name'),
             regionId: $this->embeddedSlugOrFallback(
-                $response['region'] ?? null,
+                $vm['region'] ?? null,
                 'region',
                 $region,
             ),
             status: $this->mapStatus($status),
             username: self::DEFAULT_USERNAME,
-            sizeId: $size === null ? null : $this->optionalString($size['slug'] ?? null),
+            sizeId: $this->optionalString($vm['size_slug'] ?? null)
+                ?? ($size === null ? null : $this->optionalString($size['slug'] ?? null)),
             imageId: $image === null ? null : $this->optionalString($image['slug'] ?? null),
-            createdAt: $this->dateTime($response['created_at'] ?? null),
-            addresses: $this->mapAddresses($response['networks'] ?? []),
+            createdAt: $this->dateTime($vm['created_at'] ?? null),
+            addresses: $this->mapAddresses($vm['networks'] ?? []),
             networkIds: $vpcUuid === null ? [] : [$vpcUuid],
             securityGroupIds: [],
             volumeBacked: false,
             highAvailability: false,
             sizeName: $size === null ? null : $this->optionalString($size['slug'] ?? null),
             vCpu: $this->optionalPositiveInt(
-                $response['vcpus'] ?? ($size['vcpus'] ?? null),
+                $vm['vcpus'] ?? ($size['vcpus'] ?? null),
             ),
             memoryMiB: $this->optionalPositiveInt(
-                $response['memory'] ?? ($size['memory'] ?? null),
+                $vm['memory'] ?? ($size['memory'] ?? null),
             ),
             diskGiB: $this->optionalPositiveInt(
-                $response['disk'] ?? ($size['disk'] ?? null),
+                $vm['disk'] ?? ($size['disk'] ?? null),
             ),
-            taskState: $this->actionStatus($response['action'] ?? null),
+            taskState: $this->actionStatus($vm['action'] ?? null),
             providerError: null,
             powerState: $this->mapPowerState($status),
             generatedPassword: null,
@@ -223,7 +230,7 @@ final readonly class ParsPackCloudResponseMapper
     {
         $servers = [];
 
-        foreach ($this->dataList($response, 'VM') as $server) {
+        foreach ($this->dataList($response, 'vm') as $server) {
             if (! is_array($server)) {
                 throw $this->unexpected('ParsPack VM inventory contains an invalid entry.');
             }
@@ -238,18 +245,27 @@ final readonly class ParsPackCloudResponseMapper
     /** @return list<CloudServerAddressData> */
     private function mapAddresses(mixed $value): array
     {
-        if (! is_array($value) || ! array_is_list($value)) {
-            throw $this->unexpected('ParsPack VM network list is invalid.');
+        if (! is_array($value)) {
+            throw $this->unexpected('ParsPack VM network payload is invalid.');
         }
+
+        if ($value === []) {
+            return [];
+        }
+
+        $networks = array_is_list($value)
+            ? $value
+            : $this->flattenNetworkFamilies($value);
 
         $addresses = [];
 
-        foreach ($value as $network) {
+        foreach ($networks as $network) {
             if (! is_array($network)) {
                 throw $this->unexpected('ParsPack VM network entry is invalid.');
             }
 
-            $address = $this->optionalString($network['ip'] ?? null)
+            $address = $this->optionalString($network['ip_address'] ?? null)
+                ?? $this->optionalString($network['ip'] ?? null)
                 ?? $this->optionalString($network['address'] ?? null);
 
             if ($address === null) {
@@ -281,6 +297,31 @@ final readonly class ParsPackCloudResponseMapper
         return $addresses;
     }
 
+    /**
+     * @param  array<string, mixed>  $families
+     * @return list<mixed>
+     */
+    private function flattenNetworkFamilies(array $families): array
+    {
+        $networks = [];
+
+        foreach ($families as $family => $entries) {
+            if (! in_array(strtolower((string) $family), ['v4', 'v6'], true)) {
+                continue;
+            }
+
+            if (! is_array($entries) || ! array_is_list($entries)) {
+                throw $this->unexpected('ParsPack VM network family payload is invalid.');
+            }
+
+            foreach ($entries as $entry) {
+                $networks[] = $entry;
+            }
+        }
+
+        return $networks;
+    }
+
     private function mapStatus(string $status): CloudServerStatus
     {
         return match (strtolower(trim($status))) {
@@ -309,15 +350,50 @@ final readonly class ParsPackCloudResponseMapper
             return $response;
         }
 
-        $data = $response['data'] ?? null;
+        $resource = strtolower(trim($resource));
+        $collectionKey = match ($resource) {
+            'region' => 'regions',
+            'size' => 'sizes',
+            'image' => 'images',
+            'vm' => 'vms',
+            default => null,
+        };
 
-        if (! is_array($data) || ! array_is_list($data)) {
-            throw $this->unexpected(
-                sprintf('ParsPack %s payload does not contain a data list.', $resource),
-            );
+        foreach (array_filter([$collectionKey, 'data']) as $key) {
+            if (! array_key_exists($key, $response)) {
+                continue;
+            }
+
+            $data = $response[$key];
+
+            if (! is_array($data) || ! array_is_list($data)) {
+                throw $this->unexpected(
+                    sprintf('ParsPack %s collection [%s] is invalid.', $resource, $key),
+                );
+            }
+
+            return $data;
         }
 
-        return $data;
+        throw $this->unexpected(
+            sprintf('ParsPack %s payload does not contain a list.', $resource),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function vmPayload(array $response): array
+    {
+        if (! array_key_exists('vm', $response)) {
+            return $response;
+        }
+
+        $vm = $response['vm'];
+
+        if (! is_array($vm) || array_is_list($vm)) {
+            throw $this->unexpected('ParsPack VM payload wrapper is invalid.');
+        }
+
+        return $vm;
     }
 
     /** @param array<string, mixed> $size */
