@@ -16,19 +16,12 @@ final readonly class CloudProviderPurchasePeriodPolicy
     public function allowedPeriodIds(
         CloudProviderType $provider,
     ): array {
-        $periodCatalog = config('money.periods', []);
         $configured = config(
             sprintf(
                 'cloud_purchase.periods.%s',
                 $provider->value,
             ),
         );
-
-        if (! is_array($periodCatalog)) {
-            throw new CloudConfigurationException(
-                'Cloud purchase period catalog must be an array.',
-            );
-        }
 
         if (! is_array($configured) || ! array_is_list($configured)) {
             throw new CloudConfigurationException(
@@ -52,17 +45,6 @@ final readonly class CloudProviderPurchasePeriodPolicy
             }
 
             $period = trim($period);
-
-            if (! isset($periodCatalog[$period]) || ! is_array($periodCatalog[$period])) {
-                throw new CloudConfigurationException(
-                    sprintf(
-                        'Cloud provider [%s] references unknown purchase period [%s].',
-                        $provider->value,
-                        $period,
-                    ),
-                );
-            }
-
             $periods[$period] = $period;
         }
 
