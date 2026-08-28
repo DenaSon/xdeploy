@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Models\Server;
+use Illuminate\Validation\Rule;
 
 trait HasServerForm
 {
@@ -16,8 +18,10 @@ trait HasServerForm
 
     public string $credential = '';
 
+    public string $authenticationType = AuthenticationType::Password->value;
+
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     protected function serverRules(
         bool $requireCredential = true,
@@ -47,7 +51,34 @@ trait HasServerForm
                     : 'nullable',
                 'string',
             ],
+
+            'authenticationType' => [
+                'required',
+                Rule::in(
+                    array_map(
+                        static fn (AuthenticationType $type): string => $type->value,
+                        AuthenticationType::supportedCases(),
+                    ),
+                ),
+            ],
         ];
+    }
+
+    /**
+     * Convert Livewire-facing state to the canonical Server attribute shape.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function normalizeServerFormData(array $data): array
+    {
+        $data['authentication_type'] = $data['authenticationType'];
+
+        unset(
+            $data['authenticationType'],
+        );
+
+        return $data;
     }
 
     protected function serverAlreadyExists(
@@ -81,7 +112,8 @@ trait HasServerForm
      * @param array{
      *     host: string,
      *     port: int,
-     *     username: string
+     *     username: string,
+     *     authentication_type?: AuthenticationType|string,
      * } $data
      */
     protected function fillServerForm(
@@ -92,6 +124,13 @@ trait HasServerForm
             'port' => $data['port'],
             'username' => $data['username'],
         ]);
+
+        $authenticationType = $data['authentication_type']
+            ?? AuthenticationType::Password;
+
+        $this->authenticationType = $authenticationType instanceof AuthenticationType
+            ? $authenticationType->value
+            : AuthenticationType::from($authenticationType)->value;
 
         /*
          * Never expose the existing decrypted credential

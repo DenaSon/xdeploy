@@ -23,7 +23,11 @@ enum AuthenticationType: string
 
     public function isSupported(): bool
     {
-        return $this === self::Password;
+        return match ($this) {
+            self::Password,
+            self::SSHKey => true,
+            self::Agent => false,
+        };
     }
 
     /**

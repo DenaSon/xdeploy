@@ -1,6 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Application\Server\Data;
+
+use App\Domain\Server\Enums\AuthenticationType;
 
 final readonly class TestServerConnectionData
 {
@@ -9,6 +13,7 @@ final readonly class TestServerConnectionData
         public int $port,
         public string $username,
         public string $credential,
+        public AuthenticationType $authenticationType = AuthenticationType::Password,
     ) {}
 
     /**
@@ -17,6 +22,7 @@ final readonly class TestServerConnectionData
      *     port: int,
      *     username: string,
      *     credential: string,
+     *     authentication_type?: string,
      * } $data
      */
     public static function from(array $data): self
@@ -26,6 +32,10 @@ final readonly class TestServerConnectionData
             port: $data['port'],
             username: $data['username'],
             credential: $data['credential'],
+            authenticationType: AuthenticationType::from(
+                $data['authentication_type']
+                    ?? AuthenticationType::Password->value,
+            ),
         );
     }
 }

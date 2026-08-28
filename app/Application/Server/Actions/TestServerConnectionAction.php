@@ -6,7 +6,6 @@ namespace App\Application\Server\Actions;
 
 use App\Application\Server\Data\TestServerConnectionData;
 use App\Application\Server\Data\TestServerConnectionResult;
-use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Exceptions\RootPrivilegesRequiredException;
 use App\Domain\Server\Exceptions\UnsupportedOperatingSystemException;
 use App\Domain\Server\Services\PrivilegedExecutionPreflight;
@@ -76,7 +75,7 @@ final readonly class TestServerConnectionAction
             'port' => $data->port,
             'username' => $data->username,
             'credential' => $data->credential,
-            'authentication_type' => AuthenticationType::Password,
+            'authentication_type' => $data->authenticationType,
         ]);
     }
 }

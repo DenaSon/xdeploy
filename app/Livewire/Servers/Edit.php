@@ -40,6 +40,7 @@ final class Edit extends Component
                 'host',
                 'port',
                 'username',
+                'authentication_type',
             ]),
         );
     }
@@ -48,7 +49,7 @@ final class Edit extends Component
      * Host remains in validation because the connection-test workflow
      * requires it, but update() never persists it.
      *
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     protected function rules(): array
     {
