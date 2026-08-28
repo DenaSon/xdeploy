@@ -225,7 +225,7 @@
                                         <x-icon
                                             :name="! $isAvailable
                                                 ? 'lucide.circle-off'
-                                                : ($isSelected ? 'lucide.check' : 'lucide.cloud')"
+                                                : 'lucide.mountain'"
                                             class="!size-3.5"
                                         />
                                     </span>
@@ -245,6 +245,20 @@
                                         <span class="truncate">
                                             {{ $providerOption['label'] }}
                                         </span>
+
+                                        @if($isSelected && $isAvailable)
+                                            <span
+                                                class="
+                                                    shrink-0 rounded-md
+                                                    bg-primary-content/15
+                                                    px-1.5 py-0.5
+                                                    text-[9px] font-medium
+                                                    text-primary-content
+                                                "
+                                            >
+                                                انتخاب‌شده
+                                            </span>
+                                        @endif
 
                                         @if(! $isAvailable)
                                             <span
@@ -271,7 +285,7 @@
                                         @if(! $isAvailable)
                                             خرید جدید از این زیرساخت فعلاً در دسترس نیست.
                                         @else
-                                            {{ $isSelected ? 'انتخاب‌شده' : 'انتخاب زیرساخت' }}
+                                            {{ $providerOption['description'] }}
                                         @endif
                                     </div>
                                 </div>
