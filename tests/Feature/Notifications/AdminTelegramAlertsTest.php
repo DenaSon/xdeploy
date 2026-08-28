@@ -57,7 +57,7 @@ final class AdminTelegramAlertsTest extends TestCase
         );
     }
 
-    public function test_registration_alert_targets_admins_only_and_masks_phone(): void
+    public function test_registration_alert_targets_admins_only_masks_phone_and_is_idempotent(): void
     {
         Notification::fake();
 
@@ -72,15 +72,27 @@ final class AdminTelegramAlertsTest extends TestCase
             'phone' => '09123456789',
         ]);
 
-        app(SendAdminUserRegisteredNotification::class)->handle(
-            new UserRegistered(
-                userId: (int) $registered->getKey(),
-            ),
+        $event = new UserRegistered(
+            userId: (int) $registered->getKey(),
         );
+        $listener = app(SendAdminUserRegisteredNotification::class);
+
+        $listener->handle($event);
+        $listener->handle($event);
 
         $assertRegistrationNotification = static fn (AdminUserRegisteredNotification $notification): bool => $notification->telegramTopic() === NotificationTopic::Account
             && $notification->via(new \stdClass()) === [TelegramChannel::class];
 
+        Notification::assertSentToTimes(
+            $adminA,
+            AdminUserRegisteredNotification::class,
+            1,
+        );
+        Notification::assertSentToTimes(
+            $adminB,
+            AdminUserRegisteredNotification::class,
+            1,
+        );
         Notification::assertSentTo(
             $adminA,
             AdminUserRegisteredNotification::class,
