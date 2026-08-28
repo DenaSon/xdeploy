@@ -14,18 +14,22 @@ final class ParsPackCloudResponseMapperTest extends TestCase
     public function test_it_maps_regions_and_uses_slug_as_identity(): void
     {
         $regions = $this->mapper()->mapRegions([
-            'data' => [
+            'regions' => [
                 [
-                    'name' => 'Tehran',
+                    'name' => 'tehran',
                     'slug' => 'tehran11',
                     'available' => true,
+                    'sizes' => ['irVPS2'],
                 ],
                 [
-                    'name' => 'Frankfurt',
+                    'name' => 'frankfurt',
                     'slug' => 'frankfurt',
                     'available' => true,
+                    'sizes' => ['deVPS2'],
                 ],
             ],
+            'links' => [],
+            'meta' => ['total' => 2],
         ]);
 
         $this->assertSame('tehran11', $regions[0]->id);
@@ -37,16 +41,19 @@ final class ParsPackCloudResponseMapperTest extends TestCase
     public function test_it_maps_fixed_size_pricing_as_raw_irr(): void
     {
         $sizes = $this->mapper()->mapSizes([
-            'data' => [
+            'sizes' => [
                 [
                     'slug' => 'deVPS2',
                     'memory' => 2048,
                     'vcpus' => 1,
                     'disk' => 40,
+                    'transfer' => 1,
+                    'transfer_type' => 'total_traffic',
                     'price_monthly' => 1246920,
                     'price_hourly' => 1731.25,
                     'regions' => ['frankfurt'],
                     'description' => '',
+                    'id' => 997,
                     'available' => true,
                 ],
                 [
@@ -54,13 +61,18 @@ final class ParsPackCloudResponseMapperTest extends TestCase
                     'memory' => 2048,
                     'vcpus' => 1,
                     'disk' => 40,
+                    'transfer' => 1,
+                    'transfer_type' => 'download_only',
                     'price_monthly' => 1000000,
                     'price_hourly' => 1500,
                     'regions' => ['tehran11'],
                     'description' => '',
+                    'id' => 998,
                     'available' => true,
                 ],
             ],
+            'links' => [],
+            'meta' => ['total' => 2],
         ], 'frankfurt');
 
         $this->assertCount(1, $sizes);
@@ -75,15 +87,17 @@ final class ParsPackCloudResponseMapperTest extends TestCase
     public function test_it_filters_images_locally_and_skips_unsupported_base_images(): void
     {
         $images = $this->mapper()->mapImages([
-            'data' => [
+            'images' => [
                 [
                     'id' => 76,
                     'slug' => 'ubuntu24-cloudinit-qcow2',
-                    'name' => 'Ubuntu 24 x64',
+                    'name' => 'Ubuntu24-x64',
                     'type' => 'base',
+                    'distribution' => 'ubuntu',
                     'status' => 'available',
                     'public' => true,
                     'regions' => [],
+                    'min_disk_size' => 0,
                 ],
                 [
                     'id' => 200,
@@ -97,56 +111,93 @@ final class ParsPackCloudResponseMapperTest extends TestCase
                 [
                     'id' => 300,
                     'slug' => 'nextcloud-ubuntu24',
-                    'name' => 'NextCloud Ubuntu 24',
+                    'name' => 'NextCloud Ubuntu24',
                     'type' => 'application',
                     'status' => 'available',
                     'public' => true,
                     'regions' => [],
                 ],
             ],
+            'links' => [],
+            'meta' => ['total' => 3],
         ], 'frankfurt');
 
         $this->assertCount(1, $images);
         $this->assertSame('ubuntu24-cloudinit-qcow2', $images[0]->id);
         $this->assertSame('ubuntu', $images[0]->distribution);
         $this->assertSame('24.04', $images[0]->version);
+        $this->assertSame('x86_64', $images[0]->architecture);
         $this->assertTrue($images[0]->supportsSshKey);
         $this->assertTrue($images[0]->supportsPassword);
     }
 
-    public function test_it_maps_actual_vm_readiness_and_network_shape(): void
+    public function test_it_maps_wrapped_create_response(): void
+    {
+        $created = $this->mapper()->mapCreatedServer([
+            'vm' => [
+                'id' => 'a34a-4c03-5f73-1a14',
+                'name' => 'coreflare-api-test',
+                'status' => 'new',
+                'created_at' => '2026-08-28T08:26:51.000000Z',
+                'region' => [
+                    'name' => 'frankfurt',
+                    'slug' => 'frankfurt',
+                ],
+            ],
+        ]);
+
+        $this->assertSame('a34a-4c03-5f73-1a14', $created->id);
+        $this->assertSame('frankfurt', $created->regionId);
+        $this->assertSame(CloudServerStatus::Provisioning, $created->status);
+        $this->assertSame('root', $created->username);
+        $this->assertFalse($created->hasGeneratedPassword());
+    }
+
+    public function test_it_maps_actual_wrapped_vm_readiness_and_network_shape(): void
     {
         $server = $this->mapper()->mapServer([
-            'id' => 'a34a-4c03-5f73-1a14',
-            'name' => 'coreflare-api-test',
-            'status' => 'active',
-            'memory' => 2048,
-            'vcpus' => 1,
-            'disk' => 40,
-            'image' => [
-                'slug' => 'ubuntu24-cloudinit-qcow2',
-            ],
-            'size' => [
-                'slug' => 'deVPS2',
+            'vm' => [
+                'id' => 'a34a-4c03-5f73-1a14',
+                'name' => 'coreflare-api-test',
+                'status' => 'active',
                 'memory' => 2048,
                 'vcpus' => 1,
                 'disk' => 40,
-            ],
-            'region' => [
-                'slug' => 'frankfurt',
-            ],
-            'networks' => [
-                [
-                    'ip' => '185.110.191.31',
-                    'type' => 'public',
+                'created_at' => '2026-08-28T08:26:51.000000Z',
+                'image' => [
+                    'slug' => 'ubuntu24-cloudinit-qcow2',
                 ],
-                [
-                    'ip' => '172.16.0.2',
-                    'type' => 'private',
+                'size' => [
+                    'slug' => 'deVPS2',
+                    'memory' => 2048,
+                    'vcpus' => 1,
+                    'disk' => 40,
                 ],
+                'size_slug' => 'deVPS2',
+                'region' => [
+                    'name' => 'frankfurt',
+                    'slug' => 'frankfurt',
+                ],
+                'networks' => [
+                    'v4' => [
+                        [
+                            'ip_address' => '185.110.191.31',
+                            'netmask' => '255.255.255.0',
+                            'gateway' => '185.110.191.254',
+                            'type' => 'public',
+                        ],
+                        [
+                            'ip_address' => '172.16.0.2',
+                            'netmask' => '255.255.0.0',
+                            'gateway' => '',
+                            'type' => 'private',
+                        ],
+                    ],
+                    'v6' => [],
+                ],
+                'vpc_uuid' => '7892',
+                'action' => null,
             ],
-            'vpc_uuid' => '7892',
-            'action' => null,
         ], 'frankfurt');
 
         $this->assertSame(CloudServerStatus::Active, $server->status);
@@ -160,18 +211,31 @@ final class ParsPackCloudResponseMapperTest extends TestCase
     public function test_off_vm_remains_active_resource_with_stopped_power_state(): void
     {
         $server = $this->mapper()->mapServer([
-            'id' => 'a34a-4c03-5f73-1a14',
-            'name' => 'coreflare-api-test',
-            'status' => 'off',
-            'region' => ['slug' => 'frankfurt'],
-            'size' => ['slug' => 'deVPS2'],
-            'image' => ['slug' => 'ubuntu24-cloudinit-qcow2'],
-            'networks' => [],
-            'vpc_uuid' => '7892',
+            'vm' => [
+                'id' => 'a34a-4c03-5f73-1a14',
+                'name' => 'coreflare-api-test',
+                'status' => 'off',
+                'region' => ['slug' => 'frankfurt'],
+                'size' => ['slug' => 'deVPS2'],
+                'image' => ['slug' => 'ubuntu24-cloudinit-qcow2'],
+                'networks' => [],
+                'vpc_uuid' => '7892',
+            ],
         ], 'frankfurt');
 
         $this->assertSame(CloudServerStatus::Active, $server->status);
         $this->assertSame(CloudServerPowerState::Stopped, $server->powerState);
+    }
+
+    public function test_empty_vm_inventory_uses_real_plural_collection_shape(): void
+    {
+        $servers = $this->mapper()->mapServerInventory([
+            'vms' => [],
+            'links' => [],
+            'meta' => ['total' => 0],
+        ]);
+
+        $this->assertSame([], $servers);
     }
 
     private function mapper(): ParsPackCloudResponseMapper
