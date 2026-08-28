@@ -45,9 +45,7 @@ final class AdminServerIpUpdateTest extends TestCase
             ->assertHasNoErrors()
             ->assertSet('newHost', '198.51.100.25')
             ->assertSet('hostUpdateReason', '')
-            ->assertSee(
-                'آدرس IP سرور از 192.0.2.10 به 198.51.100.25 تغییر کرد.',
-            );
+            ->assertSee('198.51.100.25:22');
 
         $this->assertSame(
             '198.51.100.25',
