@@ -56,12 +56,13 @@ return [
 
     /*
      * ParsPack API tariffs are returned in Tomans and normalized to IRR by
-     * the response mapper. Funding overhead models wallet-funding tax/cost
-     * separately and is only applied to the commercial purchase catalog.
+     * the response mapper. An optional funding overhead can be configured
+     * separately, but verified wallet debit matched the API tariff exactly,
+     * so the safe default is zero.
      */
     'funding_overhead_percent' => (int) env(
         'PARSPACK_CLOUD_FUNDING_OVERHEAD_PERCENT',
-        10,
+        0,
     ),
 
     'bootstrap' => [
