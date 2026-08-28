@@ -8,6 +8,7 @@ use App\Application\Billing\Events\PaymentStatusChanged;
 use App\Application\Navigation\PublicDocumentationNavigation;
 use App\Application\Navigation\PublicFooterNavigation;
 use App\Application\Support\Contracts\SupportImageProcessorInterface;
+use App\Application\Support\Events\SupportRequestCreated;
 use App\Application\User\Events\UserRegistered;
 use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -16,6 +17,7 @@ use App\Infrastructure\Analytics\PostHogProductAnalytics;
 use App\Infrastructure\Support\LaravelSupportImageProcessor;
 use App\Listeners\CaptureAuthenticationCompleted;
 use App\Listeners\SendAdminPaymentSucceededNotification;
+use App\Listeners\SendAdminSupportRequestCreatedNotification;
 use App\Listeners\SendAdminUserRegisteredNotification;
 use App\Listeners\SendPaymentStatusNotification;
 use App\Livewire\Applications\WordPress\ManagementPanel as WordPressManagementPanel;
@@ -77,6 +79,11 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(
             UserRegistered::class,
             SendAdminUserRegisteredNotification::class,
+        );
+
+        Event::listen(
+            SupportRequestCreated::class,
+            SendAdminSupportRequestCreatedNotification::class,
         );
 
         Event::listen(
