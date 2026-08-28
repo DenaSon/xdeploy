@@ -198,8 +198,7 @@
 
                     <div>
                         <div class="h-3 w-20 rounded bg-base-300"></div>
-                        <div class="mt-2 grid grid-cols-3 gap-2">
-                            <div class="h-14 rounded-xl bg-base-200"></div>
+                        <div class="mt-2 grid grid-cols-2 gap-2">
                             <div class="h-14 rounded-xl bg-base-200"></div>
                             <div class="h-14 rounded-xl bg-base-200"></div>
                         </div>
@@ -287,6 +286,14 @@
             />
         </section>
     @else
+        @php
+            $iranRegionCount = (int) ($regionGroupCounts['iran'] ?? 0);
+            $internationalRegionCount = (int) ($regionGroupCounts['international'] ?? 0);
+            $showRegionGroupSwitch = $iranRegionCount > 0 && $internationalRegionCount > 0;
+            $periodCount = count($periods);
+            $imageCount = count($images);
+        @endphp
+
         <div
             data-buy-main-layout
             class="
@@ -341,70 +348,62 @@
                                 sm:flex-row sm:items-center
                             "
                         >
-                            <div
-                                class="
-                                    inline-grid shrink-0
-                                    grid-cols-2 gap-1
-                                    rounded-xl
-                                    bg-base-200/70 p-1
-                                "
-                            >
-                                <button
-                                    type="button"
-                                    wire:click="selectRegionGroup('iran')"
-                                    wire:target="selectRegionGroup,selectRegion"
-                                    wire:loading.attr="disabled"
-                                    @disabled(
-                                        ($regionGroupCounts['iran'] ?? 0) === 0
-                                    )
-                                    @class([
-                                        '
-                                            btn btn-sm
-                                            h-11 min-h-11
-                                            cursor-pointer
-                                            rounded-lg border-0
-                                            px-3 text-xs font-medium
-                                            sm:h-8 sm:min-h-8
-                                        ',
-                                        'btn-primary text-primary-content' =>
-                                            $regionGroup === 'iran',
-                                        'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
-                                            $regionGroup !== 'iran',
-                                        'opacity-40 cursor-not-allowed' =>
-                                            ($regionGroupCounts['iran'] ?? 0) === 0,
-                                    ])
+                            @if($showRegionGroupSwitch)
+                                <div
+                                    class="
+                                        inline-grid shrink-0
+                                        grid-cols-2 gap-1
+                                        rounded-xl
+                                        bg-base-200/70 p-1
+                                    "
                                 >
-                                    ایران
-                                </button>
+                                    <button
+                                        type="button"
+                                        wire:click="selectRegionGroup('iran')"
+                                        wire:target="selectRegionGroup,selectRegion"
+                                        wire:loading.attr="disabled"
+                                        @class([
+                                            '
+                                                btn btn-sm
+                                                h-11 min-h-11
+                                                cursor-pointer
+                                                rounded-lg border-0
+                                                px-3 text-xs font-medium
+                                                sm:h-8 sm:min-h-8
+                                            ',
+                                            'btn-primary text-primary-content' =>
+                                                $regionGroup === 'iran',
+                                            'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
+                                                $regionGroup !== 'iran',
+                                        ])
+                                    >
+                                        ایران
+                                    </button>
 
-                                <button
-                                    type="button"
-                                    wire:click="selectRegionGroup('international')"
-                                    wire:target="selectRegionGroup,selectRegion"
-                                    wire:loading.attr="disabled"
-                                    @disabled(
-                                        ($regionGroupCounts['international'] ?? 0) === 0
-                                    )
-                                    @class([
-                                        '
-                                            btn btn-sm
-                                            h-11 min-h-11
-                                            cursor-pointer
-                                            rounded-lg border-0
-                                            px-3 text-xs font-medium
-                                            sm:h-8 sm:min-h-8
-                                        ',
-                                        'btn-primary text-primary-content' =>
-                                            $regionGroup === 'international',
-                                        'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
-                                            $regionGroup !== 'international',
-                                        'opacity-40 cursor-not-allowed' =>
-                                            ($regionGroupCounts['international'] ?? 0) === 0,
-                                    ])
-                                >
-                                    آلمان
-                                </button>
-                            </div>
+                                    <button
+                                        type="button"
+                                        wire:click="selectRegionGroup('international')"
+                                        wire:target="selectRegionGroup,selectRegion"
+                                        wire:loading.attr="disabled"
+                                        @class([
+                                            '
+                                                btn btn-sm
+                                                h-11 min-h-11
+                                                cursor-pointer
+                                                rounded-lg border-0
+                                                px-3 text-xs font-medium
+                                                sm:h-8 sm:min-h-8
+                                            ',
+                                            'btn-primary text-primary-content' =>
+                                                $regionGroup === 'international',
+                                            'btn-ghost text-base-content/50 hover:bg-base-300/50' =>
+                                                $regionGroup !== 'international',
+                                        ])
+                                    >
+                                        خارج از ایران
+                                    </button>
+                                </div>
+                            @endif
 
                             <div class="relative min-w-0 flex-1">
                                 <select
@@ -494,11 +493,16 @@
                         </div>
 
                         <div
-                            class="
-                                grid grid-cols-3 gap-1.5
-                                rounded-xl
-                                bg-base-200/55 p-1.5
-                            "
+                            @class([
+                                '
+                                    grid gap-1.5
+                                    rounded-xl
+                                    bg-base-200/55 p-1.5
+                                ',
+                                'grid-cols-1' => $periodCount <= 1,
+                                'grid-cols-2' => $periodCount === 2,
+                                'grid-cols-3' => $periodCount >= 3,
+                            ])
                         >
                             @foreach($periods as $periodOption)
                                 <button
@@ -916,11 +920,16 @@
                                 <div
                                     wire:loading.class="opacity-60"
                                     wire:target="imageId"
-                                    class="
-                                        grid grid-cols-2 gap-1.5
-                                        transition-opacity duration-150
-                                        sm:grid-cols-4
-                                    "
+                                    @class([
+                                        '
+                                            grid gap-1.5
+                                            transition-opacity duration-150
+                                        ',
+                                        'grid-cols-1' => $imageCount <= 1,
+                                        'grid-cols-2' => $imageCount === 2,
+                                        'grid-cols-2 sm:grid-cols-3' => $imageCount === 3,
+                                        'grid-cols-2 sm:grid-cols-4' => $imageCount >= 4,
+                                    ])
                                 >
                                     @foreach($images as $image)
                                         <label
@@ -967,7 +976,8 @@
                                                         truncate
                                                     "
                                                 >
-                                                    {{ $image['name'] }}
+                                                    {{ ucfirst($image['distribution']) }}
+                                                    {{ $image['version'] }}
                                                 </span>
                                             </span>
                                         </label>
@@ -1249,7 +1259,7 @@
                                     "
                                 >
                                     @if($selectedImage)
-                                        {{ $selectedImage['distribution'] }}
+                                        {{ ucfirst($selectedImage['distribution']) }}
                                         {{ $selectedImage['version'] }}
                                     @else
                                         —
