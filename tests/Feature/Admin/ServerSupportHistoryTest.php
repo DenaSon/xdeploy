@@ -10,10 +10,12 @@ use App\Application\Server\Data\SupportHistoryEntryData;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
 use App\Domain\Server\Enums\SupportAccessAction;
+use App\Livewire\Admin\Servers\SupportHistory;
 use App\Models\Server;
 use App\Models\SupportAccessLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use LogicException;
 use Tests\TestCase;
 
@@ -94,6 +96,44 @@ final class ServerSupportHistoryTest extends TestCase
             ],
             $filtered[0]->metadata,
         );
+    }
+
+    public function test_admin_can_open_reusable_support_history_modal(): void
+    {
+        $admin = $this->admin();
+        $server = $this->server(User::factory()->create());
+
+        app(RecordSupportAccessAction::class)->handle(
+            admin: $admin,
+            server: $server,
+            action: SupportAccessAction::ConnectionHostUpdated,
+            reason: 'Provider آدرس اتصال را تغییر داد',
+            successful: true,
+            ipAddress: '127.0.0.1',
+            userAgent: 'test',
+            metadata: [
+                'old_host' => '192.0.2.10',
+                'new_host' => '198.51.100.25',
+            ],
+        );
+
+        $this->actingAs($admin);
+
+        Livewire::test(
+            SupportHistory::class,
+            ['serverId' => $server->id],
+        )
+            ->assertSee('سوابق پشتیبانی')
+            ->assertDontSee('سوابق پشتیبانی سرور')
+            ->call('openSupportHistory')
+            ->assertSet('supportHistoryOpen', true)
+            ->assertSee('سوابق پشتیبانی سرور')
+            ->assertSee('تغییر IP سرور')
+            ->assertSee('192.0.2.10')
+            ->assertSee('198.51.100.25')
+            ->assertSee('Provider آدرس اتصال را تغییر داد')
+            ->call('closeSupportHistory')
+            ->assertSet('supportHistoryOpen', false);
     }
 
     public function test_legacy_ip_change_reason_is_normalized_into_structured_history(): void
