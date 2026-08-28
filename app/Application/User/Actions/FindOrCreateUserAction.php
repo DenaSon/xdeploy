@@ -9,6 +9,7 @@ use App\Domain\User\Services\UserService;
 use App\Domain\User\ValueObjects\PhoneNumber;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
+use Throwable;
 
 final readonly class FindOrCreateUserAction
 {
@@ -31,9 +32,18 @@ final readonly class FindOrCreateUserAction
             $phone,
         );
 
-        Event::dispatch(new UserRegistered(
-            userId: (int) $user->getKey(),
-        ));
+        try {
+            Event::dispatch(new UserRegistered(
+                userId: (int) $user->getKey(),
+            ));
+        } catch (Throwable $exception) {
+            /*
+             * An operational admin alert must never turn a successful account
+             * creation into a failed OTP login. The user is already durable at
+             * this point, so alert dispatch failures are reported and isolated.
+             */
+            report($exception);
+        }
 
         return $user;
     }
