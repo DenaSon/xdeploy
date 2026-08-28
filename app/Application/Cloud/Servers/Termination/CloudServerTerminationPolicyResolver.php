@@ -38,7 +38,8 @@ final readonly class CloudServerTerminationPolicyResolver
         CloudProviderType $provider,
     ): CloudServerTerminationPolicy {
         return match ($provider) {
-            CloudProviderType::Arvan => new ImmediateCloudServerTerminationPolicy,
+            CloudProviderType::Arvan,
+            CloudProviderType::ParsPack => new ImmediateCloudServerTerminationPolicy,
             CloudProviderType::Liara => new LiaraCloudServerTerminationPolicy(
                 providers: $this->requiredProviderRegistry(),
             ),
