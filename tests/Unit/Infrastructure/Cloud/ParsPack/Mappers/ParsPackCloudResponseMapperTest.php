@@ -38,7 +38,7 @@ final class ParsPackCloudResponseMapperTest extends TestCase
         $this->assertSame('DE', $regions[1]->country);
     }
 
-    public function test_it_maps_fixed_size_pricing_as_raw_irr(): void
+    public function test_it_normalizes_toman_size_pricing_to_irr(): void
     {
         $sizes = $this->mapper()->mapSizes([
             'sizes' => [
@@ -79,8 +79,8 @@ final class ParsPackCloudResponseMapperTest extends TestCase
         $this->assertSame('deVPS2', $sizes[0]->id);
         $this->assertSame(2048, $sizes[0]->memoryMiB);
         $this->assertSame(40, $sizes[0]->diskGiB);
-        $this->assertSame('1731.25', $sizes[0]->hourlyPrice?->amount);
-        $this->assertSame('1246920', $sizes[0]->monthlyPrice?->amount);
+        $this->assertSame('17312.5', $sizes[0]->hourlyPrice?->amount);
+        $this->assertSame('12469200', $sizes[0]->monthlyPrice?->amount);
         $this->assertSame('IRR', $sizes[0]->monthlyPrice?->currencyCode);
     }
 
