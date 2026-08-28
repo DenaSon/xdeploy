@@ -9,7 +9,8 @@ return [
     | Currency
     |--------------------------------------------------------------------------
     |
-    | ArvanCloud prices are returned in Iranian Rials.
+    | Cloud provider prices are normalized to Iranian Rials at their
+    | infrastructure boundary before entering Coreflare billing logic.
     |
     */
 
@@ -27,8 +28,12 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Purchase Periods
+    | Purchase Period Catalog
     |--------------------------------------------------------------------------
+    |
+    | This is the canonical period definition catalog. Provider-specific
+    | availability is controlled separately by cloud_purchase.php.
+    |
     */
 
     'periods' => [
@@ -36,6 +41,12 @@ return [
         '2_days' => [
             'label' => '۲ روزه',
             'hours' => 48,
+            'pricing' => 'hourly',
+        ],
+
+        '7_days' => [
+            'label' => '۷ روزه',
+            'hours' => 168,
             'pricing' => 'hourly',
         ],
 
