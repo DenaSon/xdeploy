@@ -30,7 +30,9 @@ trait TestsServerConnection
          */
         $this->verifiedConnectionFingerprint = null;
 
-        $data = $this->validate();
+        $data = $this->normalizeServerFormData(
+            $this->validate(),
+        );
 
         $data['credential'] =
             $this->credentialForConnectionTest();
@@ -94,6 +96,7 @@ trait TestsServerConnection
                 'host' => trim($this->host),
                 'port' => $this->port,
                 'username' => trim($this->username),
+                'authentication_type' => $this->authenticationType,
 
                 /*
                  * اینجا مقدار فرم را fingerprint می‌کنیم،
