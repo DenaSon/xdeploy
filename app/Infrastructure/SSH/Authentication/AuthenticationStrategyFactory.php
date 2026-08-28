@@ -14,8 +14,7 @@ final class AuthenticationStrategyFactory
     ): AuthenticationStrategy {
         return match ($type) {
             AuthenticationType::Password => new PasswordAuthenticator,
-
-            AuthenticationType::SSHKey,
+            AuthenticationType::SSHKey => new SSHKeyAuthenticator,
             AuthenticationType::Agent => throw UnsupportedAuthenticationTypeException::forType($type),
         };
     }
