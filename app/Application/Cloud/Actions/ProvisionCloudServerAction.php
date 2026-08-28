@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Actions;
 
+use App\Application\Cloud\DTOs\CloudProvisioningPollingSettings;
 use App\Application\Cloud\DTOs\ProvisionCloudServerResult;
+use App\Application\Cloud\Services\CloudProvisioningPollingPolicy;
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
@@ -43,15 +45,16 @@ final readonly class ProvisionCloudServerAction
         private CreateServerAction $createServer,
         private VerifyCloudServerSshReadinessAction $verifySshReadiness,
         private string $providerName = 'arvan',
-        private int $maxAttempts = 20,
-        private int $pollDelaySeconds = 3,
+        private ?int $maxAttempts = null,
+        private ?int $pollDelaySeconds = null,
         private ?CloudProviderRegistryInterface $providers = null,
+        private ?CloudProvisioningPollingPolicy $pollingPolicy = null,
     ) {
-        if ($this->maxAttempts < 1) {
+        if ($this->maxAttempts !== null && $this->maxAttempts < 1) {
             throw new InvalidArgumentException('Provisioning attempts must be greater than zero.');
         }
 
-        if ($this->pollDelaySeconds < 0) {
+        if ($this->pollDelaySeconds !== null && $this->pollDelaySeconds < 0) {
             throw new InvalidArgumentException('Provisioning poll delay cannot be negative.');
         }
 
@@ -88,6 +91,7 @@ final readonly class ProvisionCloudServerAction
         $provider = $this->resolveProviderType($provider);
         $catalog = $this->catalogFor($provider);
         $provisioner = $this->provisionerFor($provider);
+        $polling = $this->pollingSettings($provider);
 
         $this->validateSelection(
             data: $data,
@@ -126,6 +130,7 @@ final readonly class ProvisionCloudServerAction
             regionId: $data->regionId,
             providerServerId: $createdServer->id,
             provisioner: $provisioner,
+            polling: $polling,
         );
     }
 
@@ -134,17 +139,21 @@ final readonly class ProvisionCloudServerAction
         string $regionId,
         string $providerServerId,
         CloudServerProvisionerInterface $provisioner,
+        CloudProvisioningPollingSettings $polling,
     ): ProvisionCloudServerResult {
         $lastCloudServer = null;
 
-        for ($attempt = 1; $attempt <= $this->maxAttempts; $attempt++) {
+        for ($attempt = 1; $attempt <= $polling->maxAttempts; $attempt++) {
             try {
                 $cloudServer = $provisioner->findServer(
                     $regionId,
                     $providerServerId,
                 );
             } catch (CloudResourceNotFoundException) {
-                $this->waitBeforeNextAttempt($attempt);
+                $this->waitBeforeNextAttempt(
+                    attempt: $attempt,
+                    polling: $polling,
+                );
 
                 continue;
             }
@@ -178,7 +187,10 @@ final readonly class ProvisionCloudServerAction
                 );
             }
 
-            $this->waitBeforeNextAttempt($attempt);
+            $this->waitBeforeNextAttempt(
+                attempt: $attempt,
+                polling: $polling,
+            );
         }
 
         if ($lastCloudServer instanceof CloudServerData && $lastCloudServer->status->isReady()) {
@@ -205,7 +217,7 @@ final readonly class ProvisionCloudServerAction
             sprintf(
                 'Cloud server [%s] did not become ready after [%d] attempts.',
                 $providerServerId,
-                $this->maxAttempts,
+                $polling->maxAttempts,
             ),
         );
     }
@@ -362,13 +374,31 @@ final readonly class ProvisionCloudServerAction
         return $username;
     }
 
-    private function waitBeforeNextAttempt(int $attempt): void
-    {
-        if ($attempt >= $this->maxAttempts || $this->pollDelaySeconds === 0) {
+    private function pollingSettings(
+        CloudProviderType $provider,
+    ): CloudProvisioningPollingSettings {
+        $policy = $this->pollingPolicy
+            ?? new CloudProvisioningPollingPolicy();
+
+        return $policy->resolve(
+            provider: $provider,
+            maxAttemptsOverride: $this->maxAttempts,
+            pollDelaySecondsOverride: $this->pollDelaySeconds,
+        );
+    }
+
+    private function waitBeforeNextAttempt(
+        int $attempt,
+        CloudProvisioningPollingSettings $polling,
+    ): void {
+        if (
+            $attempt >= $polling->maxAttempts
+            || $polling->pollDelaySeconds === 0
+        ) {
             return;
         }
 
-        sleep($this->pollDelaySeconds);
+        sleep($polling->pollDelaySeconds);
     }
 
     private function validateSelection(
