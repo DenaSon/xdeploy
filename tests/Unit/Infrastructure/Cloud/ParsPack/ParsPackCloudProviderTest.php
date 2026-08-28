@@ -16,11 +16,13 @@ use Tests\TestCase;
 final class ParsPackCloudProviderTest extends TestCase
 {
     private const string BASE_URL = 'https://my.parspack.example.test/cserver/api/public/v1';
+
     private const string PRIVATE_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-bootstrap-private-key\n-----END OPENSSH PRIVATE KEY-----";
 
     protected function setUp(): void
     {
         parent::setUp();
+
         Http::preventStrayRequests();
     }
 
@@ -29,10 +31,16 @@ final class ParsPackCloudProviderTest extends TestCase
         Http::fake([
             self::BASE_URL.'/sizes*' => Http::response($this->sizesResponse()),
             self::BASE_URL.'/vms' => Http::response([
-                'id' => 'a34a-4c03-5f73-1a14',
-                'name' => 'coreflare-api-test',
-                'status' => 'new',
-                'region' => ['slug' => 'frankfurt'],
+                'vm' => [
+                    'id' => 'a34a-4c03-5f73-1a14',
+                    'name' => 'coreflare-api-test',
+                    'status' => 'new',
+                    'created_at' => '2026-08-28T08:26:51.000000Z',
+                    'region' => [
+                        'name' => 'frankfurt',
+                        'slug' => 'frankfurt',
+                    ],
+                ],
             ], 201),
         ]);
 
@@ -82,9 +90,11 @@ final class ParsPackCloudProviderTest extends TestCase
     {
         Http::fake([
             self::BASE_URL.'/vms/*/actions' => Http::response([
-                'id' => 5652602,
-                'status' => 'in-progress',
-                'type' => 'command',
+                'action' => [
+                    'id' => 5652602,
+                    'status' => 'in-progress',
+                    'type' => 'command',
+                ],
             ], 201),
         ]);
 
@@ -100,6 +110,7 @@ final class ParsPackCloudProviderTest extends TestCase
             }
 
             $payloads[] = $request->data();
+
             return true;
         });
 
@@ -125,6 +136,33 @@ final class ParsPackCloudProviderTest extends TestCase
         );
     }
 
+    public function test_purchase_catalog_applies_configured_funding_overhead(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/sizes*' => Http::response($this->sizesResponse()),
+        ]);
+
+        $sizes = $this->provider(fundingOverheadPercent: 10)
+            ->listPurchaseSizes('frankfurt');
+
+        $this->assertCount(1, $sizes);
+        $this->assertSame('1905', $sizes[0]->hourlyPrice?->amount);
+        $this->assertSame('1371612', $sizes[0]->monthlyPrice?->amount);
+    }
+
+    public function test_operational_catalog_keeps_raw_provider_price(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/sizes*' => Http::response($this->sizesResponse()),
+        ]);
+
+        $sizes = $this->provider(fundingOverheadPercent: 10)
+            ->listSizes('frankfurt');
+
+        $this->assertSame('1731.25', $sizes[0]->hourlyPrice?->amount);
+        $this->assertSame('1246920', $sizes[0]->monthlyPrice?->amount);
+    }
+
     public function test_fixed_disk_price_is_zero_for_included_disk(): void
     {
         Http::fake([
@@ -141,8 +179,9 @@ final class ParsPackCloudProviderTest extends TestCase
         $this->assertSame('0', $price->monthlyPrice->amount);
     }
 
-    private function provider(): ParsPackCloudProvider
-    {
+    private function provider(
+        int $fundingOverheadPercent = 0,
+    ): ParsPackCloudProvider {
         return new ParsPackCloudProvider(
             client: new ParsPackCloudClient(
                 baseUrl: self::BASE_URL,
@@ -152,6 +191,7 @@ final class ParsPackCloudProviderTest extends TestCase
             mapper: new ParsPackCloudResponseMapper(),
             bootstrapSshKeyId: 14956,
             bootstrapPrivateKey: self::PRIVATE_KEY,
+            fundingOverheadPercent: $fundingOverheadPercent,
         );
     }
 
@@ -170,19 +210,24 @@ final class ParsPackCloudProviderTest extends TestCase
     private function sizesResponse(): array
     {
         return [
-            'data' => [
+            'sizes' => [
                 [
                     'slug' => 'deVPS2',
                     'memory' => 2048,
                     'vcpus' => 1,
                     'disk' => 40,
+                    'transfer' => 1,
+                    'transfer_type' => 'total_traffic',
                     'price_monthly' => 1246920,
                     'price_hourly' => 1731.25,
                     'regions' => ['frankfurt'],
                     'description' => '',
+                    'id' => 997,
                     'available' => true,
                 ],
             ],
+            'links' => [],
+            'meta' => ['total' => 1],
         ];
     }
 }
