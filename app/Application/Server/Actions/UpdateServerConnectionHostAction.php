@@ -105,15 +105,14 @@ final readonly class UpdateServerConnectionHostAction
                 admin: $admin,
                 server: $lockedServer,
                 action: SupportAccessAction::ConnectionHostUpdated,
-                reason: sprintf(
-                    'IP: %s → %s | %s',
-                    $oldHost,
-                    $normalizedHost,
-                    $normalizedReason,
-                ),
+                reason: $normalizedReason,
                 successful: true,
                 ipAddress: $ipAddress,
                 userAgent: $userAgent,
+                metadata: [
+                    'old_host' => $oldHost,
+                    'new_host' => $normalizedHost,
+                ],
             );
 
             return $lockedServer->refresh();
