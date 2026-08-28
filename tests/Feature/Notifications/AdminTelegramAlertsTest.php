@@ -60,11 +60,17 @@ final class AdminTelegramAlertsTest extends TestCase
 
     public function test_registration_succeeds_when_admin_alert_dispatch_fails(): void
     {
-        Event::shouldReceive('dispatch')
-            ->once()
-            ->andThrow(new RuntimeException(
-                'notification queue unavailable',
-            ));
+        Event::forget(
+            UserRegistered::class,
+        );
+        Event::listen(
+            UserRegistered::class,
+            static function (UserRegistered $event): void {
+                throw new RuntimeException(
+                    'notification queue unavailable',
+                );
+            },
+        );
 
         $phone = PhoneNumber::from('09123456789');
 
