@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Server\Actions;
 
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Support\Arr;
@@ -45,7 +46,13 @@ final readonly class UpdateServerAction
                         'port',
                         'username',
                         'credential',
+                        'authentication_type',
                     ],
+                );
+
+                $this->guardAuthenticationChange(
+                    server: $ownedServer,
+                    attributes: $mutableAttributes,
                 );
 
                 $this->guardAgainstDuplicateServer(
@@ -73,6 +80,67 @@ final readonly class UpdateServerAction
                 return $ownedServer->refresh();
             },
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function guardAuthenticationChange(
+        Server $server,
+        array &$attributes,
+    ): void {
+        if (
+            ! array_key_exists(
+                'authentication_type',
+                $attributes,
+            )
+        ) {
+            return;
+        }
+
+        $rawType = $attributes['authentication_type'];
+        $authenticationType = $rawType instanceof AuthenticationType
+            ? $rawType
+            : (
+                is_string($rawType)
+                    ? AuthenticationType::tryFrom($rawType)
+                    : null
+            );
+
+        if (
+            ! $authenticationType instanceof AuthenticationType
+            || ! $authenticationType->isSupported()
+        ) {
+            throw ValidationException::withMessages([
+                'authenticationType' => [
+                    'روش احراز هویت انتخاب‌شده پشتیبانی نمی‌شود.',
+                ],
+            ]);
+        }
+
+        $attributes['authentication_type'] =
+            $authenticationType->value;
+
+        if (
+            $authenticationType
+            === $server->authentication_type
+        ) {
+            return;
+        }
+
+        $credential = $attributes['credential']
+            ?? null;
+
+        if (
+            ! is_string($credential)
+            || trim($credential) === ''
+        ) {
+            throw ValidationException::withMessages([
+                'credential' => [
+                    'برای تغییر روش احراز هویت، اطلاعات ورود جدید الزامی است.',
+                ],
+            ]);
+        }
     }
 
     /**
