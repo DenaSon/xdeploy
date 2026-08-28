@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Support\Actions;
 
+use App\Application\Support\Events\SupportRequestCreated;
 use App\Application\Support\SupportContent;
 use App\Domain\Support\Enums\SupportMessageAuthorRole;
 use App\Domain\Support\Enums\SupportRequestCategory;
@@ -13,6 +14,8 @@ use App\Models\SupportRequest;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Throwable;
 
 final readonly class CreateSupportRequestAction
 {
@@ -35,7 +38,7 @@ final readonly class CreateSupportRequestAction
         $message = SupportContent::message($message);
         $attachments = array_values($attachments);
 
-        return DB::transaction(
+        $supportRequest = DB::transaction(
             function () use (
                 $user,
                 $subject,
@@ -77,6 +80,21 @@ final readonly class CreateSupportRequestAction
                 return $supportRequest;
             },
         );
+
+        try {
+            Event::dispatch(new SupportRequestCreated(
+                supportRequestId: (int) $supportRequest->getKey(),
+            ));
+        } catch (Throwable $exception) {
+            /*
+             * Admin alerts are operational side effects. A notification or
+             * queue failure must never turn a persisted support request into a
+             * failed customer submission.
+             */
+            report($exception);
+        }
+
+        return $supportRequest;
     }
 
     private function resolveOwnedServerId(
