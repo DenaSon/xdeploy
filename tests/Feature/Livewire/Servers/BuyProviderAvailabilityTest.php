@@ -64,7 +64,7 @@ final class BuyProviderAvailabilityTest extends TestCase
                 'providers',
                 static fn (array $providers): bool => count($providers) === 1
                     && ($providers[0]['id'] ?? null) === $publicCode
-                    && ($providers[0]['label'] ?? null) === 'Core-2',
+                    && ($providers[0]['label'] ?? null) === 'دماوند',
             );
     }
 }
