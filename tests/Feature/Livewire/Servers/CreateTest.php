@@ -15,6 +15,7 @@ use App\Support\SSH\SSHTimeout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use phpseclib3\Crypt\RSA;
 use Tests\TestCase;
 
 final class CreateTest extends TestCase
@@ -31,7 +32,69 @@ final class CreateTest extends TestCase
             ->assertSee('آن را به Coreflare اضافه کن.')
             ->assertSee(
                 'اطلاعات SSH موردنیاز برای اتصال Coreflare به سرور را وارد کنید.',
-            );
+            )
+            ->assertSee('روش احراز هویت')
+            ->assertSee('رمز عبور')
+            ->assertSee('کلید خصوصی SSH')
+            ->assertDontSee('فقط Private Key را وارد کنید');
+    }
+
+    public function test_switching_to_ssh_key_clears_password_and_invalidates_verified_connection(): void
+    {
+        $ssh = new ReadyServerSshConnectionFake;
+
+        $this->app->instance(
+            SSHConnectionInterface::class,
+            $ssh,
+        );
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user);
+
+        Livewire::test(Create::class)
+            ->set('host', '203.0.113.10')
+            ->set('port', 22)
+            ->set('username', 'root')
+            ->set('credential', 'test-password')
+            ->call('testConnection')
+            ->assertSet(
+                'verifiedConnectionFingerprint',
+                static fn (?string $fingerprint): bool => is_string($fingerprint)
+                    && $fingerprint !== '',
+            )
+            ->call(
+                'selectAuthenticationType',
+                AuthenticationType::SSHKey->value,
+            )
+            ->assertSet(
+                'authenticationType',
+                AuthenticationType::SSHKey->value,
+            )
+            ->assertSet('credential', '')
+            ->assertSet('verifiedConnectionFingerprint', null)
+            ->assertSee('فقط Private Key را وارد کنید')
+            ->assertSee('فایل public با پسوند .pub');
+    }
+
+    public function test_invalid_private_key_is_rejected_before_connection_attempt(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user);
+
+        Livewire::test(Create::class)
+            ->set('host', '203.0.113.10')
+            ->set('port', 22)
+            ->set('username', 'root')
+            ->call(
+                'selectAuthenticationType',
+                AuthenticationType::SSHKey->value,
+            )
+            ->set('credential', 'ssh-ed25519 this-is-a-public-key')
+            ->call('testConnection')
+            ->assertHasErrors(['credential'])
+            ->assertSet('verifiedConnectionFingerprint', null);
     }
 
     public function test_ssh_key_connection_can_be_verified_and_persisted_without_exposing_plaintext_storage(): void
@@ -44,11 +107,8 @@ final class CreateTest extends TestCase
         );
 
         $user = User::factory()->create();
-        $privateKey = implode("\n", [
-            '-----BEGIN OPENSSH PRIVATE KEY-----',
-            'phase-one-test-private-key',
-            '-----END OPENSSH PRIVATE KEY-----',
-        ]);
+        $privateKey = RSA::createKey(1024)
+            ->toString('PKCS8');
 
         $this->actingAs($user);
 
@@ -56,8 +116,8 @@ final class CreateTest extends TestCase
             ->set('host', '203.0.113.10')
             ->set('port', 22)
             ->set('username', 'root')
-            ->set(
-                'authenticationType',
+            ->call(
+                'selectAuthenticationType',
                 AuthenticationType::SSHKey->value,
             )
             ->set('credential', $privateKey)
