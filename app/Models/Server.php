@@ -7,7 +7,6 @@ namespace App\Models;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Domain\Server\Enums\AuthenticationType;
 use App\Domain\Server\Enums\ServerStatus;
-use App\Domain\Server\Enums\SupportAccessAction;
 use App\Infrastructure\Security\Casts\ServerCredentialCast;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -87,16 +86,6 @@ class Server extends Model
     public function supportRequests(): HasMany
     {
         return $this->hasMany(SupportRequest::class);
-    }
-
-    /** @return HasMany<SupportAccessLog, $this> */
-    public function connectionHostUpdateLogs(): HasMany
-    {
-        return $this->hasMany(SupportAccessLog::class)
-            ->where(
-                'action',
-                SupportAccessAction::ConnectionHostUpdated->value,
-            );
     }
 
     public function isActive(): bool
