@@ -26,11 +26,11 @@ return [
         ],
 
         /*
-         * ParsPack charges a non-refundable seven-day initial setup period,
-         * so shorter Coreflare plans must never be exposed for this provider.
+         * ParsPack purchases intentionally start at Coreflare's 14-day plan.
+         * Shorter catalog periods stay unavailable for this provider.
          */
         'parspack' => [
-            '7_days',
+            '14_days',
             '1_month',
         ],
     ],
