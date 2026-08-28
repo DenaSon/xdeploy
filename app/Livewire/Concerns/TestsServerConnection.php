@@ -8,6 +8,7 @@ use App\Application\Server\Actions\TestServerConnectionAction;
 use App\Application\Server\Data\TestServerConnectionData;
 use App\Application\Server\Data\TestServerConnectionResult;
 use App\Application\Server\Enums\ServerConnectionTestStatus;
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Infrastructure\SSH\Exceptions\SSHConnectionTargetNotAllowedException;
 use Livewire\Attributes\Locked;
 use Mary\Traits\Toast;
@@ -19,6 +20,45 @@ trait TestsServerConnection
 
     #[Locked]
     public ?string $verifiedConnectionFingerprint = null;
+
+    public function selectAuthenticationType(string $type): void
+    {
+        $authenticationType = AuthenticationType::tryFrom(
+            $type,
+        );
+
+        if (
+            ! $authenticationType instanceof AuthenticationType
+            || ! $authenticationType->isSupported()
+        ) {
+            $this->addError(
+                'authenticationType',
+                'روش احراز هویت انتخاب‌شده پشتیبانی نمی‌شود.',
+            );
+
+            return;
+        }
+
+        if (
+            $this->authenticationType
+            === $authenticationType->value
+        ) {
+            return;
+        }
+
+        $this->authenticationType = $authenticationType->value;
+
+        /*
+         * Credentials are not interchangeable between authentication modes.
+         * Clearing the field prevents a password from being treated as a key
+         * (or vice versa) and forces a fresh verification for the new mode.
+         */
+        $this->credential = '';
+        $this->verifiedConnectionFingerprint = null;
+
+        $this->resetValidation('authenticationType');
+        $this->resetValidation('credential');
+    }
 
     public function testConnection(
         TestServerConnectionAction $action,

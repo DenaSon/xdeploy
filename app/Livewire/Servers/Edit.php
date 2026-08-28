@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Application\Server\Actions\UpdateServerAction;
+use App\Domain\Server\Enums\AuthenticationType;
 use App\Livewire\Concerns\HasServerForm;
 use App\Livewire\Concerns\TestsServerConnection;
 use App\Models\Server;
@@ -49,19 +50,29 @@ final class Edit extends Component
      * Host remains in validation because the connection-test workflow
      * requires it, but update() never persists it.
      *
+     * A new credential is mandatory when changing authentication modes;
+     * otherwise an empty field means "preserve the stored credential".
+     *
      * @return array<string, array<int, mixed>>
      */
     protected function rules(): array
     {
+        $currentAuthenticationType =
+            $this->server->authentication_type
+            ?? AuthenticationType::Password;
+
         return $this->serverRules(
-            requireCredential: false,
+            requireCredential: $this->authenticationType
+                !== $currentAuthenticationType->value,
         );
     }
 
     public function update(
         UpdateServerAction $action,
     ): void {
-        $data = $this->validate();
+        $data = $this->normalizeServerFormData(
+            $this->validate(),
+        );
 
         /*
          * Host is immutable after Server registration.
