@@ -102,6 +102,15 @@ final class BuyProviderPresentationTest extends TestCase
                 'Core-1',
             )
             ->assertSee(
+                'دماوند',
+            )
+            ->assertSee(
+                'زیرساخت ایران',
+            )
+            ->assertSee(
+                'انتخاب‌شده',
+            )
+            ->assertDontSee(
                 'Core-2',
             )
             ->assertDontSee(

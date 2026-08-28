@@ -16,6 +16,7 @@ final class CloudProviderPublicIdentityTest extends TestCase
         CloudProviderType $provider,
         string $code,
         string $label,
+        string $description,
     ): void {
         self::assertSame(
             $code,
@@ -25,6 +26,11 @@ final class CloudProviderPublicIdentityTest extends TestCase
         self::assertSame(
             $label,
             CloudProviderPublicIdentity::label($provider),
+        );
+
+        self::assertSame(
+            $description,
+            CloudProviderPublicIdentity::description($provider),
         );
 
         self::assertSame(
@@ -41,7 +47,7 @@ final class CloudProviderPublicIdentityTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{CloudProviderType, string, string}>
+     * @return iterable<string, array{CloudProviderType, string, string, string}>
      */
     public static function providerIdentityProvider(): iterable
     {
@@ -49,18 +55,21 @@ final class CloudProviderPublicIdentityTest extends TestCase
             CloudProviderType::Arvan,
             'core-1',
             'Core-1',
+            'زیرساخت ابری Core-1',
         ];
 
         yield 'liara' => [
             CloudProviderType::Liara,
             'core-2',
-            'Core-2',
+            'دماوند',
+            'زیرساخت ایران',
         ];
 
         yield 'parspack' => [
             CloudProviderType::ParsPack,
             'core-3',
-            'Core-3',
+            'زاگرس',
+            'انتخاب موقعیت‌های بیشتر',
         ];
     }
 }

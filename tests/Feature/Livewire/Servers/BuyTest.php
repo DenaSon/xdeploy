@@ -369,7 +369,7 @@ final class BuyTest extends TestCase
             ->assertSet('regionId', 'ir-thr-ba1')
             ->assertSet('sizeId', 'eco-2-2')
             ->assertSee('Core-1')
-            ->assertSee('Core-2')
+            ->assertSee('دماوند')
             ->assertDontSee('ابر آروان')
             ->assertDontSee('لیارا')
             ->call(
@@ -391,7 +391,7 @@ final class BuyTest extends TestCase
             ->assertSet('imageId', 'ubuntu-24.04')
             ->assertSet('selectedDiskGiB', 20)
             ->assertSet('quote.selected_disk_gib', 20)
-            ->assertSee('Core-2')
+            ->assertSee('دماوند')
             ->assertDontSee('لیارا');
     }
 
