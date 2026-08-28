@@ -11,16 +11,16 @@ use Tests\TestCase;
 
 final class CloudProviderPurchasePeriodPolicyTest extends TestCase
 {
-    public function test_parspack_allows_seven_day_and_monthly_periods_only(): void
+    public function test_parspack_allows_fourteen_day_and_monthly_periods_only(): void
     {
         $policy = new CloudProviderPurchasePeriodPolicy();
 
         $this->assertSame(
-            ['7_days', '1_month'],
+            ['14_days', '1_month'],
             $policy->allowedPeriodIds(CloudProviderType::ParsPack),
         );
         $this->assertTrue(
-            $policy->allows(CloudProviderType::ParsPack, '7_days'),
+            $policy->allows(CloudProviderType::ParsPack, '14_days'),
         );
         $this->assertTrue(
             $policy->allows(CloudProviderType::ParsPack, '1_month'),
@@ -29,7 +29,7 @@ final class CloudProviderPurchasePeriodPolicyTest extends TestCase
             $policy->allows(CloudProviderType::ParsPack, '2_days'),
         );
         $this->assertFalse(
-            $policy->allows(CloudProviderType::ParsPack, '14_days'),
+            $policy->allows(CloudProviderType::ParsPack, '7_days'),
         );
     }
 
@@ -65,11 +65,11 @@ final class CloudProviderPurchasePeriodPolicyTest extends TestCase
         $policy = new CloudProviderPurchasePeriodPolicy();
 
         $this->assertSame(
-            ['7_days', '1_month'],
+            ['14_days', '1_month'],
             $policy->allowedPeriodIds(CloudProviderType::ParsPack),
         );
         $this->assertTrue(
-            $policy->allows(CloudProviderType::ParsPack, '7_days'),
+            $policy->allows(CloudProviderType::ParsPack, '14_days'),
         );
     }
 
