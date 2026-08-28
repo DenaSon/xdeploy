@@ -6,6 +6,7 @@ namespace Tests\Feature\Livewire\Servers;
 
 use App\Domain\Cloud\Contracts\CloudProviderInterface;
 use App\Domain\Cloud\Contracts\CloudProviderRegistryInterface;
+use App\Domain\Cloud\Contracts\CloudServerResizerInterface;
 use App\Domain\Cloud\Enums\CloudProviderType;
 use App\Livewire\Servers\Buy;
 use App\Models\User;
@@ -20,9 +21,12 @@ final class BuyDiskControlVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_liara_purchase_ui_renders_fixed_disk_without_resize_controls(): void
+    public function test_purchase_ui_hides_custom_disk_controls_without_capability(): void
     {
-        $this->bindProvider(CloudProviderType::Liara);
+        $this->bindProvider(
+            providerType: CloudProviderType::Liara,
+            customDisk: false,
+        );
 
         $this->actingAs(User::factory()->create());
 
@@ -38,9 +42,12 @@ final class BuyDiskControlVisibilityTest extends TestCase
             ->assertDontSeeHtml('wire:click="increaseDisk"');
     }
 
-    public function test_arvan_purchase_ui_renders_custom_disk_resize_controls(): void
+    public function test_purchase_ui_uses_provider_capability_for_custom_disk_controls(): void
     {
-        $this->bindProvider(CloudProviderType::Arvan);
+        $this->bindProvider(
+            providerType: CloudProviderType::Liara,
+            customDisk: true,
+        );
 
         $this->actingAs(User::factory()->create());
 
@@ -48,7 +55,7 @@ final class BuyDiskControlVisibilityTest extends TestCase
             ->assertSet(
                 'provider',
                 CloudProviderPublicIdentity::code(
-                    CloudProviderType::Arvan,
+                    CloudProviderType::Liara,
                 ),
             )
             ->set('catalogLoaded', true)
@@ -56,16 +63,26 @@ final class BuyDiskControlVisibilityTest extends TestCase
             ->assertSeeHtml('wire:click="increaseDisk"');
     }
 
-    private function bindProvider(CloudProviderType $providerType): void
-    {
+    private function bindProvider(
+        CloudProviderType $providerType,
+        bool $customDisk,
+    ): void {
         config()->set('cloud.default', $providerType->value);
 
         $provider = Mockery::mock(CloudProviderInterface::class);
+        $capabilities = [];
+
+        if ($customDisk) {
+            $capabilities[CloudServerResizerInterface::class] = Mockery::mock(
+                CloudServerResizerInterface::class,
+            );
+        }
 
         $this->app->instance(
             CloudProviderRegistryInterface::class,
             new CloudProviderRegistryStub(
                 provider: $provider,
+                capabilities: $capabilities,
                 registeredProviders: [$providerType],
                 purchasableProviders: [$providerType],
             ),

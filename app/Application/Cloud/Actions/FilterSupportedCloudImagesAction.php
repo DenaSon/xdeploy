@@ -20,7 +20,7 @@ final readonly class FilterSupportedCloudImagesAction
     public function execute(
         array $images,
     ): array {
-        return array_values(
+        $supported = array_values(
             array_filter(
                 $images,
                 function (
@@ -47,5 +47,50 @@ final readonly class FilterSupportedCloudImagesAction
                 },
             ),
         );
+
+        $ranked = array_map(
+            static fn (CloudImageData $image, int $index): array => [
+                'image' => $image,
+                'index' => $index,
+            ],
+            $supported,
+            array_keys($supported),
+        );
+
+        usort(
+            $ranked,
+            static fn (array $left, array $right): int => [
+                self::purchasePreference($left['image']),
+                $left['index'],
+            ] <=> [
+                self::purchasePreference($right['image']),
+                $right['index'],
+            ],
+        );
+
+        return array_map(
+            static fn (array $item): CloudImageData => $item['image'],
+            $ranked,
+        );
+    }
+
+    private static function purchasePreference(
+        CloudImageData $image,
+    ): int {
+        $distribution = strtolower(trim($image->distribution));
+        $version = trim($image->version);
+
+        if (
+            $distribution === 'ubuntu'
+            && str_starts_with($version, '24.04')
+        ) {
+            return 0;
+        }
+
+        if ($distribution === 'ubuntu') {
+            return 1;
+        }
+
+        return 2;
     }
 }
