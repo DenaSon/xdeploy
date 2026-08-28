@@ -49,6 +49,30 @@ final class CloudProviderPurchasePeriodPolicyTest extends TestCase
         );
     }
 
+    public function test_provider_availability_policy_is_independent_from_pricing_catalog_shape(): void
+    {
+        config()->set(
+            'money.periods',
+            [
+                '7_days' => [
+                    'label' => '۷ روزه',
+                    'hours' => 168,
+                    'pricing' => 'hourly',
+                ],
+            ],
+        );
+
+        $policy = new CloudProviderPurchasePeriodPolicy();
+
+        $this->assertSame(
+            ['7_days', '1_month'],
+            $policy->allowedPeriodIds(CloudProviderType::ParsPack),
+        );
+        $this->assertTrue(
+            $policy->allows(CloudProviderType::ParsPack, '7_days'),
+        );
+    }
+
     public function test_disallowed_period_is_rejected_server_side(): void
     {
         $this->expectException(CloudValidationException::class);
