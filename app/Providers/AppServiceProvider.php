@@ -145,6 +145,11 @@ class AppServiceProvider extends ServiceProvider
             static fn (User $user): bool => $user->isAdmin(),
         );
 
+        Gate::define(
+            'downloadLogFolder',
+            static fn (User $user): bool => $user->isAdmin(),
+        );
+
         // Production log deletion stays disabled from the web UI. Rotation and
         // retention should remain an explicit infrastructure responsibility.
         Gate::define(
