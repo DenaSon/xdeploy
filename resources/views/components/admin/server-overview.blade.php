@@ -174,12 +174,6 @@
             <p class="text-xs leading-6 text-base-content/50">
                 این عملیات فقط آدرس ذخیره‌شده در Coreflare را تغییر می‌دهد و هیچ درخواست تغییر IP به Cloud Provider ارسال نمی‌کند. تغییر موفق در Audit ثبت می‌شود.
             </p>
-
-            @if ($hostUpdateMessage !== null)
-                <div class="mt-2 rounded-xl border border-success/20 bg-success/5 px-3.5 py-2.5 text-sm text-success">
-                    {{ $hostUpdateMessage }}
-                </div>
-            @endif
         </div>
     </section>
 </div>
