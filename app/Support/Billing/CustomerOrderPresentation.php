@@ -8,6 +8,7 @@ use App\Domain\Billing\Enums\CustomerOrderState;
 use App\Domain\Billing\Enums\OrderType;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Domain\Cloud\Enums\CloudProviderType;
+use App\Support\Cloud\CloudProviderPublicIdentity;
 
 final class CustomerOrderPresentation
 {
@@ -135,10 +136,8 @@ final class CustomerOrderPresentation
     public static function provider(
         CloudProviderType $provider,
     ): string {
-        return match ($provider) {
-            CloudProviderType::Arvan => 'ابر آروان',
-            CloudProviderType::Liara => 'لیارا',
-            CloudProviderType::ParsPack => 'پارس‌پک',
-        };
+        return CloudProviderPublicIdentity::label(
+            $provider,
+        );
     }
 }
