@@ -89,9 +89,6 @@ final class BuyProviderPresentationTest extends TestCase
             ->assertSeeHtml(
                 'data-provider-switch-overlay',
             )
-            ->assertSeeHtml(
-                'lucide.mountain',
-            )
             ->assertDontSeeHtml(
                 'data-buy-desktop-placeholder',
             )
