@@ -39,6 +39,22 @@ return [
     ],
 
     /*
+     * ParsPack creation has been observed to take longer than the generic
+     * provider window. Keep this bounded override provider-specific so the
+     * existing Arvan/Liara polling behavior remains unchanged.
+     */
+    'provisioning' => [
+        'max_attempts' => (int) env(
+            'PARSPACK_CLOUD_PROVISIONING_MAX_ATTEMPTS',
+            60,
+        ),
+        'poll_delay_seconds' => (int) env(
+            'PARSPACK_CLOUD_PROVISIONING_POLL_DELAY_SECONDS',
+            3,
+        ),
+    ],
+
+    /*
      * ParsPack API tariffs are normalized as raw IRR by the response mapper.
      * Funding overhead models wallet-funding tax/cost separately and is only
      * applied to the commercial purchase catalog.
