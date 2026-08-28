@@ -126,16 +126,22 @@ final readonly class ParsPackCloudResponseMapper
             }
 
             $slug = $this->requiredString($image, 'slug');
-            [$distribution, $version] = $this->distributionAndVersion(
+            $distribution = $this->distributionAndVersion(
                 slug: $slug,
                 name: $this->optionalString($image['name'] ?? null),
             );
+
+            if ($distribution === null) {
+                continue;
+            }
+
+            [$distributionId, $version] = $distribution;
 
             $images[] = new CloudImageData(
                 id: $slug,
                 name: $this->optionalString($image['name'] ?? null) ?? $slug,
                 regionId: $region,
-                distribution: $distribution,
+                distribution: $distributionId,
                 version: $version,
                 architecture: $this->imageArchitecture($image, $slug),
                 minDiskGiB: $this->optionalPositiveInt(
@@ -366,8 +372,8 @@ final readonly class ParsPackCloudResponseMapper
         return false;
     }
 
-    /** @return array{0:string,1:string} */
-    private function distributionAndVersion(string $slug, ?string $name): array
+    /** @return array{0:string,1:string}|null */
+    private function distributionAndVersion(string $slug, ?string $name): ?array
     {
         $haystack = strtolower(trim($slug.' '.($name ?? '')));
 
@@ -390,9 +396,7 @@ final readonly class ParsPackCloudResponseMapper
             return ['almalinux', $version];
         }
 
-        throw $this->unexpected(
-            sprintf('ParsPack base image [%s] distribution/version could not be identified.', $slug),
-        );
+        return null;
     }
 
     /** @param array<string, mixed> $image */
@@ -448,15 +452,7 @@ final readonly class ParsPackCloudResponseMapper
     /** @return array<string, mixed>|null */
     private function embeddedObject(mixed $value): ?array
     {
-        if ($value === null) {
-            return null;
-        }
-
-        if (! is_array($value)) {
-            return null;
-        }
-
-        return $value;
+        return is_array($value) ? $value : null;
     }
 
     private function actionStatus(mixed $action): ?string
