@@ -138,6 +138,7 @@ final class CustomerOrderPresentation
         return match ($provider) {
             CloudProviderType::Arvan => 'ابر آروان',
             CloudProviderType::Liara => 'لیارا',
+            CloudProviderType::ParsPack => 'پارس‌پک',
         };
     }
 }
