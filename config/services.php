@@ -41,6 +41,26 @@ return [
             'POSTHOG_TIMEOUT',
             3,
         ),
+        'api_host' => env(
+            'POSTHOG_API_HOST',
+            'https://us.posthog.com',
+        ),
+        'project_id' => env('POSTHOG_PROJECT_ID'),
+        'personal_api_key' => env(
+            'POSTHOG_PERSONAL_API_KEY',
+        ),
+        'query_connect_timeout' => (int) env(
+            'POSTHOG_QUERY_CONNECT_TIMEOUT',
+            2,
+        ),
+        'query_timeout' => (int) env(
+            'POSTHOG_QUERY_TIMEOUT',
+            8,
+        ),
+        'report_cache_seconds' => (int) env(
+            'POSTHOG_REPORT_CACHE_SECONDS',
+            120,
+        ),
         'internal_user_ids' => array_values(
             array_filter(
                 array_map(
