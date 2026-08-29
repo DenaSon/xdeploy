@@ -17,12 +17,16 @@ final class AnalyticsPropertySanitizerTest extends TestCase
             'order_id' => 42,
             'failure_code' => 'provider_timeout',
             'phone' => '09120000000',
+            'user_email' => 'user@example.com',
             'otp_code' => '123456',
             'credential' => 'secret-value',
+            'raw_response' => ['body' => 'provider-secret'],
+            'request_payload' => ['authorization' => 'Bearer secret'],
             'nested' => [
                 'api_token' => 'token-value',
                 'region_id' => 'ir-thr-1',
                 'code' => 'should-not-leave',
+                'set_cookie' => 'session=secret',
             ],
         ]);
 
@@ -32,11 +36,38 @@ final class AnalyticsPropertySanitizerTest extends TestCase
             $result['failure_code'],
         );
         self::assertArrayNotHasKey('phone', $result);
+        self::assertArrayNotHasKey('user_email', $result);
         self::assertArrayNotHasKey('otp_code', $result);
         self::assertArrayNotHasKey('credential', $result);
+        self::assertArrayNotHasKey('raw_response', $result);
+        self::assertArrayNotHasKey('request_payload', $result);
         self::assertSame(
             ['region_id' => 'ir-thr-1'],
             $result['nested'],
+        );
+    }
+
+    public function test_it_preserves_analytics_context_properties(): void
+    {
+        $sanitizer = new AnalyticsPropertySanitizer;
+
+        $result = $sanitizer->sanitize([
+            'route_name' => 'panel.servers.buy',
+            'is_internal' => true,
+            '$set' => [
+                'is_internal' => true,
+            ],
+        ]);
+
+        self::assertSame(
+            [
+                'route_name' => 'panel.servers.buy',
+                'is_internal' => true,
+                '$set' => [
+                    'is_internal' => true,
+                ],
+            ],
+            $result,
         );
     }
 }
