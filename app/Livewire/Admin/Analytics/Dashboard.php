@@ -33,7 +33,26 @@ final class Dashboard extends Component
 
         return view(
             'livewire.admin.analytics.dashboard',
-            ['report' => $report->toArray()],
+            [
+                'report' => $report->toArray(),
+                'funnelSections' => [
+                    'purchase' => [
+                        'title' => 'Purchase Funnel',
+                        'description' => 'از ورود تا پرداخت موفق',
+                        'icon' => 'lucide.shopping-cart',
+                    ],
+                    'fulfillment' => [
+                        'title' => 'Fulfillment Funnel',
+                        'description' => 'از پرداخت تا آماده‌شدن VPS',
+                        'icon' => 'lucide.server-cog',
+                    ],
+                    'activation' => [
+                        'title' => 'Activation Funnel',
+                        'description' => 'از VPS آماده تا برنامه در حال اجرا',
+                        'icon' => 'lucide.rocket',
+                    ],
+                ],
+            ],
         );
     }
 }
