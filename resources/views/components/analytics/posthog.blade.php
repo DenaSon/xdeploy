@@ -21,7 +21,8 @@
     );
     $analyticsRouteName = $analyticsContext->routeName();
     $analyticsUserId = auth()->id();
-    $analyticsIsInternal = $analyticsContext->currentUserIsInternal();
+    $analyticsIsInternal = $analyticsContext->currentTrafficIsInternal();
+    $analyticsAccountIsInternal = $analyticsContext->currentAccountIsInternal();
 @endphp
 
 @if($postHogEnabled && $postHogApiKey !== '')
@@ -50,6 +51,10 @@
         <meta
             name="coreflare-analytics-is-internal"
             content="{{ $analyticsIsInternal === true ? '1' : '0' }}"
+        >
+        <meta
+            name="coreflare-analytics-account-is-internal"
+            content="{{ $analyticsAccountIsInternal === true ? '1' : '0' }}"
         >
     @endif
 
