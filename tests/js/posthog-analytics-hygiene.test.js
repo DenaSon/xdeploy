@@ -10,21 +10,25 @@ const adminLayout = readProjectFile(
     'resources/views/layouts/admin.blade.php',
 );
 
-test('PostHog identity persists the internal traffic classification', () => {
+test('PostHog identity persists account classification only', () => {
     assert.match(
         analytics,
-        /window\.posthog\.identify\([\s\S]*is_internal:\s*isInternal/,
+        /window\.posthog\.identify\([\s\S]*is_internal:\s*isInternalAccount/,
     );
+    assert.match(
+        bootstrap,
+        /name="coreflare-analytics-account-is-internal"/,
+    );
+});
+
+test('PostHog pageviews carry request-level internal context', () => {
+    assert.match(analytics, /route_name:\s*routeName \|\| null/);
+    assert.match(analytics, /is_internal:\s*isInternal/);
+    assert.match(analytics, /window\.posthog\.capture\(\s*'\$pageview'/);
     assert.match(
         bootstrap,
         /name="coreflare-analytics-is-internal"/,
     );
-});
-
-test('PostHog pageviews carry route and internal traffic context', () => {
-    assert.match(analytics, /route_name:\s*routeName \|\| null/);
-    assert.match(analytics, /is_internal:\s*isInternal/);
-    assert.match(analytics, /window\.posthog\.capture\(\s*'\$pageview'/);
 });
 
 test('admin layout refreshes PostHog context explicitly', () => {
