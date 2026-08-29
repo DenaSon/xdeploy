@@ -31,6 +31,47 @@ test('PostHog pageviews carry request-level internal context', () => {
     );
 });
 
+test('frontend analytics carries first and last touch attribution', () => {
+    for (const property of [
+        'first_touch_source',
+        'first_touch_medium',
+        'first_touch_campaign',
+        'first_touch_content',
+        'first_touch_term',
+        'last_touch_source',
+        'last_touch_medium',
+        'last_touch_campaign',
+        'last_touch_content',
+        'last_touch_term',
+    ]) {
+        assert.ok(
+            analytics.includes(`'${property}'`),
+            `missing attribution property: ${property}`,
+        );
+    }
+
+    assert.match(
+        bootstrap,
+        /AcquisitionAttribution::class/,
+    );
+    assert.match(
+        bootstrap,
+        /coreflare-analytics-attribution-/,
+    );
+    assert.match(
+        analytics,
+        /attributionWithPrefix\([\s\S]*'last_touch'/,
+    );
+    assert.match(
+        analytics,
+        /window\.posthog\.identify\([\s\S]*'first_touch'/,
+    );
+    assert.match(
+        analytics,
+        /\.\.\.currentAttribution\(\)/,
+    );
+});
+
 test('admin layout refreshes PostHog context explicitly', () => {
     assert.match(adminLayout, /<x-analytics\.posthog\s*\/>/);
 });
