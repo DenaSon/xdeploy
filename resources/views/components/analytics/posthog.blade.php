@@ -16,8 +16,13 @@
         ),
         '/',
     );
-    $analyticsRouteName = request()->route()?->getName();
+    $analyticsContext = app(
+        \App\Infrastructure\Analytics\AnalyticsContext::class,
+    );
+    $analyticsRouteName = $analyticsContext->routeName();
     $analyticsUserId = auth()->id();
+    $analyticsIsInternal = $analyticsContext->currentTrafficIsInternal();
+    $analyticsAccountIsInternal = $analyticsContext->currentAccountIsInternal();
 @endphp
 
 @if($postHogEnabled && $postHogApiKey !== '')
@@ -35,13 +40,21 @@
     >
     <meta
         name="coreflare-analytics-route"
-        content="{{ is_string($analyticsRouteName) ? $analyticsRouteName : '' }}"
+        content="{{ $analyticsRouteName ?? '' }}"
     >
 
     @if($analyticsUserId !== null)
         <meta
             name="coreflare-analytics-user-id"
             content="user:{{ $analyticsUserId }}"
+        >
+        <meta
+            name="coreflare-analytics-is-internal"
+            content="{{ $analyticsIsInternal === true ? '1' : '0' }}"
+        >
+        <meta
+            name="coreflare-analytics-account-is-internal"
+            content="{{ $analyticsAccountIsInternal === true ? '1' : '0' }}"
         >
     @endif
 
@@ -65,6 +78,7 @@
                 'token',
                 'otp',
                 'phone',
+                'email',
                 'authorization',
                 'merchant',
                 'gateway_reference',
@@ -72,6 +86,20 @@
                 'api_key',
                 'access_key',
                 'private_key',
+                'raw_request',
+                'raw_response',
+                'request_body',
+                'response_body',
+                'cookie',
+                'csrf',
+                'payload',
+                'username',
+                'first_name',
+                'last_name',
+                'full_name',
+                'address',
+                'ip_address',
+                'signature',
             ];
 
             const sanitizeUrl = (value) => {

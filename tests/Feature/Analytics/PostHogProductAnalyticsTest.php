@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Analytics;
 
 use App\Application\Analytics\ProductAnalyticsEvent;
+use App\Infrastructure\Analytics\AnalyticsContext;
 use App\Infrastructure\Analytics\AnalyticsPropertySanitizer;
 use App\Infrastructure\Analytics\Jobs\SendPostHogEventJob;
 use App\Infrastructure\Analytics\PostHogProductAnalytics;
@@ -23,6 +24,7 @@ final class PostHogProductAnalyticsTest extends TestCase
 
         $analytics = new PostHogProductAnalytics(
             new AnalyticsPropertySanitizer,
+            app(AnalyticsContext::class),
         );
 
         $analytics->capture(
@@ -58,6 +60,7 @@ final class PostHogProductAnalyticsTest extends TestCase
 
         $analytics = new PostHogProductAnalytics(
             new AnalyticsPropertySanitizer,
+            app(AnalyticsContext::class),
         );
 
         $analytics->capture(

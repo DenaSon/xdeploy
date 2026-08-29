@@ -14,6 +14,7 @@ final class AnalyticsPropertySanitizer
         'token',
         'otp',
         'phone',
+        'email',
         'authorization',
         'merchant',
         'gateway_reference',
@@ -21,6 +22,20 @@ final class AnalyticsPropertySanitizer
         'api_key',
         'access_key',
         'private_key',
+        'raw_request',
+        'raw_response',
+        'request_body',
+        'response_body',
+        'cookie',
+        'csrf',
+        'payload',
+        'username',
+        'first_name',
+        'last_name',
+        'full_name',
+        'address',
+        'ip_address',
+        'signature',
     ];
 
     /**

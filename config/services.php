@@ -41,6 +41,21 @@ return [
             'POSTHOG_TIMEOUT',
             3,
         ),
+        'internal_user_ids' => array_values(
+            array_filter(
+                array_map(
+                    'trim',
+                    explode(
+                        ',',
+                        (string) env(
+                            'POSTHOG_INTERNAL_USER_IDS',
+                            '',
+                        ),
+                    ),
+                ),
+                static fn (string $userId): bool => $userId !== '',
+            ),
+        ),
     ],
 
     'google_oidc' => [
