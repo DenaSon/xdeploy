@@ -6,6 +6,7 @@ use App\Domain\Cloud\Exceptions\CloudConnectionException;
 use App\Domain\Cloud\Exceptions\CloudInsufficientBalanceException;
 use App\Domain\Cloud\Exceptions\CloudRateLimitException;
 use App\Domain\Cloud\Exceptions\CloudResourceNotFoundException;
+use App\Http\Middleware\CaptureAnalyticsAttribution;
 use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Foundation\Application;
@@ -28,6 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_HOST
                 | Request::HEADER_X_FORWARDED_PORT
                 | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
+        $middleware->web(
+            append: [
+                CaptureAnalyticsAttribution::class,
+            ],
         );
 
         $middleware->alias([
