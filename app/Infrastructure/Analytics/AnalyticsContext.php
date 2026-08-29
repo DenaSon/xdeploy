@@ -17,6 +17,10 @@ final readonly class AnalyticsContext
     /**
      * Snapshot request-scoped analytics context before an event is queued.
      *
+     * `is_internal` classifies this specific event/request. `$set.is_internal`
+     * classifies the account itself, so admin impersonation never marks the
+     * target customer's Person as an internal/test account.
+     *
      * @return array<string, mixed>
      */
     public function eventProperties(int|string $userId): array
@@ -34,11 +38,9 @@ final readonly class AnalyticsContext
             return $properties;
         }
 
-        $isInternal = $this->isInternal($user);
-
-        $properties['is_internal'] = $isInternal;
+        $properties['is_internal'] = $this->isInternalTraffic($user);
         $properties['$set'] = [
-            'is_internal' => $isInternal,
+            'is_internal' => $this->isInternalAccount($user),
         ];
 
         return $properties;
@@ -61,34 +63,42 @@ final readonly class AnalyticsContext
         return $routeName !== '' ? $routeName : null;
     }
 
-    public function currentUserIsInternal(): ?bool
+    public function currentTrafficIsInternal(): ?bool
     {
-        try {
-            $user = auth()->user();
-        } catch (Throwable) {
-            return null;
-        }
+        $user = $this->currentUser();
 
         return $user instanceof User
-            ? $this->isInternal($user)
+            ? $this->isInternalTraffic($user)
             : null;
     }
 
-    public function isInternal(User $user): bool
+    public function currentAccountIsInternal(): ?bool
     {
-        if ($user->isAdmin()) {
+        $user = $this->currentUser();
+
+        return $user instanceof User
+            ? $this->isInternalAccount($user)
+            : null;
+    }
+
+    public function isInternalTraffic(User $user): bool
+    {
+        if ($this->isInternalAccount($user)) {
             return true;
         }
 
         try {
-            if (
-                request()->hasSession()
-                && $this->impersonationSession->isActiveFor($user)
-            ) {
-                return true;
-            }
+            return request()->hasSession()
+                && $this->impersonationSession->isActiveFor($user);
         } catch (Throwable) {
-            // Analytics classification must never affect the product workflow.
+            return false;
+        }
+    }
+
+    public function isInternalAccount(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
         }
 
         $configuredUserIds = config(
@@ -117,13 +127,20 @@ final readonly class AnalyticsContext
         return false;
     }
 
-    private function currentUserFor(int|string $userId): ?User
+    private function currentUser(): ?User
     {
         try {
             $user = auth()->user();
         } catch (Throwable) {
             return null;
         }
+
+        return $user instanceof User ? $user : null;
+    }
+
+    private function currentUserFor(int|string $userId): ?User
+    {
+        $user = $this->currentUser();
 
         if (! $user instanceof User) {
             return null;
