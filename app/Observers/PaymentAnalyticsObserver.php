@@ -58,6 +58,8 @@ final readonly class PaymentAnalyticsObserver
         }
 
         $properties = [
+            'payment_id' => $payment->getKey(),
+            'order_id' => $order->getKey(),
             'source' => 'purchase',
             'resource_kind' => 'vps',
             'gateway' => $payment->gateway,
