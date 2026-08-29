@@ -9,6 +9,7 @@ use App\Application\Analytics\ProductAnalyticsEvent;
 use App\Domain\Billing\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\Payment;
+use Throwable;
 
 final readonly class PaymentAnalyticsObserver
 {
@@ -22,6 +23,22 @@ final readonly class PaymentAnalyticsObserver
             return;
         }
 
+        try {
+            $this->captureStatusTransition(
+                $payment,
+            );
+        } catch (Throwable $exception) {
+            /*
+             * Analytics is strictly observational. Metadata enrichment or
+             * transport failures must never turn a durable payment state
+             * transition into a customer-facing payment failure.
+             */
+            report($exception);
+        }
+    }
+
+    private function captureStatusTransition(Payment $payment): void
+    {
         $order = $payment->order;
 
         if (! $order instanceof Order || ! $order->isProvisioning()) {
@@ -41,8 +58,6 @@ final readonly class PaymentAnalyticsObserver
         }
 
         $properties = [
-            'payment_id' => $payment->getKey(),
-            'order_id' => $order->getKey(),
             'source' => 'purchase',
             'resource_kind' => 'vps',
             'gateway' => $payment->gateway,
