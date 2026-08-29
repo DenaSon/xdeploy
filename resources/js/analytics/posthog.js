@@ -1,4 +1,16 @@
 const ANALYTICS_USER_STORAGE_KEY = 'coreflare.analytics.user';
+const ATTRIBUTION_PROPERTIES = [
+    'first_touch_source',
+    'first_touch_medium',
+    'first_touch_campaign',
+    'first_touch_content',
+    'first_touch_term',
+    'last_touch_source',
+    'last_touch_medium',
+    'last_touch_campaign',
+    'last_touch_content',
+    'last_touch_term',
+];
 
 let lastNavigationSignature = null;
 
@@ -29,9 +41,34 @@ function currentAccountInternalFlag() {
     ) === '1';
 }
 
+function currentAttribution() {
+    const attribution = {};
+
+    for (const property of ATTRIBUTION_PROPERTIES) {
+        const value = metaContent(
+            `coreflare-analytics-attribution-${property.replaceAll('_', '-')}`,
+        );
+
+        if (value !== '') {
+            attribution[property] = value;
+        }
+    }
+
+    return attribution;
+}
+
+function attributionWithPrefix(attribution, prefix) {
+    return Object.fromEntries(
+        Object.entries(attribution).filter(
+            ([property]) => property.startsWith(`${prefix}_`),
+        ),
+    );
+}
+
 function syncIdentity() {
     const userId = metaContent('coreflare-analytics-user-id');
     const isInternalAccount = currentAccountInternalFlag();
+    const attribution = currentAttribution();
     const previousIdentity = window.sessionStorage.getItem(
         ANALYTICS_USER_STORAGE_KEY,
     );
@@ -40,6 +77,7 @@ function syncIdentity() {
         const identitySignature = [
             userId,
             isInternalAccount ? '1' : '0',
+            JSON.stringify(attribution),
         ].join('|');
 
         if (
@@ -50,7 +88,15 @@ function syncIdentity() {
                 userId,
                 {
                     is_internal: isInternalAccount,
+                    ...attributionWithPrefix(
+                        attribution,
+                        'last_touch',
+                    ),
                 },
+                attributionWithPrefix(
+                    attribution,
+                    'first_touch',
+                ),
             );
         }
 
@@ -85,11 +131,13 @@ function captureNavigation() {
         'coreflare-analytics-user-id',
     );
     const isInternal = currentInternalFlag();
+    const attribution = currentAttribution();
     const signature = [
         window.location.href,
         routeName,
         userId,
         isInternal ? '1' : '0',
+        JSON.stringify(attribution),
     ].join('|');
 
     if (signature === lastNavigationSignature) {
@@ -103,6 +151,7 @@ function captureNavigation() {
     const properties = {
         route_name: routeName || null,
         is_internal: isInternal,
+        ...attribution,
         $current_url: currentUrlWithoutQuery(),
         event_source: 'frontend',
         analytics_schema_version: 1,
@@ -160,6 +209,7 @@ function captureProviderSelection(event) {
             provider_public_code: match[1],
             route_name: 'panel.servers.buy',
             is_internal: currentInternalFlag(),
+            ...currentAttribution(),
             $current_url: currentUrlWithoutQuery(),
             event_source: 'frontend',
             analytics_schema_version: 1,

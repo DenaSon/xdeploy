@@ -19,10 +19,14 @@
     $analyticsContext = app(
         \App\Infrastructure\Analytics\AnalyticsContext::class,
     );
+    $acquisitionAttribution = app(
+        \App\Infrastructure\Analytics\AcquisitionAttribution::class,
+    );
     $analyticsRouteName = $analyticsContext->routeName();
     $analyticsUserId = auth()->id();
     $analyticsIsInternal = $analyticsContext->currentTrafficIsInternal();
     $analyticsAccountIsInternal = $analyticsContext->currentAccountIsInternal();
+    $analyticsAttribution = $acquisitionAttribution->eventProperties();
 @endphp
 
 @if($postHogEnabled && $postHogApiKey !== '')
@@ -42,6 +46,13 @@
         name="coreflare-analytics-route"
         content="{{ $analyticsRouteName ?? '' }}"
     >
+
+    @foreach($analyticsAttribution as $property => $value)
+        <meta
+            name="coreflare-analytics-attribution-{{ str_replace('_', '-', $property) }}"
+            content="{{ $value }}"
+        >
+    @endforeach
 
     @if($analyticsUserId !== null)
         <meta
