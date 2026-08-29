@@ -12,6 +12,7 @@ final readonly class AnalyticsContext
 {
     public function __construct(
         private AdminImpersonationSession $impersonationSession,
+        private AcquisitionAttribution $attribution,
     ) {}
 
     /**
@@ -21,9 +22,15 @@ final readonly class AnalyticsContext
      * classifies the account itself, so admin impersonation never marks the
      * target customer's Person as an internal/test account.
      *
+     * Request-scoped acquisition attribution is added only when the current
+     * authenticated user matches the event owner. This prevents one browser
+     * session from leaking campaign context onto another user's event.
+     *
      * When capture happens outside an authenticated request (for example in a
      * queue worker), the event owner is resolved by ID so admin/QA operations
-     * keep the same classification as request-scoped events.
+     * keep the same classification as request-scoped events. Attribution is
+     * intentionally not reconstructed in workers; PostHog Person properties
+     * retain the first/last touch captured while the user was request-bound.
      *
      * @return array<string, mixed>
      */
@@ -43,10 +50,22 @@ final readonly class AnalyticsContext
                 return $properties;
             }
 
+            $properties = [
+                ...$properties,
+                ...$this->attribution->eventProperties(),
+            ];
+
             $properties['is_internal'] = $this->isInternalTraffic($currentUser);
             $properties['$set'] = [
                 'is_internal' => $this->isInternalAccount($currentUser),
+                ...$this->attribution->lastTouchProperties(),
             ];
+
+            $firstTouchProperties = $this->attribution->firstTouchProperties();
+
+            if ($firstTouchProperties !== []) {
+                $properties['$set_once'] = $firstTouchProperties;
+            }
 
             return $properties;
         }
