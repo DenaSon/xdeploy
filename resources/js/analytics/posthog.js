@@ -23,9 +23,15 @@ function currentInternalFlag() {
     return metaContent('coreflare-analytics-is-internal') === '1';
 }
 
+function currentAccountInternalFlag() {
+    return metaContent(
+        'coreflare-analytics-account-is-internal',
+    ) === '1';
+}
+
 function syncIdentity() {
     const userId = metaContent('coreflare-analytics-user-id');
-    const isInternal = currentInternalFlag();
+    const isInternalAccount = currentAccountInternalFlag();
     const previousIdentity = window.sessionStorage.getItem(
         ANALYTICS_USER_STORAGE_KEY,
     );
@@ -33,7 +39,7 @@ function syncIdentity() {
     if (userId !== '') {
         const identitySignature = [
             userId,
-            isInternal ? '1' : '0',
+            isInternalAccount ? '1' : '0',
         ].join('|');
 
         if (
@@ -43,7 +49,7 @@ function syncIdentity() {
             window.posthog.identify(
                 userId,
                 {
-                    is_internal: isInternal,
+                    is_internal: isInternalAccount,
                 },
             );
         }
