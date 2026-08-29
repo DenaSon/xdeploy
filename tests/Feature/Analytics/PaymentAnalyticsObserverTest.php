@@ -48,6 +48,16 @@ final class PaymentAnalyticsObserverTest extends TestCase
         );
 
         $this->assertSame(
+            $payment->getKey(),
+            $event['properties']['payment_id'],
+        );
+
+        $this->assertSame(
+            $order->getKey(),
+            $event['properties']['order_id'],
+        );
+
+        $this->assertSame(
             'purchase',
             $event['properties']['source'],
         );
