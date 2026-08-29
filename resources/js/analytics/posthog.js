@@ -19,30 +19,45 @@ function currentUrlWithoutQuery() {
     return `${window.location.origin}${window.location.pathname}`;
 }
 
+function currentInternalFlag() {
+    return metaContent('coreflare-analytics-is-internal') === '1';
+}
+
 function syncIdentity() {
     const userId = metaContent('coreflare-analytics-user-id');
-    const previousUserId = window.sessionStorage.getItem(
+    const isInternal = currentInternalFlag();
+    const previousIdentity = window.sessionStorage.getItem(
         ANALYTICS_USER_STORAGE_KEY,
     );
 
     if (userId !== '') {
+        const identitySignature = [
+            userId,
+            isInternal ? '1' : '0',
+        ].join('|');
+
         if (
-            previousUserId !== userId
+            previousIdentity !== identitySignature
             && typeof window.posthog.identify === 'function'
         ) {
-            window.posthog.identify(userId);
+            window.posthog.identify(
+                userId,
+                {
+                    is_internal: isInternal,
+                },
+            );
         }
 
         window.sessionStorage.setItem(
             ANALYTICS_USER_STORAGE_KEY,
-            userId,
+            identitySignature,
         );
 
         return;
     }
 
     if (
-        previousUserId !== null
+        previousIdentity !== null
         && typeof window.posthog.reset === 'function'
     ) {
         window.posthog.reset();
@@ -63,10 +78,12 @@ function captureNavigation() {
     const userId = metaContent(
         'coreflare-analytics-user-id',
     );
+    const isInternal = currentInternalFlag();
     const signature = [
         window.location.href,
         routeName,
         userId,
+        isInternal ? '1' : '0',
     ].join('|');
 
     if (signature === lastNavigationSignature) {
@@ -79,6 +96,7 @@ function captureNavigation() {
 
     const properties = {
         route_name: routeName || null,
+        is_internal: isInternal,
         $current_url: currentUrlWithoutQuery(),
         event_source: 'frontend',
         analytics_schema_version: 1,
@@ -135,6 +153,7 @@ function captureProviderSelection(event) {
         {
             provider_public_code: match[1],
             route_name: 'panel.servers.buy',
+            is_internal: currentInternalFlag(),
             $current_url: currentUrlWithoutQuery(),
             event_source: 'frontend',
             analytics_schema_version: 1,
