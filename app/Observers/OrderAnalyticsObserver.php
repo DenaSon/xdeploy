@@ -51,21 +51,13 @@ final readonly class OrderAnalyticsObserver
             return;
         }
 
-        $properties = [
-            ...$this->orderProperties($order),
-            'server_id' => $order->server_id,
-        ];
-
         $this->analytics->capture(
             ProductAnalyticsEvent::ServerFulfilled,
             $order->user_id,
-            $properties,
-        );
-
-        $this->analytics->capture(
-            ProductAnalyticsEvent::ServerReady,
-            $order->user_id,
-            $properties,
+            [
+                ...$this->orderProperties($order),
+                'server_id' => $order->server_id,
+            ],
         );
     }
 
