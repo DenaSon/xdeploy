@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\Servers\RevealSupportCredentialController;
 use App\Http\Controllers\Admin\Servers\SupportPasskeyOptionsController;
 use App\Http\Controllers\Admin\Users\StartUserImpersonationController;
 use App\Http\Controllers\Support\ShowSupportMessageAttachmentController;
+use App\Livewire\Admin\Analytics\Dashboard as AdminAnalyticsDashboard;
 use App\Livewire\Admin\CloudProviders\Index as AdminCloudProvidersIndex;
 use App\Livewire\Admin\CloudVolumes\Index as AdminCloudVolumesIndex;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
@@ -65,6 +66,11 @@ Route::middleware([
             ->group(function (): void {
                 Route::livewire('/', AdminDashboard::class)
                     ->name('dashboard');
+
+                Route::livewire(
+                    '/analytics',
+                    AdminAnalyticsDashboard::class,
+                )->name('analytics.dashboard');
 
                 Route::livewire(
                     '/cloud-providers',

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Cloud\Actions;
 
+use App\Application\Analytics\Contracts\ProductAnalytics;
+use App\Application\Analytics\ProductAnalyticsEvent;
 use App\Application\Cloud\Servers\CloudServerCapabilityResolver;
 use App\Application\Cloud\Services\CloudServerCredentialRecovery;
 use App\Application\Server\Actions\EnsureSupportedOperatingSystemAction;
@@ -24,6 +26,7 @@ use App\Infrastructure\SSH\Services\SSHCommandReadinessInspector;
 use App\Infrastructure\SSH\Services\SSHKeyBootstrapService;
 use App\Infrastructure\SSH\Services\SSHPasswordRotationService;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -39,6 +42,7 @@ final readonly class VerifyCloudServerSshReadinessAction
         private SSHPortReadinessProbeInterface $portReadinessProbe,
         private EnsureSupportedOperatingSystemAction $ensureSupportedOperatingSystem,
         private CloudServerCapabilityResolver $capabilities,
+        private ProductAnalytics $analytics,
     ) {}
 
     public function handle(
@@ -107,6 +111,10 @@ final readonly class VerifyCloudServerSshReadinessAction
         }
 
         $this->activateServer(
+            $server,
+        );
+
+        $this->captureServerReady(
             $server,
         );
 
@@ -402,6 +410,33 @@ final readonly class VerifyCloudServerSshReadinessAction
                     $server->cloud_server_id,
                 ),
                 previous: $exception,
+            );
+        }
+    }
+
+    private function captureServerReady(Server $server): void
+    {
+        if (! $server->isCloudProvisioned()) {
+            return;
+        }
+
+        try {
+            $this->analytics->capture(
+                ProductAnalyticsEvent::ServerReady,
+                $server->user_id,
+                [
+                    'server_id' => $server->getKey(),
+                    'provider' => $server->cloud_provider?->value,
+                    'region_id' => $server->cloud_region,
+                ],
+            );
+        } catch (Throwable $exception) {
+            Log::warning(
+                'analytics.server_ready.capture_failed',
+                [
+                    'server_id' => $server->getKey(),
+                    'exception_type' => $exception::class,
+                ],
             );
         }
     }

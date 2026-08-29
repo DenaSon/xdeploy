@@ -3,6 +3,7 @@
         @php
             $items = [
                 ['title' => 'داشبورد', 'icon' => 'lucide.layout-dashboard', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard'],
+                ['title' => 'تحلیل محصول', 'icon' => 'lucide.chart-no-axes-combined', 'route' => 'admin.analytics.dashboard', 'active' => 'admin.analytics.*'],
                 ['title' => 'کاربران', 'icon' => 'lucide.users', 'route' => 'admin.users.index', 'active' => 'admin.users.*'],
                 ['title' => 'سرورها', 'icon' => 'lucide.server', 'route' => 'admin.servers.index', 'active' => 'admin.servers.*'],
                 ['title' => 'ارائه‌دهندگان ابری', 'icon' => 'lucide.cloud', 'route' => 'admin.cloud-providers.index', 'active' => 'admin.cloud-providers.*'],

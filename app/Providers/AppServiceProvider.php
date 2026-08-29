@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App;
 use App\Application\Analytics\Contracts\ProductAnalytics;
+use App\Application\Analytics\Contracts\ProductAnalyticsReporting;
 use App\Application\Billing\Events\PaymentStatusChanged;
 use App\Application\Navigation\PublicDocumentationNavigation;
 use App\Application\Navigation\PublicFooterNavigation;
@@ -14,6 +15,7 @@ use App\Http\Middleware\EnsureAdminPasskeyVerified;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Infrastructure\Analytics\NullProductAnalytics;
 use App\Infrastructure\Analytics\PostHogProductAnalytics;
+use App\Infrastructure\Analytics\PostHogProductAnalyticsReporter;
 use App\Infrastructure\Support\LaravelSupportImageProcessor;
 use App\Listeners\CaptureAuthenticationCompleted;
 use App\Listeners\SendAdminPaymentSucceededNotification;
@@ -63,6 +65,11 @@ class AppServiceProvider extends ServiceProvider
             )
                 ? $app->make(PostHogProductAnalytics::class)
                 : $app->make(NullProductAnalytics::class),
+        );
+
+        $this->app->singleton(
+            ProductAnalyticsReporting::class,
+            PostHogProductAnalyticsReporter::class,
         );
     }
 
