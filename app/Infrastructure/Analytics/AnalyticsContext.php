@@ -15,11 +15,15 @@ final readonly class AnalyticsContext
     ) {}
 
     /**
-     * Snapshot request-scoped analytics context before an event is queued.
+     * Snapshot analytics context before an event is queued.
      *
      * `is_internal` classifies this specific event/request. `$set.is_internal`
      * classifies the account itself, so admin impersonation never marks the
      * target customer's Person as an internal/test account.
+     *
+     * When capture happens outside an authenticated request (for example in a
+     * queue worker), the event owner is resolved by ID so admin/QA operations
+     * keep the same classification as request-scoped events.
      *
      * @return array<string, mixed>
      */
@@ -32,15 +36,47 @@ final readonly class AnalyticsContext
             $properties['route_name'] = $routeName;
         }
 
-        $user = $this->currentUserFor($userId);
+        $currentUser = $this->currentUser();
 
-        if (! $user instanceof User) {
+        if ($currentUser instanceof User) {
+            if (! $this->userIdsMatch($currentUser, $userId)) {
+                return $properties;
+            }
+
+            $properties['is_internal'] = $this->isInternalTraffic($currentUser);
+            $properties['$set'] = [
+                'is_internal' => $this->isInternalAccount($currentUser),
+            ];
+
             return $properties;
         }
 
-        $properties['is_internal'] = $this->isInternalTraffic($user);
+        $eventUserId = $this->normalizedUserId($userId);
+
+        if ($eventUserId === null) {
+            return $properties;
+        }
+
+        if ($this->isConfiguredInternalUserId($eventUserId)) {
+            $properties['is_internal'] = true;
+            $properties['$set'] = [
+                'is_internal' => true,
+            ];
+
+            return $properties;
+        }
+
+        $eventOwner = $this->storedUser($eventUserId);
+
+        if (! $eventOwner instanceof User) {
+            return $properties;
+        }
+
+        $isInternal = $this->isInternalAccount($eventOwner);
+
+        $properties['is_internal'] = $isInternal;
         $properties['$set'] = [
-            'is_internal' => $this->isInternalAccount($user),
+            'is_internal' => $isInternal,
         ];
 
         return $properties;
@@ -101,30 +137,10 @@ final readonly class AnalyticsContext
             return true;
         }
 
-        $configuredUserIds = config(
-            'services.posthog.internal_user_ids',
-            [],
-        );
+        $userId = $this->normalizedUserId($user->getKey());
 
-        if (! is_array($configuredUserIds)) {
-            return false;
-        }
-
-        $userId = trim((string) $user->getKey());
-
-        foreach ($configuredUserIds as $configuredUserId) {
-            if (
-                $userId !== ''
-                && hash_equals(
-                    $userId,
-                    trim((string) $configuredUserId),
-                )
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        return $userId !== null
+            && $this->isConfiguredInternalUserId($userId);
     }
 
     private function currentUser(): ?User
@@ -138,25 +154,64 @@ final readonly class AnalyticsContext
         return $user instanceof User ? $user : null;
     }
 
-    private function currentUserFor(int|string $userId): ?User
+    private function userIdsMatch(User $user, int|string $expectedUserId): bool
     {
-        $user = $this->currentUser();
+        $expected = $this->normalizedUserId($expectedUserId);
+        $current = $this->normalizedUserId($user->getKey());
 
-        if (! $user instanceof User) {
+        return $expected !== null
+            && $current !== null
+            && hash_equals($expected, $current);
+    }
+
+    private function normalizedUserId(mixed $userId): ?string
+    {
+        if (! is_int($userId) && ! is_string($userId)) {
             return null;
         }
 
-        $expectedUserId = trim((string) $userId);
-        $currentUserId = trim((string) $user->getKey());
+        $normalized = trim((string) $userId);
 
-        if (
-            $expectedUserId === ''
-            || $currentUserId === ''
-            || ! hash_equals($expectedUserId, $currentUserId)
-        ) {
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function isConfiguredInternalUserId(string $userId): bool
+    {
+        $configuredUserIds = config(
+            'services.posthog.internal_user_ids',
+            [],
+        );
+
+        if (! is_array($configuredUserIds)) {
+            return false;
+        }
+
+        foreach ($configuredUserIds as $configuredUserId) {
+            $configured = $this->normalizedUserId($configuredUserId);
+
+            if (
+                $configured !== null
+                && hash_equals($userId, $configured)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function storedUser(string $userId): ?User
+    {
+        if (! ctype_digit($userId) || (int) $userId < 1) {
             return null;
         }
 
-        return $user;
+        try {
+            $user = User::query()->find((int) $userId);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $user instanceof User ? $user : null;
     }
 }
