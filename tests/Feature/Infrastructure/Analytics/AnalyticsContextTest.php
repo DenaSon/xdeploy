@@ -176,4 +176,9 @@ final class AnalyticsContextTest extends TestCase
                 'is_internal' => false,
             ]);
     }
+
+    protected function automaticallyVerifyAdminPasskey(): bool
+    {
+        return false;
+    }
 }
