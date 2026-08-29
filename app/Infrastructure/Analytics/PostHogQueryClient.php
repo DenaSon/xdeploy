@@ -13,6 +13,12 @@ final class PostHogQueryClient
     /** @param array<string, mixed> $query */
     public function query(array $query): array
     {
+        if (! $this->isConfigured()) {
+            throw new RuntimeException(
+                'PostHog reporting is not configured.',
+            );
+        }
+
         $apiHost = rtrim(
             trim((string) config('services.posthog.api_host', '')),
             '/',
@@ -23,18 +29,6 @@ final class PostHogQueryClient
         $personalApiKey = trim(
             (string) config('services.posthog.personal_api_key', ''),
         );
-
-        if (
-            $apiHost === ''
-            || ! str_starts_with($apiHost, 'https://')
-            || $projectId === ''
-            || ! ctype_digit($projectId)
-            || $personalApiKey === ''
-        ) {
-            throw new RuntimeException(
-                'PostHog reporting is not configured.',
-            );
-        }
 
         $response = $this->request($personalApiKey)
             ->post(
@@ -52,6 +46,26 @@ final class PostHogQueryClient
         }
 
         return $payload;
+    }
+
+    public function isConfigured(): bool
+    {
+        $apiHost = rtrim(
+            trim((string) config('services.posthog.api_host', '')),
+            '/',
+        );
+        $projectId = trim(
+            (string) config('services.posthog.project_id', ''),
+        );
+        $personalApiKey = trim(
+            (string) config('services.posthog.personal_api_key', ''),
+        );
+
+        return $apiHost !== ''
+            && str_starts_with($apiHost, 'https://')
+            && $projectId !== ''
+            && ctype_digit($projectId)
+            && $personalApiKey !== '';
     }
 
     private function request(string $personalApiKey): PendingRequest
