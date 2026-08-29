@@ -6,6 +6,7 @@ namespace Tests\Feature\Infrastructure\Analytics;
 
 use App\Infrastructure\Analytics\AnalyticsContext;
 use App\Models\User;
+use App\Support\Admin\AdminImpersonationSession;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -103,6 +104,45 @@ final class AnalyticsContextTest extends TestCase
                 'is_internal' => true,
                 '$set' => [
                     'is_internal' => true,
+                ],
+            ]);
+    }
+
+    public function test_impersonation_is_internal_traffic_without_reclassifying_the_customer(): void
+    {
+        config([
+            'services.posthog.internal_user_ids' => [],
+        ]);
+
+        $target = new User;
+        $target->forceFill([
+            'id' => 71,
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($target);
+
+        Route::middleware('web')
+            ->get(
+                '/_analytics-context/impersonated',
+                static fn (AnalyticsContext $context) => response()->json(
+                    $context->eventProperties(71),
+                ),
+            )
+            ->name('panel.analytics.impersonated');
+
+        $this->withSession([
+            AdminImpersonationSession::SESSION_KEY => [
+                'admin_user_id' => 1,
+                'target_user_id' => 71,
+            ],
+        ])->get('/_analytics-context/impersonated')
+            ->assertOk()
+            ->assertJson([
+                'route_name' => 'panel.analytics.impersonated',
+                'is_internal' => true,
+                '$set' => [
+                    'is_internal' => false,
                 ],
             ]);
     }
