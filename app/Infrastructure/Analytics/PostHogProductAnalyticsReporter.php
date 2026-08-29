@@ -158,7 +158,7 @@ final readonly class PostHogProductAnalyticsReporter implements ProductAnalytics
             'kind' => 'FunnelsQuery',
             'dateRange' => ['date_from' => '-'.$days.'d'],
             'filterTestAccounts' => true,
-            'properties' => [],
+            'properties' => $this->externalTrafficProperties(),
             'funnelsFilter' => [
                 'funnelOrderType' => 'ordered',
                 'funnelVizType' => 'steps',
@@ -318,7 +318,7 @@ final readonly class PostHogProductAnalyticsReporter implements ProductAnalytics
                 'dateRange' => ['date_from' => '-'.$days.'d'],
                 'filterTestAccounts' => true,
                 'interval' => 'day',
-                'properties' => [],
+                'properties' => $this->externalTrafficProperties(),
                 'series' => array_map(
                     static fn (string $event): array => [
                         'kind' => 'EventsNode',
@@ -383,7 +383,7 @@ final readonly class PostHogProductAnalyticsReporter implements ProductAnalytics
                 'dateRange' => ['date_from' => '-'.$days.'d'],
                 'filterTestAccounts' => true,
                 'interval' => 'day',
-                'properties' => [],
+                'properties' => $this->externalTrafficProperties(),
                 'series' => [[
                     'kind' => 'EventsNode',
                     'event' => $event,
@@ -490,6 +490,17 @@ final readonly class PostHogProductAnalyticsReporter implements ProductAnalytics
             'application_running' => 'برنامه در حال اجرا',
             default => $event,
         };
+    }
+
+    /** @return list<array{key: string, operator: string, type: string, value: list<string>}> */
+    private function externalTrafficProperties(): array
+    {
+        return [[
+            'key' => 'is_internal',
+            'operator' => 'is_not',
+            'type' => 'event',
+            'value' => ['true'],
+        ]];
     }
 
     private function logOptionalFailure(
