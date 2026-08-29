@@ -34,6 +34,8 @@
         'resources/css/app.css',
         'resources/js/app.js',
     ])
+
+    <x-analytics.posthog />
 </head>
 
 <body
