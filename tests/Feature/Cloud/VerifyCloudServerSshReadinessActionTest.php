@@ -7,6 +7,8 @@ namespace Tests\Feature\Cloud;
 require_once __DIR__
     .'/../../Support/SSH/FakeSshPortSocket.php';
 
+use App\Application\Analytics\Contracts\ProductAnalytics;
+use App\Application\Analytics\ProductAnalyticsEvent;
 use App\Application\Cloud\Actions\VerifyCloudServerSshReadinessAction;
 use App\Application\Server\Actions\CreateServerAction;
 use App\Domain\Cloud\Exceptions\CloudServerSshUnavailableException;
@@ -45,6 +47,26 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
     public function test_it_activates_a_server_with_direct_root_access(): void
     {
         $server = $this->createServer();
+
+        $analytics = Mockery::mock(ProductAnalytics::class);
+        $analytics
+            ->shouldReceive('capture')
+            ->once()
+            ->with(
+                ProductAnalyticsEvent::ServerReady,
+                $server->user_id,
+                Mockery::on(
+                    fn (array $properties): bool =>
+                        ($properties['server_id'] ?? null) === $server->getKey()
+                        && ($properties['provider'] ?? null) === 'arvan'
+                        && ($properties['region_id'] ?? null) === 'eu-west1-a',
+                ),
+            );
+
+        $this->app->instance(
+            ProductAnalytics::class,
+            $analytics,
+        );
 
         $ssh = $this->ssh();
 
@@ -175,6 +197,14 @@ final class VerifyCloudServerSshReadinessActionTest extends TestCase
     public function test_connection_failure_keeps_server_inactive(): void
     {
         $server = $this->createServer();
+
+        $analytics = Mockery::mock(ProductAnalytics::class);
+        $analytics->shouldNotReceive('capture');
+
+        $this->app->instance(
+            ProductAnalytics::class,
+            $analytics,
+        );
 
         $ssh = $this->ssh();
 
