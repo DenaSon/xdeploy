@@ -77,4 +77,9 @@ final class PostHogProductAnalyticsTest extends TestCase
             },
         );
     }
+
+    protected function automaticallyVerifyAdminPasskey(): bool
+    {
+        return false;
+    }
 }
