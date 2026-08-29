@@ -31,6 +31,15 @@ final class PostHogProductAnalyticsReporterTest extends TestCase
             $query = $request['query'];
 
             self::assertTrue($query['filterTestAccounts']);
+            self::assertSame(
+                [[
+                    'key' => 'is_internal',
+                    'operator' => 'is_not',
+                    'type' => 'event',
+                    'value' => ['true'],
+                ]],
+                $query['properties'],
+            );
 
             if ($query['kind'] === 'FunnelsQuery') {
                 $events = array_column($query['series'], 'event');
