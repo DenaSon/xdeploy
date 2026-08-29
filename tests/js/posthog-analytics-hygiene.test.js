@@ -6,6 +6,9 @@ const analytics = readProjectFile('resources/js/analytics/posthog.js');
 const bootstrap = readProjectFile(
     'resources/views/components/analytics/posthog.blade.php',
 );
+const adminLayout = readProjectFile(
+    'resources/views/layouts/admin.blade.php',
+);
 
 test('PostHog identity persists the internal traffic classification', () => {
     assert.match(
@@ -22,6 +25,10 @@ test('PostHog pageviews carry route and internal traffic context', () => {
     assert.match(analytics, /route_name:\s*routeName \|\| null/);
     assert.match(analytics, /is_internal:\s*isInternal/);
     assert.match(analytics, /window\.posthog\.capture\(\s*'\$pageview'/);
+});
+
+test('admin layout refreshes PostHog context explicitly', () => {
+    assert.match(adminLayout, /<x-analytics\.posthog\s*\/>/);
 });
 
 test('frontend analytics sanitizer blocks raw payload and identity fields', () => {
