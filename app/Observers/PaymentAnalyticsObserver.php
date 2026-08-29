@@ -31,6 +31,8 @@ final readonly class PaymentAnalyticsObserver
         $event = match ($payment->status) {
             PaymentStatus::Pending => ProductAnalyticsEvent::PaymentStarted,
             PaymentStatus::Paid => ProductAnalyticsEvent::PaymentSucceeded,
+            PaymentStatus::Failed => ProductAnalyticsEvent::PaymentFailed,
+            PaymentStatus::Cancelled => ProductAnalyticsEvent::PaymentCancelled,
             default => null,
         };
 
@@ -38,18 +40,51 @@ final readonly class PaymentAnalyticsObserver
             return;
         }
 
+        $properties = [
+            'payment_id' => $payment->getKey(),
+            'order_id' => $order->getKey(),
+            'source' => 'purchase',
+            'resource_kind' => 'vps',
+            'gateway' => $payment->gateway,
+            'amount' => $payment->amount,
+            'currency' => $payment->currency,
+            'provider' => $order->cloud_provider,
+            'duration_hours' => $order->duration_hours,
+            'duration_days' => intdiv($order->duration_hours, 24),
+            'attempt_number' => $order->payments()
+                ->where('id', '<=', $payment->getKey())
+                ->count(),
+        ];
+
+        if ($payment->status === PaymentStatus::Failed) {
+            $failureCode = $this->analyticsFailureCode(
+                $payment->failure_code,
+            );
+
+            if ($failureCode !== null) {
+                $properties['failure_code'] = $failureCode;
+            }
+        }
+
         $this->analytics->capture(
             $event,
             $order->user_id,
-            [
-                'payment_id' => $payment->getKey(),
-                'order_id' => $order->getKey(),
-                'gateway' => $payment->gateway,
-                'amount' => $payment->amount,
-                'currency' => $payment->currency,
-                'provider' => $order->cloud_provider,
-                'duration_hours' => $order->duration_hours,
-            ],
+            $properties,
         );
+    }
+
+    private function analyticsFailureCode(?string $failureCode): ?string
+    {
+        $normalized = strtolower(trim((string) $failureCode));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (! preg_match('/^[a-z0-9._:-]{1,64}$/', $normalized)) {
+            return null;
+        }
+
+        return $normalized;
     }
 }
