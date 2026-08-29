@@ -7,11 +7,14 @@ namespace Tests\Feature\Infrastructure\Analytics;
 use App\Infrastructure\Analytics\AnalyticsContext;
 use App\Models\User;
 use App\Support\Admin\AdminImpersonationSession;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 final class AnalyticsContextTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_it_marks_admin_traffic_internal_and_sets_person_property(): void
     {
         config([
@@ -175,6 +178,61 @@ final class AnalyticsContextTest extends TestCase
             ->assertJsonMissing([
                 'is_internal' => false,
             ]);
+    }
+
+    public function test_it_classifies_admin_event_owner_without_an_authenticated_request(): void
+    {
+        config([
+            'services.posthog.internal_user_ids' => [],
+        ]);
+
+        $user = User::factory()->create();
+        $user->forceFill([
+            'is_admin' => true,
+        ])->save();
+
+        $properties = app(AnalyticsContext::class)
+            ->eventProperties((int) $user->getKey());
+
+        $this->assertTrue($properties['is_internal']);
+        $this->assertSame(
+            ['is_internal' => true],
+            $properties['$set'],
+        );
+    }
+
+    public function test_it_classifies_configured_qa_owner_without_database_lookup(): void
+    {
+        config([
+            'services.posthog.internal_user_ids' => ['777'],
+        ]);
+
+        $properties = app(AnalyticsContext::class)
+            ->eventProperties(777);
+
+        $this->assertTrue($properties['is_internal']);
+        $this->assertSame(
+            ['is_internal' => true],
+            $properties['$set'],
+        );
+    }
+
+    public function test_it_classifies_regular_event_owner_external_without_an_authenticated_request(): void
+    {
+        config([
+            'services.posthog.internal_user_ids' => [],
+        ]);
+
+        $user = User::factory()->create();
+
+        $properties = app(AnalyticsContext::class)
+            ->eventProperties((int) $user->getKey());
+
+        $this->assertFalse($properties['is_internal']);
+        $this->assertSame(
+            ['is_internal' => false],
+            $properties['$set'],
+        );
     }
 
     protected function automaticallyVerifyAdminPasskey(): bool
