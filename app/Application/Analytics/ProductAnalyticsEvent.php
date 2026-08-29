@@ -13,6 +13,8 @@ enum ProductAnalyticsEvent: string
     case OrderCreated = 'order_created';
     case PaymentStarted = 'payment_started';
     case PaymentSucceeded = 'payment_succeeded';
+    case PaymentFailed = 'payment_failed';
+    case PaymentCancelled = 'payment_cancelled';
     case ProvisioningStarted = 'provisioning_started';
     case ServerFulfilled = 'server_fulfilled';
     case ServerReady = 'server_ready';
