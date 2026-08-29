@@ -14,6 +14,7 @@ final readonly class PostHogProductAnalytics implements ProductAnalytics
 {
     public function __construct(
         private AnalyticsPropertySanitizer $sanitizer,
+        private AnalyticsContext $context,
     ) {}
 
     public function capture(
@@ -36,12 +37,15 @@ final readonly class PostHogProductAnalytics implements ProductAnalytics
         }
 
         try {
+            $contextProperties = $this->context->eventProperties($userId);
+
             SendPostHogEventJob::dispatch(
                 event: $event->value,
                 distinctId: $distinctId,
-                properties: $this->sanitizer->sanitize(
-                    $properties,
-                ),
+                properties: $this->sanitizer->sanitize([
+                    ...$properties,
+                    ...$contextProperties,
+                ]),
             )
                 ->onQueue(
                     (string) config(
